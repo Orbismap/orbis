@@ -1,0 +1,150 @@
+@layer features {
+  .legend {
+    padding: var(--s-3) var(--s-4) var(--s-2);
+    min-width: 0;
+  }
+  .legend-compact {
+    padding: 0;
+  }
+  .legend-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-2);
+    margin-bottom: 6px;
+    font-size: var(--fs-small);
+  }
+  .legend-title {
+    font-weight: 600;
+    color: var(--text-1);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .legend-unit {
+    color: var(--text-2);
+    font-weight: 500;
+  }
+  .legend-now {
+    color: var(--text-1);
+    font-weight: 600;
+    font-size: var(--fs-ui);
+    min-width: 2.5em;
+    text-align: right;
+  }
+
+  .lg {
+    min-width: 0;
+  }
+  .lg-scale {
+    position: relative;
+    padding-bottom: 16px;
+  }
+  .lg-bar {
+    position: relative;
+    height: 8px;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px var(--g-rim);
+  }
+  .lg-fill {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  .lg-compact .lg-bar {
+    height: 6px;
+  }
+  .lg-marker {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 14px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--text-1);
+    box-shadow: 0 0 0 1.5px var(--ink-0);
+    transition: left 80ms linear;
+  }
+  .lg-ticks {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 12px;
+    height: 14px;
+  }
+  .lg-tick {
+    position: absolute;
+    transform: translateX(-50%);
+    font-size: var(--fs-axis);
+    font-weight: 500;
+    color: var(--text-2);
+    white-space: nowrap;
+  }
+  .lg-tick[data-edge='start'] {
+    transform: translateX(0);
+  }
+  .lg-tick[data-edge='end'] {
+    transform: translateX(-100%);
+  }
+  .lg-classes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 4px 12px;
+    font-size: var(--fs-small);
+    color: var(--text-2);
+  }
+  .lg-classes li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .lg-swatch {
+    flex: none;
+    display: inline-block;
+  }
+  .lg-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .lg-square {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+  }
+  .lg-line {
+    width: 14px;
+    height: 3px;
+    border-radius: 2px;
+  }
+  .lg-size {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--s-3);
+  }
+  .lg-sizes {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--s-4);
+    font-size: var(--fs-axis);
+    color: var(--text-2);
+  }
+  .lg-sizes li {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .lg-circle {
+    display: block;
+    border-radius: 50%;
+    border: 1.5px solid;
+  }
+  .lg-unit {
+    margin-left: auto;
+    font-size: var(--fs-axis);
+    color: var(--text-3);
+  }
+}

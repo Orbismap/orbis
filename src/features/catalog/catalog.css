@@ -1,0 +1,166 @@
+@layer features {
+  .cat {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+  }
+  .cat-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    min-height: 44px;
+    padding: 0 var(--s-3) 0 var(--s-2);
+  }
+  .cat-title {
+    flex: 1;
+    font-size: var(--fs-title);
+    font-weight: 600;
+  }
+  .cat-count {
+    color: var(--text-3);
+    font-size: var(--fs-small);
+  }
+  .cat-search {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    margin: 0 var(--s-3) var(--s-2);
+    padding: 0 var(--s-2);
+    min-height: var(--hit, 28px);
+    border-radius: var(--r-input);
+    background: var(--ink-3);
+    border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+    color: var(--text-3);
+  }
+  .cat-search:focus-within {
+    border-color: var(--limb);
+    color: var(--limb);
+  }
+  .cat-input {
+    flex: 1;
+    min-width: 0;
+    min-height: calc(var(--hit, 28px) + 4px);
+    background: none;
+    border: 0;
+    color: var(--text-1);
+    outline: none;
+    font-size: var(--fs-ui);
+  }
+  .cat-input::placeholder {
+    color: var(--text-3);
+  }
+  .cat-input::-webkit-search-cancel-button {
+    appearance: none;
+  }
+  .cat-list {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .cat-scroll {
+    flex: 1;
+    padding: 0 var(--s-2);
+  }
+  .cat-empty {
+    padding: var(--s-5) var(--s-4);
+    color: var(--text-2);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-1);
+  }
+  .chead {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 10px var(--s-2) 0;
+    color: var(--text-2);
+    font-size: var(--fs-small);
+    font-weight: 600;
+  }
+  .chead-n {
+    color: var(--text-3);
+    font-weight: 400;
+  }
+  .crow {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    height: 52px;
+    padding: 0 var(--s-2);
+    border-radius: var(--r-input);
+    cursor: pointer;
+    transition: background var(--t-panel) var(--ease);
+  }
+  .crow.is-active {
+    background: var(--ink-2);
+  }
+  @media (hover: hover) {
+    .crow:hover {
+      background: var(--ink-2);
+    }
+  }
+  .crow.is-active {
+    box-shadow: inset 2px 0 0 var(--limb);
+  }
+  .crow-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--r-input);
+    color: var(--c, var(--limb));
+    background: color-mix(in oklab, var(--c, var(--limb)) 14%, transparent);
+  }
+  .crow-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .crow-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .crow-title {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .crow .chip {
+    height: 16px;
+    padding: 0 5px;
+    font-size: 10.5px;
+    flex: none;
+  }
+  .crow-summary {
+    font-size: var(--fs-small);
+    color: var(--text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .crow-state {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+    color: var(--text-3);
+  }
+  .crow.is-on .crow-state {
+    background: var(--limb);
+    border-color: var(--limb);
+    color: var(--ink-0);
+  }
+}

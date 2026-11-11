@@ -1,0 +1,74 @@
+@layer components {
+  .sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-sheet);
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+    background: color-mix(in oklab, var(--ink-1) 92%, transparent);
+    backdrop-filter: var(--panel-blur);
+    -webkit-backdrop-filter: var(--panel-blur);
+    border: var(--panel-border);
+    border-bottom: 0;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
+    will-change: transform;
+    touch-action: none;
+    contain: layout style;
+  }
+  .sheet.is-dragging {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .sheet-grab {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 14px;
+    padding-top: 2px;
+    cursor: grab;
+  }
+  .sheet-grip {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--text-3);
+    opacity: 0.55;
+    transition: opacity var(--t-panel) var(--ease);
+  }
+  @media (hover: hover) {
+    .sheet-grab:hover .sheet-grip {
+      opacity: 0.9;
+    }
+  }
+  .sheet-peek {
+    flex: none;
+    padding: 0 var(--s-3);
+    overflow: hidden;
+  }
+  .sheet-body-wrap {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+  }
+  .sheet-body {
+    flex: 1;
+    touch-action: pan-y;
+  }
+  .sheet-body.is-locked {
+    touch-action: none;
+  }
+  .sheet-safe {
+    height: calc(var(--s-5) + env(safe-area-inset-bottom));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sheet {
+      will-change: auto;
+    }
+  }
+}

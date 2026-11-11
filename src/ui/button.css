@@ -1,0 +1,122 @@
+@layer components {
+  .btn {
+    --_bg: var(--g-fill);
+    --_fg: var(--text-1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: var(--hit, var(--hit-mouse));
+    padding: 0 14px;
+    border-radius: var(--r-round);
+    background: var(--_bg);
+    color: var(--_fg);
+    font-size: var(--fs-ui);
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    transition: background var(--t-panel) var(--ease), transform 120ms var(--ease), opacity var(--t-panel) var(--ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+    background: var(--g-fill-hover);
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .btn-block {
+    width: 100%;
+  }
+  /* prominent: colour the background, not the label (HIG: Liquid Glass colour) */
+  .btn-primary {
+    --_bg: var(--limb);
+    --_fg: #04202f;
+  }
+  :root[data-theme='light'] .btn-primary {
+    --_fg: #fff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme]) .btn-primary {
+      --_fg: #fff;
+    }
+  }
+  .btn-primary:active:not(:disabled) {
+    background: color-mix(in srgb, var(--limb) 85%, #000);
+  }
+  .btn-ghost {
+    --_bg: transparent;
+    color: var(--text-2);
+  }
+  .btn-danger {
+    --_bg: transparent;
+    --_fg: var(--alert);
+  }
+  .btn-destructive {
+    --_bg: var(--alert);
+    --_fg: #fff;
+  }
+  :root[data-theme='light'] .btn-destructive {
+    --_fg: #fff;
+  }
+  .btn-destructive:active:not(:disabled) {
+    background: color-mix(in srgb, var(--alert) 85%, #000);
+  }
+  @media (hover: hover) {
+  @media (hover: hover) {
+    .btn:hover:not(:disabled) {
+        background: var(--g-fill-hover);
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--limb) 88%, #fff);
+      }
+      .btn-ghost:hover:not(:disabled) {
+        color: var(--text-1);
+      }
+      .btn-danger:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--alert) 14%, transparent);
+      }
+      .btn-destructive:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--alert) 90%, #fff);
+      }
+    }
+  }
+
+  .iconbtn {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: var(--hit, var(--hit-mouse));
+    height: var(--hit, var(--hit-mouse));
+    border-radius: var(--r-round);
+    color: var(--text-2);
+    background: transparent;
+    transition: background var(--t-panel) var(--ease), color var(--t-panel) var(--ease), transform 120ms var(--ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .iconbtn:active:not(:disabled) {
+    background: var(--g-fill-hover);
+    transform: scale(0.94);
+  }
+  .iconbtn[aria-pressed='true'] {
+    color: var(--limb);
+    background: var(--limb-quiet);
+  }
+  .iconbtn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .iconbtn-solid,
+  .iconbtn-round {
+    color: var(--text-1);
+  }
+  @media (hover: hover) {
+  @media (hover: hover) {
+    .iconbtn:hover:not(:disabled) {
+        background: var(--g-fill);
+        color: var(--text-1);
+      }
+    }
+  }
+}

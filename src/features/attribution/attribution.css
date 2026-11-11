@@ -1,0 +1,73 @@
+@layer features {
+  .attr {
+    position: relative;
+  }
+  .attr-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    padding: 0 8px 0 6px;
+    border-radius: var(--r-round);
+    background: var(--panel-bg);
+    backdrop-filter: var(--panel-blur);
+    -webkit-backdrop-filter: var(--panel-blur);
+    border: var(--panel-border);
+    color: var(--text-2);
+    font-size: var(--fs-axis);
+    font-weight: 500;
+  }
+  .attr-btn[aria-expanded='true'] {
+    color: var(--text-1);
+  }
+  @media (hover: hover) {
+    .attr-btn:hover {
+      color: var(--text-1);
+    }
+  }
+  [data-bp='mobile'] .attr-btn {
+    height: 28px;
+  }
+  .attr-pop {
+    width: 300px;
+    padding: var(--s-3);
+  }
+  .attr-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    max-height: min(50vh, 360px);
+    overflow-y: auto;
+  }
+  .attr-body h3 {
+    font-size: var(--fs-small);
+    font-weight: 600;
+    color: var(--text-2);
+  }
+  .attr-body ul {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .attr-body li {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+    font-size: var(--fs-small);
+  }
+  .attr-body a {
+    color: var(--text-1);
+    text-underline-offset: 2px;
+    text-decoration-color: var(--text-3);
+    width: fit-content;
+  }
+  .attr-body li span {
+    color: var(--text-3);
+  }
+  /* MapLibre's own attribution control stays in the DOM (legal text from the sources) but is replaced visually */
+  .maplibregl-ctrl-attrib {
+    display: none !important;
+  }
+}

@@ -1,0 +1,62 @@
+@layer features {
+  .feed {
+    flex: 1;
+    padding: var(--s-1) var(--s-2);
+  }
+  .frow {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    width: 100%;
+    height: 56px;
+    padding: 0 var(--s-2);
+    border-radius: var(--r-input);
+    text-align: left;
+    transition: background var(--t-panel) var(--ease);
+  }
+  @media (hover: hover) {
+    .frow:hover {
+      background: var(--ink-2);
+    }
+  }
+  .frow-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--r-input);
+    color: var(--c);
+    background: color-mix(in oklab, var(--c) 15%, transparent);
+  }
+  .frow-mag {
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+  .frow-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .frow-title {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .frow-sub {
+    font-size: var(--fs-small);
+    color: var(--text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .frow-time {
+    flex: none;
+    font-size: var(--fs-small);
+    color: var(--text-3);
+    font-weight: 500;
+  }
+}

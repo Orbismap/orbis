@@ -1,0 +1,56 @@
+@layer features {
+  .bm {
+    position: relative;
+  }
+  .bm-pop {
+    width: 252px;
+    padding: var(--s-2);
+  }
+  .bm-left {
+    top: 0;
+    right: calc(100% + 8px);
+  }
+  .bm-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--s-2);
+  }
+  .bm-opt {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    text-align: center;
+    color: var(--text-2);
+    font-size: var(--fs-axis);
+    line-height: 1.2;
+  }
+  .bm-thumb {
+    display: block;
+    overflow: hidden;
+    border-radius: var(--r-input);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--line) 80%, transparent);
+    aspect-ratio: 3 / 2;
+    transition: box-shadow var(--t-panel) var(--ease);
+  }
+  .bm-thumb svg {
+    width: 100%;
+    height: 100%;
+  }
+  @media (hover: hover) {
+    .bm-opt:hover .bm-thumb {
+      box-shadow: 0 0 0 1px var(--text-3);
+    }
+  }
+  .bm-opt[aria-checked='true'] {
+    color: var(--text-1);
+  }
+  .bm-opt[aria-checked='true'] .bm-thumb {
+    box-shadow: 0 0 0 2px var(--limb);
+  }
+  .bm-switches {
+    margin-top: var(--s-2);
+    padding: var(--s-1) var(--s-1) 0;
+    border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+  }
+}

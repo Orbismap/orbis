@@ -1,0 +1,14 @@
+@layer features {
+  .probe-coord {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: var(--s-2) 0 var(--s-2);
+    border-block: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+  }
+  .probe-coord-v {
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+}

@@ -1,0 +1,164 @@
+/* Design tokens, see docs/DESIGN.md. Dark is the default; light follows the data-theme attribute
+   or, when it is absent (theme "auto"), prefers-color-scheme.
+   Materials (Liquid Glass imitation) are three tiers, defined here as colours and used in glass.css:
+   control (capsules, round buttons), panel (sidebars, sheets, popovers, bars), dense (content areas inside panels). */
+@layer tokens {
+  :root {
+    color-scheme: dark;
+
+    /* surfaces */
+    --ink-0: #0a0f18;
+    --ink-1: #101724;
+    --ink-2: #182132;
+    --ink-3: #243044;
+    --line: #2a3649;
+
+    /* text (on glass: 4.5:1 and up, see test/contrast.mjs) */
+    --text-1: #f2f5f9;
+    --text-2: #b9c3d3;
+    --text-3: #a6b2c5;
+
+    /* accents: blue = where, amber = when */
+    --limb: #72c8f0;
+    --limb-quiet: rgba(114, 200, 240, 0.16);
+    --now: #f2b45a;
+    --alert: #ff6b5e;
+    --ok: #58d0a0;
+
+    /* material tiers */
+    --g-control: rgba(34, 43, 60, 0.7);
+    --g-panel: rgba(18, 25, 38, 0.86);
+    --g-dense: rgba(255, 255, 255, 0.065);
+    --g-dense-line: rgba(255, 255, 255, 0.06);
+    --g-fill: rgba(255, 255, 255, 0.09);
+    --g-fill-hover: rgba(255, 255, 255, 0.15);
+    --g-edge: rgba(255, 255, 255, 0.32);
+    --g-rim: rgba(255, 255, 255, 0.1);
+    --g-sep: rgba(255, 255, 255, 0.11);
+    --g-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.3), 0 24px 56px rgba(0, 0, 0, 0.28);
+    --g-bright: 0.85;
+    --g-blur-control: blur(22px) saturate(1.9) brightness(1.02);
+    --g-blur-panel: blur(40px) saturate(1.7) brightness(var(--g-bright));
+
+    /* aliases used by components */
+    --panel-bg: var(--g-panel);
+    --panel-border: 1px solid var(--g-rim);
+    --panel-blur: var(--g-blur-panel);
+    --shadow: var(--g-shadow);
+
+    /* type: system stack, Apple text scale (rem, base 16) */
+    --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, 'Segoe UI', Roboto, sans-serif;
+    --font-num: var(--font-ui);
+    --fs-axis: 0.6875rem; /* caption 2: 11 */
+    --fs-small: 0.75rem; /* caption 1: 12 */
+    --fs-ui: 0.8125rem; /* footnote/body on desktop: 13 */
+    --fs-title: 0.9375rem; /* headline: 15 */
+    --fs-inspector: 1.125rem;
+    --fs-value: 1.5rem;
+    --lh-ui: 1.35;
+    --lh-text: 1.5;
+
+    /* 4 px grid */
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 24px;
+    --s-6: 32px;
+
+    /* radii: concentric. inner = outer - padding */
+    --r-input: 10px;
+    --r-inner: 14px;
+    --r-panel: 22px;
+    --r-sheet: 30px;
+    --r-round: 999px;
+
+    /* hit areas */
+    --hit-mouse: 28px;
+    --hit-touch: 44px;
+
+    /* layout */
+    --panel-left: 340px;
+    --panel-right: 360px;
+    --edge: 12px;
+
+    /* motion: system-like ease and spring-ish curves */
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+    --t-panel: 200ms;
+
+    /* focus */
+    --focus: 2px solid var(--limb);
+    --focus-offset: 2px;
+
+    /* stacking */
+    --z-map: 0;
+    --z-panel: 10;
+    --z-sheet: 20;
+    --z-toast: 40;
+  }
+
+  :root[data-theme='light'] {
+    color-scheme: light;
+    --ink-0: #ffffff;
+    --ink-1: #f4f6f9;
+    --ink-2: #e9edf2;
+    --ink-3: #dde3ec;
+    --line: #cdd5e0;
+    --text-1: #0f1826;
+    --text-2: #364258;
+    --text-3: #4a576e;
+    --limb: #0a5f94;
+    --limb-quiet: rgba(11, 111, 168, 0.1);
+    --now: #8f5300;
+    --alert: #c6382c;
+    --ok: #1b8a5e;
+    --g-control: rgba(255, 255, 255, 0.74);
+    --g-panel: rgba(247, 249, 252, 0.86);
+    --g-dense: rgba(255, 255, 255, 0.72);
+    --g-dense-line: rgba(15, 24, 38, 0.07);
+    --g-fill: rgba(15, 24, 38, 0.06);
+    --g-fill-hover: rgba(15, 24, 38, 0.1);
+    --g-edge: rgba(255, 255, 255, 0.95);
+    --g-rim: rgba(15, 24, 38, 0.12);
+    --g-sep: rgba(15, 24, 38, 0.11);
+    --g-shadow: 0 1px 2px rgba(15, 24, 38, 0.1), 0 6px 18px rgba(15, 24, 38, 0.12), 0 20px 44px rgba(15, 24, 38, 0.1);
+    --g-bright: 1;
+    --shadow: var(--g-shadow);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme]) {
+      color-scheme: light;
+      --ink-0: #ffffff;
+      --ink-1: #f4f6f9;
+      --ink-2: #e9edf2;
+      --ink-3: #dde3ec;
+      --line: #cdd5e0;
+      --text-1: #0f1826;
+      --text-2: #364258;
+      --text-3: #4a576e;
+      --limb: #0a5f94;
+      --limb-quiet: rgba(11, 111, 168, 0.1);
+      --now: #8f5300;
+      --alert: #c6382c;
+      --ok: #1b8a5e;
+      --g-control: rgba(255, 255, 255, 0.74);
+      --g-panel: rgba(247, 249, 252, 0.86);
+      --g-dense: rgba(255, 255, 255, 0.72);
+      --g-dense-line: rgba(15, 24, 38, 0.07);
+      --g-fill: rgba(15, 24, 38, 0.06);
+      --g-fill-hover: rgba(15, 24, 38, 0.1);
+      --g-edge: rgba(255, 255, 255, 0.95);
+      --g-rim: rgba(15, 24, 38, 0.12);
+      --g-sep: rgba(15, 24, 38, 0.11);
+      --g-shadow: 0 1px 2px rgba(15, 24, 38, 0.1), 0 6px 18px rgba(15, 24, 38, 0.12), 0 20px 44px rgba(15, 24, 38, 0.1);
+      --g-bright: 1;
+      --shadow: var(--g-shadow);
+    }
+  }
+
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+  }
+}

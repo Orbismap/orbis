@@ -1,0 +1,137 @@
+@layer features {
+  .kbar-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 var(--s-2) var(--s-2);
+  }
+  .kbar {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--r-round);
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+  .kbar::-webkit-scrollbar {
+    display: none;
+  }
+  .ktab {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: var(--r-round);
+    color: var(--text-2);
+    font-size: var(--fs-ui);
+    font-weight: 500;
+    white-space: nowrap;
+    scroll-snap-align: nearest;
+    transition: background var(--t-panel) var(--ease), color var(--t-panel) var(--ease);
+  }
+  .ktab-label {
+    display: none;
+  }
+  .ktab.is-active {
+    color: var(--text-1);
+    background: color-mix(in srgb, var(--text-1) 16%, var(--ink-1));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22), inset 0 0 0 0.5px var(--g-rim);
+    padding: 0 12px 0 10px;
+  }
+  :root[data-theme='light'] .ktab.is-active {
+    background: #fff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme]) .ktab.is-active {
+      background: #fff;
+    }
+  }
+  .ktab.is-active .ktab-label {
+    display: inline;
+    animation: ktab-in 220ms var(--ease);
+  }
+  @keyframes ktab-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @media (hover: hover) {
+  @media (hover: hover) {
+    .ktab:not(.is-active):hover {
+        color: var(--text-1);
+        background: var(--g-fill);
+      }
+    }
+  }
+  .kbar-dirty {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--limb);
+    flex: none;
+  }
+  .kbar-tools {
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: center;
+  }
+
+  .karten-pop {
+    min-width: 260px;
+  }
+  .nameform {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding: var(--s-2);
+  }
+  .nameform-label {
+    font-size: var(--fs-small);
+    color: var(--text-2);
+  }
+  .nameform-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--s-2);
+  }
+  .karten-actions-anchor {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .karten-actions-anchor > * {
+    pointer-events: auto;
+  }
+
+  .kswitch {
+    position: relative;
+    min-width: 0;
+  }
+  .kswitch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--hit-touch);
+    max-width: 100%;
+    padding: 0 var(--s-3) 0 var(--s-3);
+    border-radius: var(--r-round);
+    background: var(--ink-2);
+    font-size: var(--fs-title);
+    font-weight: 600;
+    color: var(--text-1);
+  }
+  .kswitch-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kswitch-pop {
+    min-width: 220px;
+  }
+}

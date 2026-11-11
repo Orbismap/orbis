@@ -1,0 +1,33 @@
+@layer components {
+  .panel {
+    position: relative;
+    background: var(--panel-bg);
+    backdrop-filter: var(--panel-blur);
+    -webkit-backdrop-filter: var(--panel-blur);
+    border: var(--panel-border);
+    border-radius: var(--r-panel);
+    box-shadow: var(--shadow);
+    color: var(--text-1);
+    min-width: 0;
+  }
+  .panel-flat {
+    box-shadow: none;
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 44px;
+    padding: 0 var(--s-3) 0 var(--s-4);
+  }
+  .panel-title {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--fs-title);
+    font-weight: 600;
+    line-height: var(--lh-ui);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

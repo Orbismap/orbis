@@ -1,0 +1,108 @@
+/* Materials: Liquid Glass imitation in three tiers. Loaded last (layer "materials") so it owns background, blur,
+   edge light and shadow of every floating surface. Colours come from the --g-* tokens (tokens.css).
+   Layer discipline (HIG): glass only on the functional layer; content inside panels sits on the dense tier. */
+@layer materials {
+  /* ---- tier 1: panel glass (sidebars, sheets, popovers, bars, dialogs) ---- */
+  .panel,
+  .sheet,
+  .popover,
+  .search,
+  .sc,
+  .toast,
+  .legend:not(.legend-compact),
+  .tooltip {
+    background-color: var(--g-panel);
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--g-edge) 22%, transparent), transparent 46%);
+    -webkit-backdrop-filter: var(--g-blur-panel);
+    backdrop-filter: var(--g-blur-panel);
+    border: 0;
+    box-shadow: inset 0 1px 0 var(--g-edge), inset 0 0 0 1px var(--g-rim), var(--g-shadow);
+  }
+  .panel { border-radius: var(--r-panel); }
+  .popover { border-radius: 18px; }
+  .search { border-radius: 26px; }
+  .sc { border-radius: 26px; }
+  .toast { border-radius: var(--r-round); }
+  .legend:not(.legend-compact) { border-radius: 20px; }
+  .timeline-idle { border-radius: var(--r-round); }
+  .tooltip { border-radius: 9px; background-color: var(--g-panel); }
+  .sheet { border-radius: var(--r-sheet) var(--r-sheet) 0 0; box-shadow: inset 0 1px 0 var(--g-edge), inset 0 0 0 1px var(--g-rim), 0 -10px 40px rgba(0, 0, 0, 0.28); }
+
+  /* ---- tier 2: control glass (capsules, round buttons) ---- */
+  .iconbtn-solid,
+  .iconbtn-round,
+  .attr-btn,
+  .msearch,
+  .cap,
+  .compass-round {
+    background-color: var(--g-control);
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--g-edge) 30%, transparent), transparent 55%);
+    -webkit-backdrop-filter: var(--g-blur-control);
+    backdrop-filter: var(--g-blur-control);
+    border: 0;
+    color: var(--text-1);
+    box-shadow: inset 0 1px 0 var(--g-edge), inset 0 0 0 1px var(--g-rim), 0 1px 2px rgba(0, 0, 0, 0.18), 0 6px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  /* ---- tier 3: dense material for content inside panels ---- */
+  .dense, .lgroup, .setgroup {
+    background-color: var(--g-dense);
+    box-shadow: inset 0 0 0 1px var(--g-dense-line);
+    border-radius: var(--r-inner);
+  }
+  .kbar, .lsearch, .cat-search, .field, .seg {
+    background-color: var(--g-fill);
+    border: 0;
+    box-shadow: none;
+  }
+
+  /* ---- fallbacks ---- */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .panel,
+  .sheet,
+  .popover,
+  .search,
+  .sc,
+  .toast,
+  .legend:not(.legend-compact),
+  .tooltip { background-color: var(--ink-1); background-image: none; }
+    .iconbtn-solid,
+  .iconbtn-round,
+  .attr-btn,
+  .msearch,
+  .cap,
+  .compass-round { background-color: color-mix(in srgb, var(--ink-1) 94%, var(--text-1)); background-image: none; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .panel,
+  .sheet,
+  .popover,
+  .search,
+  .sc,
+  .toast,
+  .legend:not(.legend-compact),
+  .tooltip { background-color: color-mix(in srgb, var(--ink-1) 98%, transparent); background-image: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .iconbtn-solid,
+  .iconbtn-round,
+  .attr-btn,
+  .msearch,
+  .cap,
+  .compass-round { background-color: color-mix(in srgb, var(--ink-1) 96%, var(--text-1)); background-image: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
+  @media (prefers-contrast: more) {
+    .panel,
+  .sheet,
+  .popover,
+  .search,
+  .sc,
+  .toast,
+  .legend:not(.legend-compact),
+  .tooltip, .iconbtn-solid,
+  .iconbtn-round,
+  .attr-btn,
+  .msearch,
+  .cap,
+  .compass-round { background-color: var(--ink-1); background-image: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: inset 0 0 0 1.5px var(--text-3), var(--g-shadow); }
+    :root { --text-2: var(--text-1); --text-3: var(--text-2); }
+  }
+}
