@@ -5,7 +5,6 @@ import { createMapEngine } from '../map/engine';
 import { activeKarte } from '../state/session';
 import { mapEngine, pointerLngLat } from '../state/ui';
 import { startProbeMarker } from '../features/probe/marker';
-import { startLocateOverlay } from '../features/tools/locate';
 
 /** Hosts the MapLibre map. Reads no signals, so it never re-renders. */
 export const MapView = memo(function MapView() {
@@ -31,7 +30,7 @@ export const MapView = memo(function MapView() {
     const onLeave = () => (pointerLngLat.value = null);
     el.addEventListener('mousemove', onMove);
     el.addEventListener('mouseleave', onLeave);
-    const stops = [startProbeMarker(), startLocateOverlay(), () => (el.removeEventListener('mousemove', onMove), el.removeEventListener('mouseleave', onLeave))];
+    const stops = [startProbeMarker(), () => (el.removeEventListener('mousemove', onMove), el.removeEventListener('mouseleave', onLeave))];
     return () => {
       stops.forEach((s) => s());
       stopRuntime();

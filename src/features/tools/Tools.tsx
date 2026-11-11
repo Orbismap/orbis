@@ -4,7 +4,6 @@ import { IconButton } from '../../ui/Button';
 import { Icon } from '../../ui/icons/Icon';
 import { tipProps } from '../../ui/tip-state';
 import { BasemapPicker } from '../basemap/BasemapPicker';
-import { locateMe, locating } from './locate';
 import './tools.css';
 
 const zoomBy = (d: number) => mapEngine.peek()?.flyTo({ zoom: camera.peek().zoom + d, duration: 260 });
@@ -68,13 +67,11 @@ function openSettings() {
   leftView.value = leftView.peek() === 'settings' ? 'layers' : 'settings';
 }
 
-/** Toolbar capsule in the top right corner: basemap, location, settings. */
+/** Toolbar capsule in the top right corner: basemap and settings. */
 export function TopBar() {
-  const busy = locating.value;
   return (
     <div class="cap topbar" role="toolbar" aria-label="Karte und Einstellungen">
       <BasemapPicker />
-      <IconButton icon="locate" label="Mein Standort" onClick={() => void locateMe()} disabled={busy} aria-busy={busy} />
       <IconButton icon="settings" label="Einstellungen" shortcut="," onClick={openSettings} />
     </div>
   );
