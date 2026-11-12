@@ -217,8 +217,8 @@
   }
   .ktab.is-active {
     color: var(--text-1);
-    background: color-mix(in srgb, var(--text-1) 16%, var(--ink-1));
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22), inset 0 0 0 0.5px var(--g-rim);
+    background: var(--g-fill-active);
+    box-shadow: none;
     padding: 0 8px 0 9px;
     flex: 0 1 auto;
     max-width: 110px;

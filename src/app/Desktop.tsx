@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'preact/hooks';
 import { Attribution } from '../features/attribution/Attribution';
 import { InspectorCard } from '../features/inspector/Inspector';
 import { KartenBar } from '../features/karten-bar/KartenBar';
@@ -14,7 +13,6 @@ import { Kbd } from '../ui/Chip';
 import { Icon } from '../ui/icons/Icon';
 import { Panel } from '../ui/Panel';
 import { ScrollArea } from '../ui/ScrollArea';
-import { dockPx } from './layout';
 import { LeftBody } from './LeftBody';
 import { OrbisMark } from '../ui/brand/OrbisMark';
 
@@ -62,14 +60,8 @@ function RightPanel() {
 }
 
 export function DesktopLayout() {
-  const dock = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const ro = new ResizeObserver(() => (dockPx.value = dock.current?.getBoundingClientRect().height ?? 90));
-    ro.observe(dock.current!);
-    return () => ro.disconnect();
-  }, []);
   return (
-    <div class="hud hud-desktop">
+    <div class="hud hud-desktop" style={{ '--map-left': leftPanelOpen.value ? 'calc(var(--edge) + var(--panel-left) + var(--s-2))' : '0px' }}>
       <LeftPanel />
       {!leftPanelOpen.value && (
         <div class="reopen">
@@ -83,12 +75,14 @@ export function DesktopLayout() {
         <ToolRail />
       </div>
       <RightPanel />
-      <div class="dock" ref={dock}>
-        <Legend />
+      <div class="dock">
         <Timeline />
       </div>
+      <div class="maplegend-pos">
+        <Legend />
+      </div>
       <div class="scalebar-pos">
-        <Scalebar side="right" />
+        <Scalebar />
       </div>
       <div class="attr-pos">
         <Attribution />

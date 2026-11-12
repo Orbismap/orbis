@@ -1,0 +1,23 @@
+.cursor-tip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  pointer-events: none;
+  padding: 4px 9px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--text-1);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 100ms linear;
+  font-variant-numeric: tabular-nums;
+}
+.cursor-tip[data-on] { opacity: 1; }
+.cursor-tip-row { display: flex; align-items: center; gap: 6px; }
+.cursor-tip-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 1px var(--g-rim); flex: none; }
+.cursor-tip-name { color: var(--text-2); }
+@media (prefers-reduced-motion: reduce) {
+  .cursor-tip { transition: none; }
+}

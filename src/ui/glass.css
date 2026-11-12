@@ -10,14 +10,17 @@
   .sc,
   .toast,
   .legend:not(.legend-compact),
-  .tooltip {
+  .tooltip,
+  .cursor-tip {
     background-color: var(--g-panel);
-    background-image: linear-gradient(180deg, color-mix(in srgb, var(--g-edge) 22%, transparent), transparent 46%);
     -webkit-backdrop-filter: var(--g-blur-panel);
     backdrop-filter: var(--g-blur-panel);
     border: 0;
-    box-shadow: inset 0 1px 0 var(--g-edge), inset 0 0 0 1px var(--g-rim), var(--g-shadow);
+    box-shadow: inset 0 0 0 0.5px var(--g-rim), var(--g-shadow);
   }
+  .panel { box-shadow: inset 0 0.5px 0 var(--g-edge), inset 0 0 0 0.5px var(--g-rim), var(--g-shadow); }
+  .popover, .search, .tooltip, .cursor-tip { background-color: var(--g-pop); }
+  .toast { box-shadow: inset 0 0 0 0.5px var(--g-rim), var(--g-shadow-sm); }
   .panel { border-radius: var(--r-panel); }
   .popover { border-radius: 18px; }
   .search { border-radius: 26px; }
@@ -25,8 +28,8 @@
   .toast { border-radius: var(--r-round); }
   .legend:not(.legend-compact) { border-radius: 20px; }
   .timeline-idle { border-radius: var(--r-round); }
-  .tooltip { border-radius: 9px; background-color: var(--g-panel); }
-  .sheet { border-radius: var(--r-sheet) var(--r-sheet) 0 0; box-shadow: inset 0 1px 0 var(--g-edge), inset 0 0 0 1px var(--g-rim), 0 -10px 40px rgba(0, 0, 0, 0.28); }
+  .tooltip { border-radius: 9px; box-shadow: inset 0 0 0 0.5px var(--g-rim), var(--g-shadow-sm); }
+  .sheet { border-radius: var(--r-sheet) var(--r-sheet) 0 0; box-shadow: inset 0 0.5px 0 var(--g-edge), inset 0 0 0 0.5px var(--g-rim), 0 -8px 24px rgba(0, 0, 0, 0.18); }
 
   /* ---- tier 2: control glass (capsules, round buttons) ---- */
   .iconbtn-solid,
@@ -36,20 +39,20 @@
   .cap,
   .compass-round {
     background-color: var(--g-control);
-    background-image: linear-gradient(180deg, color-mix(in srgb, var(--g-edge) 30%, transparent), transparent 55%);
     -webkit-backdrop-filter: var(--g-blur-control);
     backdrop-filter: var(--g-blur-control);
     border: 0;
     color: var(--text-1);
-    box-shadow: inset 0 1px 0 var(--g-edge), inset 0 0 0 1px var(--g-rim), 0 1px 2px rgba(0, 0, 0, 0.18), 0 6px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: inset 0 0 0 0.5px var(--g-rim), var(--g-shadow-sm);
   }
 
   /* ---- tier 3: dense material for content inside panels ---- */
   .dense, .lgroup, .setgroup {
     background-color: var(--g-dense);
-    box-shadow: inset 0 0 0 1px var(--g-dense-line);
+    box-shadow: none;
     border-radius: var(--r-inner);
   }
+  .seg-opt[aria-checked='true'], .seg-opt[aria-checked='true']:hover, .ktab.is-active { background: var(--g-fill-active); box-shadow: none; }
   .kbar, .lsearch, .cat-search, .field, .seg {
     background-color: var(--g-fill);
     border: 0;
@@ -102,7 +105,7 @@
   .attr-btn,
   .msearch,
   .cap,
-  .compass-round { background-color: var(--ink-1); background-image: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: inset 0 0 0 1.5px var(--text-3), var(--g-shadow); }
+  .compass-round { background-color: var(--ink-1); background-image: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: inset 0 0 0 1px var(--text-3); }
     :root { --text-2: var(--text-1); --text-3: var(--text-2); }
   }
 }

@@ -134,7 +134,7 @@ export interface MapEngine {
   requestRender(): void;
   // Ergänzungen zum Fundament
   moveToSlotTop(layerId: string, slot: SlotId): void;   // Reihenfolge innerhalb eines Slots (runtime)
-  setPadding(p: Partial<Padding>): void;                // Paneele/Sheet verdecken Kartenfläche
+  setPadding(p: Partial<Padding>): void;                // Padding bleibt 0; Paneele/Sheet liegen über der Karte, die Karte verschiebt sich nie
   getBasemap(): BasemapId;
   locate(): Promise<{ lng: number; lat: number; accuracy: number }>;   // Geolocation + flyTo
 }
@@ -159,7 +159,7 @@ direkt *unter* seinem Marker-Layer (`slot:<name>`, `beforeId` beim Einfügen); z
 die Ebene angelegt hat (für Umsortierung und Aufräumen nach fehlgeschlagenem `mount`).
 
 **Grundkarten** (`map/basemaps/`): `orbis-dark`, `orbis-light` (eigene Stile auf OpenFreeMap-Vektorkacheln,
-Farben aus den Design-Tokens, bewusst ruhig, damit Daten tragen), `satellite` (Esri World Imagery + eigene
+Farben aus den Design-Tokens, bewusst ruhig, damit Daten tragen; ab Zoom 13.5 2,5D-Gebäude als `fill-extrusion` mit `fill-extrusion-rounded-corner-distance` (Layout, ab maplibre-gl 6.2) aus Quelllayer `building`, `render_height`/`render_min_height`), `satellite` (Esri World Imagery + eigene
 Beschriftung), `terrain` (OpenTopoMap), `bluemarble` (NASA GIBS). Der Stil enthält *alle* Grundkarten und
 Beschriftungsvarianten gleichzeitig (unsichtbar bis auf die gewählte), der Wechsel schaltet nur `visibility`. Es gibt
 kein `setStyle`, daher gehen weder Quellen noch Layer, Custom-Layer oder Bilder beim Wechsel verloren.

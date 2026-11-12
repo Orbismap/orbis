@@ -10,8 +10,10 @@ Vorgabe des Auftraggebers (11. Nov. 2026), geht allem Folgenden vor, wo es sich 
 - **Apple Human Interface Guidelines** sind der Maßstab für Aufbau, Bedienmuster, Abstände, Trefferflächen,
   Bewegung und Zugänglichkeit, auf dem Desktop (macOS) wie mobil (iOS).
 - **Liquid Glass** (Design von macOS/iOS 26 „Tahoe“) für alle schwebenden Bedienelemente über der Karte:
-  durchscheinendes, lichtbrechendes Glas mit starker Unschärfe und Sättigung des Hintergrunds, heller Kante oben
-  (Spiegelglanz als 1-px-Innenlinie), weichem Schatten, großen durchgehenden Radien (Kapseln und konzentrische
+  ruhiges, flaches Glas: gleichmäßig getönte Fläche (dunkel ~0.72, hell ~0.72 Deckkraft, Popover +0.08),
+  Unschärfe 24–30 px mit Sättigung 150–160 %, nur eine Haarlinie (0.5 px, sehr niedriger Kontrast) statt Lichtkante,
+  ein weicher flacher Schatten (`--g-shadow`, kleine Elemente `--g-shadow-sm`), keine Verläufe oder Glows; Elemente
+  innerhalb eines Panels nur flache Füllung (`--g-fill`, aktiv `--g-fill-active`) ohne Kante, Blur, Schatten; großen durchgehenden Radien (Kapseln und konzentrische
   Ecken: innerer Radius = äußerer Radius − Abstand). Glas nur für die Bedienebene, nie für Inhalte; Inhalt in
   Paneelen liegt auf ruhigerem, dichterem Material. Bedienelemente gruppieren sich in Glaskapseln und rücken beim
   Scrollen/Verschieben zusammen statt die Karte zu verdecken.
@@ -73,6 +75,10 @@ Dunkel ist Standard (Karten leuchten auf dunklem Grund, Satellitenbild und Wette
 | `--limb` | `#72C8F0` | `#0B6FA8` | Akzent Bedienung |
 | `--limb-quiet` | `rgba(114,200,240,.14)` | `rgba(11,111,168,.10)` | Akzentfläche |
 | `--now` | `#F2B45A` | `#A86200` | Zeit |
+| `--boost` | `#B9A2FD` | `#6D44D0` | Boost (eigene Schlüssel), nur dafür |
+| `--boost-soft` | `rgba(185,162,253,.14)` | `rgba(109,68,208,.12)` | Boost-Fläche |
+
+Farbregel: Blau = Ort/Auswahl, Bernstein = Zeit, Violett = Boost, sonst nirgends. Violett steht nur beim Boost-Abschnitt, bei Schlüssel-Hinweisen und -Symbolen.
 | `--alert` | `#FF6B5E` | `#C6382C` | Fehler, Warnung |
 | `--ok` | `#58D0A0` | `#1B8A5E` | frisch, verbunden |
 
@@ -120,9 +126,10 @@ Großschreibung nach deutscher Rechtschreibung, Satzschreibung in Schaltflächen
 │ │  …                        │                       └─────────────────┘ │
 │ │ [＋ Ebene hinzufügen]     │                                           │
 │ └───────────────────────────┘                                           │
-│ ┌─ Legende ─┐ ┌─ Zeitleiste ───────────────────────────────────────────┐│
-│ │ °C ▇▇▇▇▇  │ │ ▶  Di 10. ░░▒▒▓▓│▓▓▒▒░░ Mi 11. ░░▒▒▓▓▒▒░░ Do 12.   Jetzt ││
-│ └───────────┘ └────────────────────────────────────────────────────────┘│
+│   Temperatur ▇▇▇▇▇ °C   ← Legende, direkt auf der Karte                  │
+│ ┌─ Zeitleiste ───────────────────────────────────────────────────────────┐│
+│ │ ▶  Di 10. ░░▒▒▓▓│▓▓▒▒░░ Mi 11. ░░▒▒▓▓▒▒░░ Do 12.   Jetzt ││
+│ └────────────────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -133,12 +140,19 @@ Großschreibung nach deutscher Rechtschreibung, Satzschreibung in Schaltflächen
 - **Ebenenzeile** und Ebenenliste: siehe „Linkes Menü: Aktiv und Vorschläge“ unten.
 - **Punktabfrage**: Klick ins Leere setzt ein Fadenkreuz und zeigt im Inspektor Koordinate, Höhe über der Zeit
   des Tages (Sonnenstand) und je aktiver Feld-Ebene den Wert an dieser Stelle zur gewählten Zeit.
-- **Mauszeiger-Wert**: bei aktiver Feld-Ebene wandert der Wert an der Legende mit (kleines Dreieck auf der Skala
-  plus Zahl), nicht als Tooltip am Zeiger.
+- **Maßstab**: oben mittig über der Kartenfläche (bei offenem linken Paneel dessen rechter Bereich, sonst Fenstermitte),
+  7 px unter dem oberen Rand (`safe-area-inset-top`), mobil direkt unter der Suchleiste. Ohne Hintergrund, `pointer-events: none`.
+  Die Einheit folgt der Balkenlänge: unter 1 km Meter, darüber Kilometer (imperial Fuß/Meilen).
+- **Legende**: keine Karte, sondern schlanke Zeilen direkt auf der Karte (weiße 11-px-Schrift mit Textschatten wie der
+  Maßstab), unten links neben dem Paneel über der Zeitleiste, mobil über Attribution und Sheet. Je sichtbarer Ebene mit
+  Legende eine Zeile: Name (Sekundärfarbe), 6 px hoher Farbbalken (120–200 px) mit 2–4 Zahlenmarken, Einheit rechts;
+  der Wert unter dem Mauszeiger erscheint als feiner Strich auf dem Balken. Klassen- und Symbol-Legenden sind eine Reihe
+  kleiner Farbfelder mit Kurzlabels (höchstens 6, der Rest steht auf der Detailseite der Ebene). Höchstens 3 Zeilen,
+  weitere als „+n“ (öffnet die Ebenenliste). Klick auf eine Zeile öffnet die Detailseite der Ebene.
 
 ## Linkes Menü: Aktiv und Vorschläge
 
-Schmales, dichtes Paneel (300 px, `--panel-left` und `PANEL_LEFT_PX` in `app/layout.ts` gleich halten). Zeilen
+Schmales, dichtes Paneel (300 px, `--panel-left` in `ui/tokens.css`). Zeilen
 ~33 px, Schrift 13 px, Nebentext 11 px, Icons 16 px, kompakte Schalter; mobil bleiben Trefferflächen ≥ 44 px.
 
 - **Aktiv**: alle eingeschalteten Ebenen der Karte (auch die aus Themen). Zeile: Griff, Icon, Name,
@@ -173,7 +187,7 @@ Schmales, dichtes Paneel (300 px, `--panel-left` und `PANEL_LEFT_PX` in `app/lay
 │                        │
 │ ┌────────────────────┐ │
 │ │ ▬                  │ │  Sheet, drei Stufen:
-│ │ Wetter ▾  °C ▇▇▇▇  │ │   1 Blick  (112 px): Karte wählen, Legende, Zeitleiste
+│ │ Wetter ▾  Jetzt    │ │   1 Blick  (112 px): Karte wählen, Zeit, Zeitleiste
 │ │ ▶ ──────│───────── │ │   2 Halb   (50 %):   Ebenen der Karte
 │ └────────────────────┘ │   3 Voll   (100 % − Kopf): Katalog, Inspektor, Einstellungen
 └───────────────────────┘
@@ -181,8 +195,7 @@ Schmales, dichtes Paneel (300 px, `--panel-left` und `PANEL_LEFT_PX` in `app/lay
 
 - Sheet folgt dem Finger, rastet mit Federung ein, respektiert `env(safe-area-inset-*)`. Ziehen am Inhalt scrollt
   erst, wenn die Stufe „Voll“ erreicht ist. Zurück-Geste/Escape schließt eine Stufe.
-- Auswahl auf der Karte öffnet den Inspektor in Stufe „Halb“; die Karte verschiebt sich so, dass das Objekt im
-  sichtbaren Rest bleibt (`padding` der Kamera).
+- Auswahl auf der Karte öffnet den Inspektor in Stufe „Halb“ als Überlagerung; die Karte verschiebt sich nie.
 - Zeitleiste ist in Stufe 1 immer erreichbar, Scrubben mit dem Daumen, haptisches Ticken an Tagesgrenzen
   (`navigator.vibrate`, wenn vorhanden).
 
@@ -197,6 +210,7 @@ Schmales, dichtes Paneel (300 px, `--panel-left` und `PANEL_LEFT_PX` in `app/lay
 
 - **Bewegung** antwortet nur auf Handlungen: Paneele 180 ms `cubic-bezier(.2,.8,.2,1)`, Sheet mit Feder,
   Auswahlring pulsiert einmal. `prefers-reduced-motion`: keine Partikel, keine Übergänge außer Deckkraft.
+- **Cursor-Tooltip:** Wo die Legende den Strich unter dem Mauszeiger zeigt, erscheint zusätzlich ein kleines Glaskärtchen 14 px über dem Zeiger mit dem Wert in der gewählten Einheit (bei mehreren Ebenen je Zeile Farbpunkt und Name, höchstens drei). Nur bei vorhandenem Wert, nur mit Maus; nicht beim Ziehen, Zoomen, Drehen, über HUD-Elementen oder bei Objekt-Hover. `aria-hidden`, Einblenden 100 ms, ohne Bewegung entfällt es.
 - **Laden**: nie Vollbild-Spinner. Die Ebenenzeile zeigt einen 2-px-Fortschrittsstreifen in Limbus-Blau; die Karte
   bleibt bedienbar. Skelette nur im Inspektor.
 - **Fehler** stehen an der Ebene, die sie betreffen, mit Ursache und Handlung („Quelle antwortet nicht.
@@ -213,3 +227,5 @@ Schmales, dichtes Paneel (300 px, `--panel-left` und `PANEL_LEFT_PX` in `app/lay
 Ebenen heißen nach dem, was man sieht („Erdbeben“, „Seekabel“), nicht nach der Quelle. Zusammenfassung ist ein
 Satz ohne Punkt am Ende. Alter: „vor 3 min“, „heute 14:20“, „Stand 9. Nov.“. Zahlen mit `Intl.NumberFormat('de-DE')`,
 Einheiten mit schmalem Leerzeichen. Keine Ausrufezeichen, keine Emojis.
+
+Die Vorschaubilder der Grundkartenauswahl (`public/basemaps/*.webp`) sind echte Kartenausschnitte; ändert sich ein Kartenstil, werden sie mit `pnpm thumbs` neu erzeugt.

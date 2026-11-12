@@ -31,7 +31,7 @@
     backdrop-filter: var(--panel-blur);
     -webkit-backdrop-filter: var(--panel-blur);
     border: var(--panel-border);
-    box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--g-shadow);
     overflow: hidden;
     animation: search-in var(--t-panel) var(--ease);
   }

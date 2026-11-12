@@ -47,7 +47,7 @@ export function SettingsView() {
             size="sm"
             aria-label="Thema"
             value={s.theme}
-            options={[{ value: 'auto', label: 'Automatisch' }, { value: 'dark', label: 'Dunkel' }, { value: 'light', label: 'Hell' }]}
+            options={[{ value: 'auto', label: 'Auto', title: 'Automatisch' }, { value: 'dark', label: 'Dunkel' }, { value: 'light', label: 'Hell' }]}
             onChange={(v) => updateSettings({ theme: v })}
           />
         </div>
@@ -57,7 +57,7 @@ export function SettingsView() {
             size="sm"
             aria-label="Bewegung"
             value={s.motion}
-            options={[{ value: 'auto', label: 'Automatisch' }, { value: 'reduce', label: 'Reduziert' }, { value: 'full', label: 'Voll' }]}
+            options={[{ value: 'auto', label: 'Auto', title: 'Automatisch' }, { value: 'reduce', label: 'Reduziert' }, { value: 'full', label: 'Voll' }]}
             onChange={(v) => updateSettings({ motion: v })}
           />
         </div>

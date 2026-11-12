@@ -24,12 +24,12 @@ interface Palette {
 const PALETTE: Record<'dark' | 'light', Palette> = {
   dark: {
     land: '#1c2739', water: '#0d1a2e', ice: '#26324a', wood: '#1a2a35', grass: '#1c2a3a', urban: '#202c40', industrial: '#223046',
-    roadMinor: '#2a374e', roadMajor: '#38486a', highway: '#465a82', casing: '#152033', building: '#2a3b56',
+    roadMinor: '#2a374e', roadMajor: '#38486a', highway: '#465a82', casing: '#152033', building: '#34465f',
     border: '#4f6389', borderSoft: 'rgba(79, 99, 137, 0.5)', rail: '#33425d', space: '#0A0F18',
   },
   light: {
     land: '#eceff4', water: '#c9d8e8', ice: '#f8fafc', wood: '#e1e9e0', grass: '#e5ecdf', urban: '#e4e8ee', industrial: '#dde3ea',
-    roadMinor: '#f8f9fb', roadMajor: '#ffffff', highway: '#ffffff', casing: '#d3dae4', building: '#d9dfe8',
+    roadMinor: '#f8f9fb', roadMajor: '#ffffff', highway: '#ffffff', casing: '#d3dae4', building: '#dcd8d2',
     border: '#9aa8bf', borderSoft: 'rgba(154, 168, 191, 0.6)', rail: '#b4bfd0', space: '#F4F6F9',
   },
 };
@@ -70,8 +70,15 @@ export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
       paint: { 'line-color': c.borderSoft, 'line-width': 0.7, 'line-dasharray': [3, 2] },
     },
     {
-      id: id('building'), type: 'fill', source: 'ofm', 'source-layer': 'building', minzoom: 14, layout: hidden,
-      paint: { 'fill-color': c.building, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 15.5, 0.9] },
+      // 2.5D buildings (OpenMapTiles `building`: render_height / render_min_height, metres). Rounded corners need maplibre-gl >= 6.2.
+      id: id('building'), type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, layout: { ...hidden, 'fill-extrusion-rounded-corner-distance': 1.5 },
+      paint: {
+        'fill-extrusion-color': c.building,
+        'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 15.5, ['coalesce', ['to-number', ['get', 'render_height']], 9]],
+        'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 14, 0, 15.5, ['coalesce', ['to-number', ['get', 'render_min_height']], 0]],
+        'fill-extrusion-opacity': 0.85,
+        'fill-extrusion-vertical-gradient': true,
+      },
     },
     {
       id: id('rails'), type: 'line', source: 'ofm', 'source-layer': 'transportation', minzoom: 8, layout: hidden,

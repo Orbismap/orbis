@@ -3,7 +3,8 @@
     position: relative;
   }
   .bm-pop {
-    width: 252px;
+    /* never wider than the room left of the rail, so it cannot run off the left edge */
+    width: min(252px, calc(100vw - var(--rail-w) - var(--rail-inset) - 16px));
     padding: var(--s-2);
   }
   .bm-left {
@@ -40,9 +41,11 @@
     aspect-ratio: 3 / 2;
     transition: box-shadow var(--t-panel) var(--ease);
   }
-  .bm-thumb svg {
+  .bm-thumb img {
+    display: block;
     width: 100%;
     height: 100%;
+    object-fit: cover;
   }
   @media (hover: hover) {
     .bm-opt:hover .bm-thumb {

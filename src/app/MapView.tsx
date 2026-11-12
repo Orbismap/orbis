@@ -4,6 +4,8 @@ import { startRuntime } from '../layers/runtime';
 import { createMapEngine } from '../map/engine';
 import { activeKarte } from '../state/session';
 import { mapEngine, pointerLngLat } from '../state/ui';
+import { placeCursorTip } from '../features/legend/CursorTip';
+import { cursorTipHidden } from '../features/legend/pointer-value';
 import { startProbeMarker } from '../features/probe/marker';
 
 /** Hosts the MapLibre map. Reads no signals, so it never re-renders. */
@@ -15,22 +17,36 @@ export const MapView = memo(function MapView() {
     const stopRuntime = startRuntime(engine);
     mapEngine.value = engine;
     (window as unknown as { orbis?: unknown }).orbis = { engine };
-    // pointer position for the legend marker; TODO(runtime): feed it to LayerHandle.probe() and write
-    // features/legend/pointer-value.ts (pointerValue) once the runtime exposes a probeAt().
+    // Pointer position for legend marker and cursor tooltip: one value query per animation frame (mouse only).
     const el = host.current!;
-    let last = 0;
-    const onMove = (e: MouseEvent) => {
-      const t = performance.now();
-      if (t - last < 80) return;
-      last = t;
+    let raf = 0;
+    let ev: PointerEvent | undefined;
+    const frame = () => {
+      raf = 0;
+      if (!ev) return;
+      const { clientX, clientY, buttons } = ev;
       const r = el.getBoundingClientRect();
-      const ll = engine.ml.unproject([e.clientX - r.left, e.clientY - r.top]);
+      const ll = engine.ml.unproject([clientX - r.left, clientY - r.top]);
       pointerLngLat.value = { lng: ll.lng, lat: ll.lat };
+      // object hover (own pointer cursor), dragging and zooming/rotating take precedence over the tooltip
+      cursorTipHidden.value = buttons !== 0 || engine.ml.isMoving() || engine.ml.getCanvas().style.cursor === 'pointer';
+      placeCursorTip(clientX, clientY);
     };
-    const onLeave = () => (pointerLngLat.value = null);
-    el.addEventListener('mousemove', onMove);
-    el.addEventListener('mouseleave', onLeave);
-    const stops = [startProbeMarker(), () => (el.removeEventListener('mousemove', onMove), el.removeEventListener('mouseleave', onLeave))];
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse') return;
+      ev = e;
+      if (!raf) raf = requestAnimationFrame(frame);
+    };
+    const onLeave = () => {
+      ev = undefined;
+      if (raf) cancelAnimationFrame(raf), (raf = 0);
+      pointerLngLat.value = null;
+    };
+    const onMoveStart = () => (cursorTipHidden.value = true);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerleave', onLeave);
+    engine.ml.on('movestart', onMoveStart);
+    const stops = [startProbeMarker(), () => (cancelAnimationFrame(raf), el.removeEventListener('pointermove', onMove), el.removeEventListener('pointerleave', onLeave), engine.ml.off('movestart', onMoveStart))];
     return () => {
       stops.forEach((s) => s());
       stopRuntime();

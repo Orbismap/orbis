@@ -204,10 +204,6 @@
   .dock > * {
     pointer-events: auto;
   }
-  .dock .legend {
-    flex: none;
-    width: var(--panel-left);
-  }
   .dock .timeline {
     flex: 1;
     min-width: 0;
@@ -215,6 +211,22 @@
   .dock .timeline-idle {
     flex: none;
     margin-left: auto;
+  }
+  /* map legend: bottom left of the map area, above the timeline, right of the panel */
+  .maplegend-pos {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .hud-desktop .maplegend-pos {
+    left: var(--map-left, 0px);
+    bottom: calc(var(--dock-h, 90px) + var(--dock-bottom) + 10px);
+    right: calc(var(--rail-inset) + var(--rail-w) + 12px);
+    padding-left: var(--edge);
+    transition: left var(--t-panel) var(--ease);
+  }
+  .hud-desktop:has(> .right) .maplegend-pos {
+    right: calc(var(--rail-inset) + var(--rail-w) + 12px + var(--panel-right) + 12px);
   }
   .hud-desktop .attr-pos {
     position: absolute;
@@ -264,12 +276,20 @@
     left: 12px;
     bottom: calc(var(--sheet-h, 122px) + 8px);
   }
+  /* mobile: above the attribution button, left of the rail, over the sheet */
+  .hud-mobile .maplegend-pos {
+    left: 12px;
+    right: calc(var(--rail-inset) + var(--rail-w) + 12px);
+    bottom: calc(var(--sheet-h, 122px) + 44px);
+  }
   .hud-mobile .rail-pos,
-  .hud-mobile .attr-pos {
+  .hud-mobile .attr-pos,
+  .hud-mobile .maplegend-pos {
     transition: opacity var(--t-panel) var(--ease);
   }
   .hud-mobile[data-detent='full'] .rail-pos,
-  .hud-mobile[data-detent='full'] .attr-pos {
+  .hud-mobile[data-detent='full'] .attr-pos,
+  .hud-mobile[data-detent='full'] .maplegend-pos {
     opacity: 0;
     pointer-events: none;
   }
@@ -296,9 +316,6 @@
   .peek-mid {
     flex: 1;
     min-width: 0;
-  }
-  .peek-mid .legend-head {
-    margin-bottom: 2px;
   }
   .peek-mid .tl-readout {
     justify-content: flex-end;

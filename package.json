@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "brand": "node scripts/build-brand.mjs",
+    "thumbs": "node scripts/build-basemap-thumbs.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "vite build --outDir dist-smoke --emptyOutDir && node test/smoke.mjs"

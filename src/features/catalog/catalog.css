@@ -161,10 +161,10 @@
     flex: none;
     align-self: center;
     display: inline-grid;
-    color: var(--text-3);
+    color: var(--boost);
   }
   .crow-key.is-ok {
-    color: var(--limb);
+    color: var(--boost);
   }
   .crow-snippet {
     font-size: 11px;

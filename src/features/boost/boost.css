@@ -1,15 +1,65 @@
 @layer features {
-  .boost-count {
-    margin-left: 6px;
-    padding: 1px 8px;
-    border-radius: var(--r-round);
-    background: var(--g-fill);
-    color: var(--text-2);
+  .boost-card {
+    margin: var(--s-3) var(--s-2) 0;
+    padding: var(--s-3) 0 var(--s-2);
+    border-radius: var(--r-panel);
+    background: var(--boost-soft);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--boost) 35%, transparent);
+  }
+  .boost-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: 0 var(--s-3);
+  }
+  .boost-icon {
+    flex: none;
+    color: var(--boost);
+  }
+  .boost-card h3 {
+    flex: 1;
+    padding: 0;
+    font-size: var(--fs-title);
     font-weight: 500;
+    color: var(--boost);
+  }
+  .boost-count {
+    flex: none;
+    padding: 2px 10px;
+    border-radius: var(--r-round);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--boost) 55%, transparent);
+    color: var(--boost);
+    font-size: var(--fs-small);
+    font-weight: 500;
+  }
+  .boost-count.is-on {
+    background: var(--boost);
+    box-shadow: none;
+    color: var(--ink-0);
+  }
+  .boost-bar {
+    height: 4px;
+    margin: 0 var(--s-3);
+    border-radius: var(--r-round);
+    background: color-mix(in oklab, var(--boost) 22%, transparent);
+    overflow: hidden;
+  }
+  .boost-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--boost);
+    transition: width 200ms var(--ease);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .boost-bar span {
+      transition: none;
+    }
   }
   .boost-lead {
     padding: 0 var(--s-3);
-    font-size: var(--fs-small);
+    font-size: var(--fs-ui);
+    color: var(--text-1);
   }
   .boost-group {
     display: flex;
@@ -69,8 +119,13 @@
     font-size: var(--fs-small);
     color: var(--text-3);
   }
+  .bkey-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
   .bkey-state.is-on {
-    color: var(--ok);
+    color: var(--boost);
     font-weight: 500;
   }
   .bkey-chev {
@@ -160,7 +215,7 @@
     background-color: var(--g-panel);
     -webkit-backdrop-filter: var(--g-blur-panel);
     backdrop-filter: var(--g-blur-panel);
-    box-shadow: inset 0 1px 0 var(--g-edge), inset 0 0 0 1px var(--g-rim), var(--g-shadow);
+    box-shadow: inset 0 0 0 0.5px var(--g-rim), var(--g-shadow);
     animation: search-in var(--t-panel) var(--ease);
   }
   .wd h2 {

@@ -26,10 +26,10 @@ function measure(unit: 'km' | 'mi', zoom: number): ScaleModel | null {
 
 /**
  * Scale bar: numbers above a rounded strip of up to three alternating light/dark segments.
- * Sits directly on the map. `side="right"` ends the last label at the bar (right-anchored), "left" starts it at its tick.
+ * Sits directly on the map, top centre. The last label starts at its tick.
  * The width follows the map every frame (sub-pixel, one element, no re-render); labels change only at the step jumps.
  */
-export function Scalebar({ side }: { side: 'left' | 'right' }) {
+export function Scalebar() {
   const unit = unitPrefs.value.distance;
   const [m, setM] = useState<ScaleModel | null>(null);
   const el = useRef<HTMLDivElement>(null);
@@ -55,7 +55,7 @@ export function Scalebar({ side }: { side: 'left' | 'right' }) {
     <div ref={el} class="scalebar" role="img" aria-label={`Maßstab ${fmt(m.seg * m.n)} ${m.label}`}>
       <div class="sb-marks" aria-hidden="true">
         {Array.from({ length: m.n + 1 }, (_, i) => {
-          const pos = i === 0 ? { left: 0 } : i === m.n ? (side === 'left' ? { left: 'calc(100% - 7px)' } : { right: 0 }) : { left: `${(i / m.n) * 100}%`, transform: 'translateX(-50%)' };
+          const pos = i === 0 ? { left: 0 } : i === m.n ? { left: 'calc(100% - 7px)' } : { left: `${(i / m.n) * 100}%`, transform: 'translateX(-50%)' };
           return (
             <span key={i} style={pos}>
               {fmt(m.seg * i)}

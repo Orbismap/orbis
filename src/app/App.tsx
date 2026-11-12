@@ -3,6 +3,7 @@ import { useEffect } from 'preact/hooks';
 import { WarningDialog } from '../features/boost/WarningDialog';
 import { Search } from '../features/search/Search';
 import { Shortcuts } from '../features/shortcuts/Shortcuts';
+import { CursorTip } from '../features/legend/CursorTip';
 import { Toasts } from '../features/toasts/Toasts';
 import { breakpoint, isMobile, searchOpen, shortcutsOpen } from '../state/ui';
 import { settings } from '../state/settings';
@@ -10,7 +11,6 @@ import { TooltipLayer } from '../ui/Tooltip';
 import { Splash } from '../ui/brand/Splash';
 import { DesktopLayout } from './Desktop';
 import { startKeyboard } from './keyboard';
-import { startPadding } from './layout';
 import { MapView } from './MapView';
 import { MobileLayout } from './Mobile';
 import './app.css';
@@ -31,7 +31,6 @@ function useDocumentState() {
         };
         requestAnimationFrame(apply);
       }),
-      startPadding(),
       startKeyboard(),
     ];
     return () => stops.forEach((s) => s());
@@ -49,6 +48,7 @@ export function App() {
       <WarningDialog />
       <Toasts />
       <TooltipLayer />
+      <CursorTip />
       <Splash />
     </div>
   );

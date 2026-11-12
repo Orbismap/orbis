@@ -50,8 +50,13 @@ export interface ScaleModel { seg: number; n: number; label: string; width: numb
 /** Model for `meters` of ground under MAX_PX pixels. */
 export function scaleModel(meters: number, unit: ScaleUnit, zoom: number): ScaleModel | null {
   if (!Number.isFinite(meters) || meters <= 0) return null;
-  const [label, perUnit] = meters >= unit.big[1] ? unit.big : unit.small;
-  const { seg, n } = fit(meters / perUnit);
+  let [label, perUnit] = meters >= unit.big[1] ? unit.big : unit.small;
+  let { seg, n } = fit(meters / perUnit);
+  // the unit follows the length of the BAR, not of the measured span: a bar under 1 km reads "500 m", not "0,5 km"
+  if (perUnit === unit.big[1] && seg * n < 1) {
+    [label, perUnit] = unit.small;
+    ({ seg, n } = fit(meters / perUnit));
+  }
   if (!seg) return null;
   return { seg, n, label, width: ((seg * n * perUnit) / meters) * MAX_PX, zoom };
 }

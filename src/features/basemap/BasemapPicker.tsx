@@ -10,7 +10,6 @@ import { projection, setProjection } from '../../state/view';
 import { cx } from '../../ui/hooks';
 import { Popover } from '../../ui/Popover';
 import { Switch } from '../../ui/Switch';
-import { Thumb } from './Thumbs';
 import './basemap.css';
 
 const IDS: BasemapId[] = ['orbis-dark', 'orbis-light', 'satellite', 'terrain', 'bluemarble'];
@@ -60,7 +59,7 @@ export function BasemapPicker({ side = 'down' }: { side?: 'down' | 'left' }) {
           {IDS.map((id) => (
             <button key={id} type="button" role="radio" aria-checked={k.basemap === id} class="bm-opt" onClick={() => setBasemap(k.id, id)}>
               <span class="bm-thumb">
-                <Thumb id={id} />
+                <img src={`${import.meta.env.BASE_URL}basemaps/${id}${globe ? '-globe' : ''}.webp`} width={72} height={48} alt="" loading="lazy" decoding="async" draggable={false} />
               </span>
               <span class="bm-name">{BASEMAPS[id].label}</span>
             </button>

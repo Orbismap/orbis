@@ -26,7 +26,7 @@
   .lrow.is-dragging {
     z-index: 3;
     background: color-mix(in srgb, var(--ink-1) 92%, var(--text-1));
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--g-rim);
+    box-shadow: var(--g-shadow-sm);
     border-radius: var(--r-input);
     transition: none;
     content-visibility: visible;
@@ -148,7 +148,7 @@
     color: var(--now);
   }
   .lrow-sub.is-hint {
-    color: var(--limb);
+    color: var(--boost);
   }
   .lrow-sub.is-error {
     color: var(--alert);
@@ -257,6 +257,9 @@
   .ld-note.is-error {
     color: var(--alert);
   }
+  .ld-note.is-boost .linkbtn {
+    color: var(--boost);
+  }
   .linkbtn {
     color: var(--limb);
     text-decoration: underline;
@@ -292,8 +295,8 @@
     padding: 0 8px 0 6px;
     margin-right: 2px;
     border-radius: var(--r-round);
-    background: var(--limb-quiet);
-    color: var(--limb);
+    background: var(--boost-soft);
+    color: var(--boost);
     font-size: var(--fs-small);
     font-weight: 500;
   }

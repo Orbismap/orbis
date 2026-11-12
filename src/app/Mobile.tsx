@@ -5,7 +5,6 @@ import { InspectorCard } from '../features/inspector/Inspector';
 import { KartenChangeRow } from '../features/karten-bar/actions';
 import { KartenSwitcher } from '../features/karten-bar/KartenSwitcher';
 import { Legend } from '../features/legend/Legend';
-import { topFieldLegend } from '../features/legend/Legend';
 import { ProbeCard } from '../features/probe/ProbeCard';
 import { Readout } from '../features/timeline/Transport';
 import { TimelineCompact } from '../features/timeline/Timeline';
@@ -16,7 +15,6 @@ import { searchOpen, sheetDetent, leftView } from '../state/ui';
 import { hasTimeLayers } from '../state/time';
 import { Icon } from '../ui/icons/Icon';
 import { Sheet } from '../ui/Sheet';
-import { sheetPx } from './layout';
 import { LeftBody } from './LeftBody';
 import { startSheetHistory } from './history';
 
@@ -33,12 +31,11 @@ function Header() {
 }
 
 function PeekRow() {
-  const legend = topFieldLegend.value;
   return (
     <div class="peek">
       <div class="peek-row">
         <KartenSwitcher />
-        <div class="peek-mid">{legend ? <Legend compact /> : hasTimeLayers.value ? <Readout /> : null}</div>
+        <div class="peek-mid">{hasTimeLayers.value ? <Readout /> : null}</div>
       </div>
       <TimelineCompact />
     </div>
@@ -66,8 +63,11 @@ export function MobileLayout() {
       <div class="rail-pos">
         <ToolRail popoverUp />
       </div>
+      <div class="maplegend-pos">
+        <Legend />
+      </div>
       <div class="scalebar-pos">
-        <Scalebar side="left" />
+        <Scalebar />
       </div>
       <div class="attr-pos">
         <Attribution />
@@ -79,7 +79,6 @@ export function MobileLayout() {
         peekHeight={122}
         topInset={64}
         reducedMotion={reducedMotion()}
-        onVisible={(px, settled) => settled && (sheetPx.value = px)}
         peek={<PeekRow />}
       >
         {sel ? <InspectorCard key={`${sel.layerId}:${sel.card.title}`} card={sel.card} layerId={sel.layerId} /> : p ? <ProbeCard /> : (

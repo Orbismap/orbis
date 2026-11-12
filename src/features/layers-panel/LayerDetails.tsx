@@ -12,7 +12,6 @@ import { Slider } from '../../ui/Slider';
 import { Switch } from '../../ui/Switch';
 import { openKeySettings } from '../boost/open';
 import { LegendBody } from '../legend/LegendBody';
-import { topFieldLegend } from '../legend/Legend';
 
 export function Source({ s }: { s: SourceRef }) {
   const sig = useMemo(() => (s.manifest ? manifestEntrySignal(s.manifest.bucket, s.manifest.key) : undefined), [s.manifest?.bucket, s.manifest?.key]);
@@ -72,7 +71,7 @@ export function LayerNotes({ def, karteId }: { def: LayerDef; karteId: string })
   return (
     <>
       {st?.needsKey && (
-        <p class="ld-note" role="status">
+        <p class="ld-note is-boost" role="status">
           Diese Ebene braucht einen kostenlosen Schlüssel.{' '}
           <button type="button" class="linkbtn" onClick={() => openKeySettings(st.needsKey!)}>
             Schlüssel eintragen
@@ -117,8 +116,7 @@ export function OptionFields({ layer, def, karteId, specs = def.options }: PartP
 
 export function LayerLegend({ def }: { def: LayerDef }) {
   const legend = legends.value[def.id];
-  const top = topFieldLegend.value;
-  if (!legend || top?.id === def.id) return null;
+  if (!legend) return null;
   return (
     <div class="ld-legend">
       <LegendBody spec={legend} />

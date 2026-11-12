@@ -39,25 +39,21 @@
   .sb-bar .dk {
     background: rgb(40, 44, 48);
   }
+  /* top centre of the whole window, just under the top edge; never takes clicks */
   .scalebar-pos {
     position: absolute;
     z-index: 1;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
   }
-  /* desktop: bottom right above the timeline, clear of the rail, inspector and attribution */
   .hud-desktop .scalebar-pos {
-    right: var(--rail-inset, 14px);
-    bottom: calc(var(--dock-h, 90px) + var(--dock-bottom, 30px) + var(--edge));
+    top: calc(env(safe-area-inset-top, 0px) + 7px);
   }
-  /* mobile: bottom left above the attribution button and the sheet */
+  /* mobile: directly under the search header */
   .hud-mobile .scalebar-pos {
-    left: 12px;
-    bottom: calc(var(--sheet-h, 122px) + 44px);
-    transition: opacity var(--t-panel) var(--ease);
-  }
-  .hud-mobile[data-detent='full'] .scalebar-pos {
-    opacity: 0;
-  }
-  .hud-desktop .right {
-    bottom: calc(var(--dock-h, 90px) + var(--dock-bottom, 30px) + var(--edge) + 56px);
+    top: calc(env(safe-area-inset-top, 0px) + 8px + var(--hit-touch, 44px) + 6px);
   }
 }

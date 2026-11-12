@@ -49,7 +49,7 @@ function KeyRow({ def }: { def: KeyDef }) {
           <span class="bkey-name">{def.name}</span>
           <span class="bkey-unlocks">{def.unlocks}</span>
         </span>
-        <span class={stored ? 'bkey-state is-on' : 'bkey-state'}>{stored ? 'aktiv' : 'nicht gesetzt'}</span>
+        <span class={stored ? 'bkey-state is-on' : 'bkey-state'}>{stored && <Icon name="check" size={12} />}{stored ? 'aktiv' : 'nicht gesetzt'}</span>
         <Icon name="chevron-down" size={14} class="bkey-chev" />
       </button>
       {isOpen && (
@@ -139,10 +139,15 @@ export function BoostSection() {
   const active = allKeys().filter((k) => settings.value.keys[k.id]).length;
   if (!total) return null;
   return (
-    <section class="set-sec" aria-labelledby="set-boost">
-      <h3 id="set-boost">
-        Boost <span class="boost-count num">{active} von {total} aktiv</span>
-      </h3>
+    <section class="set-sec boost-card" aria-labelledby="set-boost">
+      <div class="boost-head">
+        <Icon name="boost" size={20} class="boost-icon" />
+        <h3 id="set-boost">Boost</h3>
+        <span class={cx('boost-count num', active > 0 && 'is-on')}>{active} von {total} aktiv</span>
+      </div>
+      <div class="boost-bar" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={active} aria-label="Aktive Schlüssel">
+        <span style={{ width: `${(active / total) * 100}%` }} />
+      </div>
       <p class="set-text boost-lead">Mit eigenen, kostenlosen Schlüsseln schaltet Orbis weitere Quellen frei. Schlüssel bleiben nur in diesem Browser.</p>
       {groups.map((g) => (
         <div key={g.group.id} class="boost-group">

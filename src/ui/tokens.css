@@ -15,30 +15,35 @@
 
     /* text (on glass: 4.5:1 and up, see test/contrast.mjs) */
     --text-1: #f2f5f9;
-    --text-2: #b9c3d3;
-    --text-3: #a6b2c5;
+    --text-2: #d0d8e5;
+    --text-3: #c0cad9;
 
-    /* accents: blue = where, amber = when */
+    /* accents: blue = where, amber = when, violet = boost */
     --limb: #72c8f0;
     --limb-quiet: rgba(114, 200, 240, 0.16);
     --now: #f2b45a;
+    --boost: #b9a2fd; /* violet = Boost (own keys), reserved */
+    --boost-soft: rgba(185, 162, 253, 0.14);
     --alert: #ff6b5e;
     --ok: #58d0a0;
 
     /* material tiers */
-    --g-control: rgba(34, 43, 60, 0.7);
-    --g-panel: rgba(18, 25, 38, 0.86);
-    --g-dense: rgba(255, 255, 255, 0.065);
-    --g-dense-line: rgba(255, 255, 255, 0.06);
-    --g-fill: rgba(255, 255, 255, 0.09);
-    --g-fill-hover: rgba(255, 255, 255, 0.15);
-    --g-edge: rgba(255, 255, 255, 0.32);
-    --g-rim: rgba(255, 255, 255, 0.1);
+    --g-control: rgba(22, 26, 34, 0.66);
+    --g-panel: rgba(22, 26, 34, 0.72);
+    --g-pop: rgba(22, 26, 34, 0.8);
+    --g-dense: rgba(255, 255, 255, 0.06);
+    --g-dense-line: transparent;
+    --g-fill: rgba(255, 255, 255, 0.06);
+    --g-fill-hover: rgba(255, 255, 255, 0.09);
+    --g-fill-active: rgba(255, 255, 255, 0.12);
+    --g-edge: rgba(255, 255, 255, 0.12);
+    --g-rim: rgba(255, 255, 255, 0.09);
     --g-sep: rgba(255, 255, 255, 0.11);
-    --g-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.3), 0 24px 56px rgba(0, 0, 0, 0.28);
-    --g-bright: 0.85;
-    --g-blur-control: blur(22px) saturate(1.9) brightness(1.02);
-    --g-blur-panel: blur(40px) saturate(1.7) brightness(var(--g-bright));
+    --g-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+    --g-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.14);
+    --g-bright: 1;
+    --g-blur-control: blur(24px) saturate(1.5);
+    --g-blur-panel: blur(30px) saturate(1.6);
 
     /* aliases used by components */
     --panel-bg: var(--g-panel);
@@ -106,23 +111,28 @@
     --ink-3: #dde3ec;
     --line: #cdd5e0;
     --text-1: #0f1826;
-    --text-2: #364258;
-    --text-3: #4a576e;
+    --text-2: #2a3448;
+    --text-3: #38445a;
     --limb: #0a5f94;
     --limb-quiet: rgba(11, 111, 168, 0.1);
     --now: #8f5300;
+    --boost: #6d44d0;
+    --boost-soft: rgba(109, 68, 208, 0.12);
     --alert: #c6382c;
     --ok: #1b8a5e;
-    --g-control: rgba(255, 255, 255, 0.74);
-    --g-panel: rgba(247, 249, 252, 0.86);
-    --g-dense: rgba(255, 255, 255, 0.72);
-    --g-dense-line: rgba(15, 24, 38, 0.07);
-    --g-fill: rgba(15, 24, 38, 0.06);
-    --g-fill-hover: rgba(15, 24, 38, 0.1);
-    --g-edge: rgba(255, 255, 255, 0.95);
-    --g-rim: rgba(15, 24, 38, 0.12);
+    --g-control: rgba(255, 255, 255, 0.66);
+    --g-panel: rgba(255, 255, 255, 0.72);
+    --g-pop: rgba(255, 255, 255, 0.8);
+    --g-dense: rgba(0, 0, 0, 0.04);
+    --g-dense-line: transparent;
+    --g-fill: rgba(0, 0, 0, 0.04);
+    --g-fill-hover: rgba(0, 0, 0, 0.07);
+    --g-fill-active: rgba(0, 0, 0, 0.09);
+    --g-edge: rgba(255, 255, 255, 0.5);
+    --g-rim: rgba(0, 0, 0, 0.07);
     --g-sep: rgba(15, 24, 38, 0.11);
-    --g-shadow: 0 1px 2px rgba(15, 24, 38, 0.1), 0 6px 18px rgba(15, 24, 38, 0.12), 0 20px 44px rgba(15, 24, 38, 0.1);
+    --g-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    --g-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.07);
     --g-bright: 1;
     --shadow: var(--g-shadow);
   }
@@ -136,23 +146,28 @@
       --ink-3: #dde3ec;
       --line: #cdd5e0;
       --text-1: #0f1826;
-      --text-2: #364258;
-      --text-3: #4a576e;
+      --text-2: #2a3448;
+      --text-3: #38445a;
       --limb: #0a5f94;
       --limb-quiet: rgba(11, 111, 168, 0.1);
       --now: #8f5300;
+      --boost: #6d44d0;
+      --boost-soft: rgba(109, 68, 208, 0.12);
       --alert: #c6382c;
       --ok: #1b8a5e;
-      --g-control: rgba(255, 255, 255, 0.74);
-      --g-panel: rgba(247, 249, 252, 0.86);
-      --g-dense: rgba(255, 255, 255, 0.72);
-      --g-dense-line: rgba(15, 24, 38, 0.07);
-      --g-fill: rgba(15, 24, 38, 0.06);
-      --g-fill-hover: rgba(15, 24, 38, 0.1);
-      --g-edge: rgba(255, 255, 255, 0.95);
-      --g-rim: rgba(15, 24, 38, 0.12);
+      --g-control: rgba(255, 255, 255, 0.66);
+      --g-panel: rgba(255, 255, 255, 0.72);
+      --g-pop: rgba(255, 255, 255, 0.8);
+      --g-dense: rgba(0, 0, 0, 0.04);
+      --g-dense-line: transparent;
+      --g-fill: rgba(0, 0, 0, 0.04);
+      --g-fill-hover: rgba(0, 0, 0, 0.07);
+      --g-fill-active: rgba(0, 0, 0, 0.09);
+      --g-edge: rgba(255, 255, 255, 0.5);
+      --g-rim: rgba(0, 0, 0, 0.07);
       --g-sep: rgba(15, 24, 38, 0.11);
-      --g-shadow: 0 1px 2px rgba(15, 24, 38, 0.1), 0 6px 18px rgba(15, 24, 38, 0.12), 0 20px 44px rgba(15, 24, 38, 0.1);
+      --g-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      --g-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.07);
       --g-bright: 1;
       --shadow: var(--g-shadow);
     }

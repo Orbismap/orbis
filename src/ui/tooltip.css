@@ -16,8 +16,6 @@
     line-height: 1.2;
     white-space: nowrap;
     pointer-events: none;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
     animation: tip-in 120ms var(--ease);
   }
   .tooltip[data-place='bottom'] {
