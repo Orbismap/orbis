@@ -7,6 +7,7 @@ import { Toasts } from '../features/toasts/Toasts';
 import { breakpoint, isMobile, searchOpen, shortcutsOpen } from '../state/ui';
 import { settings } from '../state/settings';
 import { TooltipLayer } from '../ui/Tooltip';
+import { Splash } from '../ui/brand/Splash';
 import { DesktopLayout } from './Desktop';
 import { startKeyboard } from './keyboard';
 import { startPadding } from './layout';
@@ -48,6 +49,7 @@ export function App() {
       <WarningDialog />
       <Toasts />
       <TooltipLayer />
+      <Splash />
     </div>
   );
 }

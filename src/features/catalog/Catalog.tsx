@@ -1,71 +1,81 @@
 import { computed } from '@preact/signals';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { addLayer, removeLayer, setLayerVisible } from '../../karten/store';
-import { categoryById } from '../../layers/categories';
 import { allLayers, layersByCategory } from '../../layers/registry';
 import type { LayerDef } from '../../layers/types';
 import { activeKarte } from '../../state/session';
 import { isMobile, leftView } from '../../state/ui';
-import { Chip } from '../../ui/Chip';
 import { IconButton } from '../../ui/Button';
 import { Icon } from '../../ui/icons/Icon';
 import { cx } from '../../ui/hooks';
 import { VirtualList } from '../../ui/VirtualList';
 import { settings } from '../../state/settings';
-import { CADENCE_LABEL, scoreLayer } from './fuzzy';
+import { matchSnippet, scoreLayer } from './fuzzy';
 import './catalog.css';
 
-type Item = { kind: 'head'; id: string; title: string; icon: Parameters<typeof Icon>[0]['name']; count: number } | { kind: 'row'; id: string; def: LayerDef; cat?: string };
+type IconName = Parameters<typeof Icon>[0]['name'];
+type Item =
+  | { kind: 'head'; id: string; title: string; icon: IconName; count: number }
+  | { kind: 'sub'; id: string; title: string }
+  | { kind: 'row'; id: string; def: LayerDef; snippet?: string };
 
 const membership = computed(() => new Map(activeKarte.value.layers.map((l) => [l.id, l.visible])));
 
 function toggle(def: LayerDef) {
   const k = activeKarte.peek();
   const m = membership.peek().get(def.id);
-  if (m === undefined) addLayer(k.id, def.id);
-  else if (m) removeLayer(k.id, def.id);
+  if (m === undefined) {
+    // exclusive field layers replace the current one
+    if (def.exclusive) {
+      const byId = new Map(allLayers().map((d) => [d.id, d]));
+      for (const l of k.layers) if (l.id !== def.id && byId.get(l.id)?.exclusive === def.exclusive) removeLayer(k.id, l.id);
+    }
+    addLayer(k.id, def.id);
+  } else if (m) removeLayer(k.id, def.id);
   else setLayerVisible(k.id, def.id, true);
 }
 
-function KeyChip({ def }: { def: LayerDef }) {
+function KeyMark({ def }: { def: LayerDef }) {
   const have = settings.value.keys;
   if (!def.keys?.length) return null;
-  if (def.keys.some((r) => r.required))
+  if (def.keys.some((r) => r.required)) {
+    const ok = def.keys.every((r) => !r.required || have[r.id]);
     return (
-      <Chip tone={def.keys.every((r) => !r.required || have[r.id]) ? 'ok' : 'limb'}>
-        <Icon name="key" size={10} />
-        mit Schlüssel
-      </Chip>
+      <span class={cx('crow-key', ok && 'is-ok')} title={ok ? 'Schlüssel hinterlegt' : 'Benötigt einen Schlüssel'}>
+        <Icon name="key" size={12} />
+        <span class="sr-only">{ok ? 'Schlüssel hinterlegt' : 'benötigt Schlüssel'}</span>
+      </span>
     );
+  }
   return def.keys.some((r) => !have[r.id]) ? (
-    <Chip tone="limb">
-      <Icon name="boost" size={10} />
-      Boost möglich
-    </Chip>
+    <span class="crow-key" title="Mit Schlüssel genauer">
+      <Icon name="boost" size={12} />
+      <span class="sr-only">mit Schlüssel genauer</span>
+    </span>
   ) : null;
 }
 
-function Row({ def, active, state, showCat, onPick }: { def: LayerDef; active: boolean; state: boolean | undefined; showCat?: string; onPick(): void }) {
+function Row({ def, active, state, snippet, onPick }: { def: LayerDef; active: boolean; state: boolean | undefined; snippet?: string; onPick(): void }) {
+  const area = def.coverage && def.coverage !== 'Welt' ? def.coverage : undefined;
   return (
     <div
       id={`cat-${def.id}`}
       role="option"
       aria-selected={state === true}
-      class={cx('crow', active && 'is-active', state && 'is-on')}
+      title={def.summary}
+      class={cx('crow', active && 'is-active', state && 'is-on', snippet && 'has-snippet')}
       onClick={onPick}
-      onMouseMove={undefined}
     >
       <span class="crow-icon" style={{ ['--c' as string]: def.color }}>
-        <Icon name={def.icon} size={18} />
+        <Icon name={def.icon} size={14} />
       </span>
       <span class="crow-text">
         <span class="crow-line">
           <span class="crow-title">{def.title}</span>
-          <Chip>{CADENCE_LABEL[def.cadence]}</Chip>
-          {def.coverage && def.coverage !== 'Welt' && <Chip>{def.coverage}</Chip>}
-          <KeyChip def={def} />
+          {area && <span class="crow-area">{area}</span>}
+          <KeyMark def={def} />
         </span>
-        <span class="crow-summary">{showCat ? `${showCat}: ` : ''}{def.summary}</span>
+        {snippet && <span class="crow-snippet">{snippet}</span>}
       </span>
       <span class="crow-state" aria-hidden="true">
         {state === true ? <Icon name="check" size={16} /> : state === false ? <Icon name="eye-off" size={16} /> : <Icon name="plus" size={16} />}
@@ -91,12 +101,19 @@ export function Catalog() {
         .map((def) => ({ def, s: scoreLayer(def, q) }))
         .filter((r) => r.s > 0)
         .sort((a, b) => b.s - a.s || a.def.title.localeCompare(b.def.title, 'de'))
-        .map((r): Item => ({ kind: 'row', id: r.def.id, def: r.def, cat: categoryById(r.def.category).title }));
+        .map((r): Item => ({ kind: 'row', id: r.def.id, def: r.def, snippet: matchSnippet(r.def, q) }));
     }
-    return layersByCategory().flatMap((g): Item[] => [
-      { kind: 'head', id: `h-${g.category.id}`, title: g.category.title, icon: g.category.icon, count: g.layers.length },
-      ...g.layers.map((def): Item => ({ kind: 'row', id: def.id, def })),
-    ]);
+    return layersByCategory().flatMap((g): Item[] => {
+      const fields = g.layers.filter((d) => d.exclusive === 'field');
+      const rest = g.layers.filter((d) => d.exclusive !== 'field');
+      const row = (def: LayerDef): Item => ({ kind: 'row', id: def.id, def });
+      return [
+        { kind: 'head', id: `h-${g.category.id}`, title: g.category.title, icon: g.category.icon, count: g.layers.length },
+        ...(fields.length ? [{ kind: 'sub', id: `s-f-${g.category.id}`, title: 'Felder · eines gleichzeitig' } as Item, ...fields.map(row)] : []),
+        ...(fields.length && rest.length ? [{ kind: 'sub', id: `s-r-${g.category.id}`, title: 'Weitere' } as Item] : []),
+        ...rest.map(row),
+      ];
+    });
   }, [q]);
 
   const rowIdx = useMemo(() => items.map((it, i) => (it.kind === 'row' ? i : -1)).filter((i) => i >= 0), [items]);
@@ -161,7 +178,7 @@ export function Catalog() {
           <VirtualList
             class="cat-scroll"
             items={items}
-            rowHeight={(it) => (it.kind === 'head' ? 36 : 52)}
+            rowHeight={(it) => (it.kind === 'head' ? 36 : it.kind === 'sub' ? 24 : (isMobile.value ? 44 : 36) + (it.snippet ? 16 : 0))}
             itemKey={(it) => it.id}
             scrollToIndex={rowIdx[a]}
             render={(it, i) =>
@@ -171,8 +188,12 @@ export function Catalog() {
                   <span>{it.title}</span>
                   <span class="num chead-n">{it.count}</span>
                 </div>
+              ) : it.kind === 'sub' ? (
+                <div class="csub" role="presentation">
+                  {it.title}
+                </div>
               ) : (
-                <Row def={it.def} showCat={it.cat} active={i === rowIdx[a]} state={mem.get(it.def.id)} onPick={() => (setActive(rowIdx.indexOf(i)), toggle(it.def))} />
+                <Row def={it.def} snippet={it.snippet} active={i === rowIdx[a]} state={mem.get(it.def.id)} onPick={() => (setActive(rowIdx.indexOf(i)), toggle(it.def))} />
               )
             }
           />

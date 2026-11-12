@@ -160,23 +160,3 @@ export function RemoveAction({ def, karteId }: { def: LayerDef; karteId: string 
     </div>
   );
 }
-
-/**
- * Inline settings inside the row (layers with at most two options): opacity and options. `onMore` opens the
- * detail page for source, legend and the like; `removable` only for layers the user added themselves.
- */
-export function LayerDetails({ layer, def, karteId, removable, onMore }: PartProps & { removable?: boolean; onMore?(): void }) {
-  return (
-    <div class="ld" id={`ld-${def.id}`}>
-      <LayerNotes def={def} karteId={karteId} />
-      <OpacityField layer={layer} def={def} karteId={karteId} />
-      <OptionFields layer={layer} def={def} karteId={karteId} />
-      {onMore && (
-        <button type="button" class="linkbtn ld-more" onClick={onMore}>
-          Quelle und Legende
-        </button>
-      )}
-      {removable && <RemoveAction def={def} karteId={karteId} />}
-    </div>
-  );
-}

@@ -70,8 +70,13 @@
   }
   .lname {
     flex: 1;
-    font-size: var(--fs-title);
+    font-size: 1.0625rem;
+    line-height: 1;
     font-weight: 600;
+  }
+  .lhead .orbis-mark {
+    flex: none;
+    display: block;
   }
   .lsearch-wrap {
     padding: 0 var(--s-2) var(--s-2);
@@ -118,6 +123,18 @@
   }
   .ltabs .seg {
     flex: 1;
+    animation: ltabs-in var(--dur-2, 200ms) ease-out;
+  }
+  @keyframes ltabs-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ltabs .seg {
+      animation: none;
+    }
   }
   .ltabs .seg-opt {
     gap: 6px;

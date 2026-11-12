@@ -85,34 +85,51 @@
     color: var(--text-3);
     font-weight: 400;
   }
+  .csub {
+    height: 24px;
+    display: flex;
+    align-items: flex-end;
+    padding: 0 var(--s-2) 2px 40px;
+    color: var(--text-3);
+    font-size: 11px;
+  }
   .crow {
     display: flex;
     align-items: center;
-    gap: var(--s-3);
-    height: 52px;
+    gap: var(--s-2);
+    height: 36px;
     padding: 0 var(--s-2);
     border-radius: var(--r-input);
     cursor: pointer;
     transition: background var(--t-panel) var(--ease);
   }
+  .crow.has-snippet {
+    height: 52px;
+  }
+  @media (pointer: coarse) {
+    .crow {
+      height: 44px;
+    }
+    .crow.has-snippet {
+      height: 60px;
+    }
+  }
   .crow.is-active {
     background: var(--ink-2);
+    box-shadow: inset 2px 0 0 var(--limb);
   }
   @media (hover: hover) {
     .crow:hover {
       background: var(--ink-2);
     }
   }
-  .crow.is-active {
-    box-shadow: inset 2px 0 0 var(--limb);
-  }
   .crow-icon {
     flex: none;
     display: grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--r-input);
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
     color: var(--c, var(--limb));
     background: color-mix(in oklab, var(--c, var(--limb)) 14%, transparent);
   }
@@ -121,29 +138,37 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
   }
   .crow-line {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 6px;
     min-width: 0;
   }
   .crow-title {
-    font-weight: 500;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .crow .chip {
-    height: 16px;
-    padding: 0 5px;
-    font-size: 10.5px;
+  .crow-area {
     flex: none;
-  }
-  .crow-summary {
+    color: var(--text-3);
     font-size: var(--fs-small);
-    color: var(--text-2);
+  }
+  .crow-key {
+    flex: none;
+    align-self: center;
+    display: inline-grid;
+    color: var(--text-3);
+  }
+  .crow-key.is-ok {
+    color: var(--limb);
+  }
+  .crow-snippet {
+    font-size: 11px;
+    color: var(--text-3);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -154,13 +179,11 @@
     place-items: center;
     width: 24px;
     height: 24px;
-    border-radius: 50%;
-    border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
     color: var(--text-3);
+    opacity: 0.7;
   }
   .crow.is-on .crow-state {
-    background: var(--limb);
-    border-color: var(--limb);
-    color: var(--ink-0);
+    color: var(--limb);
+    opacity: 1;
   }
 }

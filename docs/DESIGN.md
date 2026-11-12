@@ -39,6 +39,22 @@ Alle anderen Farben gehören den Daten. Die Bedienung ist sonst einfarbig.
 letzten Tage) bis Vorhersage (+72 h), mit Tag/Nacht-Schattierung für den Kartenmittelpunkt, Ereignismarken der
 aktiven Ebenen und der bernsteinfarbenen Jetzt-Linie. Alles andere bleibt still.
 
+## Marke
+
+Idee: jeder Punkt der Welt, einer leuchtet, das ist jetzt und hier. Eine Kugel aus einzelnen Punkten (Fibonacci-Verteilung,
+leicht gekippt), ein Punkt in Bernstein. Eine Geometrie, vier Fassungen (`src/ui/brand/orbis-dots.ts`, Skript
+`pnpm brand` erzeugt daraus Favicon, App-Symbole und PNGs):
+
+- **Logo** (ab 33 px): 70 große Punkte. **Klein** (17 bis 32 px): 34 Punkte. **Winzig** (bis 16 px, Favicon): 12 Punkte.
+  `<OrbisMark size>` wählt automatisch; Mindestgröße 12 px.
+- **Bewegung** (`<OrbisSpinner>`): 260 feine Punkte, dreht sich mit etwa 0,15 rad/s, der Leuchtpunkt wandert mit.
+  Nur für globale Lade- und Startzustände (Start-Splash), nie als Dauerzierde. Pausiert im Hintergrund-Tab, steht
+  bei „Bewegung reduzieren“ still.
+- **Farben**: Punkte `--limb`, Leuchtpunkt `--now`. App-Symbol: Kachel `#0b1220`, Radius 27/120, Punkte `#4f8dff`,
+  Leuchtpunkt `#ffb547`. Hell: Kachel `#eef3fb`, Punkte `#2f5fc0`. Einfarbig (`mono`): `currentColor`, Leuchtpunkt
+  größer.
+- Maskable-Symbol: Kachel randlos, Zeichen in der sicheren Zone (80 %).
+
 ## Farben
 
 Dunkel ist Standard (Karten leuchten auf dunklem Grund, Satellitenbild und Wetterfelder wirken). Hell folgt
@@ -114,34 +130,38 @@ Großschreibung nach deutscher Rechtschreibung, Satzschreibung in Schaltflächen
 - „Ebene hinzufügen“ öffnet den **Katalog** im selben Paneel (kein Modal): Suche oben, Kategorien als Abschnitte,
   je Ebene Icon in Leitfarbe, Titel, ein Satz, Abdeckung („DE“), Takt („live“, „täglich“). Ein Klick schaltet,
   das Paneel bleibt offen.
-- **Ebenenzeile** und Themenliste: siehe „Linkes Menü: Themenliste“ unten.
+- **Ebenenzeile** und Ebenenliste: siehe „Linkes Menü: Aktiv und Vorschläge“ unten.
 - **Punktabfrage**: Klick ins Leere setzt ein Fadenkreuz und zeigt im Inspektor Koordinate, Höhe über der Zeit
   des Tages (Sonnenstand) und je aktiver Feld-Ebene den Wert an dieser Stelle zur gewählten Zeit.
 - **Mauszeiger-Wert**: bei aktiver Feld-Ebene wandert der Wert an der Legende mit (kleines Dreieck auf der Skala
   plus Zahl), nicht als Tooltip am Zeiger.
 
-## Linkes Menü: Themenliste
+## Linkes Menü: Aktiv und Vorschläge
 
-Kuratierte Liste nach dem Vorbild der Apple-Seitenleiste (Vorlage: Menüs des alten Orbis).
+Schmales, dichtes Paneel (300 px, `--panel-left` und `PANEL_LEFT_PX` in `app/layout.ts` gleich halten). Zeilen
+~33 px, Schrift 13 px, Nebentext 11 px, Icons 16 px, kompakte Schalter; mobil bleiben Trefferflächen ≥ 44 px.
 
-- **Themen** sind Daten im Karten-Modell (`Karte.themes` in `src/karten/standard.ts`: Id, Titel, Icon, Ebenen-IDs).
-  Jede Standardkarte hat ihre Themen; jede Ebene der Registry steht in mindestens einem (Test `themes.test.ts`).
-  Eigene Karten haben keine Themen. Themen kommen immer aus dem Code, nie aus gespeicherten Entwürfen.
-- **Themenzeile**: Icon, Name, Zähler („3 von 4“ aktiv, sonst Anzahl), Pfeil. Ein Tipp klappt auf; mehrere dürfen
-  offen sein, der Zustand wird je Karte gemerkt (erstes Thema anfangs offen). Darunter Ebenenzeilen mit Schalter
-  (`role="switch"`), Datenalter klein rechts (Bernstein, wenn veraltet), Hinweise („Schlüssel nötig“, „Näher
-  heranzoomen“) unter dem Namen. Exklusive Feld-Ebenen: Einschalten schaltet die anderen aus.
-- **„Eigene Ebenen“**: Ebenen der Karte ohne Thema (aus dem Katalog), per Griff sortierbar (Alt+↑/↓), darunter die
-  Zeile „Ebene hinzufügen“ (öffnet den Katalog).
-- **Einstellungen, Mischregel** (`settingsMode` in `layers-panel/mode.ts`): höchstens zwei eigene Optionen und kein
-  Schlüssel: Pfeil nach unten klappt Deckkraft und Optionen in der Zeile auf. Drei oder mehr Optionen oder ein
-  Schlüssel: Pfeil nach rechts schiebt eine **Detailseite** ins Paneel (Push wie iOS, Zurück-Pfeil oben mit dem
-  Namen des Themas) mit Titel, Schalter, Daten (Abdeckung, Takt, Quelle mit Alter), Optionen in Abschnitten,
-  Deckkraft, Legende. Künftige Ebenen mit mehr Optionen wandern damit von selbst auf die Seite.
-- Mobil dieselbe Liste im Bottom-Sheet, die Detailseite schiebt sich innerhalb des Sheets herein.
-- **Bedienung**: Pfeil hoch/runter wechselt zwischen Zeilen, Pfeil rechts/links öffnet/schließt ein Thema,
-  `aria-expanded` an Themen und aufklappbaren Zeilen, Trefferflächen mobil ≥ 44 px, Animationen 200 ms und bei
-  `prefers-reduced-motion` aus.
+- **Aktiv**: alle eingeschalteten Ebenen der Karte (auch die aus Themen). Zeile: Griff, Icon, Name,
+  Datenalter/Status klein rechts (Bernstein, wenn veraltet; Hinweise wie „Schlüssel nötig“ unter dem Namen),
+  Einstellungs-Symbol (Schieberegler, Sekundärfarbe), Schalter (`role="switch"`). Reihenfolge für alle aktiven Ebenen per Griff oder Alt+↑/↓. Ausschalten nimmt die
+  Zeile heraus. Leer: „Schalte unten eine Ebene ein.“
+- **Passt zu dieser Karte**: Ebenen aus `Karte.themes` (`src/karten/standard.ts`), die nicht aktiv sind, mit Icon,
+  Name, Schalter, nach Themen gruppiert (kleine Zwischenüberschrift, nicht aufklappbar). Anfangs höchstens 6
+  Zeilen, dann „n weitere anzeigen“ (Zustand je Karte gemerkt, `themes-state.ts`). Eigene Karten ohne Themen:
+  Abschnitt entfällt.
+- **Feld** (direkt unter „Aktiv“): Exklusive Feld-Ebenen (`exclusive: 'field'`, z. B. Wind, Temperatur) sind
+  Einfachauswahl und deshalb eine Auswahlliste mit Häkchen (`role="radiogroup"`/`radio`), keine Schalter; erste
+  Zeile „Kein Feld“, die gewählte Zeile ist blau hinterlegt und zeigt Datenalter und Einstellungs-Symbol. Anfangs
+  höchstens 6 Felder (gewähltes immer sichtbar), Pfeil hoch/runter wechselt die Auswahl; Felder erscheinen nicht
+  zusätzlich in „Aktiv“ oder „Passt zu dieser Karte“. Im Katalog tragen sie den Vermerk „Feld · ersetzt das aktuelle“.
+- **Alle Ebenen**: Zeile „Katalog durchsuchen“ öffnet den Katalog.
+- **Einstellungen**: Das Schieberegler-Symbol an aktiven Zeilen und an der gewählten Feld-Zeile (`aria-label`
+  „Einstellungen <Ebene>“) und ein Klick auf den Ebenennamen schieben immer die **Detailseite** (`LayerPage`) ins
+  Paneel (Push, Zurück-Pfeil): Schalter, Quelle, Alter, Abdeckung, Optionen, Deckkraft, Legende, ggf. Schlüssel.
+  Kein Aufklappen unter der Zeile.
+- Mobil dieselbe Liste im Bottom-Sheet.
+- **Bedienung**: Pfeil hoch/runter wechselt zwischen Zeilen, `aria-expanded` an den „weitere anzeigen“-Knöpfen, Animationen
+  200 ms und bei `prefers-reduced-motion` aus.
 
 ## Aufbau Mobil (< 900 px)
 
@@ -165,6 +185,13 @@ Kuratierte Liste nach dem Vorbild der Apple-Seitenleiste (Vorlage: Menüs des al
   sichtbaren Rest bleibt (`padding` der Kamera).
 - Zeitleiste ist in Stufe 1 immer erreichbar, Scrubben mit dem Daumen, haptisches Ticken an Tagesgrenzen
   (`navigator.vibrate`, wenn vorhanden).
+
+## Karten: Ansichten und eigene Karten
+
+- **Standardkarten sind Ansichten.** Ebenen der eigenen Themen schalten, Feld wählen, Optionen dieser Ebenen gelten nie als Änderung; sie werden still je Karte gemerkt und beim nächsten Start wiederhergestellt. Nur ein Umbau zählt: Ebene aus dem Katalog, geänderte Reihenfolge oder Deckkraft, andere Grundkarte/Ortsnamen/Tag-Nacht-Linie, Name oder Symbol.
+- **Kartenleiste:** volle Breite, keine Dauer-Knöpfe. Der Punkt an der Pille und die schmale Glaszeile „<Name> angepasst“ (Sichern als Karte, Verwerfen) erscheinen nur bei echtem Umbau. Verwerfen entfernt nur den Umbau und bietet Rückgängig.
+- **„Alle Karten“** (Knopf am Ende der Leiste, immer da; bei Überlauf „+n“): Standardkarten, Eigene Karten, „Neue Karte“. Jede Zeile hat „⋯“: Standardkarte mit Auf Startansicht zurücksetzen, Duplizieren, Link kopieren; eigene Karte mit Umbenennen/Symbol/Farbe, Duplizieren, Link kopieren, Löschen (mit Bestätigung). Das Popover liegt neben, nicht in der geclippten Tab-Fläche, und scrollt bei vielen Karten.
+- **Eigene Karten** speichern jede Änderung sofort; sie haben keinen „geändert“-Zustand. Mobil gilt dasselbe (Schalter, Liste, Änderungszeile im Sheet).
 
 ## Verhalten
 

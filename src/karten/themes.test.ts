@@ -8,9 +8,13 @@ describe('themes of the standard Karten', () => {
     const missing = themes.flatMap((t) => t.layers.filter((id) => !hasLayer(id)).map((id) => `${t.karte}/${t.id}: ${id}`));
     expect(missing).toEqual([]);
   });
+  // Layers deliberately left out of all topics (still reachable via the catalog).
+  const NOT_IN_THEMES = new Set([
+    'radar-de', // subset of 'radar'
+  ]);
   it('cover every layer at least once', () => {
     const used = new Set(themes.flatMap((t) => t.layers));
-    expect(allLayers().map((l) => l.id).filter((id) => !used.has(id))).toEqual([]);
+    expect(allLayers().map((l) => l.id).filter((id) => !used.has(id) && !NOT_IN_THEMES.has(id))).toEqual([]);
   });
   it('has unique topic ids per Karte and no layer twice in one topic', () => {
     for (const k of STANDARD_DEFS) {

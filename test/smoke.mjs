@@ -248,6 +248,41 @@ async function main() {
     });
     report(camWrites <= 25, '7 camera signal writes throttled', `${camWrites} writes during 1.5 s ease`);
 
+    // rubber band: right-button drag pulls the tilt past the zoom's limit / the bearing away from north (zoom < 5) with
+    // growing resistance (steps shrink, no wall); the release eases back
+    {
+      const drag = async (zoom, dx, dy, read) => {
+        await page.evaluate((zoom) => { const o = window.__orbis; o.view.setProjection('mercator'); o.engine.ml.jumpTo({ center: [11.5, 48.1], zoom, pitch: 0, bearing: 0 }); }, zoom);
+        await sleep(400);
+        const x0 = 640, y0 = dy ? 700 : 400;
+        await page.mouse.move(x0, y0);
+        await page.mouse.down({ button: 'right' });
+        const vals = [];
+        for (let i = 1; i <= 20; i++) {
+          await page.mouse.move(x0 + (dx * i) / 20, y0 + (dy * i) / 20);
+          await sleep(30);
+          vals.push(await page.evaluate(read));
+        }
+        await page.mouse.up({ button: 'right' });
+        await sleep(700);
+        return { vals, end: await page.evaluate(read) };
+      };
+      const incs = (v) => v.map((x, i) => Math.abs(x - (i ? v[i - 1] : 0)));
+      const fmt = (a) => a.map((x) => x.toFixed(1)).join(' ');
+      const t = await drag(14, 0, -600, () => window.__orbis.engine.ml.getPitch());
+      const lim = 70;
+      const iT = incs(t.vals);
+      const over = t.vals.map((v, i) => [v, iT[i]]).filter(([v]) => v > lim + 0.01).map(([, d]) => d);
+      const tiltOk = over.length >= 3 && over.every((d, i) => !i || d < over[i - 1] + 1e-6) && over[over.length - 1] < 0.35 * over[0] && Math.max(...t.vals) < lim + 20 && Math.abs(t.end - lim) < 1;
+      report(tiltOk, 'rubber band: tilt past the limit gets harder, rebounds', `max ${Math.max(...t.vals).toFixed(1)} end ${t.end.toFixed(1)} steps ${fmt(iT)}`);
+      const b = await drag(3, 1000, 0, () => window.__orbis.engine.ml.getBearing());
+      const iB = incs(b.vals.map((v) => Math.abs(v)));
+      const bigB = iB.slice(5);
+      const bearOk = Math.abs(b.vals[19]) > 20 && bigB[bigB.length - 1] < 0.6 * Math.max(...iB) && bigB[bigB.length - 1] < bigB[0] && Math.abs(((b.end + 180) % 360 + 360) % 360 - 180) < 1;
+      report(bearOk, 'rubber band: rotation away from north (zoom 3) gets harder, rebounds', `max ${Math.max(...b.vals.map(Math.abs)).toFixed(1)} end ${b.end.toFixed(1)} steps ${fmt(iB)}`);
+      await page.evaluate(() => window.__orbis.engine.ml.jumpTo({ zoom: 4, pitch: 0, bearing: 0 }));
+    }
+
     // 3. basemaps + projection
     const errBefore = errors.length;
     const bmFail = [];
@@ -365,7 +400,9 @@ async function main() {
         const feats = ml.queryRenderedFeatures({ layers: ids }).filter((f) => f.geometry.type === 'Point');
         for (const f of feats) {
           const p = ml.project(f.geometry.coordinates);
-          if (p.x > 40 && p.y > 40 && p.x < box.width - 40 && p.y < box.height - 40) return { x: box.left + p.x, y: box.top + p.y, n: feats.length, ids };
+          // the point must really hit the map: the floating panels (left nav, bars, tools) sit above the canvas
+          const top = document.elementFromPoint(box.left + p.x, box.top + p.y);
+          if (p.x > 40 && p.y > 40 && p.x < box.width - 40 && p.y < box.height - 40 && top && ml.getCanvasContainer().contains(top)) return { x: box.left + p.x, y: box.top + p.y, n: feats.length, ids };
         }
         return { n: feats.length, ids };
       });

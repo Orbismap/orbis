@@ -78,6 +78,10 @@
     height: 100%;
     overflow: visible;
   }
+  .compass-ring {
+    transform-box: view-box;
+    transform-origin: 26px 26px; /* turned per frame from script: no transition */
+  }
   .compass-round .tick {
     stroke: var(--text-3);
     stroke-width: 1;

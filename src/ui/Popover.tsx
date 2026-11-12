@@ -18,10 +18,11 @@ export interface PopoverProps {
   /** Element(s) that toggle it; clicks on them are not "outside". */
   anchorRef?: { current: HTMLElement | null };
   menu?: boolean;
+  style?: Record<string, string | number>;
 }
 
 /** Anchored popover: Escape and outside press close it, focus returns to the anchor's first button. */
-export function Popover({ open, onClose, children, align = 'start', up, class: cls, label, anchorRef, menu }: PopoverProps) {
+export function Popover({ open, onClose, children, align = 'start', up, class: cls, label, anchorRef, menu, style }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEscape(open, onClose);
   useOutside(open, anchorRef ?? ref, onClose);
@@ -39,7 +40,7 @@ export function Popover({ open, onClose, children, align = 'start', up, class: c
     else if (e.key === 'End') (e.preventDefault(), items[items.length - 1]?.focus());
   };
   return (
-    <div ref={ref} class={cx('popover', `popover-${align}`, up && 'popover-up', cls)} role={menu ? 'menu' : 'dialog'} aria-label={label} onKeyDown={onKey}>
+    <div ref={ref} class={cx('popover', `popover-${align}`, up && 'popover-up', cls)} style={style} role={menu ? 'menu' : 'dialog'} aria-label={label} onKeyDown={onKey}>
       {children}
     </div>
   );

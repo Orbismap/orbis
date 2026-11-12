@@ -1,31 +1,33 @@
 import { signal } from '@preact/signals';
 import { getJSON, setJSON } from '../../core/storage';
 
-const KEY = 'themes-open';
+const KEY = 'suggest-all';
 const VERSION = 1;
-type OpenMap = Record<string, string[]>;
 
-const validate = (raw: unknown): OpenMap | undefined => {
-  if (!raw || typeof raw !== 'object') return undefined;
-  const out: OpenMap = {};
-  for (const [k, v] of Object.entries(raw)) if (Array.isArray(v)) out[k] = v.filter((x): x is string => typeof x === 'string');
-  return out;
-};
+const validate = (raw: unknown): string[] | undefined => (Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : undefined);
 
-/** Open topics per Karte id. A Karte without an entry shows its first topic open. */
-export const openThemes = signal<OpenMap>(getJSON(KEY, VERSION, validate, {}));
+/** Karte ids whose suggestions are fully unfolded ("n weitere anzeigen" was used). */
+export const suggestAll = signal<string[]>(getJSON(KEY, VERSION, validate, []));
 
-export const isThemeOpen = (karteId: string, themeId: string, firstId: string | undefined): boolean =>
-  (openThemes.value[karteId] ?? (firstId ? [firstId] : [])).includes(themeId);
+export const isSuggestAll = (karteId: string): boolean => suggestAll.value.includes(karteId);
 
-export function setThemeOpen(karteId: string, themeId: string, open: boolean, firstId?: string): void {
-  const cur = openThemes.peek()[karteId] ?? (firstId ? [firstId] : []);
-  const next = open ? [...cur.filter((t) => t !== themeId), themeId] : cur.filter((t) => t !== themeId);
-  openThemes.value = { ...openThemes.peek(), [karteId]: next };
-  setJSON(KEY, VERSION, openThemes.peek());
+export function setSuggestAll(karteId: string, all: boolean): void {
+  const rest = suggestAll.peek().filter((id) => id !== karteId);
+  suggestAll.value = all ? [...rest, karteId] : rest;
+  setJSON(KEY, VERSION, suggestAll.peek());
 }
 
 /** Detail page (push navigation) shown inside the layer list; `from` is the label of the back button. */
 export const detailPage = signal<{ karteId: string; layerId: string; from: string } | null>(null);
 export const openDetail = (karteId: string, layerId: string, from: string) => (detailPage.value = { karteId, layerId, from });
 export const closeDetail = () => (detailPage.value = null);
+
+const FKEY = 'field-all';
+/** Karte ids whose field list is fully unfolded. */
+export const fieldAll = signal<string[]>(getJSON(FKEY, VERSION, validate, []));
+export const isFieldAll = (karteId: string): boolean => fieldAll.value.includes(karteId);
+export function setFieldAll(karteId: string, all: boolean): void {
+  const rest = fieldAll.peek().filter((id) => id !== karteId);
+  fieldAll.value = all ? [...rest, karteId] : rest;
+  setJSON(FKEY, VERSION, fieldAll.peek());
+}

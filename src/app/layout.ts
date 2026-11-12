@@ -7,6 +7,8 @@ import { padding, setPadding, type Padding } from '../state/view';
 
 /** Visible height of the mobile sheet and of the desktop bottom dock (px), written by their components. */
 export const sheetPx = signal(0);
+/** Left panel width (px); keep equal to --panel-left in ui/tokens.css. Map inset = panel + edge (12) + gap (8). */
+export const PANEL_LEFT_PX = 300;
 export const dockPx = signal(90);
 let raf = 0;
 
@@ -41,7 +43,7 @@ export function startPadding(): () => void {
     if (mobile) {
       animateTo({ top: 64, right: 0, bottom: selected ? 0 : Math.max(0, sheetPx.value), left: 0 });
     } else {
-      animateTo({ top: 0, right: 70, bottom: dockPx.value + 40, left: left ? 360 : 0 });
+      animateTo({ top: 0, right: 70, bottom: dockPx.value + 40, left: left ? PANEL_LEFT_PX + 20 : 0 });
     }
   });
   return () => {

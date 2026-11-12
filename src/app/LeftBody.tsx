@@ -1,4 +1,4 @@
-import { computed } from '@preact/signals';
+import { computed, effect } from '@preact/signals';
 import { activeKarte } from '../state/session';
 import { feedEntries } from '../features/feed/Feed';
 import { Feed } from '../features/feed/Feed';
@@ -11,14 +11,24 @@ import { Segmented } from '../ui/Segmented';
 import { ScrollArea } from '../ui/ScrollArea';
 import { formatCompact } from '../core/format';
 
+/** Feed tab is only offered while the active layers have entries. */
+const hasFeed = computed(() => feedEntries.value.length > 0);
+
+effect(() => {
+  if (!hasFeed.value && leftTab.peek() === 'feed') leftTab.value = 'layers';
+});
+
 const visibleCount = computed(() => activeKarte.value.layers.filter((l) => l.visible).length);
 
 function Tabs() {
   const tab = leftTab.value;
   const mobile = isMobile.value;
   const n = feedEntries.value.length;
+  const showTabs = hasFeed.value;
+  if (!showTabs && !mobile) return null;
   return (
     <div class="ltabs">
+      {showTabs && (
       <Segmented
         aria-label="Ansicht"
         size="md"
@@ -29,6 +39,7 @@ function Tabs() {
           { value: 'feed', label: <>Aktuell {n ? <span class="ltab-n num">{formatCompact(n)}</span> : null}</> },
         ]}
       />
+      )}
       {mobile && (
         <Button class="ltabs-add" variant="secondary" icon="plus" onClick={() => (leftView.value = 'catalog')}>
           Hinzufügen
@@ -51,7 +62,7 @@ export function LeftBody() {
   return (
     <>
       <Tabs />
-      {leftTab.value === 'feed' ? (
+      {leftTab.value === 'feed' && hasFeed.value ? (
         <Feed />
       ) : (
         <ScrollArea class="lbody">

@@ -50,6 +50,28 @@ export function scoreLayer(d: LayerDef, query: string): number {
   return sum;
 }
 
+/** Short grey hint for search hits that are not in the title (keyword or summary match). */
+export function matchSnippet(d: LayerDef, query: string): string | undefined {
+  const tokens = norm(query).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return undefined;
+  const f = fields(d);
+  const missing = tokens.filter((t) => !f.title.includes(t));
+  if (!missing.length) return undefined;
+  const t = missing[0]!;
+  const at = f.summary.indexOf(t);
+  if (at >= 0) {
+    const s = d.summary;
+    const from = Math.max(0, at - 18);
+    const cut = from > 0 ? s.indexOf(' ', from) : 0;
+    const start = cut < 0 || cut > at ? from : cut + (from > 0 ? 1 : 0);
+    return (start > 0 ? '… ' : '') + s.slice(start, start + 60).trimEnd() + (start + 60 < s.length ? ' …' : '');
+  }
+  const kw = (d.keywords ?? []).find((k) => norm(k).includes(t));
+  if (kw) return `Stichwort: ${kw}`;
+  if (f.category.includes(t)) return undefined;
+  return d.summary;
+}
+
 /** Generic label scoring for the global search (commands, Karten). */
 export function scoreText(label: string, query: string, extra: string[] = []): number {
   const tokens = norm(query).split(/\s+/).filter(Boolean);

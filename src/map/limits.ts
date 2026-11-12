@@ -4,13 +4,18 @@
 // restore a squeezed tilt: the animation only interpolates values it was asked to change.
 import type { Map as MlMap } from 'maplibre-gl';
 import { reducedMotion } from '../state/settings';
-import { BEARING_STRETCH, NORTH_MAX_ZOOM, REBOUND_MS, STRETCH_PITCH_CEILING, needsNorthReset, pitchStretch, rubberBand, tiltAvailable, tiltLimit, wrapBearing } from './camera';
+import { BEARING_FREE, BEARING_STRETCH, NORTH_MAX_ZOOM, REBOUND_MS, REBOUND_SNAP_BELOW, STRETCH_PITCH_CEILING, TILT_ROOM, needsNorthReset, pitchStretch, reboundDuration, reboundExcess, rubberBand, rubberBandInverse, tiltAvailable, tiltLimit, wrapBearing } from './camera';
 
 type Tr = { setMaxPitch(p: number): void; setBearing(b: number): void; setPitch(p: number): void };
 interface CameraInternals { applyTransformChange(change: (tr: Tr) => void): void }
 
 export const NORTH_EASE_MS = REBOUND_MS;
-const easeOutCubic = (p: number) => 1 - Math.pow(1 - p, 3);
+
+/** The tilt slider stretches past its end like a drag does: it reports the raw (unclamped) tilt, the limit writes the stretched one. */
+export interface TiltStretch { begin(): void; to(rawPitch: number): void; end(): void }
+export const tiltStretch = new WeakMap<MlMap, TiltStretch>();
+const bearingSoft = (raw: number) => Math.sign(raw) * rubberBand(Math.abs(raw), BEARING_FREE, BEARING_STRETCH);
+const bearingRaw = (v: number) => Math.sign(v) * rubberBandInverse(Math.abs(v), BEARING_FREE, BEARING_STRETCH);
 
 export interface CameraLimits {
   /** Prepares the limit for a target zoom before a jump/flight that sets zoom and pitch together. */
@@ -26,15 +31,18 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
     else fn({ setMaxPitch: (p) => ml.setMaxPitch(p), setBearing: (b) => ml.setBearing(b), setPitch: (p) => ml.setPitch(p) });
   };
 
-  // A gesture (mouse, touch) may pull a little past the limits against growing resistance (rubber band); on release
-  // the camera eases back onto the limit. While a gesture runs or the rebound plays, the transform gets room above the limit.
-  let down = false;
-  let rotating = false;
+  // State machine: idle -> gesture (a pointer is down) -> rebound (own rAF animation) -> idle. The transform only gets room
+  // above the limit outside idle; the room is withdrawn once the rebound is over (never earlier, or MapLibre clamps at once).
+  const pointers = new Set<number>();
+  let rotating = false; // rotation without a pointer (keyboard); pointer rotations are taken over at release
   let raf = 0;
   let rawP = 0;
   let lastP = 0;
   let rawB = 0;
   let lastB = 0;
+  let own: { id: number; x: number; y: number; rawB: number; rawP: number } | null = null; // right/ctrl mouse drag (our own, see below)
+  let slider = false; // the tilt slider is being dragged
+  const gesture = () => pointers.size > 0 || slider;
 
   const setMax = (v: number) => {
     if (Math.abs(ml.getMaxPitch() - v) < 1e-6) return;
@@ -43,7 +51,7 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
   };
   const maxFor = (zoom: number) => {
     const lim = tiltLimit(zoom);
-    return down || raf ? Math.min(STRETCH_PITCH_CEILING, lim + pitchStretch(lim)) : lim;
+    return gesture() || rotating || raf ? Math.min(STRETCH_PITCH_CEILING, lim + TILT_ROOM) : lim;
   };
   const ensureFor = (zoom: number) => setMax(maxFor(zoom));
 
@@ -60,21 +68,24 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
   };
 
   // ---- rebound: ease pitch and bearing back onto what the zoom allows (after a stretched gesture, or north-up when zoomed
-  // out); done on the transform, so a running zoom animation is left alone ----
+  // out); own rAF on the transform (no easeTo: MapLibre inertia / stop() cannot cancel it, a running zoom is left alone).
+  // The overshoot shrinks while the target follows the CURRENT limit, so zooming meanwhile does not make it jump. ----
   const cancelRebound = () => {
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
   };
   const startRebound = (fromGesture = false) => {
-    if (raf || down || rotating) return;
+    if (raf || gesture() || rotating) return;
     const z0 = ml.getZoom();
-    const overP = ml.getPitch() - tiltLimit(z0) > 0.01 && ml.getMaxPitch() > tiltLimit(z0) + 1e-6;
+    const excessP = ml.getPitch() - tiltLimit(z0);
+    const overP = excessP > 0.01 && ml.getMaxPitch() > tiltLimit(z0) + 1e-6;
     const overB = needsNorthReset(z0, ml.getBearing());
     if (!overP && !overB) {
-      if (fromGesture) syncLimits();
+      syncLimits();
       return;
     }
-    if (reducedMotion()) {
+    const animP = overP && excessP >= REBOUND_SNAP_BELOW;
+    if (reducedMotion() || (!animP && !overB)) {
       change((tr) => {
         if (overP) tr.setPitch(tiltLimit(ml.getZoom()));
         if (overB) tr.setBearing(0);
@@ -84,29 +95,29 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
       onBearingFrame();
       return;
     }
-    const p0 = ml.getPitch();
     const b0 = wrapBearing(ml.getBearing());
+    const dur = Math.max(animP ? reboundDuration(excessP) : 0, overB ? reboundDuration(b0, BEARING_STRETCH) : 0);
     const t0 = performance.now();
     let first = true;
     const step = (now: number) => {
-      // a pointer inertia (easeTo after the release) would fight the rebound; raf stays set meanwhile (keeps the room above the limit)
+      // a pointer inertia (easeTo after the release) would fight the rebound
       if (first && fromGesture && ml.isMoving()) ml.stop();
       first = false;
       raf = 0;
-      if (down || rotating) return;
+      if (gesture() || rotating) return; // a new gesture took over; it continues from the current value
       const z = ml.getZoom();
-      const p = Math.min(1, (now - t0) / REBOUND_MS);
-      const k = 1 - easeOutCubic(p);
+      const elapsed = now - t0;
+      const done = elapsed >= dur;
       const target = tiltLimit(z);
-      const pitch = overP ? (p >= 1 ? target : target + Math.max(0, p0 - target) * k) : undefined;
-      const bearing = overB && z < NORTH_MAX_ZOOM ? (p >= 1 ? 0 : b0 * k) : undefined;
+      const pitch = animP ? target + reboundExcess(excessP, elapsed, dur) : undefined;
+      const bearing = overB && z < NORTH_MAX_ZOOM ? reboundExcess(b0, elapsed, dur) : undefined;
       change((tr) => {
         if (pitch !== undefined) tr.setPitch(Math.min(pitch, ml.getMaxPitch()));
         if (bearing !== undefined) tr.setBearing(bearing);
       });
       ml.triggerRepaint();
       onBearingFrame();
-      if (p < 1) raf = requestAnimationFrame(step);
+      if (!done) raf = requestAnimationFrame(step);
       else syncLimits();
     };
     raf = requestAnimationFrame(step);
@@ -116,7 +127,7 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
   // ---- rubber band while a gesture runs: pitch and bearing changes of the gesture are summed up unclamped ("raw") and
   // written back stretched ----
   const onGestureMove = () => {
-    if (!down) return;
+    if (!gesture() || own || slider) return; // mouse drags and the slider write their own stretched values
     const z = ml.getZoom();
     const lim = tiltLimit(z);
     const dp = ml.getPitch() - lastP;
@@ -131,28 +142,84 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
       lastB = ml.getBearing();
     } else if (Math.abs(db) > 1e-6) {
       rawB += db;
-      lastB = Math.sign(rawB) * rubberBand(Math.abs(rawB), 0, BEARING_STRETCH);
+      lastB = bearingSoft(rawB);
       change((tr) => tr.setBearing(lastB));
     }
     onBearingFrame();
   };
-  const onDown = () => {
+  const onDown = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') pointers.clear(); // a lost mouseup must not keep the gesture alive
+    const wasGesture = gesture();
+    pointers.add(e.pointerId);
+    rotating = false;
+    if (wasGesture) return;
     cancelRebound();
-    down = true;
-    rawP = lastP = ml.getPitch();
+    // take over a stretched camera (e.g. mid-rebound) without a jump: the raw value is the inverse of the stretch
+    const z = ml.getZoom();
+    const lim = tiltLimit(z);
+    lastP = ml.getPitch();
+    rawP = rubberBandInverse(lastP, lim, pitchStretch(lim));
     lastB = ml.getBearing();
-    rawB = wrapBearing(lastB);
+    rawB = z < NORTH_MAX_ZOOM ? bearingRaw(wrapBearing(lastB)) : wrapBearing(lastB);
+    if (e.pointerType === 'mouse' && (e.button === 2 || (e.button === 0 && (e.ctrlKey || e.metaKey)))) {
+      // right button / ctrl+left: our own rotate+tilt drag (MapLibre's dragRotate is off); raw angles are summed here
+      own = { id: e.pointerId, x: e.clientX, y: e.clientY, rawB, rawP };
+      try { container.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+      e.preventDefault();
+    }
     syncLimits();
   };
-  const onUp = () => {
-    if (!down) return;
-    down = false;
+  const release = (e?: PointerEvent) => {
+    if (!gesture()) return;
+    if (e && e.pointerType !== 'mouse') pointers.delete(e.pointerId);
+    else pointers.clear();
+    if (gesture()) return; // another finger is still down
+    rotating = false;
+    own = null;
     startRebound(true);
   };
+  const onUp = (e: PointerEvent) => release(e);
+  const onLost = () => release();
   const container = ml.getCanvasContainer();
   container.addEventListener('pointerdown', onDown);
   window.addEventListener('pointerup', onUp);
   window.addEventListener('pointercancel', onUp);
+  window.addEventListener('mouseup', onLost);
+  window.addEventListener('blur', onLost);
+  // macOS fires contextmenu on mousedown: releasing the gesture there (as before) ended every right-drag at once
+  const onContext = (e: Event) => e.preventDefault();
+  container.addEventListener('contextmenu', onContext);
+  // like MapLibre's own: 0.8 degrees of bearing per pixel across, 0.5 degrees of tilt per pixel up
+  const onPointerMove = (e: PointerEvent) => {
+    if (!own || e.pointerId !== own.id) return;
+    if (e.buttons === 0) return release();
+    own.rawB += (e.clientX - own.x) * 0.8;
+    own.rawP = Math.max(0, own.rawP - (e.clientY - own.y) * 0.5);
+    own.x = e.clientX;
+    own.y = e.clientY;
+    const z = ml.getZoom();
+    const lim = tiltLimit(z);
+    ml.jumpTo({ bearing: z < NORTH_MAX_ZOOM ? bearingSoft(own.rawB) : own.rawB, pitch: rubberBand(own.rawP, lim, pitchStretch(lim)) });
+  };
+  container.addEventListener('pointermove', onPointerMove);
+  const wasDragRotate = ml.dragRotate.isEnabled();
+  ml.dragRotate.disable();
+  tiltStretch.set(ml, {
+    begin() {
+      cancelRebound();
+      slider = true;
+      syncLimits();
+    },
+    to(raw) {
+      const lim = tiltLimit(ml.getZoom());
+      ml.jumpTo({ pitch: rubberBand(Math.max(0, raw), lim, pitchStretch(lim)) });
+    },
+    end() {
+      if (!slider) return;
+      slider = false;
+      startRebound(true);
+    },
+  });
 
   const onMove = () => {
     onGestureMove();
@@ -160,6 +227,7 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
     startNorth();
   };
   const onRotateStart = () => {
+    if (gesture()) return;
     rotating = true;
     cancelRebound();
   };
@@ -186,6 +254,12 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
       container.removeEventListener('pointerdown', onDown);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('mouseup', onLost);
+      container.removeEventListener('contextmenu', onContext);
+      container.removeEventListener('pointermove', onPointerMove);
+      tiltStretch.delete(ml);
+      if (wasDragRotate) ml.dragRotate.enable();
+      window.removeEventListener('blur', onLost);
       ml.jumpTo = jumpTo;
       ml.off('move', onMove);
       ml.off('zoomend', onMove);

@@ -56,6 +56,7 @@ import { overpassRoutes } from './oepnv';
 import { overpassRoadmarks } from './roadmark';
 import { gbfsStations } from './gbfs';
 import { blitzerdeMarkers } from './blitzerde';
+import { radarFlow, radarTile } from './radar';
 import { decodeOwx } from '../owx/decode';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -135,6 +136,8 @@ export const parsers = {
   npsCameras,
   windyCameras,
   camdirMap,
+  radarTile,
+  radarFlow,
 } satisfies Record<string, Parser>;
 
 export type ParserName = keyof typeof parsers;

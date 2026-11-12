@@ -1,7 +1,7 @@
 @layer features {
   .llist {
     list-style: none;
-    margin: 0 8px 8px;
+    margin: 0 6px 2px;
     padding: 0;
     display: flex;
     flex-direction: column;
@@ -11,20 +11,17 @@
     position: relative;
     transition: background var(--t-panel) var(--ease);
     content-visibility: auto;
-    contain-intrinsic-size: auto 52px;
+    contain-intrinsic-size: auto 34px;
   }
   .lrow + .lrow::before {
     content: '';
     position: absolute;
     top: 0;
-    left: 48px;
+    left: 36px;
     right: 0;
     height: 1px;
     background: var(--g-sep);
     pointer-events: none;
-  }
-  .lrow.is-open {
-    background: color-mix(in srgb, var(--g-fill) 70%, transparent);
   }
   .lrow.is-dragging {
     z-index: 3;
@@ -41,19 +38,19 @@
   .lrow-main {
     display: flex;
     align-items: center;
-    min-height: 48px;
-    padding: 0 4px 0 8px;
+    min-height: max(33px, var(--hit, 28px));
+    padding: 0 2px 0 6px;
   }
   .lrow-grip {
     flex: none;
     display: grid;
     place-items: center;
     width: 14px;
-    height: 36px;
+    height: 30px;
     margin-left: -6px;
     color: var(--text-3);
     cursor: grab;
-    opacity: 0;
+    opacity: 0.45;
     touch-action: none;
     transition: opacity var(--t-panel) var(--ease);
   }
@@ -76,10 +73,10 @@
     flex: none;
     display: grid;
     place-items: center;
-    width: 30px;
-    height: 30px;
-    margin: 0 10px 0 2px;
-    border-radius: 9px;
+    width: 22px;
+    height: 22px;
+    margin: 0 8px 0 2px;
+    border-radius: 6px;
     color: var(--c, var(--limb));
     background: color-mix(in srgb, var(--c, var(--limb)) 18%, transparent);
     transition: opacity var(--t-panel) var(--ease);
@@ -94,12 +91,12 @@
     align-items: center;
     align-self: stretch;
     gap: 6px;
-    min-height: max(44px, var(--hit, 28px));
+    min-height: max(33px, var(--hit, 28px));
     text-align: left;
   }
   .lrow-trail {
     flex: none;
-    font-size: var(--fs-small);
+    font-size: 11px;
     color: var(--text-3);
   }
   .lrow-trail.is-stale {
@@ -107,13 +104,17 @@
   }
   .lrow-switch {
     flex: none;
-    padding: 0 8px 0 4px;
+    padding: 0 6px 0 4px;
+    transform: scale(0.85);
+    transform-origin: right center;
   }
-  .lrow-chev.is-push {
+  .lrow-chev {
+    flex: none;
+    display: grid;
+    place-items: center;
     width: 16px;
-  }
-  .lrow.is-open .lrow-chev.is-push {
-    transform: none;
+    color: var(--text-3);
+    pointer-events: none;
   }
   .lrow-text {
     flex: 1;
@@ -124,7 +125,7 @@
     gap: 1px;
   }
   .lrow-title {
-    font-size: var(--fs-title);
+    font-size: 13px;
     font-weight: 500;
     line-height: 1.25;
     overflow: hidden;
@@ -135,7 +136,7 @@
     color: var(--text-2);
   }
   .lrow-sub {
-    font-size: var(--fs-small);
+    font-size: 11px;
     line-height: 1.25;
     color: var(--text-2);
     overflow: hidden;
@@ -151,18 +152,6 @@
   }
   .lrow-sub.is-error {
     color: var(--alert);
-  }
-  .lrow-chev {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 22px;
-    color: var(--text-3);
-    transition: transform var(--t-panel) var(--ease);
-    pointer-events: none;
-  }
-  .lrow.is-open .lrow-chev {
-    transform: rotate(180deg);
   }
   .lrow-strip {
     position: absolute;
@@ -191,10 +180,8 @@
     }
   }
   @media (hover: hover) {
-  @media (hover: hover) {
     .lrow:hover .lrow-grip {
-        opacity: 1;
-      }
+      opacity: 1;
     }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -205,20 +192,7 @@
     }
   }
 
-  /* expanded details */
-  .ld {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-3);
-    padding: var(--s-1) var(--s-4) var(--s-3) 48px;
-    animation: ld-in var(--t-panel) var(--ease);
-  }
-  @keyframes ld-in {
-    from {
-      opacity: 0;
-      transform: translateY(-4px);
-    }
-  }
+  /* shared by the detail page */
   .ld-field {
     display: flex;
     flex-direction: column;
@@ -237,9 +211,6 @@
     font-size: var(--fs-small);
     font-weight: 500;
     color: var(--text-1);
-  }
-  .ld .slider {
-    margin: 0 -8px;
   }
   .ld-legend {
     padding-top: 2px;
@@ -317,8 +288,8 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    height: 28px;
-    padding: 0 10px 0 8px;
+    height: 24px;
+    padding: 0 8px 0 6px;
     margin-right: 2px;
     border-radius: var(--r-round);
     background: var(--limb-quiet);
@@ -327,89 +298,117 @@
     font-weight: 500;
   }
 
-  /* topic list */
+  /* active + suggestions */
   .lnav {
     display: flex;
     flex-direction: column;
-    gap: 2px;
     padding: 0 0 var(--s-3);
   }
-  .ltheme-head,
-  .ladd {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    width: calc(100% - 16px);
-    margin: 0 8px;
-    min-height: max(44px, var(--hit, 28px));
-    padding: 0 4px 0 8px;
-    border-radius: var(--r-input);
-    text-align: left;
-    transition: background var(--t-panel) var(--ease);
-  }
-  .ltheme-head .lrow-badge,
-  .ladd .lrow-badge {
-    margin-left: 0;
-  }
-  .ltheme-title {
-    flex: 1;
-    min-width: 0;
-    font-size: var(--fs-title);
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .ltheme-count {
-    flex: none;
-    margin-right: 4px;
-    font-size: var(--fs-small);
-    color: var(--text-3);
-  }
-  .ltheme-count.is-on {
-    color: var(--limb);
-  }
-  .ltheme.is-open > .ltheme-head .lrow-chev {
-    transform: rotate(180deg);
-  }
-  .ltheme-body {
-    animation: ld-in var(--t-panel) var(--ease);
-  }
-  .ltheme-hint {
-    margin: 0 var(--s-4) var(--s-1) 48px;
-    font-size: var(--fs-small);
-    color: var(--text-3);
-  }
-  .lown {
+  .lsec {
     display: flex;
     flex-direction: column;
-    margin-top: var(--s-3);
+    margin-top: var(--s-2);
   }
-  .lown-title {
-    margin: 0 var(--s-4) var(--s-1);
-    font-size: var(--fs-small);
+  .lsec-title {
+    margin: 0 var(--s-3) 2px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--text-3);
   }
-  .lown-empty {
-    margin: 0 var(--s-4) var(--s-2);
-    font-size: var(--fs-ui);
+  .lsec-empty,
+  .lsec-hint {
+    margin: 0 var(--s-3) var(--s-1);
+    font-size: 12px;
     line-height: var(--lh-text);
     color: var(--text-2);
   }
-  .ladd {
+  .lsec-hint {
+    color: var(--text-3);
+  }
+  .lgrp-title {
+    margin: var(--s-2) var(--s-3) 0;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-3);
+  }
+  /* field choice list (single selection) */
+  .lfield.is-selected {
+    background: color-mix(in srgb, var(--limb) 14%, transparent);
+    border-radius: var(--r-input);
+  }
+  .lfield.is-selected::before,
+  .lfield.is-selected + .lfield::before {
+    display: none;
+  }
+  .lfield-radio {
+    flex: 1;
+    min-width: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: max(33px, var(--hit, 28px));
+    text-align: left;
+  }
+  .lfield-radio .lrow-title {
+    flex: 1;
+    min-width: 0;
+  }
+  .lfield-check {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 20px;
     color: var(--limb);
-    font-size: var(--fs-title);
+  }
+  .lrow-set {
+    flex: none;
+    align-self: stretch;
+    display: grid;
+    place-items: center;
+    min-width: max(28px, var(--hit, 28px));
+    color: var(--text-2);
+  }
+  @media (hover: hover) {
+    .lrow-set:hover {
+      color: var(--text-1);
+    }
+  }
+  .lfield-none {
+    --c: var(--text-3);
+  }
+  .lrow-plain {
+    padding: 0 6px 0 0;
+  }
+  .lmore,
+  .ladd {
+    display: flex;
+    align-items: center;
+    width: calc(100% - 12px);
+    margin: 0 6px;
+    min-height: max(33px, var(--hit, 28px));
+    padding: 0 2px 0 6px;
+    border-radius: var(--r-input);
+    text-align: left;
+    font-size: 13px;
+    transition: background var(--t-panel) var(--ease);
+  }
+  .lmore {
+    color: var(--limb);
+    padding-left: 10px;
+  }
+  .ladd-text {
+    flex: 1;
+    min-width: 0;
     font-weight: 500;
   }
   .ladd-badge {
     --c: var(--limb);
-    margin-right: 10px;
   }
   @media (hover: hover) {
-    .ltheme-head:hover,
+    .lmore:hover,
     .ladd:hover {
       background: var(--g-fill);
     }
@@ -521,14 +520,9 @@
   .lpage .ld-actions {
     margin-left: 0;
   }
-  .ld-more {
-    align-self: flex-start;
-  }
   @media (prefers-reduced-motion: reduce) {
     .lnav-page,
-    .lnav:not(.lnav-page),
-    .ltheme-body,
-    .ld {
+    .lnav:not(.lnav-page) {
       animation: none;
     }
   }

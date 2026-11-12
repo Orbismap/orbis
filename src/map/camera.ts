@@ -35,23 +35,43 @@ export const tiltAvailable = (zoom: number) => tiltLimit(zoom) >= TILT_FLAT_BELO
 export const clampPitch = (zoom: number, pitch: number) => Math.max(0, Math.min(pitch, tiltLimit(zoom)));
 
 /**
- * Rubber band for a gesture that pulls past a limit (Apple-style stretch): up to `limit` the value follows the input 1:1
- * (slope 1, no kink), beyond it the excess is damped exponentially towards `limit + maxOver`, so the resistance grows with
- * the pull and the value never leaves that ceiling. Pure; the release animation brings it back to `limit`.
+ * Rubber band for a gesture that pulls past a limit (Apple-style stretch): up to `limit` the value follows the input 1:1,
+ * beyond it the excess grows logarithmically, over = k * ln(1 + excess / k): slope 1 at the limit (no kink), then strictly
+ * falling, unbounded (no plateau, the growing resistance itself is the limit). `k` is the stiffness in degrees. Pure.
  */
-export function rubberBand(raw: number, limit: number, maxOver: number): number {
-  if (!(raw > limit) || !(maxOver > 0)) return raw;
-  return limit + maxOver * (1 - Math.exp(-(raw - limit) / maxOver));
+export function rubberBand(raw: number, limit: number, k: number): number {
+  if (!(raw > limit) || !(k > 0)) return raw;
+  return limit + k * Math.log(1 + (raw - limit) / k);
+}
+/** Inverse of `rubberBand` (same limit/k): the raw input that yields the stretched value `v`, so a new gesture takes over a stretched camera without a jump. */
+export function rubberBandInverse(v: number, limit: number, k: number): number {
+  if (!(v > limit) || !(k > 0)) return v;
+  return limit + k * Math.expm1((v - limit) / k);
 }
 
-/** How far a tilt may be stretched past `limit` (degrees): a little when nearly flat, up to 12 deg when the limit is large. */
-export const pitchStretch = (limit: number) => 3 + 0.3 * Math.min(30, Math.max(0, limit));
-/** How far a rotation may be stretched against north (degrees) where north is enforced. */
-export const BEARING_STRETCH = 30;
-/** Highest pitch the transform may take while a gesture stretches the tilt (below MapLibre's own ceiling). */
+/** Stiffness k of the tilt stretch (degrees), as in the old Orbis: 3, so even a long drag stretches the tilt only ~10-15 degrees. */
+export const TILT_STRETCH = 3;
+export const pitchStretch = (_limit?: number) => TILT_STRETCH;
+/** Room (degrees) the engine keeps above the zoom's limit while a gesture or the release animation runs, so the stretch can show. */
+export const TILT_ROOM = 15;
+/** Zoomed out (< NORTH_MAX_ZOOM) a rotation follows the mouse 1:1 for this many degrees (an eighth turn), then the resistance grows. */
+export const BEARING_FREE = 22.5;
+/** Stiffness k of the rotation stretch beyond BEARING_FREE (degrees), as in the old Orbis. */
+export const BEARING_STRETCH = 10;
+/** Technical safety cap for the transform's pitch while a gesture stretches the tilt (MapLibre allows 85); the log stretch never gets near it. */
 export const STRETCH_PITCH_CEILING = 85;
 /** Release animation back onto the limit (ms, ease-out). */
 export const REBOUND_MS = 400;
+
+/** Overshoot (degrees) below which the release sets the value directly instead of animating. */
+export const REBOUND_SNAP_BELOW = 0.5;
+/** Shortest release animation (ms) for a small overshoot. */
+export const REBOUND_MIN_MS = 180;
+const easeOutCubic = (p: number) => 1 - Math.pow(1 - p, 3);
+/** Release duration for an overshoot of `excess` degrees: REBOUND_MS from `full` degrees on, proportionally shorter below, at least REBOUND_MIN_MS. */
+export const reboundDuration = (excess: number, full = 12) => Math.round(Math.max(REBOUND_MIN_MS, Math.min(REBOUND_MS, (REBOUND_MS * Math.abs(excess)) / full)));
+/** Remaining overshoot after `elapsed` ms of a release that started with `excess0` (ease-out cubic; 0 at the end). */
+export const reboundExcess = (excess0: number, elapsed: number, duration: number) => (elapsed >= duration ? 0 : excess0 * (1 - easeOutCubic(Math.max(0, elapsed) / duration)));
 
 /** Bearing normalised to (-180, 180]. */
 export const wrapBearing = (b: number) => {

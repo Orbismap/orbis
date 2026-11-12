@@ -346,6 +346,10 @@ export interface Karte {
 }
 ```
 
+### Karten: Ansichten und eigene Karten
+
+`karten/changes.ts` ist rein: `structuralSignature(karte, standard)`, `isModified`, `discardModifications`. Das „Universum“ einer Standardkarte sind ihre Standardebenen plus alle Ebenen ihrer Themen. Der Entwurf (`drafts[id]`) einer Standardkarte ist der still gemerkte Stand; `isDirty(id)` ist nur wahr, wenn er sich strukturell unterscheidet. Eigene Karten werden an Ort und Stelle geändert und sofort persistiert. Migration beim Laden (`validatePersisted`): Entwurf einer eigenen Karte wird ihr Stand, Entwürfe unbekannter Karten entfallen, Entwürfe von Standardkarten bleiben ganz (Umbau wird daraus erkannt). UI: `features/karten-bar/actions.tsx` (`KartenPopover`, `KartenChangeRow`), gemeinsam für Desktop und Mobil.
+
 ## Zustand (`src/state`)
 
 Signale, keine Klassen. Module: `view` (Mitte, Zoom, Peilung, Neigung, Projektion), `session` (Karten, aktive

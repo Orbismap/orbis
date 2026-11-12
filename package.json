@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "brand": "node scripts/build-brand.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "vite build --outDir dist-smoke --emptyOutDir && node test/smoke.mjs"

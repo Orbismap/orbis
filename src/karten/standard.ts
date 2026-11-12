@@ -15,8 +15,8 @@ const T = (id: string, title: string, icon: KarteTheme['icon'], layers: string[]
  */
 const THEMES: Record<string, KarteTheme[]> = {
   wetter: [
+    T('niederschlag', 'Niederschlag und Radar', 'rain', ['radar', 'niederschlag']),
     T('felder', 'Felder', 'thermometer', ['wind', 'temperatur', 'gefuehlt', 'taupunkt', 'feuchte', 'luftdruck', 'bewoelkung', 'boeen', 'cape', 'schnee']),
-    T('niederschlag', 'Niederschlag und Radar', 'rain', ['niederschlag', 'radar', 'radar-de']),
     T('zusaetze', 'Zusätze', 'layers', ['satellit', 'staedte', 'luftqualitaet', 'stroemung', 'blitze']),
   ],
   gefahren: [
@@ -62,7 +62,7 @@ const THEMES: Record<string, KarteTheme[]> = {
 const DEFS: Karte[] = [
   {
     id: 'wetter', name: 'Wetter', icon: 'cloud', color: '#72C8F0', builtin: true, basemap: 'orbis-dark', labels: true, terminator: true,
-    layers: [on('wind', 0.85), off('temperatur', 0.8), off('gefuehlt', 0.8), off('staedte'), off('luftqualitaet', 0.85), off('niederschlag'), off('bewoelkung'), off('luftdruck'), off('radar'), off('satellit'), off('stroemung'), off('blitze')],
+    layers: [on('radar'), off('wind', 0.85), off('temperatur', 0.8), off('gefuehlt', 0.8), off('staedte'), off('luftqualitaet', 0.85), off('niederschlag'), off('bewoelkung'), off('luftdruck'), off('satellit'), off('stroemung'), off('blitze')],
   },
   {
     id: 'gefahren', name: 'Gefahren', icon: 'warning', color: '#FF6B5E', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,

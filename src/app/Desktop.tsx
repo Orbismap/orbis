@@ -16,7 +16,7 @@ import { Panel } from '../ui/Panel';
 import { ScrollArea } from '../ui/ScrollArea';
 import { dockPx } from './layout';
 import { LeftBody } from './LeftBody';
-import { Logo } from './Logo';
+import { OrbisMark } from '../ui/brand/OrbisMark';
 
 function LeftPanel() {
   const open = leftPanelOpen.value;
@@ -26,7 +26,7 @@ function LeftPanel() {
     <aside class="left" data-open={open} data-fill={fill} aria-label="Karten und Ebenen" {...(open ? {} : ({ inert: '' } as object))}>
       <Panel as="div" class="left-panel">
         <div class="lhead">
-          <Logo />
+          <OrbisMark size={34} variant="small" />
           <span class="lname">Orbis</span>
           <IconButton icon="panel-left" label="Seitenleiste einklappen" shortcut="[" onClick={() => (leftPanelOpen.value = false)} />
         </div>

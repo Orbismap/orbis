@@ -2,6 +2,7 @@ import { useEffect } from 'preact/hooks';
 import { Scalebar } from '../features/scalebar/Scalebar';
 import { Attribution } from '../features/attribution/Attribution';
 import { InspectorCard } from '../features/inspector/Inspector';
+import { KartenChangeRow } from '../features/karten-bar/actions';
 import { KartenSwitcher } from '../features/karten-bar/KartenSwitcher';
 import { Legend } from '../features/legend/Legend';
 import { topFieldLegend } from '../features/legend/Legend';
@@ -81,7 +82,12 @@ export function MobileLayout() {
         onVisible={(px, settled) => settled && (sheetPx.value = px)}
         peek={<PeekRow />}
       >
-        {sel ? <InspectorCard key={`${sel.layerId}:${sel.card.title}`} card={sel.card} layerId={sel.layerId} /> : p ? <ProbeCard /> : <LeftBody />}
+        {sel ? <InspectorCard key={`${sel.layerId}:${sel.card.title}`} card={sel.card} layerId={sel.layerId} /> : p ? <ProbeCard /> : (
+          <>
+            {view === 'layers' && <KartenChangeRow />}
+            <LeftBody />
+          </>
+        )}
       </Sheet>
     </div>
   );

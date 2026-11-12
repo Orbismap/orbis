@@ -31,6 +31,15 @@ export interface PointSpecs {
 
 export const hoverScale = (e: NumOrExpr): Expr => ['*', e, ['case', HOVER, 1.3, 1]] as Expr;
 
+/**
+ * SDF icon halos only reach ~6 SDF px outside the shape (scaled by icon-size). A wider halo drives the shader's halo edge
+ * below 0 and fills the whole quad: a translucent rectangle around the icon. Hover therefore gets 2 px, capped to what the
+ * SDF can carry at this icon size.
+ */
+export const haloWidth = (size: NumOrExpr, base: number): Expr =>
+  ['case', HOVER, ['min', 2, ['*', size, SDF_HALO_PER_SIZE]], ['min', base, ['*', size, SDF_HALO_PER_SIZE]]] as unknown as Expr;
+const SDF_HALO_PER_SIZE = 2.6;
+
 export const andFilter = (...fs: (FilterSpecification | undefined)[]): FilterSpecification | undefined => {
   const list = fs.filter((f): f is FilterSpecification => f !== undefined);
   return list.length === 0 ? undefined : list.length === 1 ? list[0] : (['all', ...list] as FilterSpecification);
@@ -54,7 +63,7 @@ export function pointSpecs(id: string, source: string, sourceLayer: string | und
       paint: {
         'icon-color': s.color,
         'icon-halo-color': ['case', HOVER, '#ffffff', halo] as unknown as ExpressionSpecification,
-        'icon-halo-width': ['case', HOVER, 2.5, s.stroke?.width ?? 1.2] as unknown as ExpressionSpecification,
+        'icon-halo-width': mapOutputs(s.symbol.size, (sz) => haloWidth(sz, s.stroke?.width ?? 1.2)) as ExpressionSpecification | number,
         'icon-opacity': 1,
       },
     } as LayerSpecification;

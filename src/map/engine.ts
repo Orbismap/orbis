@@ -10,6 +10,7 @@ import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, composeStyle, skyFor } from './
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
 import { clampCamera, ENGINE_MAX_PITCH, flyToTarget, locate as locateImpl } from './camera';
 import { attachCameraLimits } from './limits';
+import { pokeCameraFrame } from './frame';
 import { createPicking } from './picking';
 import { beforeIdFor } from './slots';
 import { createTerminator } from './terminator';
@@ -90,7 +91,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   };
   const writeThrottled = throttle(writeCamera, 100);
   // attached before the camera listeners below, so the clamped values are the ones that get written
-  const limits = attachCameraLimits(ml, writeThrottled);
+  const limits = attachCameraLimits(ml, () => (writeThrottled(), pokeCameraFrame(ml)));
   ml.on('move', writeThrottled);
   ml.on('moveend', () => writeThrottled.flush());
 

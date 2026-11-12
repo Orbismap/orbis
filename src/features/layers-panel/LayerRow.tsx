@@ -10,9 +10,6 @@ import { Icon } from '../../ui/icons/Icon';
 import { cx } from '../../ui/hooks';
 import { Switch } from '../../ui/Switch';
 import { openKeySettings } from '../boost/open';
-import { LayerDetails } from './LayerDetails';
-import { expanded, toggleExpanded } from './expanded';
-import { settingsMode } from './mode';
 import { rowStatus } from './status';
 import { openDetail } from './themes-state';
 
@@ -25,10 +22,8 @@ export interface LayerRowProps {
   layer: KarteLayer;
   def: LayerDef;
   karteId: string;
-  /** Label of the back button on the detail page (topic title or "Eigene Ebenen"). */
+  /** Label of the back button on the detail page ("Karte"). */
   from: string;
-  /** Own layer: sortable and removable. */
-  own?: boolean;
   index?: number;
   count?: number;
   onGrip?(e: PointerEvent): void;
@@ -36,19 +31,17 @@ export interface LayerRowProps {
 }
 
 /**
- * One layer: name and switch; the status sits small on the right. Settings: inline in the row (arrow down) or,
- * for layers with many options, on a detail page (arrow right), see settingsMode.
+ * One layer: name and switch; the status sits small on the right. The settings button (and the name) push the
+ * detail page of the layer.
  */
-export function LayerRow({ layer, def, karteId, from, own, index = 0, count = 1, onGrip, onKeyMove }: LayerRowProps) {
-  const mode = settingsMode(def);
-  const open = mode === 'inline' && expanded.value.has(def.id);
+export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGrip, onKeyMove }: LayerRowProps) {
   const raw = layer.visible ? layerStatus.value[def.id] : undefined;
   const st = rowStatus(raw, def.cadence, now.value);
   const needsKey = raw?.needsKey;
   const needsConfirm = raw?.needsConfirm;
   const below = useBelowZoom(layer.visible ? def.minZoom : undefined);
   const onKey = (e: KeyboardEvent) => {
-    if (!own || !onKeyMove || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    if (!onKeyMove || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
     e.preventDefault();
     onKeyMove(e.key === 'ArrowUp' ? -1 : 1);
   };
@@ -59,30 +52,27 @@ export function LayerRow({ layer, def, karteId, from, own, index = 0, count = 1,
   else if (st.state === 'error') sub = <span class="lrow-sub is-error">Fehler beim Laden</span>;
   else if (st.state === 'empty') sub = <span class="lrow-sub">Keine Daten</span>;
   const trail = !sub && layer.visible ? (st.state === 'ready' ? st.age : st.state === 'loading' ? 'lädt' : undefined) : undefined;
-  const toggleOpen = () => (mode === 'inline' ? toggleExpanded(def.id) : openDetail(karteId, def.id, from));
-  const headAria = mode === 'inline' ? { 'aria-expanded': open, 'aria-controls': `ld-${def.id}` } : { 'aria-haspopup': 'true' as const };
+  const openPage = () => openDetail(karteId, def.id, from);
 
   return (
-    <li class={cx('lrow', open && 'is-open', !layer.visible && 'is-off', st.state === 'error' && 'has-error')} data-key={def.id} onKeyDown={onKey}>
+    <li class={cx('lrow', !layer.visible && 'is-off', st.state === 'error' && 'has-error')} data-key={def.id} onKeyDown={onKey}>
       <div class="lrow-main">
-        {own && (
+        {onGrip && (
           <button type="button" class="lrow-grip" aria-label={`${def.title} verschieben. Position ${index + 1} von ${count}. Alt plus Pfeiltasten verschiebt.`} onPointerDown={onGrip} disabled={count < 2}>
             <Icon name="grip" size={16} />
           </button>
         )}
         <span class="lrow-badge" style={{ ['--c' as string]: def.color }} aria-hidden="true">
-          <Icon name={def.icon} size={18} />
+          <Icon name={def.icon} size={16} />
         </span>
-        <button type="button" class="lrow-head" data-nav {...headAria} aria-label={`${def.title}, Einstellungen`} onClick={toggleOpen}>
+        <button type="button" class="lrow-head" data-nav aria-haspopup="true" aria-label={`${def.title}, Details`} onClick={openPage}>
           <span class="lrow-text">
             <span class="lrow-title">{def.title}</span>
             {sub}
           </span>
           {trail && <span class={cx('lrow-trail num', st.stale && 'is-stale')}>{trail}</span>}
-          <span class={cx('lrow-chev', mode === 'page' && 'is-push')} aria-hidden="true">
-            <Icon name={mode === 'page' ? 'chevron-right' : 'chevron-down'} size={14} />
-          </span>
         </button>
+        <SettingsButton def={def} onClick={openPage} />
         {needsKey && (
           <button type="button" class="lrow-keybtn" aria-label={`Schlüssel eintragen für ${def.title}`} onClick={() => openKeySettings(needsKey)}>
             <Icon name="key" size={16} />
@@ -92,7 +82,60 @@ export function LayerRow({ layer, def, karteId, from, own, index = 0, count = 1,
         <Switch class="lrow-switch" aria-label={def.title} checked={layer.visible} onChange={(v) => setLayerVisible(karteId, def.id, v)} />
       </div>
       {st.state === 'loading' && <span class="lrow-strip" role="progressbar" aria-label={`${def.title} lädt`} />}
-      {open && <LayerDetails layer={layer} def={def} karteId={karteId} removable={own} onMore={() => openDetail(karteId, def.id, from)} />}
     </li>
+  );
+}
+
+/** Small settings button (sliders icon) that pushes the detail page of the layer. */
+function SettingsButton({ def, onClick }: { def: LayerDef; onClick(): void }) {
+  return (
+    <button type="button" class="lrow-set" data-nav aria-haspopup="true" aria-label={`Einstellungen ${def.title}`} onClick={onClick}>
+      <Icon name="sliders" size={16} />
+    </button>
+  );
+}
+
+/** Suggested layer (off): icon, name, switch. Switching on moves it up into "Aktiv". */
+export function SuggestRow({ def, karteId }: { def: LayerDef; karteId: string }) {
+  return (
+    <li class="lrow is-suggest" data-key={def.id}>
+      <div class="lrow-main">
+        <span class="lrow-badge" style={{ ['--c' as string]: def.color }} aria-hidden="true">
+          <Icon name={def.icon} size={16} />
+        </span>
+        <span class="lrow-text lrow-plain">
+          <span class="lrow-title">{def.title}</span>
+        </span>
+        <Switch class="lrow-switch" aria-label={def.title} checked={false} onChange={(v) => setLayerVisible(karteId, def.id, v)} />
+      </div>
+    </li>
+  );
+}
+
+/**
+ * One option of the field choice list (single selection, Apple HIG: list with checkmark, not a switch).
+ * The chosen row also shows data age/status and the settings button.
+ */
+export function FieldRow({ layer, def, karteId, from, tabbable, onSelect }: { layer: KarteLayer; def: LayerDef; karteId: string; from: string; tabbable: boolean; onSelect(): void }) {
+  const selected = layer.visible;
+  const raw = selected ? layerStatus.value[def.id] : undefined;
+  const st = rowStatus(raw, def.cadence, now.value);
+  const trail = selected ? (raw?.needsKey ? 'Schlüssel nötig' : st.state === 'error' ? 'Fehler' : st.state === 'empty' ? 'Keine Daten' : st.state === 'ready' ? st.age : st.state === 'loading' ? 'lädt' : undefined) : undefined;
+  return (
+    <div class={cx('lrow lfield', selected && 'is-selected')} data-key={def.id}>
+      <div class="lrow-main">
+        <button type="button" role="radio" class="lfield-radio" data-radio aria-checked={selected} tabIndex={tabbable ? 0 : -1} onClick={onSelect}>
+          <span class="lrow-badge" style={{ ['--c' as string]: def.color }} aria-hidden="true">
+            <Icon name={def.icon} size={16} />
+          </span>
+          <span class="lrow-title">{def.title}</span>
+          {trail && <span class={cx('lrow-trail num', (st.stale || st.state === 'error' || raw?.needsKey) && 'is-stale')}>{trail}</span>}
+          <span class="lfield-check" aria-hidden="true">
+            {selected && <Icon name="check" size={16} />}
+          </span>
+        </button>
+        {selected && <SettingsButton def={def} onClick={() => openDetail(karteId, def.id, from)} />}
+      </div>
+    </div>
   );
 }

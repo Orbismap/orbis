@@ -43,6 +43,11 @@ describe('point specs', () => {
     const s = pointSpecs('y', 't', undefined, { radius: 8, color: '#f00', symbol: { icon: 'plane', size: 0.6, rotate: ['get', 'heading'] as never } }, undefined, 'id');
     expect(validateStyleMin(withLayers([s.main, s.ring])).map((e) => e.message)).toEqual([]);
   });
+  it('symbol layers with zoom-dependent size and capped halo validate', () => {
+    const size = ['interpolate', ['linear'], ['zoom'], 1, 0.2, 8, 0.6] as never;
+    const s = pointSpecs('z', 't', undefined, { radius: 8, color: '#f00', symbol: { icon: 'plane', size } }, undefined, 'id');
+    expect(validateStyleMin(withLayers([s.main, s.ring])).map((e) => e.message)).toEqual([]);
+  });
   it('mapOutputs wraps the outputs of zoom curves only', () => {
     const out = mapOutputs(zoomRadius, (e) => ['*', e, 2] as never) as unknown as unknown[];
     expect(out[2]).toEqual(['zoom']);
@@ -71,6 +76,13 @@ describe('helpers', () => {
     expect(Math.abs(lat - 50)).toBeLessThan(0.01);
     expect(extrapolate(t, 1e9, 120_000)[0]).toBeCloseTo(extrapolate(t, 120_000, 120_000)[0], 9);
     expect(extrapolate({ ...t, speed: undefined }, 60_000, 1e5)).toEqual([10, 50]);
+  });
+  it('sdf: border stays 0 when the shape keeps the default padding', () => {
+    const w = 64;
+    const alpha = new Uint8Array(w * w);
+    for (let y = 8; y < 56; y++) for (let x = 8; x < 56; x++) alpha[y * w + x] = 255;
+    const sdf = sdfFromAlpha(alpha, w, w);
+    for (let i = 0; i < w; i++) expect([sdf[i], sdf[(w - 1) * w + i], sdf[i * w], sdf[i * w + w - 1]]).toEqual([0, 0, 0, 0]);
   });
   it('sdf: inside > edge > outside', () => {
     const w = 16;

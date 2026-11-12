@@ -1,7 +1,9 @@
 import { computed, signal } from '@preact/signals';
 import { useRef } from 'preact/hooks';
+import { useCameraFrame } from '../../map/useCameraFrame';
 import { mapEngine } from '../../state/ui';
 import { tiltAvailable, tiltLimit } from '../../map/camera';
+import { tiltStretch } from '../../map/limits';
 import { camera, setCamera } from '../../state/view';
 import { tipProps } from '../../ui/tip-state';
 
@@ -12,7 +14,9 @@ import { tipProps } from '../../ui/tip-state';
 // camera is tilted and folds shut again once it is flat.
 const TILT_START = 0.75;
 
-const pitchSig = computed(() => camera.value.pitch);
+/** Coarse values for state/aria only (they change rarely, so the group does not re-render per frame); the slider itself is fed per frame. */
+const pitchSig = computed(() => Math.round(camera.value.pitch * 2) / 2);
+const openSig = computed(() => camera.value.pitch > 0.5);
 const availableSig = computed(() => tiltAvailable(camera.value.zoom));
 const maxTiltSig = computed(() => Math.round(tiltLimit(camera.value.zoom) * 10) / 10);
 /** Set by the button so the slider opens before the animated pitch rises above 0. */
@@ -28,24 +32,51 @@ export function TiltGroup() {
   const pitch = pitchSig.value;
   const max = maxTiltSig.value;
   const available = availableSig.value;
-  const open = opened.value || pitch > 0.5;
+  const open = opened.value || openSig.value;
   const track = useRef<HTMLDivElement>(null);
   const drag = useRef(false);
-  const frac = Math.min(1, pitch / max);
+  const fill = useRef<HTMLDivElement>(null);
+  const thumb = useRef<HTMLDivElement>(null);
+  const setFrac = (frac: number) => {
+    const p = `${frac * 100}%`;
+    if (fill.current) fill.current.style.height = p;
+    if (thumb.current) thumb.current.style.bottom = p;
+  };
+  // per frame from the map; while the user drags, the slider follows the pointer (the map echo would only add jitter)
+  useCameraFrame((f) => {
+    if (drag.current) return;
+    const lim = tiltLimit(f.zoom);
+    setFrac(lim > 0 ? Math.min(1, f.pitch / lim) : 0);
+  });
 
   const fromPointer = (e: PointerEvent) => {
     const r = track.current!.getBoundingClientRect();
-    return Math.min(1, Math.max(0, 1 - (e.clientY - r.top) / r.height)) * max;
+    return Math.max(0, 1 - (e.clientY - r.top) / r.height) * max; // unclamped above the top: the limits stretch it softly
+  };
+  const stretch = () => {
+    const ml = mapEngine.peek()?.ml;
+    return ml ? tiltStretch.get(ml) : undefined;
+  };
+  const drive = (e: PointerEvent) => {
+    const raw = fromPointer(e);
+    setFrac(max > 0 ? Math.min(1, raw / max) : 0);
+    const s = stretch();
+    if (s) s.to(raw);
+    else setPitch(Math.min(raw, max), false);
   };
   const down = (e: PointerEvent) => {
     if (e.button > 0) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     drag.current = true;
-    setPitch(fromPointer(e), false);
+    stretch()?.begin();
+    drive(e);
   };
-  const move = (e: PointerEvent) => drag.current && setPitch(fromPointer(e), false);
+  const move = (e: PointerEvent) => drag.current && drive(e);
   const up = () => {
+    if (drag.current) stretch()?.end();
     drag.current = false;
+    const m = mapEngine.peek()?.ml;
+    if (m) setFrac(Math.min(1, m.getPitch() / Math.max(1e-6, tiltLimit(m.getZoom()))));
     if (camera.peek().pitch <= 0.5) opened.value = false;
   };
   const key = (e: KeyboardEvent) => {
@@ -93,8 +124,8 @@ export function TiltGroup() {
           onKeyDown={key}
         >
           <div class="tilt-track" ref={track}>
-            <div class="tilt-fill" style={{ height: `${frac * 100}%` }} />
-            <div class="tilt-thumb" style={{ bottom: `${frac * 100}%` }} />
+            <div class="tilt-fill" ref={fill} />
+            <div class="tilt-thumb" ref={thumb} />
           </div>
         </div>
       </div>

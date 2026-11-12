@@ -1,5 +1,5 @@
-// Karten: builtin + user Karten. Edits of builtin Karten are drafts per Karte (reset restores the default);
-// user Karten are edited in place. Persisted in localStorage, validated on load.
+// Karten: builtin + user Karten. Standard Karten are views: the user's state per Karte is a draft that is remembered
+// silently; only a rebuild counts as a change (changes.ts). User Karten are edited in place and saved automatically. Persisted in localStorage, validated on load.
 import { computed, effect, signal } from '@preact/signals';
 import { getJSON, setJSON } from '../core/storage';
 import { BASEMAPS } from '../map/basemaps';
@@ -7,6 +7,7 @@ import { getLayer, hasLayer } from '../layers/registry';
 import type { OptionValues } from '../layers/types';
 import type { BasemapId } from '../map/types';
 import type { IconName } from '../ui/icons/names';
+import { discardModifications, isModified } from './changes';
 import { builtinKarten } from './standard';
 import type { Karte, KarteLayer } from './types';
 
@@ -57,7 +58,12 @@ const validatePersisted = (raw: unknown): Persisted | undefined => {
     const v = validateKarte(k);
     if (v) drafts[id] = { ...v, id };
   }
-  return { custom, drafts };
+  // migration: a draft of an own Karte is its state; drafts of unknown Karten are dropped. Drafts of standard Karten
+  // stay whole: what is structural counts as a change (see changes.ts), the rest is the silently remembered state.
+  const std = new Set(builtinKarten().map((k) => k.id));
+  const merged = custom.map((k) => (drafts[k.id] && !std.has(k.id) ? { ...drafts[k.id]!, id: k.id, builtin: undefined } : k));
+  for (const id of Object.keys(drafts)) if (!std.has(id)) delete drafts[id];
+  return { custom: merged, drafts };
 };
 
 const loaded = getJSON<Persisted>('karten', VERSION, validatePersisted, { custom: [], drafts: {} });
@@ -70,7 +76,13 @@ const builtins = computed(() => builtinKarten());
 export const karten = computed<Karte[]>(() => [...builtins.value.map((k) => (drafts.value[k.id] ? { ...drafts.value[k.id]!, themes: k.themes } : k)), ...customKarten.value]);
 export const getKarte = (id: string): Karte | undefined => karten.value.find((k) => k.id === id);
 export const isBuiltin = (id: string) => builtins.value.some((k) => k.id === id);
-export const isDirty = (id: string) => id in drafts.value;
+/** True only for a standard Karte that was really rebuilt (not for silently remembered switches). Own Karten never. */
+export const isDirty = (id: string): boolean => {
+  const d = drafts.value[id];
+  const std = d && builtins.value.find((k) => k.id === id);
+  return !!d && !!std && isModified(d, std);
+};
+const standardOf = (id: string) => builtins.peek().find((k) => k.id === id);
 
 /** Persists changes; call once at start. */
 export function initKartenStore(): () => void {
@@ -89,18 +101,45 @@ export function editKarte(id: string, mutate: (k: Karte) => Karte): void {
   else customKarten.value = customKarten.peek().map((k) => (k.id === id ? next : k));
 }
 
-/** Restores the default of a builtin Karte. */
+/** Restores the start view of a standard Karte, including everything remembered silently. */
 export function resetKarte(id: string): void {
   const { [id]: _drop, ...rest } = drafts.peek();
   drafts.value = rest;
 }
 
+/** Removes only the rebuild of a standard Karte. Returns the previous draft for undo. */
+export function discardChanges(id: string): Karte | undefined {
+  const d = drafts.peek()[id];
+  const std = standardOf(id);
+  if (!d || !std) return undefined;
+  drafts.value = { ...drafts.peek(), [id]: discardModifications(d, std) };
+  return d;
+}
+/** Puts a draft back (undo of discard/reset); undefined removes it. */
+export function restoreDraft(id: string, draft: Karte | undefined): void {
+  if (draft) drafts.value = { ...drafts.peek(), [id]: draft };
+  else resetKarte(id);
+}
+
+/** Creates an empty own Karte and returns its id. */
+export function createKarte(): string {
+  const taken = new Set(karten.peek().map((k) => k.name));
+  let name = 'Neue Karte';
+  for (let n = 2; taken.has(name); n++) name = `Neue Karte ${n}`;
+  const id = `k-${Math.random().toString(36).slice(2, 8)}`;
+  customKarten.value = [...customKarten.peek(), { id, name, icon: 'pin', color: '#A58BFF', basemap: 'orbis-dark', labels: true, terminator: false, layers: [] }];
+  return id;
+}
+/** Changes name, icon and colour of an own Karte. */
+export const updateKarteMeta = (id: string, meta: { name?: string; icon?: IconName; color?: string }) =>
+  !isBuiltin(id) && editKarte(id, (k) => ({ ...k, ...(meta.name?.trim() ? { name: meta.name.trim() } : {}), ...(meta.icon ? { icon: meta.icon } : {}), ...(meta.color ? { color: meta.color } : {}) }));
+
 /** Saves the current state of a Karte as a new own Karte and returns its id. */
-export function saveAs(id: string, name: string): string | undefined {
+export function saveAs(id: string, name: string, meta: { icon?: IconName; color?: string } = {}): string | undefined {
   const src = karten.peek().find((k) => k.id === id);
   if (!src) return undefined;
   const newId = `k-${Math.random().toString(36).slice(2, 8)}`;
-  customKarten.value = [...customKarten.peek(), { ...structuredClone({ ...src, themes: undefined }), id: newId, name: name.trim() || `${src.name} (Kopie)`, builtin: undefined }];
+  customKarten.value = [...customKarten.peek(), { ...structuredClone({ ...src, themes: undefined }), id: newId, name: name.trim() || `${src.name} (Kopie)`, builtin: undefined, ...(meta.icon ? { icon: meta.icon } : {}), ...(meta.color ? { color: meta.color } : {}) }];
   return newId;
 }
 

@@ -67,26 +67,45 @@ describe('clamp logic', () => {
 });
 
 describe('rubberBand', () => {
-  it('follows the input up to the limit', () => {
-    expect(rubberBand(0, 30, 10)).toBe(0);
-    expect(rubberBand(30, 30, 10)).toBe(30);
+  const K = 5;
+  it('is 1:1 up to the limit', () => {
+    expect(rubberBand(0, 30, K)).toBe(0);
+    expect(rubberBand(30, 30, K)).toBe(30);
   });
-  it('damps the excess, stays below limit + maxOver and is monotonic', () => {
-    let prev = 30;
-    for (let raw = 30.1; raw < 400; raw += 0.5) {
-      const v = rubberBand(raw, 30, 10);
-      expect(v).toBeGreaterThan(prev - 1e-12);
-      expect(v).toBeLessThanOrEqual(40);
-      expect(v - 30).toBeLessThan(raw - 30);
-      prev = v;
+  it('is monotonic, unbounded, with slope ~1 at the limit and strictly falling slope', () => {
+    const h = 1e-4;
+    expect((rubberBand(30 + h, 30, K) - 30) / h).toBeCloseTo(1, 3);
+    let prevV = 30;
+    let prevSlope = 1;
+    for (let raw = 31; raw <= 400; raw += 1) {
+      const v = rubberBand(raw, 30, K);
+      expect(v).toBeGreaterThan(prevV);
+      const slope = v - prevV;
+      expect(slope).toBeLessThan(prevSlope);
+      prevV = v;
+      prevSlope = slope;
     }
-    expect(rubberBand(31, 30, 10)).toBeCloseTo(30.95, 1); // first degrees almost 1:1
+    expect(rubberBand(1e6, 30, K)).toBeGreaterThan(rubberBand(1e3, 30, K));
   });
-  it('resistance grows: the same pull moves less the further out', () => {
-    expect(rubberBand(40, 30, 10) - rubberBand(30, 30, 10)).toBeGreaterThan(rubberBand(50, 30, 10) - rubberBand(40, 30, 10));
-  });
-  it('pitchStretch grows with the limit and is capped', () => {
+  it('pitchStretch (stiffness) is the old Orbis value 3 at every limit', () => {
     expect(pitchStretch(0)).toBe(3);
-    expect(pitchStretch(70)).toBe(12);
+    expect(pitchStretch(70)).toBe(3);
+  });
+});
+import { rubberBand as rb, rubberBandInverse, reboundDuration, reboundExcess } from './camera';
+describe('rebound helpers', () => {
+  it('rubberBandInverse inverts rubberBand', () => {
+    for (const raw of [10, 30, 45, 80]) expect(rubberBandInverse(rb(raw, 30, 5.5), 30, 5.5)).toBeCloseTo(raw, 6);
+    expect(rubberBandInverse(20, 30, 5.5)).toBe(20);
+  });
+  it('reboundDuration is proportional within 180..400 ms', () => {
+    expect(reboundDuration(0.6)).toBe(180);
+    expect(reboundDuration(6)).toBe(200);
+    expect(reboundDuration(50)).toBe(400);
+  });
+  it('reboundExcess eases out from excess0 to 0', () => {
+    expect(reboundExcess(10, 0, 400)).toBe(10);
+    expect(reboundExcess(10, 200, 400)).toBeCloseTo(1.25, 6);
+    expect(reboundExcess(10, 400, 400)).toBe(0);
   });
 });
