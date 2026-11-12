@@ -1,6 +1,5 @@
 import { effect, signal } from '@preact/signals';
 import { useEffect, useState } from 'preact/hooks';
-import { formatNumber } from '../../core/format';
 import { unitPrefs } from '../../core/units';
 import { camera } from '../../state/view';
 import { mapEngine } from '../../state/ui';
@@ -40,7 +39,7 @@ function startMeasure(): () => void {
 }
 
 /**
- * Scale bar: numbers above a rounded strip of up to three alternating light/dark segments, the zoom level below.
+ * Scale bar: numbers above a rounded strip of up to three alternating light/dark segments.
  * Sits directly on the map. `side="right"` ends the last label at the bar (right-anchored), "left" starts it at its tick.
  */
 export function Scalebar({ side }: { side: 'left' | 'right' }) {
@@ -71,9 +70,6 @@ export function Scalebar({ side }: { side: 'left' | 'right' }) {
         {Array.from({ length: m.n }, (_, i) => (
           <i key={i} class={i % 2 ? 'dk' : 'lt'} style={{ width: `${segW}px` }} />
         ))}
-      </div>
-      <div class="sb-zoom" aria-hidden="true">
-        Zoom {formatNumber(m.zoom, 1)}
       </div>
     </div>
   );

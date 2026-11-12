@@ -66,7 +66,8 @@ export const drafts = signal<Record<string, Karte>>(loaded.drafts);
 const builtins = computed(() => builtinKarten());
 
 /** All Karten as the user sees them: builtins (with draft) first, then own Karten. */
-export const karten = computed<Karte[]>(() => [...builtins.value.map((k) => drafts.value[k.id] ?? k), ...customKarten.value]);
+// Themes always come from the code, never from a draft.
+export const karten = computed<Karte[]>(() => [...builtins.value.map((k) => (drafts.value[k.id] ? { ...drafts.value[k.id]!, themes: k.themes } : k)), ...customKarten.value]);
 export const getKarte = (id: string): Karte | undefined => karten.value.find((k) => k.id === id);
 export const isBuiltin = (id: string) => builtins.value.some((k) => k.id === id);
 export const isDirty = (id: string) => id in drafts.value;
@@ -74,7 +75,8 @@ export const isDirty = (id: string) => id in drafts.value;
 /** Persists changes; call once at start. */
 export function initKartenStore(): () => void {
   return effect(() => {
-    setJSON('karten', VERSION, { custom: customKarten.value, drafts: drafts.value } satisfies Persisted);
+    const strip = ({ themes: _t, ...k }: Karte): Karte => k;
+    setJSON('karten', VERSION, { custom: customKarten.value.map(strip), drafts: Object.fromEntries(Object.entries(drafts.value).map(([id, k]) => [id, strip(k)])) } satisfies Persisted);
   });
 }
 
@@ -98,7 +100,7 @@ export function saveAs(id: string, name: string): string | undefined {
   const src = karten.peek().find((k) => k.id === id);
   if (!src) return undefined;
   const newId = `k-${Math.random().toString(36).slice(2, 8)}`;
-  customKarten.value = [...customKarten.peek(), { ...structuredClone(src), id: newId, name: name.trim() || `${src.name} (Kopie)`, builtin: undefined }];
+  customKarten.value = [...customKarten.peek(), { ...structuredClone({ ...src, themes: undefined }), id: newId, name: name.trim() || `${src.name} (Kopie)`, builtin: undefined }];
   return newId;
 }
 
@@ -109,7 +111,11 @@ export const renameKarte = (id: string, name: string) => !isBuiltin(id) && editK
 
 // ---- layer edits ------------------------------------------------------------
 
-const mapLayer = (k: Karte, layerId: string, fn: (l: KarteLayer) => KarteLayer): Karte => ({ ...k, layers: k.layers.map((l) => (l.id === layerId ? fn(l) : l)) });
+/** Applies `fn` to one layer; a layer that is not in the Karte yet (topic rows) is added hidden first. */
+const mapLayer = (k: Karte, layerId: string, fn: (l: KarteLayer) => KarteLayer): Karte => {
+  const base = k.layers.some((l) => l.id === layerId) ? k.layers : [{ id: layerId, visible: false, opacity: 1 }, ...k.layers];
+  return { ...k, layers: base.map((l) => (l.id === layerId ? fn(l) : l)) };
+};
 
 /** Switches a layer on/off. Switching on a field layer switches other field layers off (exclusive). */
 export function setLayerVisible(karteId: string, layerId: string, visible: boolean): void {

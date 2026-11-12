@@ -20,7 +20,12 @@ import { ensureIcons } from './icons';
 import { hoverScale, ringFilter } from './pointstyle';
 
 export type CameraData =
-  | { kind: 'pmtiles'; url: string; sourceLayer: string; attribution?: string }
+  /**
+   * `lowLayer`: attribute-free low-zoom layer of the file (osm-tiles.mjs of the data repo: `<sourceLayer>_lo`, one bare point per
+   * 1024-grid cell of a tile, zooms 0 .. lowEnd - 1; the full layer starts at lowEnd). Default `<sourceLayer>_lo` with lowEnd 6,
+   * false to switch off. Files built before it simply lack the layer (the full layer then still draws everything).
+   */
+  | { kind: 'pmtiles'; url: string; sourceLayer: string; attribution?: string; lowLayer?: string | false; lowEnd?: number }
   | { kind: 'geojson'; data: FeatureData };
 
 export interface CameraSource {
@@ -128,6 +133,9 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
       const minzoom = s.minZoom ? { minzoom: s.minZoom } : {};
       const detailZoom = Math.max(s.minZoom ?? 0, CAMERA_DETAIL_ZOOM);
       const sl = s.data.kind === 'pmtiles' ? { 'source-layer': s.data.sourceLayer } : {};
+      const lowLayer = s.data.kind === 'pmtiles' && s.data.lowLayer !== false ? (s.data.lowLayer ?? `${s.data.sourceLayer}_lo`) : undefined;
+      const lowEnd = s.data.kind === 'pmtiles' ? (s.data.lowEnd ?? 6) : 0;
+      const lo = `${base}.${s.name}-lo`;
 
       if (s.data.kind === 'pmtiles') {
         engine.addSource(src, { type: 'vector', url: `pmtiles://${s.data.url}`, promoteId: idKey, ...(s.data.attribution ? { attribution: s.data.attribution } : {}) });
@@ -150,6 +158,22 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
             'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',
           },
           paint: { 'icon-color': o.color, 'icon-opacity': 0.5 },
+        } as LayerSpecification);
+      }
+      if (lowLayer) {
+        // zoom < lowEnd: bare points (no ids, no cards); a click zooms in to where the full records load
+        specs.push({
+          id: lo, type: 'circle', source: src, 'source-layer': lowLayer, minzoom: s.minZoom ?? 0, maxzoom: lowEnd,
+          paint: {
+            'circle-radius': CAMERA_RADIUS as ExpressionSpecification,
+            'circle-color': o.color,
+            'circle-opacity': zoomOpacity(DOT_OPACITY, 1) as ExpressionSpecification,
+            'circle-stroke-color': DARK_HALO as unknown as ExpressionSpecification,
+            'circle-stroke-width': STROKE_WIDTH as ExpressionSpecification,
+            'circle-stroke-opacity': 1,
+            'circle-pitch-alignment': 'map',
+            'circle-pitch-scale': 'map',
+          },
         } as LayerSpecification);
       }
       specs.push({
@@ -194,6 +218,14 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
         }));
       }
 
+      if (lowLayer && picks) {
+        clean.add(engine.onPick([lo], {
+          click(f) {
+            if (f.geometry.type === 'Point') ml.easeTo({ center: f.geometry.coordinates.slice(0, 2) as [number, number], zoom: Math.max(ml.getZoom() + 2, lowEnd + 0.5), duration: 600 });
+          },
+        }));
+      }
+
       if (picks) {
         // selection ring follows the inspector
         clean.add(effect(() => { const sel = selected.value; if (ml.getLayer(ring)) ml.setFilter(ring, ringFilter(idKey, sel && sel.src === src ? sel.id : null)); }));
@@ -219,6 +251,8 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
       for (const s of sources) {
         const b = `${base}.${s.name}`;
         const set = (id: string, prop: string, v: unknown) => { if (ml.getLayer(id)) ml.setPaintProperty(id, prop as 'circle-opacity', v as number); };
+        set(`${b}-lo`, 'circle-opacity', zoomOpacity(DOT_OPACITY, k));
+        set(`${b}-lo`, 'circle-stroke-opacity', k);
         set(`${b}-dots`, 'circle-opacity', zoomOpacity(DOT_OPACITY, k));
         set(`${b}-dots`, 'circle-stroke-opacity', k);
         set(`${b}-fov`, 'icon-opacity', 0.5 * k);

@@ -34,6 +34,25 @@ export const tiltAvailable = (zoom: number) => tiltLimit(zoom) >= TILT_FLAT_BELO
 /** Pitch cut to what the zoom allows (never below 0). */
 export const clampPitch = (zoom: number, pitch: number) => Math.max(0, Math.min(pitch, tiltLimit(zoom)));
 
+/**
+ * Rubber band for a gesture that pulls past a limit (Apple-style stretch): up to `limit` the value follows the input 1:1
+ * (slope 1, no kink), beyond it the excess is damped exponentially towards `limit + maxOver`, so the resistance grows with
+ * the pull and the value never leaves that ceiling. Pure; the release animation brings it back to `limit`.
+ */
+export function rubberBand(raw: number, limit: number, maxOver: number): number {
+  if (!(raw > limit) || !(maxOver > 0)) return raw;
+  return limit + maxOver * (1 - Math.exp(-(raw - limit) / maxOver));
+}
+
+/** How far a tilt may be stretched past `limit` (degrees): a little when nearly flat, up to 12 deg when the limit is large. */
+export const pitchStretch = (limit: number) => 3 + 0.3 * Math.min(30, Math.max(0, limit));
+/** How far a rotation may be stretched against north (degrees) where north is enforced. */
+export const BEARING_STRETCH = 30;
+/** Highest pitch the transform may take while a gesture stretches the tilt (below MapLibre's own ceiling). */
+export const STRETCH_PITCH_CEILING = 85;
+/** Release animation back onto the limit (ms, ease-out). */
+export const REBOUND_MS = 400;
+
 /** Bearing normalised to (-180, 180]. */
 export const wrapBearing = (b: number) => {
   const w = ((((b + 180) % 360) + 360) % 360) - 180;

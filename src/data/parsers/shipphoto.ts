@@ -27,3 +27,29 @@ export function parseCommonsPhoto(raw: unknown, who: { imo: number; name: string
   }
   return null;
 }
+
+// ---- by IMO number via Wikidata (P458 IMO number -> P18 image): one SPARQL call (CORS-enabled, keyless), then the file's
+// credit from Commons. A match on the IMO number is exact, so no title check is needed; the licence check stays. ----
+export const wikidataImoUrl = (imo: number): string =>
+  `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(`SELECT ?img WHERE { ?s wdt:P458 "${Math.trunc(imo)}"; wdt:P18 ?img } LIMIT 1`)}`;
+
+/** File name (without `File:`) of the first image in a Wikidata SPARQL result. */
+export function parseWikidataImage(raw: unknown): string | null {
+  const v = (raw as { results?: { bindings?: { img?: { value?: string } }[] } } | null)?.results?.bindings?.[0]?.img?.value;
+  const m = typeof v === 'string' ? /Special:FilePath\/([^?#]+)/.exec(v) : null;
+  if (!m) return null;
+  try { return decodeURIComponent(m[1]!); } catch { return null; }
+}
+
+export const commonsFileUrl = (file: string): string =>
+  `https://commons.wikimedia.org/w/api.php?action=query&format=json&formatversion=2&origin=*&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=640&titles=${encodeURIComponent(`File:${file}`)}`;
+
+export function parseCommonsFile(raw: unknown): ShipPhoto | null {
+  const p = (raw as { query?: { pages?: { title?: string; imageinfo?: { thumburl?: string; url?: string; descriptionurl?: string; extmetadata?: Record<string, { value?: string }> }[] }[] } } | null)?.query?.pages?.[0];
+  const info = p?.imageinfo?.[0];
+  const src = info?.thumburl ?? info?.url;
+  if (!info || !src || !/^https:\/\//.test(src)) return null;
+  const license = strip(info.extmetadata?.LicenseShortName?.value ?? '');
+  if (!FREE.test(license)) return null;
+  return { src, link: info.descriptionurl ?? 'https://commons.wikimedia.org/', author: strip(info.extmetadata?.Artist?.value ?? '') || 'Wikimedia Commons', license, title: String(p?.title ?? '') };
+}

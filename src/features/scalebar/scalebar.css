@@ -38,9 +38,6 @@
   .sb-bar .dk {
     background: rgb(40, 44, 48);
   }
-  .sb-zoom {
-    margin-top: 4px;
-  }
   .scalebar-pos {
     position: absolute;
     z-index: 1;

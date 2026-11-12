@@ -2,10 +2,62 @@
 // can extend these lists freely when they add layers.
 import { hasLayer } from '../layers/registry';
 import { ZEUGEN_WARNUNG } from '../data/parsers/zeitzeugen';
-import type { Karte, KarteLayer } from './types';
+import type { Karte, KarteLayer, KarteTheme } from './types';
 
 const on = (id: string, opacity = 1): KarteLayer => ({ id, visible: true, opacity });
 const off = (id: string, opacity = 1): KarteLayer => ({ id, visible: false, opacity });
+
+const T = (id: string, title: string, icon: KarteTheme['icon'], layers: string[]): KarteTheme => ({ id, title, icon, layers });
+
+/**
+ * Curated topics per standard Karte. Every layer of the registry belongs to at least one topic of a standard Karte
+ * (checked by a test); layers may appear in several topics (and Karten). New layers: add their id here.
+ */
+const THEMES: Record<string, KarteTheme[]> = {
+  wetter: [
+    T('felder', 'Felder', 'thermometer', ['wind', 'temperatur', 'gefuehlt', 'taupunkt', 'feuchte', 'luftdruck', 'bewoelkung', 'boeen', 'cape', 'schnee']),
+    T('niederschlag', 'Niederschlag und Radar', 'rain', ['niederschlag', 'radar', 'radar-de']),
+    T('zusaetze', 'Zusätze', 'layers', ['satellit', 'staedte', 'luftqualitaet', 'stroemung', 'blitze']),
+  ],
+  gefahren: [
+    T('unwetter', 'Unwetter', 'storm', ['stuerme', 'unwetter-usa', 'unwetter-de', 'blitze']),
+    T('erde', 'Erde', 'quake', ['erdbeben', 'vulkane', 'tsunami']),
+    T('feuer', 'Feuer', 'flame', ['feuer']),
+    T('strahlung', 'Strahlung und Weltraum', 'radiation', ['radioaktivitaet', 'polarlicht']),
+    T('ereignisse', 'Ereignisse', 'warning', ['katastrophen', 'naturereignisse', 'rekonstruktionen']),
+  ],
+  verkehr: [
+    T('strasse', 'Straße', 'car', ['autobahn', 'strassennetz', 'strassenmarkierungen', 'verkehrslage', 'blitzer']),
+    T('schiene', 'Schiene', 'train', ['bahnnetz', 'zuege', 'nahverkehr', 'oepnv-linien']),
+    T('luft', 'Luft', 'plane', ['flugzeuge', 'flughaefen', 'flughafen-plan', 'gps-stoerungen', 'wetterballons']),
+    T('see', 'See', 'ship', ['schiffe', 'haefen', 'schiffsrouten']),
+    T('raumfahrt', 'Raumfahrt', 'rocket', ['satelliten', 'starlink', 'raketenstarts']),
+    T('rad-fuss', 'Rad und Fuß', 'pin', ['leihraeder', 'wegenetze']),
+  ],
+  infrastruktur: [
+    T('energie', 'Energie', 'power', ['kraftwerke', 'windraeder']),
+    T('netze', 'Netze', 'cable', ['seekabel', 'rechenzentren', 'internetknoten']),
+    T('rohstoffe', 'Rohstoffe', 'mine', ['rohstoffe', 'pipelines']),
+    T('kameras', 'Kameras', 'camera', ['webcams', 'ueberwachung', 'kennzeichen']),
+  ],
+  erde: [
+    T('oberflaeche', 'Oberfläche', 'leaf', ['satellitenbild', 'vegetation', 'landbedeckung', 'schneedecke', 'bodentemperatur', 'aerosole', 'nachtlichter']),
+    T('untergrund', 'Untergrund', 'mountain', ['geologie', 'plattengrenzen', 'erdbeben', 'vulkane']),
+    T('meer', 'Meer', 'wave', ['meerestemperatur', 'meeresstroemung', 'seegang', 'meerestiefe', 'meereis', 'chlorophyll']),
+    T('gewaesser', 'Küste und Gewässer', 'drop', ['fluesse', 'pegel', 'gezeiten', 'bojen', 'schiffsrouten']),
+  ],
+  gesellschaft: [
+    T('wahlen', 'Wahlen und Politik', 'vote', ['wahlen', 'wahlen-usa', 'us-kongress-geld']),
+    T('proteste', 'Proteste', 'people', ['demos', 'us-proteste']),
+    T('geld', 'Geld und Hilfe', 'globe', ['geldfluesse', 'ukraine-hilfe']),
+    T('medien', 'Medien', 'radio', ['radio']),
+  ],
+  zeitzeugen: [
+    T('archiv', 'Archiv', 'camera', ['kriegsarchiv']),
+    T('gaza', 'Gaza', 'people', ['gaza-lage', 'gaza-hunger', 'gaza-vertreibung', 'gaza-gesundheit']),
+    T('ukraine', 'Ukraine', 'warning', ['ukraine-lage', 'ukraine-schaeden']),
+  ],
+};
 
 const DEFS: Karte[] = [
   {
@@ -43,6 +95,13 @@ const DEFS: Karte[] = [
   },
 ];
 
-/** Builtin Karten with unknown layer ids removed. */
-export const builtinKarten = (): Karte[] => DEFS.map((k) => ({ ...k, layers: k.layers.filter((l) => hasLayer(l.id)).map((l) => ({ ...l })) }));
+/** Raw definitions (unfiltered), for tests. */
+export const STANDARD_DEFS: readonly Karte[] = DEFS.map((k) => ({ ...k, themes: THEMES[k.id] }));
+/** Builtin Karten with unknown layer ids removed (also inside the themes; empty themes are dropped). */
+export const builtinKarten = (): Karte[] =>
+  STANDARD_DEFS.map((k) => ({
+    ...k,
+    layers: k.layers.filter((l) => hasLayer(l.id)).map((l) => ({ ...l })),
+    themes: k.themes?.map((t) => ({ ...t, layers: t.layers.filter(hasLayer) })).filter((t) => t.layers.length),
+  }));
 export const DEFAULT_KARTE_ID = 'wetter';

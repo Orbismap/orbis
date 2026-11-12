@@ -114,13 +114,34 @@ Großschreibung nach deutscher Rechtschreibung, Satzschreibung in Schaltflächen
 - „Ebene hinzufügen“ öffnet den **Katalog** im selben Paneel (kein Modal): Suche oben, Kategorien als Abschnitte,
   je Ebene Icon in Leitfarbe, Titel, ein Satz, Abdeckung („DE“), Takt („live“, „täglich“). Ein Klick schaltet,
   das Paneel bleibt offen.
-- **Ebenenzeile**: Sichtbarkeit (Auge), Titel, Status rechts (Anzahl, Alter in Bernstein wenn älter als erwartet,
-  Fehlerpunkt in `--alert`). Aufklappen zeigt Deckkraft, Optionen, Legende, Quelle mit Lizenz und Alter,
-  „Entfernen“. Reihenfolge per Ziehen (Griff links), Tastatur: Alt+↑/↓.
+- **Ebenenzeile** und Themenliste: siehe „Linkes Menü: Themenliste“ unten.
 - **Punktabfrage**: Klick ins Leere setzt ein Fadenkreuz und zeigt im Inspektor Koordinate, Höhe über der Zeit
   des Tages (Sonnenstand) und je aktiver Feld-Ebene den Wert an dieser Stelle zur gewählten Zeit.
 - **Mauszeiger-Wert**: bei aktiver Feld-Ebene wandert der Wert an der Legende mit (kleines Dreieck auf der Skala
   plus Zahl), nicht als Tooltip am Zeiger.
+
+## Linkes Menü: Themenliste
+
+Kuratierte Liste nach dem Vorbild der Apple-Seitenleiste (Vorlage: Menüs des alten Orbis).
+
+- **Themen** sind Daten im Karten-Modell (`Karte.themes` in `src/karten/standard.ts`: Id, Titel, Icon, Ebenen-IDs).
+  Jede Standardkarte hat ihre Themen; jede Ebene der Registry steht in mindestens einem (Test `themes.test.ts`).
+  Eigene Karten haben keine Themen. Themen kommen immer aus dem Code, nie aus gespeicherten Entwürfen.
+- **Themenzeile**: Icon, Name, Zähler („3 von 4“ aktiv, sonst Anzahl), Pfeil. Ein Tipp klappt auf; mehrere dürfen
+  offen sein, der Zustand wird je Karte gemerkt (erstes Thema anfangs offen). Darunter Ebenenzeilen mit Schalter
+  (`role="switch"`), Datenalter klein rechts (Bernstein, wenn veraltet), Hinweise („Schlüssel nötig“, „Näher
+  heranzoomen“) unter dem Namen. Exklusive Feld-Ebenen: Einschalten schaltet die anderen aus.
+- **„Eigene Ebenen“**: Ebenen der Karte ohne Thema (aus dem Katalog), per Griff sortierbar (Alt+↑/↓), darunter die
+  Zeile „Ebene hinzufügen“ (öffnet den Katalog).
+- **Einstellungen, Mischregel** (`settingsMode` in `layers-panel/mode.ts`): höchstens zwei eigene Optionen und kein
+  Schlüssel: Pfeil nach unten klappt Deckkraft und Optionen in der Zeile auf. Drei oder mehr Optionen oder ein
+  Schlüssel: Pfeil nach rechts schiebt eine **Detailseite** ins Paneel (Push wie iOS, Zurück-Pfeil oben mit dem
+  Namen des Themas) mit Titel, Schalter, Daten (Abdeckung, Takt, Quelle mit Alter), Optionen in Abschnitten,
+  Deckkraft, Legende. Künftige Ebenen mit mehr Optionen wandern damit von selbst auf die Seite.
+- Mobil dieselbe Liste im Bottom-Sheet, die Detailseite schiebt sich innerhalb des Sheets herein.
+- **Bedienung**: Pfeil hoch/runter wechselt zwischen Zeilen, Pfeil rechts/links öffnet/schließt ein Thema,
+  `aria-expanded` an Themen und aufklappbaren Zeilen, Trefferflächen mobil ≥ 44 px, Animationen 200 ms und bei
+  `prefers-reduced-motion` aus.
 
 ## Aufbau Mobil (< 900 px)
 

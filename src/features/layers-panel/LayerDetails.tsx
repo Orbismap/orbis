@@ -14,7 +14,7 @@ import { openKeySettings } from '../boost/open';
 import { LegendBody } from '../legend/LegendBody';
 import { topFieldLegend } from '../legend/Legend';
 
-function Source({ s }: { s: SourceRef }) {
+export function Source({ s }: { s: SourceRef }) {
   const sig = useMemo(() => (s.manifest ? manifestEntrySignal(s.manifest.bucket, s.manifest.key) : undefined), [s.manifest?.bucket, s.manifest?.key]);
   const entry = sig?.value;
   const t = entry ? Date.parse(entry.updated) : NaN;
@@ -31,7 +31,7 @@ function Source({ s }: { s: SourceRef }) {
   );
 }
 
-function Option({ spec, value, onChange }: { spec: OptionSpec; value: number | string | boolean; onChange(v: number | string | boolean): void }) {
+export function Option({ spec, value, onChange }: { spec: OptionSpec; value: number | string | boolean; onChange(v: number | string | boolean): void }) {
   if (spec.type === 'toggle') return <Switch label={spec.label} checked={value === true} onChange={onChange} />;
   if (spec.type === 'select') {
     const choices = spec.choices;
@@ -60,18 +60,17 @@ function Option({ spec, value, onChange }: { spec: OptionSpec; value: number | s
   );
 }
 
-/** Expanded part of a layer row: opacity, options, legend, sources, remove. */
-export function LayerDetails({ layer, def, karteId }: { layer: KarteLayer; def: LayerDef; karteId: string }) {
-  const legend = legends.value[def.id];
-  const top = topFieldLegend.value;
+interface PartProps { layer: KarteLayer; def: LayerDef; karteId: string }
+
+/** Hints about a missing key, an error or empty data. */
+export function LayerNotes({ def, karteId }: { def: LayerDef; karteId: string }) {
   const st = layerStatus.value[def.id];
-  const [confirm, setConfirm] = useState(false);
   const reload = () => {
     setLayerVisible(karteId, def.id, false);
     setTimeout(() => setLayerVisible(karteId, def.id, true), 60);
   };
   return (
-    <div class="ld" id={`ld-${def.id}`}>
+    <>
       {st?.needsKey && (
         <p class="ld-note" role="status">
           Diese Ebene braucht einen kostenlosen Schlüssel.{' '}
@@ -90,45 +89,94 @@ export function LayerDetails({ layer, def, karteId }: { layer: KarteLayer; def: 
           )}
         </p>
       )}
-      <div class="ld-field">
-        <div class="ld-line">
-          <span class="ld-label">Deckkraft</span>
-          <span class="ld-value num">{formatPercent(layer.opacity)}</span>
-        </div>
-        <Slider aria-label={`Deckkraft ${def.title}`} value={layer.opacity} min={0} max={1} step={0.05} format={(v) => formatPercent(v)} onChange={(v) => setLayerOpacity(karteId, def.id, v)} />
+    </>
+  );
+}
+
+export function OpacityField({ layer, def, karteId }: PartProps) {
+  return (
+    <div class="ld-field">
+      <div class="ld-line">
+        <span class="ld-label">Deckkraft</span>
+        <span class="ld-value num">{formatPercent(layer.opacity)}</span>
       </div>
-      {def.options?.map((o) => (
+      <Slider aria-label={`Deckkraft ${def.title}`} value={layer.opacity} min={0} max={1} step={0.05} format={(v) => formatPercent(v)} onChange={(v) => setLayerOpacity(karteId, def.id, v)} />
+    </div>
+  );
+}
+
+export function OptionFields({ layer, def, karteId, specs = def.options }: PartProps & { specs?: OptionSpec[] }) {
+  return (
+    <>
+      {specs?.map((o) => (
         <Option key={o.id} spec={o} value={layer.options?.[o.id] ?? o.default} onChange={(v) => setLayerOption(karteId, def.id, o.id, v)} />
       ))}
-      {legend && top?.id !== def.id && (
-        <div class="ld-legend">
-          <LegendBody spec={legend} />
-        </div>
-      )}
-      <div class="ld-sources">
-        <span class="ld-label">{def.sources.length > 1 ? 'Quellen' : 'Quelle'}</span>
-        <ul role="list">
-          {def.sources.map((s) => (
-            <Source key={s.url} s={s} />
-          ))}
-        </ul>
-      </div>
-      <div class="ld-actions">
-        {confirm ? (
-          <>
-            <Button variant="ghost" onClick={() => setConfirm(false)}>
-              Abbrechen
-            </Button>
-            <Button variant="destructive" icon="trash" onClick={() => removeLayer(karteId, def.id)}>
-              {def.title} entfernen
-            </Button>
-          </>
-        ) : (
-          <Button variant="danger" icon="trash" onClick={() => setConfirm(true)}>
-            Entfernen
+    </>
+  );
+}
+
+export function LayerLegend({ def }: { def: LayerDef }) {
+  const legend = legends.value[def.id];
+  const top = topFieldLegend.value;
+  if (!legend || top?.id === def.id) return null;
+  return (
+    <div class="ld-legend">
+      <LegendBody spec={legend} />
+    </div>
+  );
+}
+
+export function SourceList({ def }: { def: LayerDef }) {
+  return (
+    <div class="ld-sources">
+      <span class="ld-label">{def.sources.length > 1 ? 'Quellen' : 'Quelle'}</span>
+      <ul role="list">
+        {def.sources.map((s) => (
+          <Source key={s.url} s={s} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function RemoveAction({ def, karteId }: { def: LayerDef; karteId: string }) {
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <div class="ld-actions">
+      {confirm ? (
+        <>
+          <Button variant="ghost" onClick={() => setConfirm(false)}>
+            Abbrechen
           </Button>
-        )}
-      </div>
+          <Button variant="destructive" icon="trash" onClick={() => removeLayer(karteId, def.id)}>
+            {def.title} entfernen
+          </Button>
+        </>
+      ) : (
+        <Button variant="danger" icon="trash" onClick={() => setConfirm(true)}>
+          Entfernen
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Inline settings inside the row (layers with at most two options): opacity and options. `onMore` opens the
+ * detail page for source, legend and the like; `removable` only for layers the user added themselves.
+ */
+export function LayerDetails({ layer, def, karteId, removable, onMore }: PartProps & { removable?: boolean; onMore?(): void }) {
+  return (
+    <div class="ld" id={`ld-${def.id}`}>
+      <LayerNotes def={def} karteId={karteId} />
+      <OpacityField layer={layer} def={def} karteId={karteId} />
+      <OptionFields layer={layer} def={def} karteId={karteId} />
+      {onMore && (
+        <button type="button" class="linkbtn ld-more" onClick={onMore}>
+          Quelle und Legende
+        </button>
+      )}
+      {removable && <RemoveAction def={def} karteId={karteId} />}
     </div>
   );
 }

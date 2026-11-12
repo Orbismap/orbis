@@ -39,9 +39,9 @@ export function startPadding(): () => void {
     const left = leftPanelOpen.value;
     const selected = !!(inspector.value || probe.value);
     if (mobile) {
-      animateTo({ top: 64, right: 0, bottom: Math.max(0, sheetPx.value), left: 0 });
+      animateTo({ top: 64, right: 0, bottom: selected ? 0 : Math.max(0, sheetPx.value), left: 0 });
     } else {
-      animateTo({ top: 0, right: selected ? 360 + 70 + 24 : 70, bottom: dockPx.value + 40, left: left ? 360 : 0 });
+      animateTo({ top: 0, right: 70, bottom: dockPx.value + 40, left: left ? 360 : 0 });
     }
   });
   return () => {

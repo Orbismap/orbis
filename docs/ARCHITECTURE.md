@@ -146,7 +146,7 @@ Die Engine führt das Maximum der MapLibre-Transform bei jedem `move` nach (ohne
 Slider, URL, `flyTo` und `jumpTo` sind damit gleich begrenzt, eine zu steile Neigung wird beim Auszoomen mitgenommen und
 kommt beim Einzoomen nicht von selbst zurück; unter 1° ist Touch-Pitch aus. Unter Zoom 5 ist die Karte nordgerichtet: eine
 Drehung läuft nach Gestenende bzw. beim Auszoomen in ca. 450 ms auf 0° zurück. URL/Zustand werden beim Laden geklemmt
-(`clampCamera`). `Tilt.tsx` nutzt dieselbe Funktion.
+(`clampCamera`). `Tilt.tsx` nutzt dieselbe Funktion. Während einer Geste (Maus, Touch) darf die Neigung über `tiltLimit` und die Drehung unter Zoom 5 über Norden hinaus gezogen werden (Gummiband `rubberBand`: Überschuss exponentiell gedämpft, höchstens 3 bis 12° bzw. 30° darüber); beim Loslassen federt die Kamera in ca. 400 ms (ease-out) auf die Grenze zurück, bei `prefers-reduced-motion` sofort. Ohne Geste (Rad, Tasten, URL, `flyTo`) gelten die harten Grenzen.
 
 **Slots** sind leere Marker-Layer im Stil, in fester Reihenfolge: `field` (Wetterfelder, unter allem) → `raster`
 → `areas` → `lines` → *Beschriftung der Grundkarte* → `points` → `labels` (eigene Beschriftung) → `top`.

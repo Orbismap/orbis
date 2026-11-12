@@ -9,7 +9,7 @@ import { Timeline } from '../features/timeline/Timeline';
 import { TopBar, ToolRail } from '../features/tools/Tools';
 import { inspector, probe } from '../state/selection';
 import { leftPanelOpen, leftTab, leftView, searchOpen } from '../state/ui';
-import { Button, IconButton } from '../ui/Button';
+import { IconButton } from '../ui/Button';
 import { Kbd } from '../ui/Chip';
 import { Icon } from '../ui/icons/Icon';
 import { Panel } from '../ui/Panel';
@@ -41,13 +41,6 @@ function LeftPanel() {
         <div class="lcontent">
           <LeftBody />
         </div>
-        {view === 'layers' && (
-          <div class="lfoot">
-            <Button block variant="secondary" icon="plus" onClick={() => (leftView.value = 'catalog')}>
-              Ebene hinzufügen
-            </Button>
-          </div>
-        )}
       </Panel>
     </aside>
   );

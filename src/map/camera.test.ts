@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampCamera, clampPitch, ENGINE_MAX_PITCH, needsNorthReset, tiltAvailable, tiltLimit, wrapBearing } from './camera';
+import { clampCamera, clampPitch, ENGINE_MAX_PITCH, needsNorthReset, pitchStretch, rubberBand, tiltAvailable, tiltLimit, wrapBearing } from './camera';
 
 describe('tiltLimit', () => {
   it('has fixed end values', () => {
@@ -63,5 +63,30 @@ describe('clamp logic', () => {
     const d = { ...c, zoom: 9 };
     expect(clampCamera(d)).toEqual({ ...d, pitch: tiltLimit(9) });
     expect(clampCamera({ ...c, zoom: 13 })).toEqual({ ...c, zoom: 13 });
+  });
+});
+
+describe('rubberBand', () => {
+  it('follows the input up to the limit', () => {
+    expect(rubberBand(0, 30, 10)).toBe(0);
+    expect(rubberBand(30, 30, 10)).toBe(30);
+  });
+  it('damps the excess, stays below limit + maxOver and is monotonic', () => {
+    let prev = 30;
+    for (let raw = 30.1; raw < 400; raw += 0.5) {
+      const v = rubberBand(raw, 30, 10);
+      expect(v).toBeGreaterThan(prev - 1e-12);
+      expect(v).toBeLessThanOrEqual(40);
+      expect(v - 30).toBeLessThan(raw - 30);
+      prev = v;
+    }
+    expect(rubberBand(31, 30, 10)).toBeCloseTo(30.95, 1); // first degrees almost 1:1
+  });
+  it('resistance grows: the same pull moves less the further out', () => {
+    expect(rubberBand(40, 30, 10) - rubberBand(30, 30, 10)).toBeGreaterThan(rubberBand(50, 30, 10) - rubberBand(40, 30, 10));
+  });
+  it('pitchStretch grows with the limit and is capped', () => {
+    expect(pitchStretch(0)).toBe(3);
+    expect(pitchStretch(70)).toBe(12);
   });
 });

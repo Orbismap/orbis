@@ -10,7 +10,9 @@ import { MINUTE } from '../../core/time';
 import { AisClient } from '../../data/parsers/aisclient';
 import { AisBook, etaText, parseAisMessage, subscriptionBoxes } from '../../data/parsers/aisstream';
 import { SHIP_CLASSES, shipClass, shipTypeName, type ShipProps, type ShipVessel } from '../../data/parsers/ais';
-import { commonsSearchUrl, parseCommonsPhoto, type ShipPhoto } from '../../data/parsers/shipphoto';
+import { greatCircle } from '../../data/parsers/flightinfo';
+import { PortIndex, type DestPort, type PortRow } from '../../data/parsers/shipdest';
+import { commonsFileUrl, commonsSearchUrl, parseCommonsFile, parseCommonsPhoto, parseWikidataImage, wikidataImoUrl, type ShipPhoto } from '../../data/parsers/shipphoto';
 import { speedText } from '../../data/parsers/traffic';
 import { extrapolate, trackLayer, type TrackObject } from '../../render/tracks';
 import { fetchJson } from '../../data/http';
@@ -22,6 +24,12 @@ const BASE = 'https://meri.digitraffic.fi/api/ais/v1';
 const colorExpr = ['match', ['get', 'cls'], ...SHIP_CLASSES.slice(0, -1).flatMap((c) => [c.id, c.color]), SHIP_CLASSES[SHIP_CLASSES.length - 1]!.color] as unknown as ExpressionSpecification;
 const size = ['interpolate', ['linear'], ['zoom'], 3, 0.2, 7, 0.3, 11, 0.5, 14, 0.7] as unknown as ExpressionSpecification;
 const AIS_MIN_ZOOM = 3;
+const env = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
+const PORTS_URL = `${env.BASE_URL ?? './'}data/ports.json`;
+
+// ports for the destination text: loaded once, only when a ship is selected
+let portIndex: Promise<PortIndex | null> | undefined;
+const loadPorts = (): Promise<PortIndex | null> => (portIndex ??= fetchJson<{ ports?: PortRow[] }>(PORTS_URL, { timeout: 30_000 }).then((r) => new PortIndex(r.data.ports ?? [])).catch(() => { portIndex = undefined; return null; }));
 
 type Photo = ShipPhoto | null;
 const photoCache = new Map<string, Promise<Photo>>();
@@ -29,8 +37,17 @@ function shipPhoto(imo: number, name: string): Promise<Photo> {
   const key = `${imo}|${name}`;
   let p = photoCache.get(key);
   if (!p) {
+    const viaWikidata = async (): Promise<Photo> => {
+      if (imo <= 0) return null;
+      try {
+        const file = parseWikidataImage((await fetchJson<unknown>(wikidataImoUrl(imo), { timeout: 12_000 })).data);
+        return file ? parseCommonsFile((await fetchJson<unknown>(commonsFileUrl(file), { timeout: 10_000 })).data) : null;
+      } catch { return null; }
+    };
     const tries = [imo > 0 ? `IMO ${imo}` : '', name.length >= 5 ? `"${name}" ship` : ''].filter(Boolean);
     p = (async () => {
+      const w = await viaWikidata();
+      if (w) return w;
       for (const q of tries) {
         try {
           const r = parseCommonsPhoto((await fetchJson<unknown>(commonsSearchUrl(q), { timeout: 10_000 })).data, { imo, name });
@@ -58,7 +75,8 @@ export default defineLayer({
   sources: [
     { name: 'aisstream.io (über den Daten-Proxy)', url: 'https://aisstream.io/', license: 'kostenlos, Quellenangabe' },
     { name: 'Fintraffic Digitraffic Marine (AIS)', url: 'https://www.digitraffic.fi/en/marine-traffic/', license: 'CC BY 4.0' },
-    { name: 'Wikimedia Commons (Fotos, wenn zuordenbar)', url: 'https://commons.wikimedia.org/', license: 'je Foto, Urheber und Lizenz in der Karte' },
+    { name: 'Wikidata + Wikimedia Commons (Fotos über die IMO-Nummer, wenn vorhanden)', url: 'https://www.wikidata.org/', license: 'je Foto, Urheber und Lizenz in der Karte' },
+    { name: 'World Port Index (NGA) / UN/LOCODE (Zielhafen aus dem AIS-Zieltext)', url: 'https://msi.nga.mil/Publications/WPI', license: 'gemeinfrei bzw. CC BY 4.0' },
   ],
   keys: [{ id: 'aisstream', required: false }],
   options: [
@@ -159,6 +177,8 @@ export default defineLayer({
     const selId = signal<string | null>(null);
     const version = signal(0);
     const photos = new Map<string, Photo>();
+    let ports: PortIndex | null = null;
+    const destPortOf = (t: TrackObject, dest: string | undefined): DestPort | null => (dest && ports ? ports.resolve(dest, [t.lng, t.lat]) : null);
     const trackOf = (id: string) => tracks.peek()?.find((t) => t.id === id);
     const cardOf = (t: TrackObject, now: number): InspectCard => {
       const p = t.props as unknown as ShipProps & { cls: string; name: string };
@@ -177,6 +197,8 @@ export default defineLayer({
       const photo = photos.get(`${imo}|${name}`);
       const facts: InspectCard['facts'] = [{ label: 'Typ', value: shipTypeName(type) }];
       if (dest) facts.push({ label: 'Ziel', value: dest, emphasis: true });
+      const dport = destPortOf(t, dest);
+      if (dport) facts.push({ label: 'Zielhafen (zugeordnet)', value: dport.code ? `${dport.name} (${dport.code})` : dport.name });
       if (eta) facts.push({ label: 'Ankunft (ETA, gemeldet)', value: eta });
       facts.push({ label: 'Geschwindigkeit', value: p.moving ? speedText(p.sog * 0.514444) : 'liegt still' });
       if (p.cog >= 0 && p.moving) facts.push({ label: 'Kurs', value: `${formatNumber(p.cog, 0)}°` });
@@ -199,6 +221,7 @@ export default defineLayer({
         ...(photo ? { media: { type: 'image' as const, url: photo.src } } : {}),
         links: [
           ...(photo ? [{ label: `Foto: ${photo.author} (${photo.license}), Wikimedia Commons`, url: photo.link }] : []),
+          ...(imo ? [{ label: 'Fotos bei ShipSpotting', url: `https://www.shipspotting.com/photos/gallery?imo=${imo}` }] : []),
           { label: 'Auf MarineTraffic ansehen', url: `https://www.marinetraffic.com/en/ais/details/ships/mmsi:${p.mmsi}` },
         ],
       };
@@ -215,6 +238,7 @@ export default defineLayer({
         photos.set(key, null);
         void shipPhoto(imo, name).then((r) => { photos.set(key, r); if (r) version.value++; });
       }
+      if (!ports) void loadPorts().then((i) => { if (i && !ports) { ports = i; version.value++; } });
       const card = cardOf(t, now);
       mine.add(card);
       return card;
@@ -236,16 +260,32 @@ export default defineLayer({
     // trail of the selected ship
     const tsrc = `${ctx.id}.trail-src`;
     ctx.map.addSource(tsrc, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    ctx.map.addLayer({ id: `${ctx.id}.trail`, type: 'line', source: tsrc, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#bfe9ff', 'line-width': 2, 'line-dasharray': [1.5, 1.5], 'line-opacity': 0.9 } }, 'lines');
+    ctx.map.addLayer({ id: `${ctx.id}.trail`, type: 'line', source: tsrc, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#bfe9ff', 'line-width': 2, 'line-dasharray': [1.5, 1.5], 'line-opacity': 0.9 }, filter: ['==', ['get', 'part'], 'trail'] }, 'lines');
+    ctx.map.addLayer({ id: `${ctx.id}.route`, type: 'line', source: tsrc, layout: { 'line-cap': 'butt' }, paint: { 'line-color': '#7fa8f0', 'line-width': 1.8, 'line-dasharray': [3, 2.5], 'line-opacity': 0.8 }, filter: ['==', ['get', 'part'], 'ahead'] }, 'lines');
+    ctx.map.addLayer({ id: `${ctx.id}.route-port`, type: 'circle', source: tsrc, filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 4.5, 'circle-color': '#0e1626', 'circle-stroke-color': '#bfe9ff', 'circle-stroke-width': 2 } }, 'lines');
     const pushTrail = () => {
       const src = ml.getSource(tsrc) as { setData(d: unknown): void } | undefined;
       const id = selId.peek();
       const t = id ? trackOf(id) : undefined;
       const pts = t ? (book.trails.get(Number(id)) ?? []).map((p): [number, number] => [p[0], p[1]]) : [];
+      const features: GeoJSON.Feature[] = [];
       if (t) pts.push(extrapolate(t, Date.now(), 10 * MINUTE));
-      src?.setData({ type: 'FeatureCollection', features: pts.length > 1 ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: pts }, properties: {} }] : [] });
+      if (pts.length > 1) features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: pts }, properties: { part: 'trail' } });
+      if (t) {
+        const p = t.props as unknown as ShipProps;
+        const st = book.statics.get(p.mmsi);
+        const dp = destPortOf(t, st?.dest || vessels.data.peek()?.[t.id]?.dest);
+        if (dp) {
+          // the line continues on the same side of the antimeridian as the ship
+          const at = pts[pts.length - 1]!;
+          const dest: [number, number] = [dp.lng + Math.round((at[0] - dp.lng) / 360) * 360, dp.lat];
+          features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: greatCircle(at, dest, 40) }, properties: { part: 'ahead' } });
+          features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [dp.lng, dp.lat] }, properties: { part: 'port' } });
+        }
+      }
+      src?.setData({ type: 'FeatureCollection', features });
     };
-    const stopTrailDraw = effect(() => { selId.value; pushTrail(); });
+    const stopTrailDraw = effect(() => { selId.value; version.value; pushTrail(); });
     const trailTimer = setInterval(() => { if (selId.peek()) pushTrail(); }, 5000);
 
     // status: what the user needs to know about coverage
@@ -281,7 +321,7 @@ export default defineLayer({
         client.close();
         stopKey(); stopTrail(); stopSel(); stopUpdate(); stopTrailDraw(); stopStatus();
         handle.destroy();
-        ctx.map.remove({ layers: [`${ctx.id}.trail`], sources: [tsrc] });
+        ctx.map.remove({ layers: [`${ctx.id}.route-port`, `${ctx.id}.route`, `${ctx.id}.trail`], sources: [tsrc] });
       },
     };
   },
