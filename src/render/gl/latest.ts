@@ -95,3 +95,10 @@ export const ICON_SOURCE: SourceRef = {
   url: 'https://opendata.dwd.de/weather/nwp/icon/',
   license: 'CC BY 4.0, verändert (Gitter, Einheiten, Quantisierung)',
 };
+
+/** Terrain heights for the terrain correction of temperature and dew point (tiles load when zoomed in). */
+export const DEM_SOURCE: SourceRef = {
+  name: 'Mapterhorn (Geländehöhen)',
+  url: 'https://mapterhorn.com/attribution',
+  license: '© Mapterhorn und Quellen, siehe Namensnennung',
+};

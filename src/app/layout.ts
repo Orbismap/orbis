@@ -41,7 +41,7 @@ export function startPadding(): () => void {
     if (mobile) {
       animateTo({ top: 64, right: 0, bottom: Math.max(0, sheetPx.value), left: 0 });
     } else {
-      animateTo({ top: 0, right: selected ? 360 + 64 + 24 : 64, bottom: dockPx.value + 40, left: left ? 360 : 0 });
+      animateTo({ top: 0, right: selected ? 360 + 70 + 24 : 70, bottom: dockPx.value + 40, left: left ? 360 : 0 });
     }
   });
   return () => {

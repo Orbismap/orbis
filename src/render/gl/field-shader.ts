@@ -32,7 +32,7 @@ const slotBlocks = Array.from(
       ivec2 p0 = ivec2(floor(g));
       p0 = min(p0, ivec2(359));
       vec2 f = g - vec2(p0);
-      tile = evalLevel(u_ta${i}, u_tb${i}, p0, p0 + ivec2(1, 0), p0 + ivec2(0, 1), p0 + ivec2(1, 1), f);
+      tile = evalLevel(u_ta${i}, u_tb${i}, p0, p0 + ivec2(1, 0), p0 + ivec2(0, 1), p0 + ivec2(1, 1), f, tileC);
       vec4 e = u_tedge[${i}];
       tileW = mix(1.0, smoothstep(0.0, FEATHER, lonRel), e.x)
             * mix(1.0, smoothstep(0.0, FEATHER, 45.0 - lonRel), e.y)
@@ -58,7 +58,12 @@ uniform vec2 u_scb;
 uniform int u_l0;
 uniform int u_l1;
 uniform float u_tf;
-uniform int u_mode;                    // 0 value, 1 magnitude (u,v → km/h), 2 humidity (T, Td → %)
+uniform int u_mode;                    // 0 value, 1 magnitude (u,v → km/h), 2 humidity (T, Td → %), 3 feels (T, Td, u, v → °C)
+uniform int u_ntl;                     // layers per variable in the packed samplers of mode 3
+uniform int u_tk;                      // terrain correction of a value field: 0 none, 1 temperature, 2 dew point
+uniform float u_terr_on;               // terrain correction available (and wanted)
+uniform sampler2D u_terr;              // dT in K on a lon/lat rectangle, row 0 = north
+uniform vec4 u_terr_rect;              // west, north, width, height (degrees)
 uniform vec2 u_range;
 uniform float u_opacity;
 uniform vec4 u_contour;                // interval (0 = off), offset, width px, alpha
@@ -74,39 +79,68 @@ int q16(vec2 rg) {
   return q >= 32768 ? q - 65536 : q;
 }
 
-// time-blended quantised value of one grid cell; ok = 0 when either step is nodata
-float cellQ(sampler2DArray t, ivec2 p, out float ok) {
-  int a = q16(texelFetch(t, ivec3(p, u_l0), 0).rg);
-  int b = u_tf > 0.0 ? q16(texelFetch(t, ivec3(p, u_l1), 0).rg) : a;
+// time-blended quantised value of one grid cell (variable voff of a packed sampler); ok = 0 when either step is nodata
+float cellQ(sampler2DArray t, ivec2 p, int voff, out float ok) {
+  int base = voff * u_ntl;
+  int a = q16(texelFetch(t, ivec3(p, u_l0 + base), 0).rg);
+  int b = u_tf > 0.0 ? q16(texelFetch(t, ivec3(p, u_l1 + base), 0).rg) : a;
   ok = (a != NODATA && b != NODATA) ? 1.0 : 0.0;
   return mix(float(a), float(b), u_tf);
 }
 
-// bilinear with nodata corners left out of the weights; xyz = value A, value B, coverage
-vec3 evalLevel(sampler2DArray ta, sampler2DArray tb, ivec2 c00, ivec2 c10, ivec2 c01, ivec2 c11, vec2 f) {
+vec4 cellQ4(sampler2DArray t, ivec2 c00, ivec2 c10, ivec2 c01, ivec2 c11, int voff, inout vec4 ok) {
+  float k0, k1, k2, k3;
+  vec4 q = vec4(cellQ(t, c00, voff, k0), cellQ(t, c10, voff, k1), cellQ(t, c01, voff, k2), cellQ(t, c11, voff, k3));
+  ok *= vec4(k0, k1, k2, k3);
+  return q;
+}
+
+// bilinear with nodata corners left out of the weights; result = the variables of the mode (physical units), cov = coverage
+vec4 evalLevel(sampler2DArray ta, sampler2DArray tb, ivec2 c00, ivec2 c10, ivec2 c01, ivec2 c11, vec2 f, out float cov) {
   vec4 w = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
-  float ok0, ok1, ok2, ok3;
-  vec4 qa = vec4(cellQ(ta, c00, ok0), cellQ(ta, c10, ok1), cellQ(ta, c01, ok2), cellQ(ta, c11, ok3));
-  vec4 ok = vec4(ok0, ok1, ok2, ok3);
-  vec4 qb = vec4(0.0);
-  if (u_mode != 0) {
-    float k0, k1, k2, k3;
-    qb = vec4(cellQ(tb, c00, k0), cellQ(tb, c10, k1), cellQ(tb, c01, k2), cellQ(tb, c11, k3));
-    ok *= vec4(k0, k1, k2, k3);
+  vec4 ok = vec4(1.0);
+  vec4 qa0 = cellQ4(ta, c00, c10, c01, c11, 0, ok);
+  vec4 qa1 = vec4(0.0);
+  vec4 qb0 = vec4(0.0);
+  vec4 qb1 = vec4(0.0);
+  if (u_mode != 0) qb0 = cellQ4(tb, c00, c10, c01, c11, 0, ok);
+  if (u_mode == 3) {
+    qa1 = cellQ4(ta, c00, c10, c01, c11, 1, ok);
+    qb1 = cellQ4(tb, c00, c10, c01, c11, 1, ok);
   }
   vec4 wk = w * ok;
   float ws = wk.x + wk.y + wk.z + wk.w;
-  if (ws < 1e-4) return vec3(0.0);
-  return vec3(dot(wk, qa) / ws * u_sca.x + u_sca.y, dot(wk, qb) / ws * u_scb.x + u_scb.y, ws);
+  cov = ws;
+  if (ws < 1e-4) { cov = 0.0; return vec4(0.0); }
+  float a0 = dot(wk, qa0) / ws * u_sca.x + u_sca.y;
+  float b0 = dot(wk, qb0) / ws * u_scb.x + u_scb.y;
+  if (u_mode == 3) return vec4(a0, dot(wk, qa1) / ws * u_sca.x + u_sca.y, b0, dot(wk, qb1) / ws * u_scb.x + u_scb.y);
+  return vec4(a0, b0, 0.0, 0.0);
 }
 
-float derive(vec2 ab) {
-  if (u_mode == 1) return length(ab) * 3.6;
+const float TD_RATIO = 0.002 / 0.0065;
+
+float terrainK(float lon, float lat) {
+  if (u_terr_on < 0.5) return 0.0;
+  vec2 uv = vec2(mod(lon - u_terr_rect.x, 360.0) / u_terr_rect.z, (u_terr_rect.y - lat) / u_terr_rect.w);
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 0.0;
+  return texture(u_terr, uv).r;
+}
+
+// twin of deriveField() in grid.ts
+float derive(vec4 v, float lon, float lat) {
+  if (u_mode == 1) return length(v.xy) * 3.6;
+  float dT = (u_mode >= 2 || u_tk > 0) ? terrainK(lon, lat) : 0.0;
+  if (u_mode == 0) return v.x + (u_tk == 1 ? dT : (u_tk == 2 ? dT * TD_RATIO : 0.0));
+  float t = v.x + dT;
+  float td = min(v.y + dT * TD_RATIO, t);
   if (u_mode == 2) {
-    float rh = 100.0 * exp(17.625 * ab.y / (243.04 + ab.y) - 17.625 * ab.x / (243.04 + ab.x));
+    float rh = 100.0 * exp(17.625 * td / (243.04 + td) - 17.625 * t / (243.04 + t));
     return clamp(rh, 0.0, 100.0);
   }
-  return ab.x;
+  float rh = clamp(100.0 * exp(17.62 * td / (243.12 + td) - 17.62 * t / (243.12 + t)), 0.0, 100.0);
+  float e = rh / 100.0 * 6.105 * exp(17.27 * t / (237.7 + t));
+  return t + 0.33 * e - 0.7 * length(v.zw) - 4.0;
 }
 
 float contourLine(float v, out float major) {
@@ -131,12 +165,14 @@ void main() {
 
   // tile (0.125°) where available
   bool tileHit = false;
-  vec3 tile = vec3(0.0);
+  vec4 tile = vec4(0.0);
+  float tileC = 0.0;
   float tileW = 0.0;
   ${slotBlocks}
 
   // overview (0.5°), longitude wraps
-  vec3 ov = vec3(0.0);
+  vec4 ov = vec4(0.0);
+  float ovC = 0.0;
   if (tileW < 0.999) {
     ivec2 osz = textureSize(u_oa, 0).xy;
     vec2 g = vec2(mod(lon + 180.0, 360.0) / 0.5, clamp((90.0 - lat) / 0.5, 0.0, float(osz.y - 1)));
@@ -144,17 +180,18 @@ void main() {
     p0.y = min(p0.y, osz.y - 2);
     vec2 f = g - vec2(p0);
     int x1 = p0.x + 1 >= osz.x ? 0 : p0.x + 1;
-    ov = evalLevel(u_oa, u_ob, p0, ivec2(x1, p0.y), ivec2(p0.x, p0.y + 1), ivec2(x1, p0.y + 1), f);
+    ov = evalLevel(u_oa, u_ob, p0, ivec2(x1, p0.y), ivec2(p0.x, p0.y + 1), ivec2(x1, p0.y + 1), f, ovC);
   }
 
   // soft hand-over from overview to tile; where one has no data the other one speaks
-  vec3 s;
-  if (tile.z > 0.0 && ov.z > 0.0) s = mix(ov, tile, tileW);
-  else if (tile.z > 0.0) s = tile;
-  else s = ov;
-  float value = derive(s.xy);
+  vec4 sv;
+  float sc;
+  if (tileC > 0.0 && ovC > 0.0) { sv = mix(ov, tile, tileW); sc = mix(ovC, tileC, tileW); }
+  else if (tileC > 0.0) { sv = tile; sc = tileC; }
+  else { sv = ov; sc = ovC; }
+  float value = derive(sv, lon, lat);
 
-  float cov = smoothstep(0.15, 0.6, s.z);
+  float cov = smoothstep(0.15, 0.6, sc);
   float t = clamp((value - u_range.x) / (u_range.y - u_range.x), 0.0, 1.0);
   vec4 col = texture(u_lut, vec2(t * (1.0 - 1.0 / 1024.0) + 0.5 / 1024.0, 0.5)) * (cov * u_opacity);
 

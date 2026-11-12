@@ -1,7 +1,7 @@
 // Temperature 2 m (ICON), diverging scale around 0 °C with an optional freezing line.
 import { computed } from '@preact/signals';
 import { formatQuantity } from '../../core/units';
-import { ICON_SOURCE, forecastTime } from '../../render/gl/latest';
+import { DEM_SOURCE, ICON_SOURCE, forecastTime } from '../../render/gl/latest';
 import { scaleLegend } from '../../render/gl/legend';
 import { TEMPERATURE } from '../../render/gl/scales';
 import { defineLayer } from '../define';
@@ -10,15 +10,15 @@ export default defineLayer({
   id: 'temperatur',
   category: 'wetter',
   title: 'Temperatur',
-  summary: 'Lufttemperatur in 2 m Höhe, Vorhersage für 72 Stunden',
+  summary: 'Lufttemperatur in 2 m Höhe, Vorhersage für 72 Stunden, nah herangezoomt mit Geländekorrektur',
   icon: 'thermometer',
   color: '#F7B84A',
   form: 'field',
   exclusive: 'field',
   cadence: 'hourly',
-  sources: [ICON_SOURCE],
+  sources: [ICON_SOURCE, DEM_SOURCE],
   time: forecastTime,
-  options: [{ id: 'nullgrad', label: '0-°C-Linie', type: 'toggle', default: true }],
+  options: [{ id: 'nullgrad', label: '0-°C-Linie', type: 'toggle', default: true }, { id: 'gelaende', label: 'Geländekorrektur', type: 'toggle', default: true }],
   legend: () => scaleLegend(TEMPERATURE),
   keywords: ['temperatur', 'wärme', 'kälte', 'frost', 'grad', 'icon', 'dwd'],
 
@@ -28,6 +28,7 @@ export default defineLayer({
       vars: ['temperature_2m'],
       scale: TEMPERATURE,
       label: 'Temperatur',
+      terrain: { enabled: computed(() => ctx.options.value.gelaende !== false), kind: 'T' },
       format: (v) => formatQuantity('temperature', v, { digits: 1 }),
       contours: computed(() => (ctx.options.value.nullgrad ? { interval: 1000, width: 1.3, alpha: 0.8 } : undefined)),
     });

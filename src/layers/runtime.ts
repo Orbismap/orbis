@@ -2,6 +2,8 @@
 // status, legend and feed into state/session, keeps the stack order of the Karte inside the slots.
 import { computed, effect, untracked } from '@preact/signals';
 import { createResource, type Resource } from '../data/resource';
+import { hasKey, keySignal } from '../keys';
+import { settings } from '../state/settings';
 import { scopeEngine, type ScopeRecord } from '../map/scope';
 import type { BasemapId, MapEngine, SlotId } from '../map/types';
 import { clearLayerSession, activeKarte, setFeed, setLayerStatus, setLegend, activeKarteId } from '../state/session';
@@ -9,7 +11,7 @@ import { inspector, selectCard } from '../state/selection';
 import { effectiveTheme } from '../state/settings';
 import { time, timeSources } from '../state/time';
 import { getLayer } from './registry';
-import type { InspectCard, LayerContext, LayerDef, LayerHandle, OptionSpec, OptionValues } from './types';
+import type { InspectCard, LayerContext, LayerDef, LayerHandle, LayerStatus, OptionSpec, OptionValues } from './types';
 
 const SLOTS: SlotId[] = ['field', 'raster', 'areas', 'lines', 'points', 'labels', 'top'];
 
@@ -51,6 +53,8 @@ export function startRuntime(engine: MapEngine): () => void {
   const mounted = new Map<string, Mounted>();
   const tearing = new Map<string, Promise<void>>();
   let lastOrder = '';
+  /** Layers the gates keep from mounting (missing key, unconfirmed warning) and the status they show instead. */
+  const gated = new Map<string, LayerStatus>();
 
   const karteLayer = (id: string) => activeKarte.value.layers.find((l) => l.id === id);
 
@@ -79,6 +83,7 @@ export function startRuntime(engine: MapEngine): () => void {
         return r;
       },
       feed: (items) => alive() && setFeed(id, items),
+      key: keySignal,
       select: (card) => {
         if (card) own.add(card);
         return alive() && selectCard(id, card);
@@ -140,6 +145,8 @@ export function startRuntime(engine: MapEngine): () => void {
       m.resources.forEach((r) => r.dispose());
       cleanupMap(m);
       clearLayerSession(id);
+      const g = gated.get(id);
+      if (g) setLayerStatus(id, g);
     })().finally(() => tearing.delete(id));
     tearing.set(id, done);
   }
@@ -177,9 +184,25 @@ export function startRuntime(engine: MapEngine): () => void {
       const k = activeKarte.value;
       const wanted: string[] = [];
       const exclusive = new Set<string>();
+      const confirmed = settings.value.confirmedWarnings;
+      const karteBlocked = !!k.sensitive && !confirmed.includes(`karte:${k.id}`);
+      gated.clear();
       for (const l of k.layers) {
         const def = l.visible ? getLayer(l.id) : undefined;
         if (!def) continue;
+        if (karteBlocked) {
+          gated.set(def.id, { state: 'empty', note: 'Bestätigung nötig', needsConfirm: true });
+          continue;
+        }
+        const missing = def.keys?.find((r) => r.required && !hasKey(r.id));
+        if (missing) {
+          gated.set(def.id, { state: 'empty', note: 'Schlüssel nötig', needsKey: missing.id });
+          continue;
+        }
+        if (def.sensitive && !confirmed.includes(`layer:${def.id}`)) {
+          gated.set(def.id, { state: 'empty', note: 'Bestätigung nötig', needsConfirm: true });
+          continue;
+        }
         if (def.exclusive) {
           if (exclusive.has(def.exclusive)) continue; // only the topmost field layer is mounted
           exclusive.add(def.exclusive);
@@ -190,6 +213,7 @@ export function startRuntime(engine: MapEngine): () => void {
       untracked(() => {
         for (const id of [...mounted.keys()]) if (!wanted.includes(id)) unmount(id);
         for (const id of wanted) if (!mounted.has(id)) mount(getLayer(id)!);
+        for (const [id, st] of gated) if (!tearing.has(id)) setLayerStatus(id, st);
         reorder();
       });
     }),

@@ -7,6 +7,8 @@ import { webcamFeed, webcamPoints } from './webcams';
 import { radioStations } from './radio';
 import { berlinToEpoch, demoEvents } from './demos';
 import { overpassPipelines } from './pipelines';
+import { peeringdbFacilities, mergeDatacenters } from './peeringdb';
+import { mrdsCommodities, mrdsSites } from './mrds';
 import { runParser } from '../worker/pool';
 
 describe('powerPlants', () => {
@@ -131,5 +133,48 @@ describe('overpassPipelines', () => {
     expect(fc.features[0]!.properties).toMatchObject({ substance: 'gas', operator: 'GASCADE', diameter: '1000', underground: true });
     expect(fc.features[0]!.geometry.coordinates[0]).toEqual([9.51, 53.64]);
     expect(fc.features[1]!.properties).toMatchObject({ substance: 'hydrogen', name: 'H2-Leitung', underground: false });
+  });
+});
+
+describe('peeringdb', () => {
+  const raw = { data: [
+    { id: 1, org_name: 'Equinix, Inc.', name: 'Equinix DC1 - Ashburn', net_count: 527, ix_count: 9, carrier_count: 14, city: 'Ashburn', country: 'US', latitude: 39.016363, longitude: -77.459023 },
+    { id: 2, org_name: 'X', name: 'X', latitude: null, longitude: null },
+    { id: 3, name: 'Null Island', latitude: 0, longitude: 0 },
+  ] };
+  it('keeps located facilities', () => {
+    const fc = peeringdbFacilities(raw);
+    expect(fc.features).toHaveLength(1);
+    expect(fc.features[0]!.properties).toMatchObject({ fid: 1, nets: 527, org: 'Equinix, Inc.', ixs: 9 });
+    expect(peeringdbFacilities(null).features).toEqual([]);
+  });
+  it('drops OSM points within 300 m of a facility', () => {
+    const pdb = peeringdbFacilities(raw);
+    const osm = dataCenters({ features: [
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [-77.4592, 39.0165] }, properties: { osm: 'node/1', name: 'dup' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [8.6, 50.1] }, properties: { osm: 'node/2', name: 'other' } },
+    ] });
+    const m = mergeDatacenters(pdb, osm);
+    expect(m.features.map((f) => f.properties.src)).toEqual(['pdb', 'osm']);
+    expect(m.features[1]!.properties.name).toBe('other');
+  });
+});
+
+describe('mrdsSites', () => {
+  const gml = `<wfs:FeatureCollection><gml:featureMember><ms:mrds fid="mrds.1"><ms:geometry><gml:Point srsName="EPSG:4326">
+    <gml:coordinates>-111.500000,39.250000</gml:coordinates></gml:Point></ms:geometry><ms:dep_id>10129978</ms:dep_id>
+    <ms:site_name>Skyline &amp; Drive Pit</ms:site_name><ms:dev_stat>Past Producer</ms:dev_stat><ms:code_list> SDG</ms:code_list></ms:mrds></gml:featureMember>
+    <gml:featureMember><ms:mrds><ms:geometry><gml:Point><gml:coordinates>-110.1,38.2</gml:coordinates></gml:Point></ms:geometry><ms:dep_id>5</ms:dep_id>
+    <ms:site_name>Unknown</ms:site_name><ms:dev_stat>Producer</ms:dev_stat><ms:code_list> CU AU</ms:code_list></ms:mrds></gml:featureMember></wfs:FeatureCollection>`;
+  it('reads GML members', () => {
+    const fc = mrdsSites(gml);
+    expect(fc.features).toHaveLength(2);
+    expect(fc.features[0]!.properties).toMatchObject({ name: 'Skyline & Drive Pit', status: 'ehemals gefördert', commodities: 'Sand & Kies', group: 'other' });
+    expect(fc.features[1]!.properties).toMatchObject({ name: '', status: 'in Förderung', commodities: 'Kupfer, Gold', group: 'metal' });
+    expect(fc.features[0]!.geometry.coordinates).toEqual([-111.5, 39.25]);
+  });
+  it('ranks groups and survives garbage', () => {
+    expect(mrdsCommodities('CU U').group).toBe('uranium');
+    expect(mrdsSites(null).features).toEqual([]);
   });
 });

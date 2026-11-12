@@ -2,7 +2,24 @@
 // tile selection for a viewport and derived quantities. No DOM, no GL: everything here is unit tested.
 import type { OwxField, OwxHeader } from '../../data/owx/decode';
 
-export type FieldMode = 'value' | 'magnitude' | 'humidity';
+export type FieldMode = 'value' | 'magnitude' | 'humidity' | 'feels';
+
+/** Dew point falls with height about 2 K/km, the temperature 6.5 K/km (terrain correction of the dew point). */
+export const TD_LAPSE_RATIO = 0.002 / 0.0065;
+/** Terrain correction applied to the stored variable(s): the temperature, or the dew point with its own factor. */
+export type TerrainKind = 'T' | 'Td';
+
+/**
+ * Apparent temperature (Steadman / Australian BoM) in °C; t °C, rh %, ws m/s. Same formula as the old Orbis
+ * (api/model.ts), including its Magnus constants for the humidity.
+ */
+export function apparentTemperature(t: number, rh: number, ws: number): number {
+  const e = (rh / 100) * 6.105 * Math.exp((17.27 * t) / (237.7 + t));
+  return t + 0.33 * e - 0.7 * ws - 4.0;
+}
+
+/** Humidity with the constants of the old app (17.62 / 243.12), used for the apparent temperature only. */
+const rhOld = (t: number, d: number) => Math.max(0, Math.min(100, 100 * Math.exp((17.62 * d) / (243.12 + d) - (17.62 * t) / (243.12 + t))));
 
 /** Two bracketing time steps and the weight of the second one. */
 export interface Bracket { i0: number; i1: number; f: number }
@@ -38,7 +55,21 @@ export function combine(mode: FieldMode, a: number, b: number): number {
 }
 
 /** Number of variables a mode needs. */
-export const modeVars = (mode: FieldMode): 1 | 2 => (mode === 'value' ? 1 : 2);
+export const modeVars = (mode: FieldMode): 1 | 2 | 4 => (mode === 'value' ? 1 : mode === 'feels' ? 4 : 2);
+
+/**
+ * Derived value from the stored variables `v` (value: [x]; magnitude: [u, v]; humidity: [T, Td]; feels: [T, Td, u, v])
+ * with an optional terrain correction `dT` (K, temperature scale): the temperature gets dT, the dew point dT times its
+ * own factor and never exceeds the temperature. CPU twin of `derive` in the shader.
+ */
+export function deriveField(mode: FieldMode, v: readonly number[], dT = 0, kind?: TerrainKind): number {
+  if (mode === 'value') return v[0]! + (kind === 'T' ? dT : kind === 'Td' ? dT * TD_LAPSE_RATIO : 0);
+  if (mode === 'magnitude') return windKmh(v[0]!, v[1]!);
+  const t = v[0]! + dT;
+  const td = Math.min(v[1]! + dT * TD_LAPSE_RATIO, t);
+  if (mode === 'humidity') return relativeHumidity(t, td);
+  return apparentTemperature(t, rhOld(t, td), Math.hypot(v[2]!, v[3]!));
+}
 
 const mod = (a: number, n: number) => ((a % n) + n) % n;
 
@@ -148,14 +179,16 @@ export interface GridLevel { fields: OwxField[]; header: OwxHeader }
  * CPU twin of the shader: the value at a position in the display unit, preferring the first level that covers it
  * (callers pass tiles before the overview).
  */
-export function sampleLevels(levels: readonly GridLevel[], mode: FieldMode, br: Bracket, lng: number, lat: number): number | undefined {
-  for (const lv of levels) {
-    const a = sampleGrid(lv.fields[0]!, br, lng, lat);
-    if (a === undefined) continue;
-    if (modeVars(mode) === 1) return a;
-    const b = sampleGrid(lv.fields[1]!, br, lng, lat);
-    if (b === undefined) continue;
-    return combine(mode, a, b);
+export function sampleLevels(levels: readonly GridLevel[], mode: FieldMode, br: Bracket, lng: number, lat: number, terrain?: { dT: number; kind?: TerrainKind }): number | undefined {
+  const n = modeVars(mode);
+  outer: for (const lv of levels) {
+    const vals: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const x = sampleGrid(lv.fields[i]!, br, lng, lat);
+      if (x === undefined) continue outer;
+      vals.push(x);
+    }
+    return deriveField(mode, vals, terrain?.dT ?? 0, terrain?.kind);
   }
   return undefined;
 }

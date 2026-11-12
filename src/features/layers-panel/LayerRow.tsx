@@ -9,6 +9,7 @@ import { setLayerVisible } from '../../karten/store';
 import { Icon } from '../../ui/icons/Icon';
 import { cx } from '../../ui/hooks';
 import { tipProps } from '../../ui/tip-state';
+import { openKeySettings } from '../boost/open';
 import { CADENCE_LABEL } from '../catalog/fuzzy';
 import { LayerDetails } from './LayerDetails';
 import { expanded, toggleExpanded } from './expanded';
@@ -32,6 +33,9 @@ export interface LayerRowProps {
 export function LayerRow({ layer, def, karteId, index, count, onGrip, onKeyMove }: LayerRowProps) {
   const open = expanded.value.has(def.id);
   const st = rowStatus(layer.visible ? layerStatus.value[def.id] : undefined, def.cadence, now.value);
+  const raw = layer.visible ? layerStatus.value[def.id] : undefined;
+  const needsKey = raw?.needsKey;
+  const needsConfirm = raw?.needsConfirm;
   const below = useBelowZoom(layer.visible ? def.minZoom : undefined);
   const onKey = (e: KeyboardEvent) => {
     if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
@@ -39,7 +43,9 @@ export function LayerRow({ layer, def, karteId, index, count, onGrip, onKeyMove 
     onKeyMove(e.key === 'ArrowUp' ? -1 : 1);
   };
   let sub: preact.ComponentChild;
-  if (!layer.visible) sub = <span class="lrow-sub">Ausgeblendet</span>;
+  if (needsKey) sub = <span class="lrow-sub is-hint">Schlüssel nötig</span>;
+  else if (needsConfirm) sub = <span class="lrow-sub is-hint">Bestätigung nötig</span>;
+  else if (!layer.visible) sub = <span class="lrow-sub">Ausgeblendet</span>;
   else if (below) sub = <span class="lrow-sub is-hint">Näher heranzoomen</span>;
   else if (st.state === 'error') sub = <span class="lrow-sub is-error">Fehler beim Laden</span>;
   else if (st.state === 'loading') sub = <span class="lrow-sub">Lädt</span>;
@@ -69,6 +75,12 @@ export function LayerRow({ layer, def, karteId, index, count, onGrip, onKeyMove 
             {sub}
           </span>
         </button>
+        {needsKey && (
+          <button type="button" class="lrow-keybtn" aria-label={`Schlüssel eintragen für ${def.title}`} onClick={() => openKeySettings(needsKey)} {...tipProps('Schlüssel eintragen')}>
+            <Icon name="key" size={16} />
+            Eintragen
+          </button>
+        )}
         <button
           type="button"
           class="lrow-eye"

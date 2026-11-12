@@ -58,6 +58,25 @@ brauchen `properties.id` (Hover, Auswahl); fehlt es, ergänzt der Baustein es.
 | `gibsLayer(ctx, o)` | `layer`, `format: 'png' \| 'jpg'`, `matrixSet` (z. B. `GoogleMapsCompatible_Level8`, bestimmt Maximalzoom), `date?: 'yesterday' \| 'YYYY-MM-DD' \| ReadonlySignal<string>` (ohne: Layer ohne Zeitdimension), `product?`, `attribution?`, `slot?`, `name?` |
 | `pmtilesLayer(ctx, o)` | `url`, `sourceLayer`, `slot?`, `name?`, `idKey?`, `radius`, `color`, `stroke?`, `symbol?`, `sortKey?`, `filter?`, `describe`, `minZoom?`, `maxZoom?`, `attribution?` |
 | `trackLayer(ctx, o)` | `data: Resource<TrackObject[]> \| ReadonlySignal<TrackObject[] \| undefined>` mit `TrackObject = {id, lng, lat, heading?, speed? (m/s), t, props?}`, `resources?`, `symbol: {icon, size, rotate?}`, `color: Dyn`, `ringRadius?`, `maxExtrapolateMs?` (2 min), `tickMs?` (100), `filter?`, `describe(track, now)`, `feed?(tracks)`, `minZoom?`, `count?` |
+| `cameraLayer(ctx, o)` | `color` (einzige Farbe), `detail: CameraSource \| CameraSource[]`, `overview?: CameraSource`, `count?`, `resources?` (hart: Fehler/Laden), `softResources?` (nur Anzahl/Alter), `slot?`; `CameraSource = {name, data: {kind:'pmtiles', url, sourceLayer, attribution?} \| {kind:'geojson', data}, minZoom?, describe?, idKey?, dirKey?}` |
+
+### Kamera-Ebenen (`render/cameras.ts`)
+
+Alle Kamera-Ebenen (`webcams`, `ueberwachung`, `kennzeichen`, `blitzer`) nutzen `cameraLayer` und sehen gleich aus,
+nur `color` unterscheidet sich (Webcams `#19C7B0`, Überwachung `#B388FF`, Kennzeichen `#FF5D5D`, Blitzer `#FFB020`):
+
+- Punkte ab der Weltansicht (Radius `CAMERA_RADIUS`: 1,4 px bei Zoom 0, 3,8 px bei 9, 6,2 px bei 12), dunkler Rand, Hover ×1,3 mit weißem
+  Rand, Auswahlring; ab Zoom 12 (`CAMERA_DETAIL_ZOOM`) Kamera-Symbol im Punkt und, wenn das Feld `dirKey` (Standard `dir`, Grad ab Nord)
+  vorhanden ist, ein Blickkegel (Icon `fov`). Keine Heatmap, keine Cluster, kein `minZoom`-Hinweis.
+- `detail`: Quellen mit Karte (`describe`), in Zeichenreihenfolge. `overview`: dekorative Positionen (kein Hover, keine Karte, kein Symbol),
+  liegt darunter (Webcams: `cams/world.json`). Eine Quelle mit `minZoom` (z. B. Feeds ab 5) übernimmt die Details, der Überblick bleibt darunter.
+- Karten: Hilfsfunktionen `directionFact(dir)` ("Blickrichtung") und `osmNodeLink(id)`; Reihenfolge der Fakten: Objektmerkmale,
+  Blickrichtung, Betreiber, Kennung; Icon `camera` und Farbe setzt der Baustein.
+- Status: `count` (undefined = unbekannt) und `resources`/`softResources`. `osmSetCount(ctx, 'cctv')` liefert die Anzahl aus
+  `osm/meta.json` (1,4 KB, `sets.<name>.features`).
+- Die PMTiles `cctv`, `alpr`, `blitzer`, `webcam` enthalten ab Zoom 0 ausgedünnte Kacheln (cctv 73.899 von 438.165 Objekten bei z0,
+  alpr 66.347 von 157.243, blitzer und webcam alle); die Weltansicht lädt deshalb nur die Kacheln z0/z1 (je ca. 1-3 MB).
+- Neue Kamera-Art (z. B. mobile Blitzer, Richtungen aus anderen Feeds): weitere `CameraSource` in `detail`, nichts im Baustein ändern.
 
 Hinweise:
 
@@ -88,3 +107,25 @@ Zeit, im Live-Modus `Date.now()` mit 30-s-Takt. `window`: Ereignisse bis zur gew
 - `LayerHandle.probe(at)` darf `numeric` (Basiseinheit) mitliefern. `layers/runtime.probeAt(lng, lat)` sammelt alle Werte.
 - Aktualisiert eine Ebene ihre Karte per `ctx.select(card)` (z. B. Gezeitenkurve, Zugposition), bleibt der Auswahlring stehen
   (`ctx.ownSelection`).
+
+## Schlüssel und Inhaltshinweise
+
+Neuen Schlüssel anlegen: eine Datei `src/keys/defs/<id>.ts` (id = Dateiname), `export default defineKey({ id, name, group, unlocks, url, steps, placeholder?, validate? })`.
+`unlocks` ist ein Satz („Schiffe weltweit statt nur Ostsee“), `steps` die Anleitung in Sätzen ohne Nummern. Keine weitere Liste.
+
+Ebene daran hängen:
+
+```ts
+export default defineLayer({
+  id: 'schiffe', /* … */
+  keys: [{ id: 'aisstream', required: true }],      // required: false = „Boost“, die Ebene läuft auch ohne
+  sensitive: { title: 'Hinweis', text: 'Die Ebene zeigt Kameras an öffentlichen Orten.' }, // optional, einmal bestätigen
+  mount(ctx) {
+    const key = ctx.key('aisstream');                // ReadonlySignal<string | undefined>, reaktiv
+    // bei required: true läuft mount nur mit Schlüssel; bei optional: key.value prüfen und die bessere Quelle wählen
+  },
+});
+```
+
+Fehlt ein Pflicht-Schlüssel, ruft die Runtime `mount` nicht auf; die Oberfläche zeigt „Schlüssel nötig“. Schlüssel nie loggen und nie in
+Abruf-URLs von Spiegeln oder Fehlermeldungen schreiben. Standardkarten können `sensitive` ebenfalls tragen (`karten/standard.ts`).

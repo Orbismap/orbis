@@ -22,7 +22,33 @@ export type AircraftProps = {
   trk: number;
   /** seconds since the position was last updated, as reported */
   age: number;
+  /** navigation quality the aircraft reports: -1 unknown, 0 fine, 1 bad (GNSS interference indicator) */
+  nav: number;
+  /** last good GPS position when the aircraft lost GPS (readsb `gpsOkLat/Lon`) */
+  navLng?: number;
+  navLat?: number;
 };
+
+/**
+ * Navigation quality the aircraft reports about its own position (only airborne DO-260A/B ADS-B, values not derived
+ * from MLAT/TIS-B): bad when NACp < 8 (>= 93 m), NIC < 7 (containment >= 0.2 NM; NIC 0 with NACp >= 10 counts as
+ * unknown) or readsb flags a GPS loss (`gpsOkBefore`). Thresholds after 14 CFR 91.227, as in God's Eye View.
+ */
+export function navQuality(a: Record<string, unknown>, onGround: boolean): { nav: number; navLng?: number; navLat?: number } {
+  if (onGround || typeof a.alt_baro !== 'number') return { nav: -1 };
+  if (a.type !== 'adsb_icao' && a.type !== 'mlat') return { nav: -1 };
+  if (a.version !== 1 && a.version !== 2) return { nav: -1 };
+  const derived = (f: string) => !!((a.mlat as string[] | undefined)?.includes?.(f) || (a.tisb as string[] | undefined)?.includes?.(f));
+  const nic = num(a.nic) !== undefined && !derived('nic') ? (a.nic as number) : undefined;
+  const nacp = num(a.nac_p) !== undefined && !derived('nac_p') ? (a.nac_p as number) : undefined;
+  const lost = (num(a.gpsOkBefore) ?? 0) > 0;
+  if (nic === undefined && nacp === undefined && !lost) return { nav: -1 };
+  const bad = lost || (nacp !== undefined && nacp < 8) || (nic !== undefined && nic < 7 && !(nic === 0 && nacp !== undefined && nacp >= 10));
+  const la = num(a.gpsOkLat);
+  const lo = num(a.gpsOkLon);
+  if (lost && la !== undefined && lo !== undefined && Math.abs(la) <= 90 && Math.abs(lo) <= 180) return { nav: bad ? 1 : 0, navLng: lo, navLat: la };
+  return { nav: bad ? 1 : 0 };
+}
 
 /** ICAO 24-bit address blocks -> state of registration. More specific blocks first. */
 const BLOCKS: [number, number, string][] = [
@@ -66,6 +92,8 @@ export function parseAircraft(a: Record<string, unknown>, now: number): TrackObj
   const vr = num(a.baro_rate) ?? num(a.geom_rate);
   const sq = typeof a.squawk === 'string' ? a.squawk : '';
   const cat = typeof a.category === 'string' ? a.category : '';
+  // ADS-B also carries fixed obstacles (category C3-C5) and placeholder addresses: no aircraft
+  if (/^C[3-5]$/.test(cat) || /^0+$/.test(hex)) return undefined;
   const flags = num(a.dbFlags) ?? 0;
   const seen = num(a.seen_pos) ?? num(a.seen) ?? 0;
   const t = now - seen * 1000;
@@ -87,6 +115,7 @@ export function parseAircraft(a: Record<string, unknown>, now: number): TrackObj
     cat,
     trk: trk ?? -1,
     age: seen,
+    ...navQuality(a, ground),
   };
   return {
     id: hex,

@@ -42,6 +42,7 @@ export function validateKarte(raw: unknown, known: (id: string) => boolean = has
     labels: r.labels !== false,
     terminator: r.terminator === true,
     layers,
+    ...(r.sensitive && typeof r.sensitive.title === 'string' && typeof r.sensitive.text === 'string' ? { sensitive: { title: r.sensitive.title, text: r.sensitive.text } } : {}),
     ...(view ? { view } : {}),
   };
 }

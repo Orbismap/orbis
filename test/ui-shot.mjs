@@ -36,6 +36,7 @@ const errs = [];
 page.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load|net::ERR|CORS|HTTP \d/.test(m.text())) errs.push('console: ' + m.text().slice(0, 300)); });
 const hash = opt('hash', '');
+if (argv.includes('--miles')) await page.addInitScript(() => localStorage.setItem('orbis-map:settings', JSON.stringify({ v: 1, d: { units: { temperature: 'c', wind: 'kmh', pressure: 'hpa', precip: 'mm', distance: 'mi' }, theme: 'dark', motion: 'auto', keys: {}, confirmedWarnings: [] } })));
 await page.goto(`${url}/?smoke${hash}`, { waitUntil: 'load' });
 if (theme === 'light') await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
 await page.waitForFunction(() => window.__orbis?.engine, null, { timeout: 20000 }).catch(() => {});
@@ -54,6 +55,9 @@ const steps = {
   search: async () => { await page.keyboard.press('Control+k'); await sleep(200); await page.keyboard.type('wind'); await sleep(900); },
   'search-empty': async () => { await page.keyboard.press('Control+k'); await sleep(500); },
   settings: async () => { await page.getByRole('button', { name: 'Einstellungen' }).first().click(); await sleep(500); },
+  boost: async () => { await page.getByRole('button', { name: 'Einstellungen' }).first().click(); await sleep(400); await page.locator('.bkey-head').first().click(); await sleep(400); await page.evaluate(() => document.querySelector('#boost-aisstream').scrollIntoView({ block: 'center' })); await sleep(400); },
+  keyrow: async () => { await page.locator('.lrow-keybtn').first().scrollIntoViewIfNeeded(); await sleep(300); },
+  'catalog-key': async () => { await page.getByRole('button', { name: 'Ebene hinzufügen' }).last().click(); await sleep(300); await page.keyboard.type('schlüssel'); await sleep(300); },
   keys: async () => { await page.keyboard.press('Shift+?'); await sleep(400); },
   basemap: async () => { await page.getByRole('button', { name: 'Grundkarte' }).click(); await sleep(400); },
   attribution: async () => { await page.getByRole('button', { name: 'Quellen' }).click(); await sleep(400); },

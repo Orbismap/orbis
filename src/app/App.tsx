@@ -1,5 +1,6 @@
 import { effect } from '@preact/signals';
 import { useEffect } from 'preact/hooks';
+import { WarningDialog } from '../features/boost/WarningDialog';
 import { Search } from '../features/search/Search';
 import { Shortcuts } from '../features/shortcuts/Shortcuts';
 import { Toasts } from '../features/toasts/Toasts';
@@ -44,6 +45,7 @@ export function App() {
       {isMobile.value ? <MobileLayout /> : <DesktopLayout />}
       {searchOpen.value && <Search />}
       {shortcutsOpen.value && <Shortcuts />}
+      <WarningDialog />
       <Toasts />
       <TooltipLayer />
     </div>

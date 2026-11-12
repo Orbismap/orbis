@@ -39,7 +39,16 @@ export function shipTypeName(code: number | undefined): string {
   return d;
 }
 
-export type ShipVessel = { name: string; type: number; dest: string; draught: number; call: string; imo: number; len: number; wid: number };
+export type ShipEta = { month: number; day: number; hour: number; minute: number };
+export type ShipVessel = { name: string; type: number; dest: string; draught: number; call: string; imo: number; len: number; wid: number; eta?: ShipEta | null };
+
+/** AIS packs the ETA into 20 bits: month (4) | day (5) | hour (5) | minute (6). */
+export function etaFromPacked(v: unknown): ShipEta | null {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const month = (n >> 16) & 15, day = (n >> 11) & 31, hour = (n >> 6) & 31, minute = n & 63;
+  return month >= 1 && month <= 12 && day >= 1 && hour < 24 && minute < 60 ? { month, day, hour, minute } : null;
+}
 
 /** `/vessels` list -> map by MMSI as plain object. `draught` is converted from decimetres to metres. */
 export function aisVessels(raw: unknown): Record<string, ShipVessel> {
@@ -61,6 +70,7 @@ export function aisVessels(raw: unknown): Record<string, ShipVessel> {
       imo: Number(v.imo) || 0,
       len: a + b,
       wid: c + d,
+      eta: etaFromPacked(v.eta),
     };
   }
   return out;

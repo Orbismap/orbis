@@ -1,4 +1,5 @@
 import { useEffect } from 'preact/hooks';
+import { Scalebar } from '../features/scalebar/Scalebar';
 import { Attribution } from '../features/attribution/Attribution';
 import { InspectorCard } from '../features/inspector/Inspector';
 import { KartenSwitcher } from '../features/karten-bar/KartenSwitcher';
@@ -62,7 +63,10 @@ export function MobileLayout() {
     <div class="hud hud-mobile" data-detent={detent}>
       <Header />
       <div class="rail-pos">
-        <ToolRail />
+        <ToolRail popoverUp />
+      </div>
+      <div class="scalebar-pos">
+        <Scalebar side="left" />
       </div>
       <div class="attr-pos">
         <Attribution />

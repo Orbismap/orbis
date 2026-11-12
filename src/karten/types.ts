@@ -8,4 +8,6 @@ export interface Karte {
   basemap: BasemapId; labels: boolean; terminator: boolean;
   layers: KarteLayer[];             // order = stack inside the slots, topmost first
   view?: { center: [number, number]; zoom: number };
+  /** Content warning, confirmed once before the Karte shows its layers. */
+  sensitive?: { title: string; text: string };
 }

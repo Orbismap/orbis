@@ -4,6 +4,7 @@ import { InspectorCard } from '../features/inspector/Inspector';
 import { KartenBar } from '../features/karten-bar/KartenBar';
 import { Legend } from '../features/legend/Legend';
 import { ProbeCard } from '../features/probe/ProbeCard';
+import { Scalebar } from '../features/scalebar/Scalebar';
 import { Timeline } from '../features/timeline/Timeline';
 import { TopBar, ToolRail } from '../features/tools/Tools';
 import { inspector, probe } from '../state/selection';
@@ -92,6 +93,9 @@ export function DesktopLayout() {
       <div class="dock" ref={dock}>
         <Legend />
         <Timeline />
+      </div>
+      <div class="scalebar-pos">
+        <Scalebar side="right" />
       </div>
       <div class="attr-pos">
         <Attribution />

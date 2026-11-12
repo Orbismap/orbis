@@ -140,18 +140,18 @@
   }
   .topbar-pos {
     position: absolute;
-    top: var(--edge);
-    right: var(--edge);
+    top: var(--rail-inset);
+    right: var(--rail-inset);
   }
   .hud-desktop .rail-pos {
     position: absolute;
-    top: calc(var(--edge) + 48px + 12px);
-    right: var(--edge);
+    top: calc(var(--rail-inset) + var(--top-h) + var(--rail-gap));
+    right: var(--rail-inset);
   }
   .right {
     position: absolute;
-    top: calc(var(--edge) + 48px + 12px);
-    right: calc(var(--edge) + 52px + 12px);
+    top: calc(var(--rail-inset) + var(--top-h) + var(--rail-gap));
+    right: calc(var(--rail-inset) + var(--rail-w) + 12px);
     width: var(--panel-right);
     bottom: calc(var(--dock-h, 90px) + var(--dock-bottom) + var(--edge));
     display: flex;
@@ -239,7 +239,7 @@
   }
   .hud-mobile .rail-pos {
     position: absolute;
-    right: 12px;
+    right: var(--rail-inset);
     bottom: calc(var(--sheet-h, 122px) + 12px);
   }
   .hud-mobile .attr-pos {

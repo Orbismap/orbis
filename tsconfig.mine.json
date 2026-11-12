@@ -1,0 +1,3 @@
+{ "extends": "/Users/malte/Develpoment/Websites/orbis-map/tsconfig.json",
+  "compilerOptions": { "noEmit": true, "incremental": false },
+  "include": ["/Users/malte/Develpoment/Websites/orbis-map/src/vite-env.d.ts", "/Users/malte/Develpoment/Websites/orbis-map/src/data/parsers/{vehicles,vehiclekit,feeds,feedutil,gtfsrt,transitous,feed-*}.ts", "/Users/malte/Develpoment/Websites/orbis-map/src/layers/verkehr/{zuege,nahverkehr}.ts", "/Users/malte/Develpoment/Websites/orbis-map/src/keys/defs/*.ts"] }

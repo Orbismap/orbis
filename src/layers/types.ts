@@ -31,7 +31,15 @@ export interface TimeSpec {
   mode: 'frames' | 'window';
 }
 
-export interface LayerStatus { state: 'loading' | 'ready' | 'empty' | 'error'; count?: number; updatedAt?: number; note?: string }
+export interface LayerStatus {
+  state: 'loading' | 'ready' | 'empty' | 'error'; count?: number; updatedAt?: number; note?: string;
+  /** Set by the runtime: the layer is not mounted because this required key is missing. */
+  needsKey?: string;
+  /** Set by the runtime: the layer (or its Karte) waits for the user to confirm its content warning. */
+  needsConfirm?: boolean;
+}
+export interface SensitiveSpec { title: string; text: string }
+export interface LayerKeyRef { id: string; /** true: the layer does nothing without it; false: the key "boosts" it */ required: boolean }
 
 export interface InspectCard {
   title: string; subtitle?: string; time?: number; color?: string; icon?: IconName;
@@ -56,6 +64,7 @@ export interface LayerContext {
   status(s: LayerStatus): void;
   resource<T>(spec: ResourceSpec<T>): Resource<T>;   // disposed automatically when the layer is switched off
   feed(items: FeedItem[]): void;                 // "Aktuell" list + marks on the timeline
+  key(id: string): ReadonlySignal<string | undefined>;   // value of a user key (see src/keys), reactive
   select(card: InspectCard | null): void;        // opens the inspector
   /** The card currently shown in the inspector (any layer); kits use it to draw their selection ring. */
   /** True for cards this layer passed to `select` itself (also later updates of the same card): kits keep their ring. */
@@ -86,6 +95,8 @@ export interface LayerDef {
   options?: OptionSpec[];
   legend?: LegendSpec | ((o: OptionValues) => LegendSpec);
   keywords?: string[];           // for search
+  keys?: LayerKeyRef[];          // user keys: required = not mounted without it, optional = boosts the layer
+  sensitive?: SensitiveSpec;     // content warning, confirmed once before the layer is shown
   mount(ctx: LayerContext): LayerHandle | Promise<LayerHandle>;
 }
 

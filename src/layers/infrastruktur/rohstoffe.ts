@@ -1,8 +1,11 @@
 // Mineral and fuel deposits: Wikidata mines and oil/gas/coal fields (clustered world view, parsed in the worker),
 // plus OpenStreetMap quarries, shafts and wells from resource.pmtiles once zoomed in.
-import { computed } from '@preact/signals';
+import { computed, signal } from '@preact/signals';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { bucketUrl } from '../../data/endpoints';
+import { fetchRaw } from '../../data/http';
+import { mrdsSites, type MrdsCollection, type MrdsProps } from '../../data/parsers/mrds';
+import { rasterLayer } from '../../render/raster';
 import { RESOURCE_GROUPS, RESOURCE_ORDER, type ResourceCollection, type ResourceGroup, type ResourceProps } from '../../data/parsers/resources';
 import { pmtilesLayer } from '../../render/pmtiles';
 import { pointLayer } from '../../render/points';
@@ -11,6 +14,11 @@ import { defineLayer } from '../define';
 
 const COLOR = '#F29B1D';
 const DETAIL_ZOOM = 9;
+const REGIONAL_ZOOM = 6;
+const KOR250 = 'https://services.bgr.de/arcgis/rest/services/inspire_mr/kor250/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image';
+const MRDS_WFS = 'https://mrdata.usgs.gov/services/wfs/mrds?service=WFS&version=1.0.0&request=GetFeature&typeName=mrds&maxFeatures=4000';
+const US_BOX = { w: -180, s: 17, e: -64, n: 72 };
+const EMPTY_MRDS: MrdsCollection = { type: 'FeatureCollection', features: [] };
 
 const G = (k: ResourceGroup) => RESOURCE_GROUPS[k].color;
 const groupColor = ['match', ['get', 'group'], ...RESOURCE_ORDER.flatMap((k) => [k, G(k)]), G('other')] as unknown as ExpressionSpecification;
@@ -34,17 +42,20 @@ export default defineLayer({
   id: 'rohstoffe',
   category: 'infrastruktur',
   title: 'Rohstoffe',
-  summary: 'Bergwerke, Öl-, Gas- und Kohlefelder; Gruben, Schächte und Bohrlöcher ab Zoomstufe 9',
+  summary: 'Bergwerke, Öl-, Gas- und Kohlefelder; USA und Deutschland ab Zoomstufe 6 genauer, Gruben und Bohrlöcher ab 9',
   icon: 'mine',
   color: COLOR,
   form: 'points',
   cadence: 'daily',
+  coverage: 'Welt; USA (MRDS) und Deutschland (KOR250) detaillierter',
   sources: [
     { name: 'Wikidata', url: 'https://www.wikidata.org/', license: 'CC0 1.0', manifest: { bucket: 'data', key: 'wikidata/resources.json' } },
+    { name: 'USGS Mineral Resources Data System (MRDS), nur USA, ab Zoomstufe 6', url: 'https://mrdata.usgs.gov/mrds/', license: 'Public Domain (US-Regierung)' },
+    { name: 'BGR, Karte oberflächennaher Rohstoffe KOR250 (nur Deutschland, ab Zoomstufe 6)', url: 'https://www.bgr.bund.de/', license: 'GeoNutzV, Quellenvermerk BGR' },
     { name: 'OpenStreetMap-Mitwirkende', url: 'https://www.openstreetmap.org/copyright', license: 'ODbL 1.0', manifest: { bucket: 'osm', key: 'resource.pmtiles' } },
   ],
   options: [{ id: 'group', label: 'Rohstoff', type: 'select', default: 'all', choices: [{ value: 'all', label: 'Alle' }, ...RESOURCE_ORDER.map((k) => ({ value: k, label: RESOURCE_GROUPS[k].label }))] }],
-  legend: { type: 'classes', items: RESOURCE_ORDER.map((k) => ({ color: G(k), label: RESOURCE_GROUPS[k].label })) },
+  legend: { type: 'classes', items: [...RESOURCE_ORDER.map((k) => ({ color: G(k), label: RESOURCE_GROUPS[k].label })), { color: '#9C7A4F', label: 'Deutschland: BGR-Rohstoffkarte KOR250 (Flächen, ab Zoom 6)', shape: 'square' as const }] },
   keywords: ['mine', 'bergbau', 'bergwerk', 'öl', 'gas', 'kohle', 'gold', 'kupfer', 'lithium', 'uran', 'steinbruch', 'erz', 'ölfeld'],
 
   mount(ctx) {
@@ -108,6 +119,71 @@ export default defineLayer({
       },
     });
 
-    return { destroy() { detail.destroy(); overview.destroy(); } };
+    // regional detail 1: USGS MRDS for the USA, loaded per viewport from zoom 6 (public WFS, CORS open)
+    const mrds = signal<MrdsCollection>(EMPTY_MRDS);
+    const mrdsShown = computed<MrdsCollection>(() => {
+      const g = String(ctx.options.value.group ?? 'all');
+      const d = mrds.value;
+      return g === 'all' ? d : { type: 'FeatureCollection', features: d.features.filter((f) => f.properties.group === g) };
+    });
+    const ml = ctx.map.ml;
+    let ctl: AbortController | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let lastKey = '';
+    const loadMrds = () => {
+      if (ctx.signal.aborted) return;
+      const b = ml.getBounds();
+      if (ml.getZoom() < REGIONAL_ZOOM || b.getEast() < US_BOX.w || b.getWest() > US_BOX.e || b.getNorth() < US_BOX.s || b.getSouth() > US_BOX.n) {
+        if (mrds.peek().features.length) mrds.value = EMPTY_MRDS;
+        lastKey = '';
+        return;
+      }
+      const r = (v: number, up: boolean) => (up ? Math.ceil(v * 4) / 4 : Math.floor(v * 4) / 4);
+      const w = r(Math.max(b.getWest(), US_BOX.w), false), so = r(Math.max(b.getSouth(), US_BOX.s), false), e = r(Math.min(b.getEast(), US_BOX.e), true), n = r(Math.min(b.getNorth(), US_BOX.n), true);
+      const key = `${w},${so},${e},${n}`;
+      if (key === lastKey) return;
+      lastKey = key;
+      ctl?.abort();
+      const my = (ctl = new AbortController());
+      fetchRaw<string>(`${MRDS_WFS}&bbox=${w},${so},${e},${n}`, { format: 'text', timeout: 40_000, signal: my.signal })
+        .then((res) => { if (!my.signal.aborted) mrds.value = mrdsSites(res.data); })
+        .catch(() => { if (!my.signal.aborted) lastKey = ''; });
+    };
+    const onMove = () => { clearTimeout(timer); timer = setTimeout(loadMrds, 400); };
+    ml.on('moveend', onMove);
+    loadMrds();
+    const regional = pointLayer({ ...ctx, status: () => {} }, {
+      data: mrdsShown,
+      name: 'mrds',
+      minZoom: REGIONAL_ZOOM,
+      radius: ['interpolate', ['linear'], ['zoom'], REGIONAL_ZOOM, 2.2, 10, 3.6, 14, 5.5] as ExpressionSpecification,
+      color: groupColor,
+      stroke: { color: 'rgba(12, 14, 20, 0.8)', width: 0.7 },
+      describe: (f: AnyFeature) => {
+        const p = f.properties as MrdsProps;
+        const g = RESOURCE_GROUPS[p.group];
+        return {
+          title: p.name || (p.commodities ? `Fundstelle ${p.commodities}` : 'Rohstoff-Fundstelle'),
+          subtitle: [p.commodities, p.status].filter(Boolean).join(' · ') || 'USGS MRDS',
+          color: g.color,
+          icon: 'mine',
+          facts: [
+            ...(p.commodities ? [{ label: 'Rohstoffe', value: p.commodities }] : []),
+            ...(p.status ? [{ label: 'Status', value: p.status }] : []),
+            { label: 'Gruppe', value: g.label },
+            { label: 'Quelle', value: 'USGS Mineral Resources Data System (Public Domain)' },
+          ],
+          links: [{ label: 'USGS MRDS', url: p.url }],
+        };
+      },
+    });
+
+    // regional detail 2: Germany, BGR KOR250 as map image (only the tiles inside Germany are requested)
+    const kor = rasterLayer({ ...ctx, status: () => {} }, {
+      tiles: [KOR250], tileSize: 256, minzoom: REGIONAL_ZOOM, maxzoom: 18, bounds: [5.5, 47, 15.5, 55.2], name: 'kor250',
+      attribution: 'Rohstoffe DE: © BGR, KOR250',
+    });
+
+    return { destroy() { clearTimeout(timer); ctl?.abort(); ml.off('moveend', onMove); kor.destroy(); regional.destroy(); detail.destroy(); overview.destroy(); } };
   },
 });

@@ -7,6 +7,9 @@ import { MINUTE } from '../../core/time';
 import { bucketUrl } from '../../data/endpoints';
 import { fetchJson } from '../../data/http';
 import { AURORA_W, auroraGrid, latestKp, type AuroraGrid } from '../../data/parsers/aurora';
+import { bzInfo, kpInfo, swXray, windInfo, xrayInfo, type SolarMag, type SolarWind, type XrayFlux } from '../../data/parsers/spaceweather';
+import type { FeatureCollection } from 'geojson';
+import type { FeedItem, InspectCard } from '../types';
 import { Cleanup, bindOpacity, idBase } from '../../render/common';
 import { defineLayer } from '../define';
 
@@ -88,11 +91,75 @@ function toDataUrl(px: Uint8ClampedArray): string {
   return c.toDataURL('image/png');
 }
 
+const SWPC = 'https://services.swpc.noaa.gov/json';
+const DEGRADED = 'Keine Messung';
+
+/** Fill colour (rgba string) of a polar-cap sector. */
+const rgba = (p: number): string => {
+  const [r, g, b, a] = rampAt(p);
+  return `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${(a / 255).toFixed(3)})`;
+};
+
+/**
+ * The image source ends at the web-mercator limit (±85.05°). The caps up to the poles are drawn as 5° sectors of
+ * fill polygons (visible on the globe; the mercator projection never shows them), coloured by the smoothed probability.
+ */
+function polarCaps(g: AuroraGrid): FeatureCollection {
+  const sm = smooth(g);
+  const features: FeatureCollection['features'] = [];
+  const step = 5;
+  for (const sign of [1, -1]) {
+    for (let lon = -180; lon < 180; lon += step) {
+      const lat0 = 85 * sign;
+      const lat1 = 89.999 * sign;
+      const c = lon + step / 2;
+      features.push({
+        type: 'Feature',
+        properties: { c: rgba(sample(sm, c, 87 * sign)) },
+        geometry: { type: 'Polygon', coordinates: [[[lon, lat0], [lon + step, lat0], [lon + step, lat1], [lon, lat1], [lon, lat0]]] },
+      });
+    }
+  }
+  return { type: 'FeatureCollection', features };
+}
+
+// ---- space weather in words ------------------------------------------------------------------------------------
+const nf = (v: number, d = 0) => formatNumber(v, d);
+const signed = (v: number, d = 1) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${nf(Math.abs(v), d)}`;
+
+function spaceCard(parts: { kp?: { kp: number; time: number }; wind?: SolarWind; mag?: SolarMag; xray?: XrayFlux }): InspectCard {
+  const { kp, wind, mag, xray } = parts;
+  const k = kp ? kpInfo(kp.kp) : undefined;
+  const facts: InspectCard['facts'] = [];
+  if (kp && k) facts.push({ label: 'Kp-Index', value: `${nf(kp.kp, kp.kp % 1 ? 1 : 0)} (${k.label})`, emphasis: k.level > 0 });
+  if (wind) facts.push({ label: 'Sonnenwind', value: `${nf(wind.speed)} km/s, ${windInfo(wind.speed)}${wind.density !== null ? `, ${nf(wind.density, 1)} Teilchen/cm³` : ''}`, emphasis: wind.speed >= 600 });
+  if (mag) facts.push({ label: 'Bz (Magnetfeld)', value: `${signed(mag.bz)} nT, ${bzInfo(mag.bz)}`, emphasis: mag.bz <= -5 });
+  if (xray) facts.push({ label: 'Röntgen (GOES)', value: `${xray.cls}, ${xrayInfo(xray.cls)}`, emphasis: xray.cls[0] === 'M' || xray.cls[0] === 'X' });
+  if (xray && xray.peakCls !== xray.cls) facts.push({ label: 'Höchstwert 24 h', value: `${xray.peakCls} (${formatAge(xray.peakTime)})` });
+  const text = [
+    k?.text,
+    mag && mag.bzMin30 !== null && mag.bzMin30 <= -5 ? `Bz fiel in den letzten 30 Minuten bis auf ${signed(mag.bzMin30)} nT. Ein anhaltender Südwert ist der wichtigste Auslöser für Polarlicht.` : undefined,
+    'Der Sonnenwind braucht vom Messpunkt (L1, 1,5 Mio. km vor der Erde) etwa 30 bis 60 Minuten bis zur Erde.',
+  ].filter(Boolean).join('\n\n');
+  const time = Math.max(kp?.time ?? 0, wind?.time ?? 0, mag?.time ?? 0, xray?.time ?? 0) || undefined;
+  return {
+    title: 'Weltraumwetter',
+    subtitle: k ? `Geomagnetisch ${k.label}` : undefined,
+    time,
+    color: k && k.level > 0 ? '#FF78D6' : '#55FFA0',
+    icon: 'aurora',
+    facts: facts.length ? facts : [{ label: 'Messwerte', value: DEGRADED }],
+    text,
+    links: [{ label: 'NOAA Space Weather Prediction Center', url: 'https://www.swpc.noaa.gov/' }],
+    location: [15, 72],
+  };
+}
+
 export default defineLayer({
   id: 'polarlicht',
   category: 'gefahren',
-  title: 'Polarlicht',
-  summary: 'Wahrscheinlichkeit für sichtbares Polarlicht, grün bei geringer, magenta bei hoher Wahrscheinlichkeit',
+  title: 'Polarlicht & Weltraumwetter',
+  summary: 'Wahrscheinlichkeit für sichtbares Polarlicht, dazu Kp, Sonnenwind, Magnetfeld (Bz) und Röntgenklasse der Sonne',
   icon: 'aurora',
   color: '#55FFA0',
   form: 'raster',
@@ -100,6 +167,8 @@ export default defineLayer({
   sources: [
     { name: 'NOAA SWPC OVATION Aurora', url: 'https://www.swpc.noaa.gov/products/aurora-30-minute-forecast', license: 'gemeinfrei (US-Regierung)', manifest: { bucket: 'live', key: 'space/swpc/ovation_aurora_latest.json' } },
     { name: 'NOAA SWPC Kp-Index', url: 'https://www.swpc.noaa.gov/products/planetary-k-index', license: 'gemeinfrei (US-Regierung)', manifest: { bucket: 'live', key: 'space/swpc/noaa-planetary-k-index.json' } },
+    { name: 'NOAA SWPC Sonnenwind (Plasma und Magnetfeld, DSCOVR/ACE/IMAP)', url: 'https://www.swpc.noaa.gov/products/real-time-solar-wind', license: 'gemeinfrei (US-Regierung)' },
+    { name: 'NOAA SWPC GOES-Röntgenfluss', url: 'https://www.swpc.noaa.gov/products/goes-x-ray-flux', license: 'gemeinfrei (US-Regierung)', manifest: { bucket: 'live', key: 'space/swpc/xrays-1-day.json' } },
   ],
   legend: () => ({
     type: 'scale',
@@ -108,7 +177,7 @@ export default defineLayer({
     ticks: [10, 30, 50, 70, 90],
     format: (v) => `${v} %`,
   }),
-  keywords: ['polarlicht', 'aurora', 'nordlicht', 'südlicht', 'kp', 'sonnenwind', 'ovation', 'swpc'],
+  keywords: ['polarlicht', 'aurora', 'nordlicht', 'südlicht', 'kp', 'sonnenwind', 'ovation', 'swpc', 'weltraumwetter', 'bz', 'röntgen', 'flare', 'sonneneruption', 'solar wind', 'geomagnetisch', 'sturm'],
 
   mount(ctx) {
     const grid = ctx.resource<AuroraGrid>({
@@ -126,8 +195,21 @@ export default defineLayer({
       refresh: 15 * MINUTE,
       fallback: async () => latestKp((await fetchJson('https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json')).data),
     });
+    // solar wind and magnetic field: CORS-open, but ~1.5-2.7 MB each (several days, three spacecraft) -> every 10 min, parsed in the worker
+    const wind = ctx.resource<SolarWind | undefined>({ key: 'swpc:rtsw-wind', url: `${SWPC}/rtsw/rtsw_wind_1m.json`, parse: 'swWind', refresh: 10 * MINUTE, timeout: 45_000 });
+    const mag = ctx.resource<SolarMag | undefined>({ key: 'swpc:rtsw-mag', url: `${SWPC}/rtsw/rtsw_mag_1m.json`, parse: 'swMag', refresh: 10 * MINUTE, timeout: 45_000 });
+    const xray = ctx.resource<XrayFlux | undefined>({
+      key: 'live:xrays',
+      url: bucketUrl('live', 'space/swpc/xrays-1-day.json'),
+      parse: 'swXray',
+      refresh: 5 * MINUTE,
+      timeout: 30_000,
+      fallback: async () => swXray((await fetchJson(`${SWPC}/goes/primary/xrays-1-day.json`, { timeout: 30_000 })).data),
+    });
     const ml = ctx.map.ml;
     const base = idBase(ctx);
+    const capSrc = `${base}-cap-src`;
+    const capLayer = `${base}-cap`;
     const src = `${base}-src`;
     const layer = `${base}-glow`;
     const clean = new Cleanup();
@@ -141,9 +223,15 @@ export default defineLayer({
         current = g;
         const url = toDataUrl(render(g));
         const existing = ml.getSource(src) as ImageSource | undefined;
-        if (existing) existing.updateImage({ url, coordinates });
+        if (existing) {
+          existing.updateImage({ url, coordinates });
+          (ml.getSource(capSrc) as { setData(d: unknown): void } | undefined)?.setData(polarCaps(g));
+        }
         else {
           ctx.map.addSource(src, { type: 'image', url, coordinates });
+          ctx.map.addSource(capSrc, { type: 'geojson', data: polarCaps(g) });
+          ctx.map.addLayer({ id: capLayer, type: 'fill', source: capSrc, paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.9, 'fill-antialias': false } }, 'raster');
+          clean.add(bindOpacity(ctx, ml, [{ layer: capLayer, prop: 'fill-opacity', base: 0.9 }]));
           ctx.map.addLayer({ id: layer, type: 'raster', source: src, paint: { 'raster-opacity': 0.9, 'raster-resampling': 'linear', 'raster-fade-duration': 0 } }, 'raster');
           clean.add(bindOpacity(ctx, ml, [{ layer, prop: 'raster-opacity', base: 0.9 }]));
         }
@@ -158,8 +246,37 @@ export default defineLayer({
           ctx.status(err && grid.state.value === 'error' ? { state: 'error', note: err } : { state: 'loading' });
           return;
         }
-        const note = [k ? `Kp ${formatNumber(k.kp, k.kp % 1 ? 1 : 0)}` : undefined, `höchste Wahrscheinlichkeit ${formatNumber(g.max)} %`].filter(Boolean).join(' · ');
+        const w = wind.data.value;
+        const m = mag.data.value;
+        const x = xray.data.value;
+        const note = [
+          k ? `Kp ${formatNumber(k.kp, k.kp % 1 ? 1 : 0)}` : undefined,
+          w ? `Wind ${formatNumber(w.speed)} km/s` : undefined,
+          m ? `Bz ${signed(m.bz)} nT` : undefined,
+          x ? `Röntgen ${x.cls}` : undefined,
+          `Polarlicht bis ${formatNumber(g.max)} %`,
+        ].filter(Boolean).join(' · ');
         ctx.status({ state: 'ready', updatedAt: g.obs || grid.updatedAt.value, note });
+      }),
+    );
+
+    clean.add(
+      effect(() => {
+        const parts = { kp: kp.data.value, wind: wind.data.value, mag: mag.data.value, xray: xray.data.value };
+        if (!parts.kp && !parts.wind && !parts.mag && !parts.xray) return;
+        const card = spaceCard(parts);
+        const k = parts.kp ? kpInfo(parts.kp.kp) : undefined;
+        const item: FeedItem = {
+          id: 'weltraumwetter',
+          title: 'Weltraumwetter jetzt',
+          subtitle: [parts.kp ? `Kp ${formatNumber(parts.kp.kp, parts.kp.kp % 1 ? 1 : 0)}` : undefined, k?.label].filter(Boolean).join(' · '),
+          time: card.time,
+          magnitude: parts.kp?.kp,
+          color: card.color,
+          location: card.location!,
+          card,
+        };
+        ctx.feed([item]);
       }),
     );
 
@@ -171,7 +288,7 @@ export default defineLayer({
       },
       destroy() {
         clean.run();
-        ctx.map.remove({ layers: [layer], sources: [src] });
+        ctx.map.remove({ layers: [capLayer, layer], sources: [capSrc, src] });
       },
     };
   },

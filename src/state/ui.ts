@@ -36,3 +36,6 @@ export function initUi(): () => void {
 
 /** Map position under the mouse pointer (null when it left the map or on touch). Written by app/MapView, throttled. */
 export const pointerLngLat = signal<{ lng: number; lat: number } | null>(null);
+
+/** Key id the Settings view should open and scroll to (set by "Schlüssel eintragen"); the Boost section clears it. */
+export const settingsKeyFocus = signal<string | null>(null);

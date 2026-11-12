@@ -308,4 +308,18 @@
     max-width: 28ch;
     margin-bottom: var(--s-2);
   }
+  .lrow-keybtn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 10px 0 8px;
+    margin-right: 2px;
+    border-radius: var(--r-round);
+    background: var(--limb-quiet);
+    color: var(--limb);
+    font-size: var(--fs-small);
+    font-weight: 500;
+  }
 }

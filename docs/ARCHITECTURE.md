@@ -140,6 +140,14 @@ export interface MapEngine {
 }
 ```
 
+**Kameragrenzen** (`map/camera.ts`, `map/limits.ts`): `tiltLimit(zoom)` ist die einzige Neigungsgrenze: 0° bis Zoom 2, dann
+`70 * smoothstep(t^0.75)` mit `t = (zoom - 2) / 10.5`, ab Zoom 12,5 der Engine-Maximalwert 70° (z3 5,5°, z5 23,7°, z8 51°).
+Die Engine führt das Maximum der MapLibre-Transform bei jedem `move` nach (ohne laufende Animationen zu stoppen): Gesten,
+Slider, URL, `flyTo` und `jumpTo` sind damit gleich begrenzt, eine zu steile Neigung wird beim Auszoomen mitgenommen und
+kommt beim Einzoomen nicht von selbst zurück; unter 1° ist Touch-Pitch aus. Unter Zoom 5 ist die Karte nordgerichtet: eine
+Drehung läuft nach Gestenende bzw. beim Auszoomen in ca. 450 ms auf 0° zurück. URL/Zustand werden beim Laden geklemmt
+(`clampCamera`). `Tilt.tsx` nutzt dieselbe Funktion.
+
 **Slots** sind leere Marker-Layer im Stil, in fester Reihenfolge: `field` (Wetterfelder, unter allem) → `raster`
 → `areas` → `lines` → *Beschriftung der Grundkarte* → `points` → `labels` (eigene Beschriftung) → `top`.
 Dadurch ist die Stapelreihenfolge unabhängig von der Einschalt-Reihenfolge und Beschriftungen bleiben lesbar.
@@ -295,6 +303,31 @@ Regeln für Ebenen-Dateien:
 
 `layers/runtime.ts` verbindet Zustand und Karte: beobachtet die aktive Karte, montiert/demontiert Ebenen, reicht
 Deckkraft/Optionen/Zeit als Signale durch, sammelt Status, Feeds und Legenden in `state/session`.
+
+## Schlüssel („Boost“) und Inhaltshinweise
+
+Quellen, die einen eigenen kostenlosen Schlüssel des Nutzers brauchen oder damit besser werden, hängen an einer **Schlüsseldefinition**
+`src/keys/defs/<id>.ts` (`defineKey`, `id` = Dateiname, gesammelt per `import.meta.glob`, Registry wie bei Ebenen):
+
+```ts
+export interface KeyDef {
+  id: string; name: string;
+  group: 'verkehr' | 'kameras' | 'wetter' | 'karte' | 'dienste';
+  unlocks: string;            // ein Satz: was der Nutzer gewinnt
+  url: string; steps: string[];   // Anbieterseite, nummerierte Anleitung (ohne Nummern)
+  placeholder?: string; validate?: (v: string) => boolean; kind?: 'key' | 'url';
+}
+```
+
+- Speicher: `settings.keys` (localStorage, nur in diesem Browser). Nie in der URL (`currentUrlState` kennt sie nicht), nie im Log.
+  API: `keySignal(id)`, `setKey(id, value | undefined)`, `hasKey(id)` aus `src/keys`.
+- Ebene: `LayerDef.keys?: { id, required }[]` (`required`: ohne Schlüssel keine Funktion; sonst „Boost“) und
+  `LayerDef.sensitive?: { title, text }` (Inhaltshinweis). Im Mount: `ctx.key(id)` (reaktives Signal).
+- Runtime: fehlt ein Pflicht-Schlüssel, wird die Ebene nicht montiert; Status `{ state: 'empty', note: 'Schlüssel nötig', needsKey: id }`.
+  Wird der Schlüssel gesetzt, montiert sie ohne Neuladen (und umgekehrt). Sensitive Ebenen und Karten (`Karte.sensitive`) werden
+  erst nach Bestätigung montiert (`settings.confirmedWarnings`: `layer:<id>` / `karte:<id>`); Status bis dahin `needsConfirm: true`.
+- Oberfläche: Einstellungen > „Boost“ (Schlüssel gruppiert, Anleitung, Eingabe), Hinweis-Dialog beim ersten Anzeigen, Katalog-Chips
+  „mit Schlüssel“ / „Boost möglich“, Zeilenaktion „Schlüssel eintragen“. Suchbegriffe „Schlüssel“ und „Boost“ finden diese Ebenen.
 
 ## Karten (`src/karten`)
 

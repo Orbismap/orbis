@@ -16,10 +16,11 @@ import { Cleanup, idBase, isSignal, peek, unwrap, type Dyn } from '../common';
 import { FIELD_ATTRIBS, FIELD_FRAGMENT, FIELD_VERTEX, TILE_SLOTS } from './field-shader';
 import {
   bracketTime, modeVars, sampleLevels, tileAt, tileKey, tileOrigin, tilesForViewport, TILE_COLS, TILE_ROWS,
-  type FieldMode, type GridLevel, type TileId,
+  type FieldMode, type GridLevel, type TerrainKind, type TileId,
 } from './grid';
+import { loadTerrain, rectCovers, terrainDeltaAt, terrainRect, TERRAIN_MIN_ZOOM, type TerrainGrid } from './terrain';
 import { createDummyArray, createFieldTexture, createLutTexture, ProgramCache, setProjectionUniforms, type RenderArgs } from './gl-util';
-import type { OwxLatest } from '../../data/owx';
+import type { OwxField, OwxLatest } from '../../data/owx';
 import { followLatest, noteOf } from './latest';
 import { acquireStore, defaultMaxTiles, dropCpu, lowMemory, type FieldStore, type Level } from './store';
 
@@ -53,6 +54,20 @@ export interface FieldLayerOptions {
   /** Zoom from which tiles are loaded (default 4). */
   tileZoom?: number;
   name?: string;
+  /**
+   * Terrain correction (ICON surface height vs. real terrain) of a temperature or dew point field. `kind` says which
+   * variable a `value` field is ('T', 'Td'); `humidity` and `feels` always use both. Active only while true and the
+   * map is zoomed in (terrain.ts).
+   */
+  terrain?: { enabled: Dyn<boolean>; kind?: TerrainKind };
+}
+
+/** Two variables with the same grid in one texture array (layers of the first, then of the second). */
+function pack(gl: WebGL2RenderingContext, a: OwxField, b: OwxField): WebGLTexture {
+  const data = new Int16Array(a.data.length + b.data.length);
+  data.set(a.data, 0);
+  data.set(b.data, a.data.length);
+  return createFieldTexture(gl, data, a.header.nx, a.header.ny, a.header.nt * 2);
 }
 
 const MESH = 192;
@@ -79,6 +94,9 @@ class FieldCustomLayer implements CustomLayerInterface {
   private order: TileId[] = [];
   store?: FieldStore;
   error?: string;
+  terrain?: TerrainGrid;
+  private terrainTex: WebGLTexture | null = null;
+  private terrainUploaded?: TerrainGrid;
   onNeedRepaint = () => this.map?.triggerRepaint();
 
   constructor(
@@ -105,6 +123,9 @@ class FieldCustomLayer implements CustomLayerInterface {
   private releaseGl(gl: WebGL2RenderingContext) {
     this.programs?.dispose(gl);
     this.programs = undefined;
+    if (this.terrainTex) gl.deleteTexture(this.terrainTex);
+    this.terrainTex = null;
+    this.terrainUploaded = undefined;
     for (const list of this.tex.values()) for (const t of list) gl.deleteTexture(t);
     this.tex.clear();
     if (this.vao) gl.deleteVertexArray(this.vao);
@@ -180,7 +201,9 @@ class FieldCustomLayer implements CustomLayerInterface {
     if (lv.cpuDropped) return undefined; // data gone (low-memory mode) and the GPU copy lost: overview only
     if (budget.n <= 0) return undefined;
     budget.n--;
-    const list = lv.fields.map((f) => createFieldTexture(gl, f.data, f.header.nx, f.header.ny, f.header.nt));
+    const list = this.o.mode === 'feels'
+      ? [pack(gl, lv.fields[0]!, lv.fields[1]!), pack(gl, lv.fields[2]!, lv.fields[3]!)]
+      : lv.fields.map((f) => createFieldTexture(gl, f.data, f.header.nx, f.header.ny, f.header.nt));
     this.tex.set(lv, list);
     if (lowMemory()) dropCpu(lv);
     return list;
@@ -247,7 +270,7 @@ class FieldCustomLayer implements CustomLayerInterface {
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex ?? this.dummy);
     };
     bindArr(0, ovTex[0]);
-    bindArr(1, nv === 2 ? ovTex[1] : this.dummy);
+    bindArr(1, nv >= 2 ? ovTex[1] : this.dummy);
     gl.uniform1i(prog.u('u_oa'), 0);
     gl.uniform1i(prog.u('u_ob'), 1);
     this.tileInfo.fill(0);
@@ -255,7 +278,7 @@ class FieldCustomLayer implements CustomLayerInterface {
     for (let i = 0; i < TILE_SLOTS; i++) {
       const s = slots[i];
       bindArr(unitA(i), s?.tex[0]);
-      bindArr(unitB(i), nv === 2 ? s?.tex[1] : undefined);
+      bindArr(unitB(i), nv >= 2 ? s?.tex[1] : undefined);
       gl.uniform1i(prog.u(`u_ta${i}`), unitA(i));
       gl.uniform1i(prog.u(`u_tb${i}`), unitB(i));
       if (!s?.lv.tile) continue;
@@ -288,7 +311,33 @@ class FieldCustomLayer implements CustomLayerInterface {
     gl.uniform2f(prog.u('u_sca'), h.scale, h.offset);
     const hb = store.overview.fields[1]?.header ?? h;
     gl.uniform2f(prog.u('u_scb'), hb.scale, hb.offset);
-    gl.uniform1i(prog.u('u_mode'), mode === 'value' ? 0 : mode === 'magnitude' ? 1 : 2);
+    gl.uniform1i(prog.u('u_mode'), mode === 'value' ? 0 : mode === 'magnitude' ? 1 : mode === 'humidity' ? 2 : 3);
+    gl.uniform1i(prog.u('u_ntl'), h.nt);
+    const tk = o.terrain?.kind;
+    gl.uniform1i(prog.u('u_tk'), tk === 'T' ? 1 : tk === 'Td' ? 2 : 0);
+
+    // terrain correction texture (R16F, lon/lat rectangle), unit after the LUT
+    const terrUnit = lutUnit + 1;
+    const tg = this.terrain;
+    if (tg && tg !== this.terrainUploaded) {
+      if (this.terrainTex) gl.deleteTexture(this.terrainTex);
+      const t = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, tg.nx, tg.ny, 0, gl.RED, gl.FLOAT, tg.data);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+      this.terrainTex = t;
+      this.terrainUploaded = tg;
+    }
+    gl.activeTexture(gl.TEXTURE0 + terrUnit);
+    gl.bindTexture(gl.TEXTURE_2D, this.terrainTex ?? this.lut);
+    gl.uniform1i(prog.u('u_terr'), terrUnit);
+    gl.uniform1f(prog.u('u_terr_on'), tg && this.terrainTex ? 1 : 0);
+    if (tg) gl.uniform4f(prog.u('u_terr_rect'), tg.rect[0], tg.rect[3], tg.rect[2] - tg.rect[0], tg.rect[3] - tg.rect[1]);
 
     // time
     const br = bracketTime(store.latest.times, this.ctx.time.peek());
@@ -335,7 +384,9 @@ class FieldCustomLayer implements CustomLayerInterface {
     const lv = store.readyTiles().find((l) => !l.cpuDropped && l.tile && l.tile.c === t.c && l.tile.r === t.r);
     if (lv) levels.push(lv);
     levels.push(store.overview);
-    return sampleLevels(levels, this.o.mode ?? 'value', bracketTime(store.latest.times, this.ctx.time.peek()), lng, lat);
+    const mode = this.o.mode ?? 'value';
+    const terr = this.terrain && (mode === 'humidity' || mode === 'feels' || this.o.terrain?.kind) ? { dT: terrainDeltaAt(this.terrain, lng, lat), kind: this.o.terrain?.kind } : undefined;
+    return sampleLevels(levels, mode, bracketTime(store.latest.times, this.ctx.time.peek()), lng, lat, terr);
   }
 }
 
@@ -368,6 +419,42 @@ export function fieldLayer(ctx: LayerContext, o: FieldLayerOptions): LayerHandle
 
   engine.addCustomLayer(layer, 'field');
   ctx.status({ state: 'loading' });
+
+  // terrain correction: a small float grid around the viewport, rebuilt when the view leaves it (terrain.ts)
+  let terrainBuild = 0;
+  let terrainCtl: AbortController | undefined;
+  let terrainTimer: ReturnType<typeof setTimeout> | undefined;
+  const terrainWanted = () => !!o.terrain && !!peek(o.terrain.enabled);
+  const updateTerrain = () => {
+    const store = layer.store;
+    if (destroyed || !store) return;
+    if (!terrainWanted() || ml.getZoom() < TERRAIN_MIN_ZOOM) {
+      terrainCtl?.abort();
+      if (layer.terrain) { layer.terrain = undefined; repaint(); }
+      return;
+    }
+    const b = ml.getBounds();
+    const c = ml.getCenter();
+    const view = terrainRect([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()], { lng: c.lng, lat: c.lat });
+    const cur = layer.terrain;
+    if (cur && rectCovers(cur.rect, view) && ml.getZoom() < cur.zoom - 0.5 + 3.5) return;
+    terrainCtl?.abort();
+    const ctl = (terrainCtl = new AbortController());
+    const id = ++terrainBuild;
+    loadTerrain(view, store.latest.run, ctl.signal).then(
+      (g) => { if (!destroyed && id === terrainBuild) { layer.terrain = g; repaint(); } },
+      () => { /* no correction: the field stays as the model has it */ },
+    );
+  };
+  const scheduleTerrain = () => {
+    clearTimeout(terrainTimer);
+    terrainTimer = setTimeout(updateTerrain, 350);
+  };
+  if (o.terrain) {
+    ml.on('moveend', scheduleTerrain);
+    clean.add(() => { ml.off('moveend', scheduleTerrain); clearTimeout(terrainTimer); terrainCtl?.abort(); });
+    if (isSignal<boolean>(o.terrain.enabled)) clean.add(effect(() => { (o.terrain!.enabled as ReadonlySignal<boolean>).value; scheduleTerrain(); }));
+  }
 
   let lastWant = 0;
   const onMove = () => {
@@ -411,6 +498,7 @@ export function fieldLayer(ctx: LayerContext, o: FieldLayerOptions): LayerHandle
       unsub = store.subscribe(repaint);
       ctx.status({ state: 'ready', updatedAt: latest.issued, note: noteOf(latest) });
       wantTiles();
+      updateTerrain();
       repaint();
       oldUnsub?.();
       old?.release();

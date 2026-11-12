@@ -1,0 +1,65 @@
+@layer features {
+  .scalebar {
+    position: relative;
+    padding-top: 15px;
+    color: #fff;
+    font: 500 10px/1 var(--font-ui);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .sb-marks {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 16px;
+  }
+  .sb-marks span {
+    position: absolute;
+    top: 0;
+    white-space: nowrap;
+  }
+  .sb-bar {
+    display: flex;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: rgb(30, 34, 38);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  }
+  .sb-bar i {
+    display: block;
+    height: 100%;
+  }
+  .sb-bar .lt {
+    background: rgb(226, 229, 216);
+  }
+  .sb-bar .dk {
+    background: rgb(40, 44, 48);
+  }
+  .sb-zoom {
+    margin-top: 4px;
+  }
+  .scalebar-pos {
+    position: absolute;
+    z-index: 1;
+  }
+  /* desktop: bottom right above the timeline, clear of the rail, inspector and attribution */
+  .hud-desktop .scalebar-pos {
+    right: var(--rail-inset, 14px);
+    bottom: calc(var(--dock-h, 90px) + var(--dock-bottom, 30px) + var(--edge));
+  }
+  /* mobile: bottom left above the attribution button and the sheet */
+  .hud-mobile .scalebar-pos {
+    left: 12px;
+    bottom: calc(var(--sheet-h, 122px) + 44px);
+    transition: opacity var(--t-panel) var(--ease);
+  }
+  .hud-mobile[data-detent='full'] .scalebar-pos {
+    opacity: 0;
+  }
+  .hud-desktop .right {
+    bottom: calc(var(--dock-h, 90px) + var(--dock-bottom, 30px) + var(--edge) + 56px);
+  }
+}

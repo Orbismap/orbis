@@ -4,7 +4,7 @@
 import type { IconName } from './names';
 
 /** Icons the UI needs in addition to the names layers may reference. */
-export type UiIconName = IconName | 'chevron-left' | 'chevron-up' | 'compass' | 'copy' | 'pencil' | 'panel-left' | 'more' | 'keyboard' | 'link' | 'north';
+export type UiIconName = IconName | 'chevron-left' | 'chevron-up' | 'compass' | 'copy' | 'pencil' | 'panel-left' | 'more' | 'keyboard' | 'link' | 'north' | 'key' | 'boost';
 
 const cloud = (y: number) => `M5.5 ${y}a3.25 3.25 0 0 1-.3-6.49 4.75 4.75 0 0 1 9.2-.6 3.55 3.55 0 0 1 .1 7.09z`;
 
@@ -80,6 +80,8 @@ export const ICON_PATHS: Record<UiIconName, string> = {
   keyboard: 'M3.5 5.5h13A1.5 1.5 0 0 1 18 7v6a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 13V7a1.5 1.5 0 0 1 1.5-1.5zM5.5 8.5h.01M8.5 8.5h.01M11.5 8.5h.01M14.5 8.5h.01M6.5 11.5h7',
   link: 'M8.5 11.5a3 3 0 0 0 4.24 0l2.5-2.5a3 3 0 0 0-4.24-4.24l-.75.75M11.5 8.5a3 3 0 0 0-4.24 0l-2.5 2.5a3 3 0 0 0 4.24 4.24l.75-.75',
   compass: 'M10 2.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15zM12.75 7.25 11.25 11.25 7.25 12.75 8.75 8.75z',
+  key: 'M6.5 10.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM8.8 11.2 16.5 3.5M14 6l2 2M11.8 8.3l1.7 1.7',
+  boost: 'M11 2.5 4.5 11h4.5l-1 6.5L15.5 8.5H11z',
   north: 'M10 3 5.5 16 10 13.25 14.5 16z',
   // society, sea, space
   people: 'M7.5 9a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5zM2.5 16.5c0-2.8 2.2-4.75 5-4.75s5 1.95 5 4.75M13 3.75a2.5 2.5 0 0 1 0 4.9M14.5 11.9c1.8.5 3 2.2 3 4.6',

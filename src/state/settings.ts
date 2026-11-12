@@ -12,10 +12,12 @@ export interface Settings {
   motion: Motion;
   /** Optional API keys by name (e.g. for keyed sources). Stored only in this browser. */
   keys: Record<string, string>;
+  /** Content warnings the user confirmed: 'layer:<id>' or 'karte:<id>'. */
+  confirmedWarnings: string[];
 }
 
 const VERSION = 1;
-export const DEFAULT_SETTINGS: Settings = { units: { ...DEFAULT_UNITS }, theme: 'dark', motion: 'auto', keys: {} };
+export const DEFAULT_SETTINGS: Settings = { units: { ...DEFAULT_UNITS }, theme: 'dark', motion: 'auto', keys: {}, confirmedWarnings: [] };
 
 const pick = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(v as T) ? (v as T) : fallback);
 
@@ -36,6 +38,7 @@ export function validateSettings(raw: unknown): Settings | undefined {
     theme: pick(r.theme, ['auto', 'dark', 'light'], 'dark'),
     motion: pick(r.motion, ['auto', 'reduce', 'full'], 'auto'),
     keys,
+    confirmedWarnings: Array.isArray(r.confirmedWarnings) ? r.confirmedWarnings.filter((x): x is string => typeof x === 'string') : [],
   };
 }
 
@@ -80,3 +83,9 @@ export const effectiveTheme = computed<'dark' | 'light'>(() => {
   const t = settings.value.theme;
   return t === 'auto' ? (osLight.value ? 'light' : 'dark') : t;
 });
+
+/** Marks a content warning ('layer:<id>' / 'karte:<id>') as confirmed. */
+export function confirmWarning(key: string): void {
+  const cur = settings.peek().confirmedWarnings;
+  if (!cur.includes(key)) updateSettings({ confirmedWarnings: [...cur, key] });
+}

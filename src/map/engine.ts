@@ -8,7 +8,8 @@ import { setProbe } from '../state/selection';
 import { camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, composeStyle, skyFor } from './basemaps';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
-import { flyToTarget, locate as locateImpl } from './camera';
+import { clampCamera, ENGINE_MAX_PITCH, flyToTarget, locate as locateImpl } from './camera';
+import { attachCameraLimits } from './limits';
 import { createPicking } from './picking';
 import { beforeIdFor } from './slots';
 import { createTerminator } from './terminator';
@@ -38,7 +39,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   let terminatorMode: 'off' | 'auto' = init.terminator === false ? 'off' : 'auto';
   let loaded = false;
 
-  const cam = camera.peek();
+  // a URL/state asking for more tilt than the zoom allows is clamped on load
+  const cam = clampCamera(camera.peek());
   const ml = new maplibregl.Map({
     container,
     style: composeStyle({ basemap, labels, terminator: terminatorMode === 'auto', projection: projectionSignal.peek() }),
@@ -47,7 +49,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     bearing: cam.bearing,
     pitch: cam.pitch,
     attributionControl: false,
-    maxPitch: 70,
+    maxPitch: ENGINE_MAX_PITCH,
     minZoom: 0.5,
     maxZoom: 19,
     fadeDuration: 150,
@@ -87,6 +89,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     viewport.value = { bounds: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()], width: el.clientWidth, height: el.clientHeight };
   };
   const writeThrottled = throttle(writeCamera, 100);
+  // attached before the camera listeners below, so the clamped values are the ones that get written
+  const limits = attachCameraLimits(ml, writeThrottled);
   ml.on('move', writeThrottled);
   ml.on('moveend', () => writeThrottled.flush());
 
@@ -94,7 +98,11 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     effect(() => {
       const c = camera.value;
       if (c === lastWritten || !loaded) return;
-      if (differs(c, readCamera())) ml.jumpTo({ center: [c.lng, c.lat], zoom: c.zoom, bearing: c.bearing, pitch: c.pitch });
+      const want = clampCamera(c);
+      limits.ensureFor(want.zoom);
+      if (differs(want, readCamera())) ml.jumpTo({ center: [want.lng, want.lat], zoom: want.zoom, bearing: want.bearing, pitch: want.pitch });
+      // asked for more than allowed: report what the map really shows
+      if (want.pitch !== c.pitch || want.bearing !== c.bearing) writeCamera();
     }),
     effect(() => {
       const p = padding.value;
@@ -189,6 +197,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     },
     destroy() {
       disposers.forEach((d) => d());
+      limits.destroy();
       writeThrottled.cancel();
       terminator.destroy();
       picking.destroy();

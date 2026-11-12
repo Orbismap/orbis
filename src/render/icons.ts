@@ -61,6 +61,14 @@ export const SHAPES = {
     g.arc(0.5, 0.58, 0.2, 0, Math.PI * 2, true);
     g.fill('evenodd');
   },
+  // viewing cone of a camera: tip in the centre, opens upwards (rotate by the bearing), ±30°
+  fov: (g) => {
+    g.beginPath();
+    g.moveTo(0.5, 0.5);
+    g.arc(0.5, 0.5, 0.5, (-90 - 30) * (Math.PI / 180), (-90 + 30) * (Math.PI / 180));
+    g.closePath();
+    g.fill();
+  },
   rocket: poly([[0.5, 0], [0.68, 0.2], [0.68, 0.64], [0.86, 0.84], [0.86, 1], [0.6, 0.88], [0.4, 0.88], [0.14, 1], [0.14, 0.84], [0.32, 0.64], [0.32, 0.2]]),
   satellite: (g) => {
     g.beginPath();

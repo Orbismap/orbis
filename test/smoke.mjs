@@ -374,11 +374,13 @@ async function main() {
         await page.mouse.move(target.x - 30, target.y - 30);
         await page.mouse.move(target.x, target.y, { steps: 4 });
         await sleep(400);
-        const hov = await page.evaluate(([x, y]) => {
+        const hov = await page.evaluate(([x, y, ids]) => {
+          // the picker chooses the nearest feature among all layers; check every earthquake feature under the cursor
           const ml = window.__orbis.engine.ml; const box = ml.getCanvas().getBoundingClientRect();
-          const f = ml.queryRenderedFeatures([x - box.left, y - box.top])[0];
-          return { cursor: ml.getCanvas().style.cursor, state: f && f.id !== undefined ? ml.getFeatureState({ source: f.source, sourceLayer: f.sourceLayer, id: f.id }) : 'no-id' };
-        }, [target.x, target.y]);
+          const fs = ml.queryRenderedFeatures([[x - box.left - 12, y - box.top - 12], [x - box.left + 12, y - box.top + 12]], { layers: ids }).filter((f) => f.id !== undefined);
+          const states = fs.map((f) => ml.getFeatureState({ source: f.source, sourceLayer: f.sourceLayer, id: f.id }));
+          return { cursor: ml.getCanvas().style.cursor, state: states.find((t) => t.hover === true) ?? states[0] ?? 'no-id' };
+        }, [target.x, target.y, target.ids]);
         report(hov.cursor === 'pointer' && hov.state?.hover === true, '5 hover sets cursor + feature-state', `cursor=${hov.cursor} state=${JSON.stringify(hov.state)}`);
         await page.mouse.click(target.x, target.y);
         await sleep(500);

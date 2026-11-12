@@ -3,6 +3,51 @@ import type { Map as MlMap } from 'maplibre-gl';
 import type { Padding } from '../state/view';
 import type { CameraTarget } from './types';
 
+/** Highest pitch the engine allows at all (MapLibre `maxPitch`); `tiltLimit` reaches it from zoom 12.5 on. */
+export const ENGINE_MAX_PITCH = 70;
+/** At or below this zoom the camera cannot tilt at all. */
+export const TILT_ZOOM_FLAT = 2;
+/** From this zoom on the full engine maximum is allowed. */
+export const TILT_ZOOM_FULL = 12.5;
+/** Below this zoom the map is north-up: a rotation eases back to bearing 0. */
+export const NORTH_MAX_ZOOM = 5;
+/** Below this limit (degrees) the map counts as flat: touch-pitch is switched off. */
+export const TILT_FLAT_BELOW = 1;
+
+const smoothstep = (x: number) => x * x * (3 - 2 * x);
+
+/**
+ * How far the camera may tilt at a zoom, in degrees. One continuous curve (C1, no kinks, no jumps):
+ * 0 at zoom <= 2, smoothstep(t^0.75) with t = (zoom - 2) / 10.5, then ENGINE_MAX_PITCH from zoom 12.5 on.
+ * The 0.75 exponent lifts the early part so a little tilt is possible soon after zoom 2 (z3 ~5.5, z5 ~24, z8 ~51).
+ * Monotonic non-decreasing.
+ */
+export function tiltLimit(zoom: number): number {
+  if (!Number.isFinite(zoom)) return 0;
+  const t = Math.min(1, Math.max(0, (zoom - TILT_ZOOM_FLAT) / (TILT_ZOOM_FULL - TILT_ZOOM_FLAT)));
+  return ENGINE_MAX_PITCH * smoothstep(Math.pow(t, 0.75));
+}
+
+/** True when the tilt limit at this zoom is large enough to be worth showing/using (>= 1 degree). */
+export const tiltAvailable = (zoom: number) => tiltLimit(zoom) >= TILT_FLAT_BELOW;
+
+/** Pitch cut to what the zoom allows (never below 0). */
+export const clampPitch = (zoom: number, pitch: number) => Math.max(0, Math.min(pitch, tiltLimit(zoom)));
+
+/** Bearing normalised to (-180, 180]. */
+export const wrapBearing = (b: number) => {
+  const w = ((((b + 180) % 360) + 360) % 360) - 180;
+  return w === -180 ? 180 : w;
+};
+
+/** True when a rotation at this zoom should ease back to north. */
+export const needsNorthReset = (zoom: number, bearing: number) => zoom < NORTH_MAX_ZOOM && Math.abs(wrapBearing(bearing)) > 0.5;
+
+/** Camera values as the limits allow them (URL on load, state written from outside): pitch clamped, north-up when zoomed out. */
+export function clampCamera<T extends { zoom: number; pitch: number; bearing: number }>(c: T): T {
+  return { ...c, pitch: clampPitch(c.zoom, c.pitch), bearing: c.zoom < NORTH_MAX_ZOOM ? 0 : c.bearing };
+}
+
 export function flyToTarget(ml: MlMap, t: CameraTarget, basePadding: Padding): void {
   const padding = { ...basePadding, ...t.padding };
   const duration = t.duration ?? 1200;

@@ -1,0 +1,11 @@
+Time,F_Scale,Location,County,State,Lat,Lon,Comments
+0459,UNK,Keyes,Cimarron,OK,36.81,-102.26,A tornado carved a narrow southwest-to-northeast path through Keyes... beginning near Phillips Avenue and dissipating past Monroe Avenue. Along the way... it s
+Time,Speed,Location,County,State,Lat,Lon,Comments
+2150,60,1 SW Mountains Edge,Clark,NV,36,-115.3,NV Energy site Enterprise Sierra Cliffs gusted to 60 mph in convective shower. (VEF)
+2254,66,8 W Northern Meadows,Sandoval,NM,35.3,-106.86,(ABQ)
+2300,63,4 E Alameda,Bernalillo,NM,35.18,-106.56,(ABQ)
+2315,60,3 S Santa Ana Pueblo,Sandoval,NM,35.31,-106.51,(ABQ)
+0610,64,6 N Dumas,Moore,TX,35.95,-101.96,(AMA)
+Time,Size,Location,County,State,Lat,Lon,Comments
+0055,100,2 N Clifton,Greenlee,AZ,33.05,-109.29,Accumulating 0.5 to 1 inch hail. (TWC)
+0510,100,3 SW Mesa,Maricopa,AZ,33.38,-111.87,Report from mPING: Quarter (1.00 in.). (PSR)

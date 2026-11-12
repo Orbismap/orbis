@@ -1,22 +1,22 @@
-// Live webcams. World overview from cams/world.json (positions), the regional feeds (traffic and weather cameras with
-// image or HLS stream) load once their region is in view, OpenStreetMap webcams (webcam.pmtiles) from zoom 10.
+// Live webcams, drawn with the shared camera look (render/cameras.ts). World overview from cams/world.json (positions),
+// the regional feeds (traffic and weather cameras with image or HLS stream) load once their region is in view, the
+// OpenStreetMap webcams (webcam.pmtiles, 10,008 objects, thinned tiles from zoom 0) carry cards from the world view on.
 import { computed, effect, signal } from '@preact/signals';
-import type { ExpressionSpecification } from 'maplibre-gl';
 import type { FeatureCollection, Point } from 'geojson';
-import { formatInt } from '../../core/format';
 import { bucketUrl } from '../../data/endpoints';
 import type { WebcamCollection, WebcamProps } from '../../data/parsers/webcams';
 import type { Resource } from '../../data/resource';
-import { pmtilesLayer } from '../../render/pmtiles';
-import { pointLayer } from '../../render/points';
+import { KEYED_FEEDS, createKeyedFeeds } from '../../data/parsers/webcamkeys-feeds';
+import { applyCamdir } from '../../data/parsers/webcamkeys';
+import { cameraLayer, directionFact, osmNodeLink } from '../../render/cameras';
 import type { AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
 import type { InspectCard } from '../types';
 
 const COLOR = '#19C7B0';
 const FEED_ZOOM = 5;
-const OSM_ZOOM = 10;
 const IMAGE_REFRESH = 60_000; // ms
+const CAMDIR_URL = ((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_CAMDIR_URL ?? 'https://orbis-cams.malte9799.workers.dev').replace(/\/+$/, '');
 
 /**
  * West, south, east, north of every feed in the data bucket (measured from the published files, Georgia corrected).
@@ -33,8 +33,6 @@ const FEEDS: Record<string, [number, number, number, number]> = {
   sk: [-110, 49.1, -102, 59.6], tfl: [-0.5, 51.3, 0.2, 51.7], vegvesen: [5, 58.1, 31, 71.2], wsdot: [-124.3, 45.3, -117.1, 49], yt: [-141, 59.8, -128.3, 66.4],
 };
 
-const radius = ['interpolate', ['linear'], ['zoom'], FEED_ZOOM, 3, 9, 4.5, 13, 7] as ExpressionSpecification;
-const strokeColor = 'rgba(4, 28, 26, 0.9)';
 
 function media(p: WebcamProps): InspectCard['media'] {
   if (p.hls) return { type: 'hls', url: p.hls, poster: p.image || undefined };
@@ -42,8 +40,6 @@ function media(p: WebcamProps): InspectCard['media'] {
   if (p.video) return { type: 'video', url: p.video };
   return undefined;
 }
-
-const compass = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
 
 export default defineLayer({
   id: 'webcams',
@@ -57,27 +53,31 @@ export default defineLayer({
   sources: [
     { name: 'Kamera-Feeds von Straßenbehörden und Parkverwaltungen (Positionen täglich gespiegelt, Bilder live)', url: 'https://github.com/Orbismap/data', license: 'je Feed, siehe Quellenangabe in der Karte', manifest: { bucket: 'data', key: 'cams/world.json' } },
     { name: 'OpenStreetMap-Mitwirkende', url: 'https://www.openstreetmap.org/copyright', license: 'ODbL 1.0', manifest: { bucket: 'osm', key: 'webcam.pmtiles' } },
+    { name: 'Kamera-Verzeichnis (korrigierte Blickrichtungen, eigener Worker)', url: CAMDIR_URL, license: 'Orbis-Community, frei lesbar' },
+    // keyed feeds: inactive without the user's key (Boost), then loaded live from the portal for the area in view
+    ...KEYED_FEEDS.map((f) => f.source),
   ],
-  legend: { type: 'classes', items: [{ color: COLOR, label: 'Kamera mit Bild' }, { color: '#9AD7CF', label: 'Weitere Kamera (Übersicht, OSM)' }] },
+  keys: KEYED_FEEDS.map((f) => ({ id: f.key, required: false })),
+  legend: { type: 'classes', items: [{ color: COLOR, label: 'Webcam (Live-Bild, Stream oder Link)' }] },
   keywords: ['kamera', 'webcam', 'verkehr', 'live', 'cam', 'traffic', 'stream', 'bild'],
 
   mount(ctx) {
     const ml = ctx.map.ml;
 
-    // 1. world overview: small dots without picking, drawn under everything of this layer
+    // 1. world overview: positions only, no cards
     const world = ctx.resource<FeatureCollection<Point>>({ key: 'data:cams-world', url: bucketUrl('data', 'cams/world.json'), parse: 'webcamPoints', timeout: 40_000 });
-    const overviewSrc = `${ctx.id}.overview-src`;
-    const overviewLayer = `${ctx.id}.overview-dots`;
-    ctx.map.addSource(overviewSrc, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    ctx.map.addLayer({
-      id: overviewLayer, type: 'circle', source: overviewSrc,
-      paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 1.1, 6, 1.8, 12, 3], 'circle-color': '#9AD7CF', 'circle-opacity': 0.55 },
-    }, 'points');
-    const stopOverview = effect(() => {
-      const d = world.data.value;
-      (ml.getSource(overviewSrc) as { setData(d: unknown): void } | undefined)?.setData(d ?? { type: 'FeatureCollection', features: [] });
-    });
-    const stopOpacity = effect(() => { if (ml.getLayer(overviewLayer)) ml.setPaintProperty(overviewLayer, 'circle-opacity', 0.55 * ctx.opacity.value); });
+
+    // corrected viewing directions of the camera directory (worker); a failure only means "no corrections"
+    const camdir = ctx.resource<Record<string, number>>({ key: 'camdir:dirs', url: `${CAMDIR_URL}/dirs`, parse: 'camdirMap', timeout: 20_000 });
+
+    // keyed feeds (Windy, 511 portals, OHGO, ...): only with the user's key
+    const keyed = createKeyedFeeds((id) => ctx.key(id).value, () => camdir.data.value);
+    const refreshKeyed = () => { const b = ml.getBounds(); keyed.refresh({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth(), zoom: ml.getZoom() }); };
+    let keyedTimer: ReturnType<typeof setTimeout> | undefined;
+    const onKeyedMove = () => { clearTimeout(keyedTimer); keyedTimer = setTimeout(refreshKeyed, 500); };
+    ml.on('moveend', onKeyedMove);
+    const keyChange = effect(() => { KEYED_FEEDS.forEach((f) => ctx.key(f.key).value); refreshKeyed(); });
+    const stopCamdirRepublish = effect(() => { camdir.data.value; refreshKeyed(); });
 
     // 2. regional feeds, lazily by viewport
     const active = signal<string[]>([]);
@@ -99,76 +99,86 @@ export default defineLayer({
 
     const merged = computed<WebcamCollection | undefined>(() => {
       if (!world.data.value) return undefined; // loading until the overview is there
-      const features = active.value.flatMap((id) => feeds.get(id)?.data.value?.features ?? []);
+      const dirs = camdir.data.value;
+      const features = [
+        ...active.value.flatMap((id) => (dirs ? applyCamdir(feeds.get(id)?.data.value ?? { type: 'FeatureCollection', features: [] }, dirs).features : feeds.get(id)?.data.value?.features ?? [])),
+        ...(keyed.data.value?.features ?? []),
+      ];
       return { type: 'FeatureCollection', features };
     });
-    const loaded = computed(() => (merged.value?.features.length ?? 0));
 
-    const feedLayer = pointLayer(ctx, {
-      data: merged,
-      resources: [world],
-      name: 'feeds',
-      minZoom: FEED_ZOOM,
-      radius,
-      color: ['case', ['==', ['get', 'kind'], 'signed'], '#9AD7CF', COLOR] as ExpressionSpecification,
-      stroke: { color: strokeColor, width: 1 },
-      count: computed(() => (world.data.value?.features.length ?? 0) || loaded.value),
-      describe: (f: AnyFeature) => {
-        const p = f.properties as WebcamProps;
-        const m = media(p);
-        return {
-          title: p.title,
-          subtitle: p.subtitle || 'Webcam',
-          color: COLOR,
-          icon: 'camera',
-          facts: [
-            ...(p.source ? [{ label: 'Quelle', value: p.source }] : []),
-            ...(p.dir >= 0 ? [{ label: 'Blickrichtung', value: `${formatInt(p.dir)}° (${compass[Math.round(p.dir / 45) % 8]})` }] : []),
-            ...(!m ? [{ label: 'Hinweis', value: 'Kein Live-Bild eingebunden, nur Link' }] : []),
-          ],
-          media: m,
-          links: p.url ? [{ label: 'Kamera öffnen', url: p.url }] : [],
-        };
-      },
+    // status note: which keyed feeds work, which fail and how many wait for a key
+    const note = computed(() => {
+      const on = KEYED_FEEDS.filter((f) => ctx.key(f.key).value?.trim());
+      const errs = Object.entries(keyed.errors.value);
+      const parts = [
+        on.length ? `Mit Ihrem Schlüssel aktiv: ${on.map((f) => f.label.replace(/ \(.*\)$/, '')).join(', ')}` : '',
+        errs.length ? `Fehler: ${errs.map(([id, m]) => `${KEYED_FEEDS.find((f) => f.id === id)?.label.replace(/ \(.*\)$/, '') ?? id}: ${m}`).join('; ')}` : '',
+        `${KEYED_FEEDS.length - on.length} weitere Feeds brauchen einen Schlüssel (Boost)`,
+      ].filter(Boolean);
+      return parts.join(' · ');
     });
+    const withNote = { ...ctx, status: (s: Parameters<typeof ctx.status>[0]) => ctx.status(s.state === 'ready' || s.state === 'empty' ? { ...s, note: [s.note, note.peek()].filter(Boolean).join(' · ') } : s) };
+    const stopNote = effect(() => { note.value; });
 
-    // 3. OpenStreetMap webcams at street level; the detail layer reports no status of its own
-    const osm = pmtilesLayer({ ...ctx, status: () => {} }, {
-      url: bucketUrl('osm', 'webcam.pmtiles'),
-      sourceLayer: 'webcam',
-      name: 'osm',
-      minZoom: OSM_ZOOM,
-      radius: ['interpolate', ['linear'], ['zoom'], OSM_ZOOM, 3, 14, 6] as ExpressionSpecification,
-      color: '#9AD7CF',
-      stroke: { color: strokeColor, width: 1 },
-      describe: (f: AnyFeature) => {
-        const p = f.properties as { id: number; name?: string; operator?: string; link?: string; dir?: number; panning?: number };
-        const link = /^https?:\/\//.test(p.link ?? '') ? p.link! : '';
-        const isImage = /\.(jpe?g|png|gif|webp)(\?|$)/i.test(link) && link.startsWith('https://');
-        return {
-          title: p.name || 'Webcam',
-          subtitle: 'Webcam aus OpenStreetMap',
-          color: COLOR,
-          icon: 'camera',
-          facts: [
-            ...(p.operator ? [{ label: 'Betreiber', value: p.operator }] : []),
-            ...(p.dir != null && p.dir >= 0 ? [{ label: 'Blickrichtung', value: `${formatInt(p.dir)}° (${compass[Math.round(p.dir / 45) % 8]})` }] : []),
-            ...(p.panning ? [{ label: 'Bauart', value: 'schwenkbar' }] : []),
-          ],
-          media: isImage ? { type: 'image', url: link, refresh: IMAGE_REFRESH } : undefined,
-          links: [...(link ? [{ label: 'Webseite der Kamera', url: link }] : []), { label: 'OpenStreetMap', url: `https://www.openstreetmap.org/node/${p.id}` }],
-        };
-      },
+    const kit = cameraLayer(withNote, {
+      color: COLOR,
+      resources: [world],
+      count: computed(() => world.data.value?.features.length),
+      overview: { name: 'overview', data: { kind: 'geojson', data: world.data } },
+      detail: [
+        {
+          name: 'feeds',
+          data: { kind: 'geojson', data: merged },
+          minZoom: FEED_ZOOM,
+          describe: (f: AnyFeature) => {
+            const p = f.properties as WebcamProps;
+            const m = media(p);
+            return {
+              title: p.title,
+              subtitle: p.subtitle || 'Webcam',
+              facts: [
+                ...(p.source ? [{ label: 'Quelle', value: p.source }] : []),
+                ...directionFact(p.dir).map((d) => ((f.properties as { dirset?: boolean }).dirset ? { ...d, value: `${d.value}, korrigiert (Kamera-Verzeichnis)` } : d)),
+                ...(!m ? [{ label: 'Hinweis', value: 'Kein Live-Bild eingebunden, nur Link' }] : []),
+              ],
+              media: m,
+              links: p.url ? [{ label: 'Kamera öffnen', url: p.url }] : [],
+            };
+          },
+        },
+        {
+          // OpenStreetMap webcams: thinned from zoom 0, full from zoom 5
+          name: 'osm',
+          data: { kind: 'pmtiles', url: bucketUrl('osm', 'webcam.pmtiles'), sourceLayer: 'webcam', attribution: '© OpenStreetMap-Mitwirkende (ODbL)' },
+          describe: (f: AnyFeature) => {
+            const p = f.properties as { id: number; name?: string; operator?: string; link?: string; dir?: number; panning?: number };
+            const link = /^https?:\/\//.test(p.link ?? '') ? p.link! : '';
+            const isImage = /\.(jpe?g|png|gif|webp)(\?|$)/i.test(link) && link.startsWith('https://');
+            return {
+              title: p.name || 'Webcam',
+              subtitle: 'Webcam aus OpenStreetMap',
+              facts: [
+                ...(p.operator ? [{ label: 'Betreiber', value: p.operator }] : []),
+                ...directionFact(p.dir),
+                ...(p.panning ? [{ label: 'Bauart', value: 'schwenkbar' }] : []),
+              ],
+              media: isImage ? { type: 'image', url: link, refresh: IMAGE_REFRESH } : undefined,
+              links: [...(link ? [{ label: 'Webseite der Kamera', url: link }] : []), ...osmNodeLink(p.id)],
+            };
+          },
+        },
+      ],
     });
 
     return {
       destroy() {
         ml.off('moveend', refreshFeeds);
-        stopOverview();
-        stopOpacity();
-        osm.destroy();
-        feedLayer.destroy();
-        ctx.map.remove({ layers: [overviewLayer], sources: [overviewSrc] });
+        ml.off('moveend', onKeyedMove);
+        clearTimeout(keyedTimer);
+        keyChange(); stopCamdirRepublish(); stopNote();
+        keyed.destroy();
+        kit.destroy();
       },
     };
   },

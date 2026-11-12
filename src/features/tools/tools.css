@@ -1,14 +1,32 @@
 @layer features {
+  /* sizes follow the old Orbis HUD: pointer 38 px, touch 44 px */
+  :root {
+    --rail-w: 38px;
+    --rail-icon: 20px;
+    --rail-gap: 10px;
+    --rail-inset: 14px;
+    --top-h: var(--rail-w);
+  }
+  @media (pointer: coarse) {
+    :root {
+      --rail-w: 44px;
+      --rail-icon: 22px;
+    }
+  }
+  :root[data-bp='mobile'] {
+    --rail-w: 44px;
+    --rail-icon: 22px;
+  }
   .rail {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-    width: 52px;
+    gap: var(--rail-gap);
+    width: var(--rail-w);
   }
   .rail-cap {
-    width: 52px;
-    border-radius: 26px;
+    width: var(--rail-w);
+    border-radius: calc(var(--rail-w) / 2);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -17,8 +35,8 @@
   .railbtn {
     display: grid;
     place-items: center;
-    width: 52px;
-    height: 52px;
+    width: var(--rail-w);
+    height: var(--rail-w);
     color: var(--text-1);
     -webkit-tap-highlight-color: transparent;
     transition: background var(--t-panel) var(--ease), color var(--t-panel) var(--ease), transform 120ms var(--ease);
@@ -32,16 +50,20 @@
   }
   .railbtn:focus-visible {
     outline-offset: -3px;
-    border-radius: 26px;
+    border-radius: calc(var(--rail-w) / 2);
+  }
+  .railbtn .icon {
+    width: var(--rail-icon);
+    height: var(--rail-icon);
   }
   .rail-hair {
-    width: 28px;
+    width: calc(var(--rail-w) - 12px);
     height: 1px;
     background: var(--g-sep);
   }
   .compass-round {
-    width: 52px;
-    height: 52px;
+    width: var(--rail-w);
+    height: var(--rail-w);
     border-radius: 50%;
     display: grid;
     place-items: center;
@@ -52,6 +74,8 @@
     transform: scale(0.94);
   }
   .compass-round svg {
+    width: 100%;
+    height: 100%;
     overflow: visible;
   }
   .compass-round .tick {
@@ -68,25 +92,92 @@
   }
   .compass-n {
     fill: var(--text-1);
-    font-size: 13px;
+    font-size: 17.5px; /* viewBox units: about 13 px at 38 px */
     font-weight: 600;
     font-family: var(--font-ui);
   }
   .topbar {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    height: 48px;
-    padding: 0 6px;
-    border-radius: 24px;
+    display: grid;
+    place-items: center;
+    width: var(--rail-w);
+    height: var(--rail-w);
+    border-radius: 50%;
   }
   .topbar .iconbtn {
-    width: 40px;
-    height: 40px;
-    border-radius: 20px;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
     color: var(--text-1);
+  }
+  .topbar .icon {
+    width: var(--rail-icon);
+    height: var(--rail-icon);
   }
   .topbar .bm {
     display: flex;
+  }
+  /* tilt group: folds away (max-height/opacity) below zoom 3 and the compass slides up into its place */
+  .tilt {
+    max-height: 220px;
+    transition: max-height 300ms var(--ease), opacity 250ms var(--ease), margin 300ms var(--ease);
+  }
+  .tilt.off {
+    max-height: 0;
+    opacity: 0;
+    margin-bottom: calc(var(--rail-gap) * -1);
+    pointer-events: none;
+  }
+  .tilt-btn {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  .tilt-sl {
+    width: 100%;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transition: max-height 250ms var(--ease), opacity 200ms var(--ease);
+  }
+  .tilt-sl.open {
+    max-height: 92px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .tilt-hit {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    height: 88px;
+    padding: 4px 0 10px;
+    touch-action: none;
+    cursor: pointer;
+    outline-offset: -3px;
+    border-radius: calc(var(--rail-w) / 2);
+  }
+  .tilt-track {
+    position: relative;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--g-sep);
+  }
+  .tilt-fill {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 2px;
+    background: var(--limb);
+  }
+  .tilt-thumb {
+    position: absolute;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    margin: 0 0 -7px -7px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   }
 }

@@ -1,6 +1,7 @@
 // Dew point 2 m (ICON): how much moisture the air holds, independent of the time of day.
+import { computed } from '@preact/signals';
 import { formatQuantity } from '../../core/units';
-import { ICON_SOURCE, forecastTime } from '../../render/gl/latest';
+import { DEM_SOURCE, ICON_SOURCE, forecastTime } from '../../render/gl/latest';
 import { scaleLegend } from '../../render/gl/legend';
 import { DEWPOINT } from '../../render/gl/scales';
 import { defineLayer } from '../define';
@@ -15,8 +16,9 @@ export default defineLayer({
   form: 'field',
   exclusive: 'field',
   cadence: 'hourly',
-  sources: [ICON_SOURCE],
+  sources: [ICON_SOURCE, DEM_SOURCE],
   time: forecastTime,
+  options: [{ id: 'gelaende', label: 'Geländekorrektur', type: 'toggle', default: true }],
   legend: () => scaleLegend(DEWPOINT),
   keywords: ['taupunkt', 'schwül', 'feuchte', 'dew point', 'icon', 'dwd'],
 
@@ -26,6 +28,7 @@ export default defineLayer({
       vars: ['dew_point_2m'],
       scale: DEWPOINT,
       label: 'Taupunkt',
+      terrain: { enabled: computed(() => ctx.options.value.gelaende !== false), kind: 'Td' },
       format: (v) => formatQuantity('temperature', v, { digits: 1 }),
     });
   },

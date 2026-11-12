@@ -11,7 +11,7 @@ const fields = (d: LayerDef): Fields => {
   let f = cache.get(d);
   if (!f) {
     const title = norm(d.title);
-    f = { title, words: title.split(/[\s&/-]+/), keywords: (d.keywords ?? []).map(norm), summary: norm(d.summary), category: norm(categoryById(d.category).title) };
+    f = { title, words: title.split(/[\s&/-]+/), keywords: [...(d.keywords ?? []), ...(d.keys?.length ? ['schlüssel', 'boost', 'api key', 'key'] : [])].map(norm), summary: norm(d.summary), category: norm(categoryById(d.category).title) };
     cache.set(d, f);
   }
   return f;

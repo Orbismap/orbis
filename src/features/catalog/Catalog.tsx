@@ -11,6 +11,7 @@ import { IconButton } from '../../ui/Button';
 import { Icon } from '../../ui/icons/Icon';
 import { cx } from '../../ui/hooks';
 import { VirtualList } from '../../ui/VirtualList';
+import { settings } from '../../state/settings';
 import { CADENCE_LABEL, scoreLayer } from './fuzzy';
 import './catalog.css';
 
@@ -24,6 +25,24 @@ function toggle(def: LayerDef) {
   if (m === undefined) addLayer(k.id, def.id);
   else if (m) removeLayer(k.id, def.id);
   else setLayerVisible(k.id, def.id, true);
+}
+
+function KeyChip({ def }: { def: LayerDef }) {
+  const have = settings.value.keys;
+  if (!def.keys?.length) return null;
+  if (def.keys.some((r) => r.required))
+    return (
+      <Chip tone={def.keys.every((r) => !r.required || have[r.id]) ? 'ok' : 'limb'}>
+        <Icon name="key" size={10} />
+        mit Schlüssel
+      </Chip>
+    );
+  return def.keys.some((r) => !have[r.id]) ? (
+    <Chip tone="limb">
+      <Icon name="boost" size={10} />
+      Boost möglich
+    </Chip>
+  ) : null;
 }
 
 function Row({ def, active, state, showCat, onPick }: { def: LayerDef; active: boolean; state: boolean | undefined; showCat?: string; onPick(): void }) {
@@ -44,6 +63,7 @@ function Row({ def, active, state, showCat, onPick }: { def: LayerDef; active: b
           <span class="crow-title">{def.title}</span>
           <Chip>{CADENCE_LABEL[def.cadence]}</Chip>
           {def.coverage && def.coverage !== 'Welt' && <Chip>{def.coverage}</Chip>}
+          <KeyChip def={def} />
         </span>
         <span class="crow-summary">{showCat ? `${showCat}: ` : ''}{def.summary}</span>
       </span>

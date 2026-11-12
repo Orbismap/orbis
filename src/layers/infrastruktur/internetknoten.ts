@@ -4,6 +4,7 @@ import { computed } from '@preact/signals';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import type { Feature, FeatureCollection, Point } from 'geojson';
 import { formatInt } from '../../core/format';
+import { failFast, pdbFacSpec, type FacCollection } from '../../data/parsers/peeringdb';
 import { pointLayer } from '../../render/points';
 import type { AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
@@ -13,7 +14,6 @@ const API = 'https://www.peeringdb.com/api';
 
 interface Ix { id: number; name: string; name_long?: string; city?: string; country?: string; website?: string; net_count?: number }
 interface IxFac { ix_id: number; fac_id: number }
-interface Fac { id: number; latitude: number | null; longitude: number | null }
 type IxProps = { id: number; name: string; longName: string; city: string; country: string; website: string; nets: number; facilities: number };
 
 const rows = <T>(raw: unknown): T[] => ((raw as { data?: T[] } | null)?.data ?? []);
@@ -40,13 +40,14 @@ export default defineLayer({
   mount(ctx) {
     const ix = ctx.resource<Ix[]>({ key: 'peeringdb:ix', url: `${API}/ix?fields=id,name,name_long,city,country,website,net_count`, parse: rows<Ix>, timeout: 40_000 });
     const ixfac = ctx.resource<IxFac[]>({ key: 'peeringdb:ixfac', url: `${API}/ixfac?fields=ix_id,fac_id`, parse: rows<IxFac>, timeout: 40_000 });
-    const fac = ctx.resource<Fac[]>({ key: 'peeringdb:fac', url: `${API}/fac?fields=id,latitude,longitude`, parse: rows<Fac>, timeout: 40_000 });
+    // same request as `rechenzentren` (shared resource): PeeringDB is only asked once
+    const fac = ctx.resource<FacCollection>(pdbFacSpec());
 
     const data = computed<FeatureCollection<Point, IxProps> | undefined>(() => {
       const a = ix.data.value, b = ixfac.data.value, c = fac.data.value;
       if (!a || !b || !c) return undefined;
       const pos = new Map<number, [number, number]>();
-      for (const f of c) if (f.latitude != null && f.longitude != null && !(f.latitude === 0 && f.longitude === 0)) pos.set(f.id, [f.longitude, f.latitude]);
+      for (const f of c.features) pos.set(f.properties.fid, f.geometry.coordinates as [number, number]);
       const at = new Map<number, [number, number][]>();
       for (const l of b) {
         const p = pos.get(l.fac_id);
@@ -67,9 +68,11 @@ export default defineLayer({
       return { type: 'FeatureCollection', features };
     });
 
-    return pointLayer(ctx, {
+    // a failed (429) request ends in `error`, not in endless loading
+    const all = [ix, ixfac, fac];
+    return pointLayer({ ...ctx, status: failFast(ctx.status, all) }, {
       data,
-      resources: [ix, ixfac, fac],
+      resources: all,
       radius: ['interpolate', ['linear'], ['zoom'], 1, size(0.8), 8, size(1.2)] as ExpressionSpecification,
       color: COLOR,
       stroke: { color: 'rgba(30, 8, 40, 0.85)', width: 1 },

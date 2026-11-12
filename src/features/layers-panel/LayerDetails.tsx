@@ -10,6 +10,7 @@ import { Segmented } from '../../ui/Segmented';
 import { Select } from '../../ui/Select';
 import { Slider } from '../../ui/Slider';
 import { Switch } from '../../ui/Switch';
+import { openKeySettings } from '../boost/open';
 import { LegendBody } from '../legend/LegendBody';
 import { topFieldLegend } from '../legend/Legend';
 
@@ -71,6 +72,14 @@ export function LayerDetails({ layer, def, karteId }: { layer: KarteLayer; def: 
   };
   return (
     <div class="ld" id={`ld-${def.id}`}>
+      {st?.needsKey && (
+        <p class="ld-note" role="status">
+          Diese Ebene braucht einen kostenlosen Schlüssel.{' '}
+          <button type="button" class="linkbtn" onClick={() => openKeySettings(st.needsKey!)}>
+            Schlüssel eintragen
+          </button>
+        </p>
+      )}
       {(st?.state === 'error' || st?.state === 'empty') && (
         <p class={st.state === 'error' ? 'ld-note is-error' : 'ld-note'} role="status">
           {st.note ?? (st.state === 'error' ? 'Quelle antwortet nicht.' : 'Keine Daten für diese Auswahl.')}{' '}

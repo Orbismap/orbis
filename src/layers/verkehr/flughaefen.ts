@@ -32,6 +32,7 @@ const describe = (f: AnyFeature) => {
       { label: 'Größe', value: p.large ? 'Großflughafen' : 'Regionalflughafen' },
       ...(p.country ? [{ label: 'Land', value: p.country }] : []),
     ],
+    text: 'Ab Zoom 11 zeigt die Ebene „Flughafenplan“ Pisten, Rollwege, Vorfelder und Gates. Abflüge und Ankünfte des Vortags liefert OpenSky nur mit Konto, deshalb hier als Link.',
     links: [
       { label: 'Flughafen bei OurAirports', url: `https://ourairports.com/airports/${encodeURIComponent(p.icao)}/` },
       ...(p.iata ? [{ label: 'Abflüge und Ankünfte (OpenSky)', url: `https://opensky-network.org/network/explorer?airport=${encodeURIComponent(p.icao)}` }] : []),
