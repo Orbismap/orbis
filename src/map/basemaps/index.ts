@@ -28,7 +28,7 @@ export function skyFor(theme: 'dark' | 'light'): SkySpecification {
   const blend: SkySpecification['atmosphere-blend'] = ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0];
   return theme === 'dark'
     ? { 'sky-color': '#16486f', 'horizon-color': '#4aa3d6', 'fog-color': '#0A0F18', 'sky-horizon-blend': 0.35, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.5, 'atmosphere-blend': blend }
-    : { 'sky-color': '#9cc3e4', 'horizon-color': '#d7e6f4', 'fog-color': '#F4F6F9', 'sky-horizon-blend': 0.5, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.5, 'atmosphere-blend': blend };
+    : { 'sky-color': '#8ddcf8', 'horizon-color': '#e2f0fb', 'fog-color': '#F4F6F9', 'sky-horizon-blend': 0.5, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.5, 'atmosphere-blend': blend };
 }
 
 const vis = (on: boolean) => ({ visibility: on ? ('visible' as const) : ('none' as const) });

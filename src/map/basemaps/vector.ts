@@ -1,6 +1,6 @@
 // Orbis dark/light basemaps built in code on OpenFreeMap vector tiles (OpenMapTiles schema).
-// Palette from docs/DESIGN.md: land ≈ ink-1/ink-2, water a little deeper and bluer, roads barely there,
-// so that data layers carry the picture.
+// Colours follow Apple Maps (standard map, light and dark appearance): warm off-white / graphite land,
+// clear blue water, soft green parks, white (dark: grey) streets and yellow-amber motorways.
 import type { ExpressionSpecification, LayerSpecification, SourceSpecification } from 'maplibre-gl';
 import type { BasemapDef, LabelVariant } from './types';
 import { BUILDING_BASE, BUILDING_HEIGHT } from '../buildings-tilt';
@@ -18,20 +18,26 @@ export const FONT_ITALIC = ['Noto Sans Italic'];
 
 interface Palette {
   land: string; water: string; ice: string; wood: string; grass: string; urban: string; industrial: string;
-  roadMinor: string; roadMajor: string; highway: string; casing: string; building: string; border: string; borderSoft: string; rail: string;
-  space: string;
+  roadMinor: string; roadMajor: string; highway: string; casing: string; highwayCasing: string; building: string;
+  /** Fill of trunk roads (between primary and motorway); defaults to roadMajor. */
+  trunk?: string;
+  /** Road fill when zoomed in close (Apple dark: streets turn dark asphalt); defaults to the normal fill. */
+  roadNear?: string;
+  border: string; borderSoft: string; rail: string; space: string;
 }
 
 const PALETTE: Record<'dark' | 'light', Palette> = {
   dark: {
-    land: '#1c2739', water: '#0d1a2e', ice: '#26324a', wood: '#1a2a35', grass: '#1c2a3a', urban: '#202c40', industrial: '#223046',
-    roadMinor: '#2a374e', roadMajor: '#38486a', highway: '#465a82', casing: '#152033', building: '#34465f',
-    border: '#4f6389', borderSoft: 'rgba(79, 99, 137, 0.5)', rail: '#33425d', space: '#0A0F18',
+    // sampled from Apple Maps dark screenshots: slate-blue land, teal parks, navy water, blue-grey buildings
+    land: '#344559', water: '#1f3679', ice: '#4a5b70', wood: '#015856', grass: '#0a5a56', urban: '#344559', industrial: '#36475b',
+    roadMinor: '#526175', roadMajor: '#7b8fa6', trunk: '#9bb2c9', highway: '#b2c6e2', casing: '#2b3a4d', highwayCasing: '#2b3a4d', building: '#546989',
+    roadNear: '#2f343f', border: '#7b8aa3', borderSoft: 'rgba(123, 138, 163, 0.5)', rail: '#2c3b4e', space: '#0A0F18',
   },
   light: {
-    land: '#eceff4', water: '#c9d8e8', ice: '#f8fafc', wood: '#e1e9e0', grass: '#e5ecdf', urban: '#e4e8ee', industrial: '#dde3ea',
-    roadMinor: '#f8f9fb', roadMajor: '#ffffff', highway: '#ffffff', casing: '#d3dae4', building: '#dcd8d2',
-    border: '#9aa8bf', borderSoft: 'rgba(154, 168, 191, 0.6)', rail: '#b4bfd0', space: '#F4F6F9',
+    // measured from Apple Newsroom images of the new map (2023): warm ground, cyan water, fresh green, warm buildings
+    land: '#f7f4eb', water: '#8ddcf8', ice: '#ffffff', wood: '#bbe2a1', grass: '#c5e8a6', urban: '#f4f1e8', industrial: '#efede8',
+    roadMinor: '#ffffff', roadMajor: '#ffffff', highway: '#f9d46e', casing: '#e4dfd3', highwayCasing: '#e2aa45', building: '#ece6da',
+    border: '#a89fb8', borderSoft: 'rgba(168, 159, 184, 0.7)', rail: '#cdc9c2', space: '#F4F6F9',
   },
 };
 
@@ -41,6 +47,9 @@ export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
   const c = PALETTE[theme];
   const id = (s: string) => `bm-orbis-${theme}-${s}`;
   const roadWidth = (base: number): ExpressionSpecification => ['interpolate', ['exponential', 1.5], ['zoom'], 5, base * 0.3, 10, base, 16, base * 6];
+  /** Fill colour that fades to `roadNear` between z16 and z17.5 (dark map only). */
+  const roadFill = (col: string | ExpressionSpecification): string | ExpressionSpecification =>
+    c.roadNear ? ['interpolate', ['linear'], ['zoom'], 16, col, 17.5, c.roadNear] as ExpressionSpecification : col;
   const roadLayout = { ...hidden, 'line-cap': 'round' as const, 'line-join': 'round' as const };
   const minorClasses = ['literal', ['secondary', 'tertiary', 'minor', 'street']] as ExpressionSpecification;
   const majorClasses = ['literal', ['motorway', 'trunk', 'primary']] as ExpressionSpecification;
@@ -48,12 +57,12 @@ export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
     { id: id('bg'), type: 'background', layout: hidden, paint: { 'background-color': c.land } },
     {
       id: id('landcover'), type: 'fill', source: 'ofm', 'source-layer': 'landcover', layout: hidden,
-      paint: { 'fill-color': ['match', ['get', 'class'], 'ice', c.ice, 'wood', c.wood, 'forest', c.wood, c.grass], 'fill-opacity': 0.9 },
+      paint: { 'fill-color': ['match', ['get', 'class'], 'ice', c.ice, 'wood', c.wood, 'forest', c.wood, c.grass], 'fill-opacity': ['match', ['get', 'class'], 'ice', 1, 'wood', 1, 'forest', 1, 'grass', 1, 0.7] },
     },
     {
       id: id('landuse'), type: 'fill', source: 'ofm', 'source-layer': 'landuse', minzoom: 8, layout: hidden,
       filter: ['in', ['get', 'class'], ['literal', ['residential', 'suburb', 'neighbourhood', 'commercial', 'industrial']]],
-      paint: { 'fill-color': ['match', ['get', 'class'], 'commercial', c.industrial, 'industrial', c.industrial, c.urban], 'fill-opacity': 0.8 },
+      paint: { 'fill-color': ['match', ['get', 'class'], 'commercial', c.industrial, 'industrial', c.industrial, c.urban], 'fill-opacity': 1 },
     },
     {
       id: id('waterway'), type: 'line', source: 'ofm', 'source-layer': 'waterway', minzoom: 6, layout: hidden,
@@ -77,20 +86,21 @@ export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
     },
     {
       id: id('roads-minor-casing'), type: 'line', source: 'ofm', 'source-layer': 'transportation', minzoom: 12, layout: roadLayout,
-      filter: ['in', ['get', 'class'], minorClasses], paint: { 'line-color': c.casing, 'line-width': roadWidth(1.05) },
+      filter: ['in', ['get', 'class'], minorClasses], paint: { 'line-color': roadFill(c.casing), 'line-width': roadWidth(1.05) },
     },
     {
       id: id('roads-major-casing'), type: 'line', source: 'ofm', 'source-layer': 'transportation', minzoom: 6, layout: roadLayout,
-      filter: ['in', ['get', 'class'], majorClasses], paint: { 'line-color': c.casing, 'line-width': roadWidth(1.5) },
+      filter: ['in', ['get', 'class'], majorClasses],
+      paint: { 'line-color': roadFill(['match', ['get', 'class'], 'motorway', c.highwayCasing, c.casing]), 'line-width': roadWidth(1.5) },
     },
     {
       id: id('roads-minor'), type: 'line', source: 'ofm', 'source-layer': 'transportation', minzoom: 12, layout: roadLayout,
-      filter: ['in', ['get', 'class'], minorClasses], paint: { 'line-color': c.roadMinor, 'line-width': roadWidth(0.6) },
+      filter: ['in', ['get', 'class'], minorClasses], paint: { 'line-color': roadFill(c.roadMinor), 'line-width': roadWidth(0.6) },
     },
     {
       id: id('roads-major'), type: 'line', source: 'ofm', 'source-layer': 'transportation', minzoom: 6, layout: roadLayout,
       filter: ['in', ['get', 'class'], majorClasses],
-      paint: { 'line-color': ['match', ['get', 'class'], 'motorway', c.highway, c.roadMajor], 'line-width': roadWidth(0.9) },
+      paint: { 'line-color': roadFill(['match', ['get', 'class'], 'motorway', c.highway, 'trunk', c.trunk ?? c.roadMajor, c.roadMajor]), 'line-width': roadWidth(0.9) },
     },
   ];
   const topLayers: LayerSpecification[] = [
@@ -101,7 +111,7 @@ export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
         'fill-extrusion-color': c.building,
         'fill-extrusion-height': BUILDING_HEIGHT,
         'fill-extrusion-base': BUILDING_BASE,
-        'fill-extrusion-opacity': 0.85,
+        'fill-extrusion-opacity': theme === 'dark' ? 1 : 0.92,
         'fill-extrusion-vertical-gradient': true,
       },
     },
@@ -124,8 +134,8 @@ const NAME: ExpressionSpecification = ['coalesce', ['get', 'name:de'], ['get', '
 
 interface LabelPaint { text: string; halo: string; water: string; country: string; border: string; borderSoft: string }
 const LABEL_PAINT: Record<LabelVariant, LabelPaint> = {
-  dark: { text: '#A3AFC2', halo: 'rgba(10, 15, 24, 0.9)', water: '#5d7191', country: '#8794ab', border: '', borderSoft: '' },
-  light: { text: '#4A5871', halo: 'rgba(255, 255, 255, 0.9)', water: '#6f87a8', country: '#5f6d86', border: '', borderSoft: '' },
+  dark: { text: '#dfe5ee', halo: 'rgba(30, 41, 56, 0.9)', water: '#6f95d6', country: '#c9d1de', border: '', borderSoft: '' },
+  light: { text: '#3c3c43', halo: 'rgba(255, 255, 255, 0.92)', water: '#358dbb', country: '#55525e', border: '', borderSoft: '' },
   imagery: { text: '#ffffff', halo: 'rgba(0, 0, 0, 0.75)', water: 'rgba(190, 215, 255, 0.9)', country: '#ffffff', border: 'rgba(255, 255, 255, 0.5)', borderSoft: 'rgba(255, 255, 255, 0.28)' },
 };
 
