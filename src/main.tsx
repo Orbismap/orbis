@@ -6,6 +6,7 @@ import * as karten from './karten/store';
 import { initKartenStore } from './karten/store';
 import { allLayers, getLayer } from './layers/registry';
 import { getEngine } from './map/engine';
+import { buildingsTiltState } from './map/buildings-tilt';
 import * as session from './state/session';
 import * as selection from './state/selection';
 import * as view from './state/view';
@@ -33,5 +34,6 @@ if (location.search.includes('smoke') || import.meta.env.DEV) {
     get engine() { return getEngine(); },
     karten, session, selection, view, time, settings,
     registry: { allLayers, getLayer },
+    buildingsTilt: buildingsTiltState,
   };
 }

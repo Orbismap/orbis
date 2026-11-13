@@ -54,6 +54,7 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
   const marker = (m: (typeof MARKERS)[number]) => ({ id: markerLayerId(m), type: 'background', layout: { visibility: 'none' } }) as LayerSpecification;
   for (const m of ['field', 'raster'] as const) layers.push(marker(m));
   for (const m of ['terminator', 'areas', 'lines'] as const) layers.push(marker(m));
+  for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(id === o.basemap) } } as LayerSpecification);
   for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(o.labels && v === active) } } as LayerSpecification);
   for (const m of ['basemap-labels', 'points', 'labels', 'top'] as const) layers.push(marker(m));
   return {

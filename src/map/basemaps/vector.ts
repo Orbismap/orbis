@@ -3,6 +3,7 @@
 // so that data layers carry the picture.
 import type { ExpressionSpecification, LayerSpecification, SourceSpecification } from 'maplibre-gl';
 import type { BasemapDef, LabelVariant } from './types';
+import { BUILDING_BASE, BUILDING_HEIGHT } from '../buildings-tilt';
 
 export const OFM_URL = 'https://tiles.openfreemap.org/planet';
 export const OFM_GLYPHS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
@@ -70,17 +71,6 @@ export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
       paint: { 'line-color': c.borderSoft, 'line-width': 0.7, 'line-dasharray': [3, 2] },
     },
     {
-      // 2.5D buildings (OpenMapTiles `building`: render_height / render_min_height, metres). Rounded corners need maplibre-gl >= 6.2.
-      id: id('building'), type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, layout: { ...hidden, 'fill-extrusion-rounded-corner-distance': 1.5 },
-      paint: {
-        'fill-extrusion-color': c.building,
-        'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 15.5, ['coalesce', ['to-number', ['get', 'render_height']], 9]],
-        'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 14, 0, 15.5, ['coalesce', ['to-number', ['get', 'render_min_height']], 0]],
-        'fill-extrusion-opacity': 0.85,
-        'fill-extrusion-vertical-gradient': true,
-      },
-    },
-    {
       id: id('rails'), type: 'line', source: 'ofm', 'source-layer': 'transportation', minzoom: 8, layout: hidden,
       filter: ['all', ['in', ['get', 'class'], ['literal', ['rail', 'transit']]], ['!=', ['get', 'brunnel'], 'tunnel']],
       paint: { 'line-color': c.rail, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.3, 12, 0.8, 18, 2.5] },
@@ -103,11 +93,25 @@ export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
       paint: { 'line-color': ['match', ['get', 'class'], 'motorway', c.highway, c.roadMajor], 'line-width': roadWidth(0.9) },
     },
   ];
+  const topLayers: LayerSpecification[] = [
+    {
+      // 2.5D buildings (OpenMapTiles `building`: render_height / render_min_height, metres); height follows the pitch, see buildings-tilt.ts. Rounded corners need maplibre-gl >= 6.2.
+      id: id('building'), type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, layout: { ...hidden, 'fill-extrusion-rounded-corner-distance': 1.5 },
+      paint: {
+        'fill-extrusion-color': c.building,
+        'fill-extrusion-height': BUILDING_HEIGHT,
+        'fill-extrusion-base': BUILDING_BASE,
+        'fill-extrusion-opacity': 0.85,
+        'fill-extrusion-vertical-gradient': true,
+      },
+    },
+  ];
   return {
     id: theme === 'dark' ? 'orbis-dark' : 'orbis-light',
     label: theme === 'dark' ? 'Orbis dunkel' : 'Orbis hell',
     sources: {},
     layers,
+    topLayers,
     labelVariant: theme,
     background: c.space,
     theme,

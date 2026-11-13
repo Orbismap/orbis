@@ -283,6 +283,18 @@ async function main() {
       await page.evaluate(() => window.__orbis.engine.ml.jumpTo({ zoom: 4, pitch: 0, bearing: 0 }));
     }
 
+    // 2.5D buildings: height follows the tilt (patched composite binder), flat at pitch 0
+    {
+      const read = () => page.evaluate(() => window.__orbis.buildingsTilt());
+      await page.evaluate(() => { const o = window.__orbis; o.settings.updateSettings({ theme: 'dark' }); o.karten.editKarte(o.session.activeKarteId.peek(), (k) => ({ ...k, basemap: 'orbis-dark' })); o.view.setProjection('mercator'); o.engine.ml.jumpTo({ center: [11.5755, 48.1374], zoom: 16, pitch: 0, bearing: 0 }); });
+      await settle(page, 12000);
+      const a = await read();
+      await page.evaluate(() => window.__orbis.engine.ml.jumpTo({ pitch: 45 }));
+      await sleep(600);
+      const b = await read();
+      report(a.patched && !a.fellBack && a.drawn > 0 && a.lastK === 0 && b.lastK > 0.7 && b.lastK < 0.9, '7 building height follows tilt (no tile reload)', `patched ${a.patched} fellBack ${a.fellBack} k@0=${a.lastK} k@45=${b.lastK.toFixed(2)} draws ${b.drawn}`);
+    }
+
     // 3. basemaps + projection
     const errBefore = errors.length;
     const bmFail = [];

@@ -14,6 +14,7 @@ import { pokeCameraFrame } from './frame';
 import { createPicking } from './picking';
 import { beforeIdFor } from './slots';
 import { createTerminator } from './terminator';
+import { installBuildingsTilt } from './buildings-tilt';
 import type { BasemapId, CameraTarget, MapEngine, PickHandler, SlotId } from './types';
 
 // MapLibre 6 ships its worker as a separate module; let Vite bundle it (with its shared chunk) and point MapLibre at it.
@@ -61,6 +62,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   ml.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
   if (import.meta.env?.DEV) ml.on('error', (e) => console.warn('[map]', e.error?.message ?? e));
 
+  const disposeBuildingsTilt = installBuildingsTilt(ml);
   const terminator = createTerminator(ml);
   const picking = createPicking(ml, setProbe);
 
@@ -122,7 +124,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     if (ml.getLayoutProperty(id, 'visibility') !== v) ml.setLayoutProperty(id, 'visibility', v);
   };
   function applyBasemap() {
-    for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].layers) setVis(l.id, id === basemap);
+    for (const id of BASEMAP_IDS) for (const l of [...BASEMAPS[id].layers, ...(BASEMAPS[id].topLayers ?? [])]) setVis(l.id, id === basemap);
     const variant = BASEMAPS[basemap].labelVariant;
     for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) setVis(l.id, labels && v === variant);
     container.style.background = BASEMAPS[basemap].background;
@@ -202,6 +204,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       writeThrottled.cancel();
       terminator.destroy();
       picking.destroy();
+      disposeBuildingsTilt();
       ml.remove();
       if (current === engine) current = undefined;
     },
