@@ -64,7 +64,7 @@ const THEMES: Record<string, KarteTheme[]> = {
 const DEFS: Karte[] = [
   {
     id: 'wetter', name: 'Wetter', icon: 'cloud', color: '#72C8F0', builtin: true, basemap: 'orbis-dark', labels: true, terminator: true,
-    layers: [on('radar'), off('wind', 0.85), off('temperatur', 0.8), off('gefuehlt', 0.8), off('staedte'), off('luftqualitaet', 0.85), off('niederschlag'), off('bewoelkung'), off('luftdruck'), off('satellit'), off('stroemung'), off('blitze')],
+    layers: [on('radar'), off('wind', 0.85), off('temperatur', 0.8), off('gefuehlt', 0.8), off('staedte'), off('luftqualitaet', 0.85), off('niederschlag'), off('bewoelkung'), off('luftdruck'), off('satellit'), on('stroemung'), off('blitze')],
   },
   {
     id: 'gefahren', name: 'Gefahren', icon: 'warning', color: '#FF6B5E', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,

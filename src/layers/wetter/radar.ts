@@ -1,9 +1,11 @@
 // Rain radar (RainViewer composite, world), drawn by the radar shader kit (render/gl/radarLayer.ts). Not exclusive with the model fields: radar is an observation and is
 // meant to be laid over a model field (clouds, wind) or the satellite basemap.
-import { computed } from '@preact/signals';
+import { computed, effect } from '@preact/signals';
 import { HOUR, MINUTE } from '../../core/time';
 import { rateColor } from '../../render/gl/radar-values';
 import type { RadarFrame } from '../../render/gl/radarLayer';
+import { idBase } from '../../render/common';
+import type { LayerHandle } from '../types';
 import { defineLayer } from '../define';
 
 interface RainViewer { host: string; radar: { past: { time: number; path: string }[]; nowcast?: { time: number; path: string }[] } }
@@ -33,6 +35,7 @@ export default defineLayer({
       return { color: `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`, label, shape: 'square' as const };
     }),
   },
+  options: [{ id: 'coverage', label: 'Abdeckung der Radarstationen', type: 'toggle', default: true }],
   keywords: ['radar', 'regen', 'niederschlag', 'rainviewer', 'schauer'],
 
   async mount(ctx) {
@@ -55,6 +58,26 @@ export default defineLayer({
       attribution: 'Radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>',
     });
     ctx.status({ state: 'loading' });
-    return h;
+
+    // Coverage map (where radars exist at all): a static image that never changes, so one raster source with no
+    // refresh. It is only added while the option is on, and the tile limit of the free tier is respected (zoom <= 7,
+    // MapLibre caches the tiles in the browser).
+    const engine = ctx.map;
+    const src = `${idBase(ctx, 'coverage')}-src`;
+    const lyr = `${idBase(ctx, 'coverage')}-raster`;
+    let shown = false;
+    const hide = () => { if (shown) { engine.remove({ layers: [lyr], sources: [src] }); shown = false; } };
+    const stop = effect(() => {
+      if (ctx.options.value.coverage === false) return hide();
+      if (shown) return;
+      engine.addSource(src, { type: 'raster', tiles: ['https://tilecache.rainviewer.com/v2/coverage/0/256/{z}/{x}/{y}/0/0_0.png'], tileSize: 256, maxzoom: 7 });
+      engine.addLayer({ id: lyr, type: 'raster', source: src, paint: { 'raster-opacity': 0.18, 'raster-fade-duration': 0 } }, 'raster');
+      shown = true;
+    });
+    const handle: LayerHandle = {
+      ...h,
+      destroy() { stop(); hide(); h.destroy(); },
+    };
+    return handle;
   },
 });
