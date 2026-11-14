@@ -5,7 +5,7 @@ import { allLayers, layersByCategory } from '../../layers/registry';
 import type { LayerDef } from '../../layers/types';
 import { activeKarte } from '../../state/session';
 import { isMobile, leftView } from '../../state/ui';
-import { IconButton } from '../../ui/Button';
+import { Button, IconButton } from '../../ui/Button';
 import { Icon } from '../../ui/icons/Icon';
 import { cx } from '../../ui/hooks';
 import { VirtualList } from '../../ui/VirtualList';
@@ -85,7 +85,8 @@ function Row({ def, active, state, snippet, onPick }: { def: LayerDef; active: b
   );
 }
 
-export function Catalog() {
+/** `modal`: desktop sheet (title, search, list, "Fertig"); otherwise the full view of the mobile sheet with a back button. */
+export function Catalog({ modal }: { modal?: boolean } = {}) {
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -136,11 +137,11 @@ export function Catalog() {
   };
 
   return (
-    <div class="cat">
+    <div class={cx('cat', modal && 'cat-modal')}>
       <div class="cat-head">
-        <IconButton icon="chevron-left" label="Zurück zu den Ebenen" onClick={() => (leftView.value = 'layers')} />
+        {!modal && <IconButton icon="chevron-left" label="Zurück zu den Ebenen" onClick={() => (leftView.value = 'layers')} />}
         <h2 class="cat-title">Ebene hinzufügen</h2>
-        <span class="cat-count num">{allLayers().length}</span>
+        {!modal && <span class="cat-count num">{allLayers().length}</span>}
       </div>
       <div class="cat-search">
         <Icon name="search" size={16} />
@@ -198,6 +199,13 @@ export function Catalog() {
             }
           />
         </div>
+      )}
+      {modal && (
+        <footer class="cat-foot">
+          <Button variant="primary" onClick={() => (leftView.value = 'layers')}>
+            Fertig
+          </Button>
+        </footer>
       )}
     </div>
   );

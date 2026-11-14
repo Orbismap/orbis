@@ -1,0 +1,20 @@
+@layer features {
+  /* spans the full card (cancels the article padding) so the corner buttons sit 8px from the panel edge */
+  .place-head { position: relative; display: flex; justify-content: center; margin: calc(-1 * var(--s-3)) calc(-1 * var(--s-4)) 0; padding: 46px var(--s-4) 6px; }
+  .place-titles { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .place-sub { font-size: 12px; color: var(--text-3); text-align: center; }
+  .place-title { font-size: 20px; font-weight: 700; text-align: center; letter-spacing: -0.01em; }
+  .place-share { position: absolute; top: 8px; left: 8px; }
+  .place-close { position: absolute; top: 8px; right: 8px; }
+  .place-line { display: block; }
+  .place-actions { padding-top: 4px; }
+  .place-info { padding: 4px 0 8px; }
+  .place-img { display: block; width: 100%; max-height: 160px; object-fit: cover; border-radius: 14px; margin: 6px 0 4px; }
+  .place-text { font-size: 14px; line-height: 1.4; color: var(--text-1); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+  .place-text.is-open { display: block; }
+  /* the spacer pushes the floated MEHR down to the last line; the clamp's ellipsis then ends before it */
+  .place-text.is-clamped:not(.is-open)::before { content: ''; float: right; width: 0; height: calc(4 * 1.4em); }
+  .place-more { float: right; clear: right; padding-left: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: var(--text-1); line-height: inherit; }
+  .place-src { margin-top: 6px; font-size: 11px; color: var(--text-3); }
+  .place-src a { color: var(--limb); font-weight: 600; }
+}

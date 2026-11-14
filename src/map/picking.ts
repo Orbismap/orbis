@@ -5,6 +5,10 @@ import type { PickHandler } from './types';
 
 interface Entry { ids: Set<string>; h: PickHandler }
 
+/** Hold time of a long press (point query). */
+export const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP = 6;
+
 export const TOLERANCE = { mouse: 6, touch: 14 } as const;
 
 export interface Picking {
@@ -19,7 +23,7 @@ const isTouch = (e: MapMouseEvent | MapTouchEvent) => {
 
 const keyOf = (f: MapGeoJSONFeature) => (f.id === undefined ? undefined : `${f.source}|${f.sourceLayer ?? ''}|${f.id}`);
 
-export function createPicking(ml: MlMap, onMiss: (at: { lng: number; lat: number } | null) => void): Picking {
+export function createPicking(ml: MlMap, onMiss: (at: { lng: number; lat: number } | null) => void, onLongPress?: (at: { lng: number; lat: number }) => void): Picking {
   const entries = new Set<Entry>();
   let hovered: { feature: MapGeoJSONFeature; key: string | undefined; entry: Entry } | undefined;
 
@@ -72,7 +76,38 @@ export function createPicking(ml: MlMap, onMiss: (at: { lng: number; lat: number
     ml.getCanvas().style.cursor = '';
   }
 
+  // long press: pointer held still for LONG_PRESS_MS (500 ms); the click that follows the release is swallowed
+  let press: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | undefined;
+  let swallowClick = false;
+  const cancelPress = () => {
+    if (press) clearTimeout(press.timer);
+    press = undefined;
+  };
+  const onDown = (e: MapMouseEvent | MapTouchEvent) => {
+    cancelPress();
+    swallowClick = false;
+    if (!onLongPress || ('button' in e.originalEvent && (e.originalEvent as MouseEvent).button !== 0)) return;
+    if (e.type === 'touchstart' && (e as MapTouchEvent).points && (e as MapTouchEvent).points.length > 1) return;
+    const at = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+    press = {
+      x: e.point.x,
+      y: e.point.y,
+      timer: setTimeout(() => {
+        press = undefined;
+        swallowClick = true;
+        onLongPress(at);
+      }, LONG_PRESS_MS),
+    };
+  };
+  const onPressMove = (e: MapMouseEvent | MapTouchEvent) => {
+    if (press && Math.hypot(e.point.x - press.x, e.point.y - press.y) > LONG_PRESS_SLOP) cancelPress();
+  };
+
   const onClick = (e: MapMouseEvent) => {
+    if (swallowClick) {
+      swallowClick = false;
+      return;
+    }
     const hit = query(e.point, isTouch(e) ? TOLERANCE.touch : TOLERANCE.mouse);
     if (!hit) {
       onMiss({ lng: e.lngLat.lng, lat: e.lngLat.lat });
@@ -113,6 +148,15 @@ export function createPicking(ml: MlMap, onMiss: (at: { lng: number; lat: number
   };
   const onLeave = () => clearHover();
 
+  ml.on('mousedown', onDown);
+  ml.on('touchstart', onDown);
+  ml.on('mousemove', onPressMove);
+  ml.on('touchmove', onPressMove);
+  ml.on('mouseup', cancelPress);
+  ml.on('touchend', cancelPress);
+  ml.on('touchcancel', cancelPress);
+  ml.on('dragstart', cancelPress);
+  ml.on('zoomstart', cancelPress);
   ml.on('click', onClick);
   ml.on('mousemove', onMove);
   ml.on('mouseout', onLeave);
@@ -128,6 +172,16 @@ export function createPicking(ml: MlMap, onMiss: (at: { lng: number; lat: number
       };
     },
     destroy() {
+      cancelPress();
+      ml.off('mousedown', onDown);
+      ml.off('touchstart', onDown);
+      ml.off('mousemove', onPressMove);
+      ml.off('touchmove', onPressMove);
+      ml.off('mouseup', cancelPress);
+      ml.off('touchend', cancelPress);
+      ml.off('touchcancel', cancelPress);
+      ml.off('dragstart', cancelPress);
+      ml.off('zoomstart', cancelPress);
       ml.off('click', onClick);
       ml.off('mousemove', onMove);
       ml.off('mouseout', onLeave);

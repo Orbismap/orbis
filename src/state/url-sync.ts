@@ -5,12 +5,15 @@ import { parseHash, serializeHash, type UrlState } from '../core/url';
 import { editKarte, getKarte } from '../karten/store';
 import { hasLayer } from '../layers/registry';
 import { activeKarte, setActiveKarte } from './session';
+import { detailOpen } from './hud';
+import { inspector, place, probe, selectPlace } from './selection';
+import { isMobile } from './ui';
 import { live, setTime, time } from './time';
 import { camera, projection, setCamera, setProjection } from './view';
 
 export function applyUrlState(u: UrlState): void {
   batch(() => {
-    if (u.karte) setActiveKarte(u.karte);
+    if (u.karte) (setActiveKarte(u.karte), (detailOpen.value = true));
     if (u.view) setCamera({ lng: u.view.lng, lat: u.view.lat, zoom: u.view.zoom, bearing: u.view.bearing ?? 0, pitch: u.view.pitch ?? 0 });
     if (u.globe !== undefined) setProjection(u.globe ? 'globe' : 'mercator');
     if (u.layers) {
@@ -28,18 +31,25 @@ export function applyUrlState(u: UrlState): void {
       }
     }
     if (u.time !== undefined) setTime(u.time);
+    if (u.place && !isMobile.peek()) {
+      const cur = place.peek();
+      if (!cur || cur.title !== u.place.title || cur.lat !== u.place.lat || cur.lng !== u.place.lng) selectPlace({ id: `url:${u.place.title}`, title: u.place.title, subtitle: u.place.subtitle, lng: u.place.lng, lat: u.place.lat, kind: u.place.kind });
+    }
   });
 }
 
 export function currentUrlState(): UrlState {
   const c = camera.value;
   const k = activeKarte.value;
+  // desktop: only while the detail menu actually shows the Karte (not closed, not replaced by a place, object or point)
+  const shown = isMobile.value || (detailOpen.value && !inspector.value && !probe.value && !place.value);
   return {
     view: { lat: c.lat, lng: c.lng, zoom: c.zoom, bearing: c.bearing, pitch: c.pitch },
-    karte: k.id,
-    layers: k.layers.filter((l) => l.visible).map((l) => l.id),
+    karte: shown ? k.id : undefined,
+    layers: shown ? k.layers.filter((l) => l.visible).map((l) => l.id) : undefined,
     time: live.value ? undefined : time.value,
     globe: projection.value === 'globe',
+    place: place.value ? { lat: place.value.lat, lng: place.value.lng, title: place.value.title, subtitle: place.value.subtitle, kind: place.value.kind } : undefined,
   };
 }
 

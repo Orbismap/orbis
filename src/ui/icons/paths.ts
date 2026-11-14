@@ -4,7 +4,7 @@
 import type { IconName } from './names';
 
 /** Icons the UI needs in addition to the names layers may reference. */
-export type UiIconName = IconName | 'chevron-left' | 'chevron-up' | 'compass' | 'copy' | 'pencil' | 'panel-left' | 'more' | 'keyboard' | 'link' | 'north' | 'key' | 'boost';
+export type UiIconName = IconName | 'chevron-left' | 'chevron-up' | 'compass' | 'copy' | 'pencil' | 'plus-square' | 'panel-left' | 'more' | 'keyboard' | 'link' | 'north' | 'key' | 'boost';
 
 const cloud = (y: number) => `M5.5 ${y}a3.25 3.25 0 0 1-.3-6.49 4.75 4.75 0 0 1 9.2-.6 3.55 3.55 0 0 1 .1 7.09z`;
 
@@ -75,6 +75,7 @@ export const ICON_PATHS: Record<UiIconName, string> = {
   trash: 'M4 5.5h12M8 5.5V3.75h4V5.5M5.5 5.5l.75 10.5a1 1 0 0 0 1 .9h5.5a1 1 0 0 0 1-.9l.75-10.5M8.5 8.5v5M11.5 8.5v5',
   check: 'M4.5 10.5l3.5 3.5 7.5-8',
   copy: 'M7.5 7.5h7a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H9A1.5 1.5 0 0 1 7.5 15.5zM12.5 7.5V5A1.5 1.5 0 0 0 11 3.5H5.5A1.5 1.5 0 0 0 4 5v6.5A1.5 1.5 0 0 0 5.5 13h2',
+  'plus-square': 'M5.5 3.5h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2zM10 7v6M7 10h6',
   pencil: 'M3.5 16.5l.75-3.75 8.5-8.5a1.77 1.77 0 0 1 2.5 2.5l-8.5 8.5zM11.5 5.5l3 3',
   'panel-left': 'M4.5 3.5h11A1.5 1.5 0 0 1 17 5v10a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15V5a1.5 1.5 0 0 1 1.5-1.5zM8 3.5v13',
   more: 'M4.5 10h.01M10 10h.01M15.5 10h.01',

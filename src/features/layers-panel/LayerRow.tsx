@@ -1,3 +1,4 @@
+import { isMobile } from '../../state/ui';
 import { computed } from '@preact/signals';
 import { useMemo } from 'preact/hooks';
 import type { KarteLayer } from '../../karten/types';
@@ -65,14 +66,20 @@ export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGr
         <span class="lrow-badge" style={{ ['--c' as string]: def.color }} aria-hidden="true">
           <Icon name={def.icon} size={16} />
         </span>
-        <button type="button" class="lrow-head" data-nav aria-haspopup="true" aria-label={`${def.title}, Details`} onClick={openPage}>
+        <button type="button" class="lrow-head" data-nav aria-haspopup="true" aria-label={`${def.title}, Details`} title={trail && !isMobile.value ? `Stand ${trail}` : undefined} onClick={openPage}>
           <span class="lrow-text">
             <span class="lrow-title">{def.title}</span>
             {sub}
           </span>
           {trail && <span class={cx('lrow-trail num', st.stale && 'is-stale')}>{trail}</span>}
         </button>
-        <SettingsButton def={def} onClick={openPage} />
+        {isMobile.value ? (
+          <SettingsButton def={def} onClick={openPage} />
+        ) : (
+          <button type="button" class="lrow-hide" data-nav aria-label={`${def.title} ausblenden`} title="Ausblenden" onClick={() => setLayerVisible(karteId, def.id, false)}>
+            <Icon name="eye-off" size={16} />
+          </button>
+        )}
         {needsKey && (
           <button type="button" class="lrow-keybtn" aria-label={`Schlüssel eintragen für ${def.title}`} onClick={() => openKeySettings(needsKey)}>
             <Icon name="key" size={16} />
@@ -98,7 +105,7 @@ function SettingsButton({ def, onClick }: { def: LayerDef; onClick(): void }) {
 /** Suggested layer (off): icon, name, switch. Switching on moves it up into "Aktiv". */
 export function SuggestRow({ def, karteId }: { def: LayerDef; karteId: string }) {
   return (
-    <li class="lrow is-suggest" data-key={def.id}>
+    <li class="lrow is-suggest" data-key={def.id} onClick={() => !isMobile.peek() && setLayerVisible(karteId, def.id, true)}>
       <div class="lrow-main">
         <span class="lrow-badge" style={{ ['--c' as string]: def.color }} aria-hidden="true">
           <Icon name={def.icon} size={16} />

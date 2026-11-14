@@ -11,9 +11,9 @@ const GROUPS: { title: string; rows: { keys: string[]; label: string }[] }[] = [
     rows: [
       { keys: ['mod+K', '/'], label: 'Suche' },
       { keys: ['G'], label: 'Globus oder flache Karte' },
-      { keys: ['['], label: 'Seitenleiste ein- oder ausklappen' },
+      { keys: ['mod+B', '['], label: 'Seitenleiste ein- oder ausklappen' },
       { keys: ['1', '5'], label: 'Standardkarten wechseln (1 bis 5)' },
-      { keys: [','], label: 'Einstellungen' },
+      { keys: ['mod+,'], label: 'Einstellungen' },
     ],
   },
   {

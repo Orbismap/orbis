@@ -254,7 +254,8 @@ export function KartenPopover({ open, onClose, anchor, align = 'end', up, class:
 }
 
 /** Slim row under the tab bar: shown only when the active standard Karte was really rebuilt. */
-export function KartenChangeRow() {
+/** `short`: the Karte name is already shown above (desktop detail menu), so just "Angepasst". */
+export function KartenChangeRow({ short }: { short?: boolean } = {}) {
   const k = activeKarte.value;
   const show = isDirty(k.id);
   const [saving, setSaving] = useState(false);
@@ -265,7 +266,7 @@ export function KartenChangeRow() {
     <div class="kchange" ref={wrap} data-open={show} {...(show ? {} : ({ inert: '' } as object))}>
       <div class="kchange-clip">
         <div class="kchange-row" role="status">
-          <span class="kchange-text">{name.current} angepasst</span>
+          <span class="kchange-text">{short ? "Angepasst" : `${name.current} angepasst`}</span>
           <button type="button" class="kchange-btn is-primary" onClick={() => setSaving(true)}>
             Sichern als Karte
           </button>

@@ -118,6 +118,13 @@ describe('url', () => {
     expect(h).toBe('#/@52.52,13.405,5.25z,30b,45p?k=wetter&l=erdbeben,seekabel&t=2026-11-10T12:00Z&g=1');
     expect(parseHash(h)).toEqual(s);
   });
+  it('round-trips a searched place, commas in names included', () => {
+    const s = { karte: 'wetter', place: { lat: 52.51874, lng: 13.40802, title: 'Berlin, Mitte', subtitle: 'Berlin, Deutschland', kind: 'city' } };
+    const h = serializeHash(s);
+    expect(h).toBe('#/?k=wetter&p=52.51874,13.40802,Berlin%2C%20Mitte,Berlin%2C%20Deutschland,city');
+    expect(parseHash(h)).toEqual(s);
+    expect(parseHash('#/?p=1,2,%E0%A4%A').place).toBeUndefined();
+  });
   it('handles empty and broken hashes', () => {
     expect(parseHash('')).toEqual({});
     expect(parseHash('#/@abc')).toEqual({});
