@@ -31,3 +31,29 @@ export function setFieldAll(karteId: string, all: boolean): void {
   fieldAll.value = all ? [...rest, karteId] : rest;
   setJSON(FKEY, VERSION, fieldAll.peek());
 }
+
+/** Reorder mode of the layer menu (pencil in the bottom bar): grips next to every group and layer. */
+export const editMode = signal(false);
+
+export interface MenuOrder { groups?: string[]; layers?: Record<string, string[]> }
+const OKEY = 'menu-order';
+const validateOrder = (raw: unknown): Record<string, MenuOrder> | undefined =>
+  raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, MenuOrder>) : undefined;
+/** Own order of groups and of the layers inside them, per Karte id (the themes themselves come from the code). */
+export const menuOrder = signal<Record<string, MenuOrder>>(getJSON(OKEY, VERSION, validateOrder, {}));
+
+/** `ids` in the saved order; unknown saved ids are dropped, new ids keep their default place at the end. */
+export function applyOrder(ids: string[], saved: string[] | undefined): string[] {
+  if (!saved?.length) return ids;
+  const known = saved.filter((id) => ids.includes(id));
+  return [...known, ...ids.filter((id) => !known.includes(id))];
+}
+
+export function saveOrder(karteId: string, patch: { groups?: string[]; group?: { id: string; ids: string[] } }): void {
+  const cur = menuOrder.peek()[karteId] ?? {};
+  const next: MenuOrder = { ...cur };
+  if (patch.groups) next.groups = patch.groups;
+  if (patch.group) next.layers = { ...cur.layers, [patch.group.id]: patch.group.ids };
+  menuOrder.value = { ...menuOrder.peek(), [karteId]: next };
+  setJSON(OKEY, VERSION, menuOrder.peek());
+}

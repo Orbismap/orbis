@@ -7,6 +7,7 @@ import { LayersList } from '../features/layers-panel/LayersList';
 import { SettingsView } from '../features/settings/Settings';
 import { leftTab, leftView, isMobile, type LeftView } from '../state/ui';
 import { Button } from '../ui/Button';
+import { cx } from '../ui/hooks';
 import { Segmented } from '../ui/Segmented';
 import { ScrollArea } from '../ui/ScrollArea';
 import { formatCompact } from '../core/format';
@@ -25,11 +26,17 @@ function Tabs() {
   const mobile = isMobile.value;
   const n = feedEntries.value.length;
   const showTabs = hasFeed.value;
-  if (!showTabs && !mobile) return null;
+  const active = visibleCount.value;
   return (
     <div class="ltabs">
+      {!mobile && (
+        <p class={cx('ltabs-info', showTabs && 'is-covered')} role="status" aria-hidden={showTabs || undefined}>
+          {active === 0 ? 'Keine Ebene aktiv' : active === 1 ? '1 Ebene aktiv' : `${active} Ebenen aktiv`}
+        </p>
+      )}
       {showTabs && (
       <Segmented
+        class="ltabs-seg"
         aria-label="Ansicht"
         size="md"
         value={tab}

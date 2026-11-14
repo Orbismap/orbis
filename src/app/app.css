@@ -79,6 +79,17 @@
   .ltabs-add {
     flex: none;
   }
+  /* keeps the height of the tab bar when it is not shown, so the list does not jump */
+  .ltabs-info {
+    flex: 1;
+    margin: 0;
+    padding: 0 var(--s-2);
+    height: 26px;
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-3);
+  }
   .lfoot {
     padding: var(--s-1) var(--s-2) var(--s-2);
   }
@@ -240,5 +251,40 @@
   }
   [data-bp='mobile'] .ltabs {
     padding-top: var(--s-3);
+  }
+}
+
+@layer features {
+  /* desktop: the tab bar slides in from above over the info text, which fades out underneath */
+  .ltabs:has(.ltabs-info) {
+    position: relative;
+    overflow: hidden;
+  }
+  .ltabs-info ~ .ltabs-seg {
+    position: absolute;
+    left: var(--s-2);
+    right: var(--s-2);
+    top: 0;
+    flex: none;
+    animation: ltabs-slide var(--dur-3, 260ms) cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .ltabs-info {
+    transition: opacity 200ms ease-out;
+  }
+  .ltabs-info.is-covered {
+    opacity: 0;
+  }
+  @keyframes ltabs-slide {
+    from {
+      transform: translateY(-110%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ltabs-info ~ .ltabs-seg {
+      animation: none;
+    }
+    .ltabs-info {
+      transition: none;
+    }
   }
 }

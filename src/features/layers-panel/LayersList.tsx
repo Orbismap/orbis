@@ -9,15 +9,11 @@ import { isMobile, leftView } from '../../state/ui';
 import { Icon } from '../../ui/icons/Icon';
 import { useFlip } from './flip';
 import { LayerPage } from './LayerPage';
-import { FieldRow, LayerRow, SuggestRow } from './LayerRow';
+import { FieldRow, LayerRow } from './LayerRow';
 import { reorderMessage, startRowDrag } from './reorder';
-import { closeDetail, detailPage, isFieldAll, isSuggestAll, setFieldAll, setSuggestAll } from './themes-state';
+import { applyOrder, closeDetail, detailPage, editMode, isFieldAll, menuOrder, saveOrder, setFieldAll } from './themes-state';
 import './layers-panel.css';
 
-type Row = { l: KarteLayer; def: LayerDef };
-
-/** Suggestions shown before "n weitere anzeigen". */
-const SUGGEST_LIMIT = 6;
 const FIELD_LIMIT = 6;
 const FROM = 'Karte';
 const isField = (d: LayerDef | undefined) => d?.exclusive === 'field';
@@ -36,38 +32,102 @@ function navKey(e: KeyboardEvent) {
   next.focus();
 }
 
-/** All switched-on layers of the Karte, sortable by the grip (Alt+↑/↓ from the keyboard). */
-function ActiveSection({ karte, rows }: { karte: Karte; rows: Row[] }) {
+interface Group { id: string; title?: string; ids: string[] }
+
+const OTHER = '_other';
+
+/** Groups of the menu: the Karte's themes (own order applied), plus the layers that belong to no theme. */
+function buildGroups(k: Karte): Group[] {
+  const saved = menuOrder.value[k.id];
+  const seen = new Set<string>();
+  const usable = (id: string) => {
+    const d = getLayer(id);
+    return !!d && !isField(d);
+  };
+  const groups: Group[] = (k.themes ?? [])
+    .map((t) => ({ id: t.id, title: t.title, ids: applyOrder(t.layers.filter((id) => usable(id) && !seen.has(id) && seen.add(id)), saved?.layers?.[t.id]) }))
+    .filter((g) => g.ids.length);
+  const rest = k.layers.filter((l) => usable(l.id) && !seen.has(l.id)).map((l) => l.id);
+  if (rest.length) groups.push({ id: OTHER, title: groups.length ? 'Weitere' : undefined, ids: rest });
+  return applyOrder(groups.map((g) => g.id), saved?.groups).map((id) => groups.find((g) => g.id === id)!);
+}
+
+/** One group: optional title (with grip in edit mode) and its layers; they are toggled by a click, sortable in edit mode. */
+function GroupBlock({ karte, group, index, count, onGrip }: { karte: Karte; group: Group; index: number; count: number; onGrip?: (e: PointerEvent) => void }) {
   const list = useRef<HTMLUListElement>(null);
   const flipPrev = useFlip(list);
+  const edit = editMode.value;
+  const ids = group.ids;
   const move = (id: string, to: number) => {
-    moveLayer(karte.id, id, karte.layers.findIndex((x) => x.id === rows[to]?.l.id));
-    reorderMessage.value = `${getLayer(id)?.title ?? id}, Position ${to + 1} von ${rows.length}`;
+    if (group.id === OTHER) moveLayer(karte.id, id, karte.layers.findIndex((x) => x.id === ids[to]));
+    else {
+      const next = ids.filter((x) => x !== id);
+      next.splice(to, 0, id);
+      saveOrder(karte.id, { group: { id: group.id, ids: next } });
+    }
+    reorderMessage.value = `${getLayer(id)?.title ?? id}, Position ${to + 1} von ${ids.length}`;
   };
   return (
-    <section class="lsec">
-      <h3 class="lsec-title">Aktiv</h3>
-      {rows.length > 0 ? (
-        <ul class="llist" role="list" ref={list} aria-label={`Aktive Ebenen in ${karte.name}`}>
-          {rows.map(({ l, def }, i) => (
+    <div class="lgrp" data-key={group.id}>
+      {group.title && (
+        <div class={cx('lgrp-head', edit && 'is-draggable')} onPointerDown={edit ? onGrip : undefined}>
+          {edit && onGrip && (
+            <button type="button" class="lrow-grip lgrp-grip" aria-label={`Kategorie ${group.title} verschieben. Position ${index + 1} von ${count}.`} disabled={count < 2}>
+              <Icon name="grip" size={16} />
+            </button>
+          )}
+          <h4 class="lgrp-title">{group.title}</h4>
+        </div>
+      )}
+      <ul class="llist" role="list" ref={list} aria-label={group.title ?? `Ebenen in ${karte.name}`}>
+        {ids.map((id, i) => {
+          const def = getLayer(id)!;
+          return (
             <LayerRow
-              key={def.id}
-              layer={l}
+              key={id}
+              layer={layerOf(karte, id)}
               def={def}
               karteId={karte.id}
               from={FROM}
               index={i}
-              count={rows.length}
-              onGrip={(e) => startRowDrag(e, def.id, { list, flipPrev, onDrop: (id, to) => move(id, to) })}
-              onKeyMove={(dir) => {
-                const to = i + dir;
-                if (to >= 0 && to < rows.length) move(def.id, to);
-              }}
+              count={ids.length}
+              onGrip={edit ? (e) => startRowDrag(e, id, { list, flipPrev, onDrop: (key, to) => move(key, to) }) : undefined}
+              onKeyMove={edit ? (dir) => i + dir >= 0 && i + dir < ids.length && move(id, i + dir) : undefined}
+            />
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** All layers of the Karte, grouped by category. Active rows stay in place (background only); groups are sortable in edit mode. */
+function MenuSection({ karte, groups }: { karte: Karte; groups: Group[] }) {
+  const box = useRef<HTMLDivElement>(null);
+  const flipPrev = useFlip(box);
+  const moveGroup = (id: string, to: number) => {
+    const next = groups.map((g) => g.id).filter((x) => x !== id);
+    next.splice(to, 0, id);
+    saveOrder(karte.id, { groups: next });
+    reorderMessage.value = `${groups.find((g) => g.id === id)?.title ?? 'Ebenen'}, Position ${to + 1} von ${groups.length}`;
+  };
+  return (
+    <section class="lsec">
+      {groups.length > 0 ? (
+        <div class="lgroups" ref={box}>
+          {groups.map((g, i) => (
+            <GroupBlock
+              key={g.id}
+              karte={karte}
+              group={g}
+              index={i}
+              count={groups.length}
+              onGrip={(e) => startRowDrag(e, g.id, { list: box, flipPrev, onDrop: moveGroup })}
             />
           ))}
-        </ul>
+        </div>
       ) : (
-        <p class="lsec-empty">Schalte unten eine Ebene ein.</p>
+        <p class="lsec-empty">Noch keine Ebenen. Füge unten eine hinzu.</p>
       )}
       <div class="sr-only" role="status" aria-live="polite">
         {reorderMessage.value}
@@ -132,44 +192,6 @@ function FieldSection({ karte, fields }: { karte: Karte; fields: LayerDef[] }) {
   );
 }
 
-/** Layers of the Karte's themes that are not active, grouped by theme; the first few, then "n weitere anzeigen". */
-function SuggestSection({ karte, activeIds }: { karte: Karte; activeIds: Set<string> }) {
-  const all = isSuggestAll(karte.id);
-  const seen = new Set<string>();
-  const groups = (karte.themes ?? [])
-    .map((t) => ({
-      id: t.id,
-      title: t.title,
-      rows: t.layers.filter((id) => !activeIds.has(id) && !seen.has(id) && seen.add(id)).map((id) => getLayer(id)).filter((d): d is LayerDef => !!d && !isField(d)),
-    }))
-    .filter((g) => g.rows.length);
-  const total = groups.reduce((n, g) => n + g.rows.length, 0);
-  if (total === 0) return null;
-  let left = all ? Infinity : SUGGEST_LIMIT;
-  const shown = groups.map((g) => ({ ...g, rows: g.rows.slice(0, Math.max(0, left)), skip: (left -= g.rows.length) })).filter((g) => g.rows.length);
-  const hidden = all ? 0 : Math.max(0, total - SUGGEST_LIMIT);
-  return (
-    <section class="lsec">
-      <h3 class="lsec-title">Passt zu dieser Karte</h3>
-      {shown.map((g) => (
-        <div key={g.id} class="lgrp">
-          <h4 class="lgrp-title">{g.title}</h4>
-          <ul class="llist" role="list" aria-label={g.title}>
-            {g.rows.map((def) => (
-              <SuggestRow key={def.id} def={def} karteId={karte.id} />
-            ))}
-          </ul>
-        </div>
-      ))}
-      {(hidden > 0 || all) && (
-        <button type="button" class="lmore" data-nav aria-expanded={all} onClick={() => setSuggestAll(karte.id, !all)}>
-          {all ? 'Weniger anzeigen' : `${hidden} weitere anzeigen`}
-        </button>
-      )}
-    </section>
-  );
-}
-
 /** Left menu of the active Karte: active layers, suggestions from its themes, catalog entry, detail page (push). */
 export function LayersList() {
   const k = activeKarte.value;
@@ -199,15 +221,12 @@ export function LayersList() {
     );
   }
 
-  const active = k.layers.filter((l) => l.visible).map((l) => ({ l, def: getLayer(l.id) })).filter((r): r is Row => !!r.def && !isField(r.def));
   const fieldIds = [...new Set([...(k.themes ?? []).flatMap((t) => t.layers), ...k.layers.map((l) => l.id)])];
   const fields = fieldIds.map((id) => getLayer(id)).filter((d): d is LayerDef => isField(d));
-  const activeIds = new Set(active.map((r) => r.def.id));
   return (
     <div class="lnav" ref={root} onKeyDown={navKey} key="list">
-      <ActiveSection karte={k} rows={active} />
+      <MenuSection karte={k} groups={buildGroups(k)} />
       <FieldSection karte={k} fields={fields} />
-      <SuggestSection karte={k} activeIds={activeIds} />
       {isMobile.value && (
       <section class="lsec">
         <h3 class="lsec-title">Alle Ebenen</h3>

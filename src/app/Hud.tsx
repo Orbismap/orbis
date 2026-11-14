@@ -9,7 +9,7 @@ import { openDetail } from '../features/layers-panel/themes-state';
 import { selectCard, setProbe } from '../state/selection';
 import { InspectorCard } from '../features/inspector/Inspector';
 import { KartenChangeRow, KartenPopover } from '../features/karten-bar/actions';
-import { detailPage } from '../features/layers-panel/themes-state';
+import { detailPage, editMode } from '../features/layers-panel/themes-state';
 import { PlaceCard } from '../features/place/PlaceCard';
 import { ProbeCard } from '../features/probe/ProbeCard';
 import '../features/karten-bar/karten-bar.css';
@@ -322,7 +322,7 @@ function Grip() {
   );
 }
 
-/** Floating capsule at the bottom of the Karte detail: add a layer, edit the Karte. */
+/** Floating capsule at the bottom of the Karte detail: add a layer, reorder (pencil), Karte actions. */
 function BottomBar() {
   const k = activeKarte.value;
   const [menu, setMenu] = useState(false);
@@ -334,7 +334,8 @@ function BottomBar() {
       </div>
       <div class="hudd-fbar" ref={bar} role="group" aria-label="Karte">
         <IconButton icon="plus-square" size={21} label="Ebene hinzufügen" onClick={() => ((setMenu(false)), (leftView.value = 'catalog'))} />
-        <IconButton icon="pencil" size={21} label="Karte bearbeiten" pressed={menu} onClick={() => setMenu(!menu)} />
+        <IconButton icon="pencil" size={21} label="Reihenfolge bearbeiten" pressed={editMode.value} onClick={() => (editMode.value = !editMode.value)} />
+        <IconButton icon="more" size={21} label="Karte bearbeiten" pressed={menu} onClick={() => setMenu(!menu)} />
       </div>
     </>
   );

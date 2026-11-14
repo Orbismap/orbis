@@ -530,3 +530,216 @@
     }
   }
 }
+
+@layer features {
+  /* all layers in one list: active rows keep their place and only get a background */
+  .lrow.is-on {
+    background: color-mix(in srgb, var(--limb) 14%, transparent);
+    border-radius: var(--r-input);
+  }
+  .lrow.is-on::before,
+  .lrow.is-on + .lrow::before {
+    display: none;
+  }
+  .lrow-head[role='switch'] {
+    cursor: pointer;
+    padding-left: 2px;
+  }
+  .lgrp {
+    position: relative;
+  }
+  .lgrp.is-dragging {
+    z-index: 3;
+    background: color-mix(in srgb, var(--ink-1) 92%, var(--text-1));
+    box-shadow: var(--g-shadow-sm);
+    border-radius: var(--r-input);
+    transition: none;
+  }
+  .lgroups.is-reordering {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .lgrp-head {
+    display: flex;
+    align-items: center;
+    padding-left: 6px;
+  }
+  .lgrp-head .lgrp-title {
+    margin-left: var(--s-3);
+  }
+  .lgrp-head .lgrp-grip {
+    margin-left: 0;
+    margin-top: var(--s-2);
+    opacity: 0.8;
+  }
+  .lgrp-head .lgrp-grip + .lgrp-title {
+    margin-left: 2px;
+  }
+}
+
+@layer features {
+  /* vertical three dots; on hover devices only shown while the row is hovered or focused (no space otherwise) */
+  .lrow-set .icon {
+    transform: rotate(90deg);
+    stroke-width: 2.5;
+  }
+  @media (hover: hover) {
+    /* collapsed to zero width (not display: none) so the neighbours slide when it appears */
+    .lrow:not(.lfield) .lrow-set {
+      display: grid;
+      width: 0;
+      min-width: 0;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transition: width 180ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 140ms ease-out;
+    }
+    .lrow:not(.lfield):hover .lrow-set,
+    .lrow:not(.lfield):has(:focus-visible) .lrow-set {
+      width: 22px;
+      margin-right: -2px;
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+  @media (hover: hover) and (prefers-reduced-motion: reduce) {
+    .lrow:not(.lfield) .lrow-set {
+      transition: none;
+    }
+  }
+}
+
+@layer features {
+  /* fixed row height: status lines, key button, loading strip or hover dots never change it, so the list stays put */
+  .lrow {
+    content-visibility: visible;
+    contain-intrinsic-size: none;
+  }
+  .lrow-main {
+    height: max(33px, var(--hit, 28px));
+    min-height: 0;
+  }
+  .lrow-head {
+    min-height: 0;
+  }
+  .lrow-keybtn {
+    align-self: center;
+    max-height: 100%;
+  }
+}
+
+@layer features {
+  /* key button: same element on and off; off = bare icon, on = background fades in and the text slides out */
+  .lrow-keybtn {
+    gap: 0;
+    padding: 0 4px;
+    background: transparent;
+    transition: background 200ms ease-out, padding 200ms ease-out;
+  }
+  .lrow-keybtn-text {
+    display: inline-block;
+    overflow: hidden;
+    white-space: nowrap;
+    max-width: 0;
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: max-width 220ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms ease-out, transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), margin 220ms ease-out;
+  }
+  .lrow-keybtn:not(.is-icon) {
+    background: var(--boost-soft);
+    padding: 0 8px 0 6px;
+  }
+  .lrow-keybtn:not(.is-icon) .lrow-keybtn-text {
+    max-width: 80px;
+    margin-left: 4px;
+    opacity: 1;
+    transform: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lrow-keybtn,
+    .lrow-keybtn-text {
+      transition: none;
+    }
+  }
+}
+
+@layer features {
+  /* edit mode: rows and group titles are dragged anywhere, not only by the grip */
+  .lrow-head.is-draggable,
+  .lgrp-head.is-draggable {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .lrow.is-dragging .lrow-head,
+  .lgrp.is-dragging .lgrp-head {
+    cursor: grabbing;
+  }
+}
+
+@layer features {
+  /* hover feedback on the three dots: round background */
+  .lrow-set {
+    align-self: center;
+    height: 26px;
+    border-radius: 7px;
+    transition: background 120ms ease-out, color 120ms ease-out;
+  }
+  @media (hover: hover) {
+    .lrow:not(.lfield) .lrow-set:hover,
+    .lrow-set:hover {
+      background: color-mix(in srgb, var(--text-1) 14%, transparent);
+      color: var(--text-1);
+    }
+  }
+}
+
+@layer features {
+  /* hover feedback on the key button (off: background appears, on: it gets stronger) */
+  @media (hover: hover) {
+    .lrow-keybtn.is-icon:hover {
+      background: var(--boost-soft);
+    }
+    .lrow-keybtn:not(.is-icon):hover {
+      background: color-mix(in srgb, var(--boost) 26%, transparent);
+    }
+  }
+}
+
+@layer features {
+  /* status line opens/closes under the title (grid 0fr <-> 1fr); the title slides up/down with it */
+  .lrow-subw {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 220ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms ease-out;
+  }
+  .lrow-subw.is-open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    animation: lrow-sub-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .lrow-subi {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+  }
+  .lrow-subi > .lrow-sub {
+    min-width: 0;
+  }
+  @keyframes lrow-sub-in {
+    from {
+      grid-template-rows: 0fr;
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lrow-subw {
+      transition: none;
+    }
+    .lrow-subw.is-open {
+      animation: none;
+    }
+  }
+}

@@ -144,16 +144,8 @@
 }
 
 @layer materials {
-  /* desktop layer rows: no switch (a row sits in "Aktiv" or in the suggestions), age as tooltip, hide button only on hover (a click on the row opens the settings) */
-  .hud-desktop .lrow-switch,
+  /* desktop layer rows: a click toggles the layer, age as tooltip, three dots open the settings */
   .hud-desktop .lrow-trail { display: none; }
-  .hud-desktop .lrow.is-suggest { cursor: pointer; }
-  .lrow-hide { flex: none; align-self: stretch; display: grid; place-items: center; min-width: 28px; color: var(--text-2); }
-  @media (hover: hover) {
-    .lrow-hide { opacity: 0; transition: opacity 120ms; }
-    .lrow:hover .lrow-hide, .lrow-hide:focus-visible { opacity: 1; }
-    .lrow-hide:hover { color: var(--text-1); }
-  }
 }
 
 @layer materials {
