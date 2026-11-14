@@ -13,6 +13,8 @@ export interface PlaneState {
   id: string;
   label: string;
   model: PlaneModel;
+  /** ICAO type designator ('' unknown): picks a detailed model (aircraft-models.ts) */
+  type: string;
   emergency: boolean;
   military: boolean;
   ground: boolean;
@@ -50,6 +52,8 @@ export const MAX_EXTRAPOLATE_S = 300;
 export const LOW_ALT_M = 150;
 export const LOW_ALT_MAX_S = 30;
 export const TRAIL_MAX = 150;
+/** a gap this long between two live reports ends the trail: the aircraft was out of the detailed view, and a straight line across the gap would be a lie */
+export const TRAIL_GAP_MS = 45_000;
 const M_PER_DEG = 111320;
 /** a position closer than this to the last trail point adds nothing (m); on the ground less */
 const TRAIL_STEP_M = 30;
@@ -107,7 +111,7 @@ export class PlaneTracker {
       const age = Math.max(0, Math.min(MAX_EXTRAPOLATE_S * 1000, epoch - s.t));
       const at = now - age;
       const prev = this.planes.get(s.id);
-      const common = { label: s.label, model: modelOf(s), emergency: s.emergency, military: s.military, ground: s.ground, color: Number.parseInt(s.color.slice(1), 16) || 0xffffff, lon: s.lng, lat: s.lat, altM: s.altM, vsMs: s.vrMs, track, speedMs: s.speedMs, at, fixEpoch: s.t, seen: now, live: !!s.live };
+      const common = { label: s.label, model: modelOf(s), type: s.type || prev?.type || '', emergency: s.emergency, military: s.military, ground: s.ground, color: Number.parseInt(s.color.slice(1), 16) || 0xffffff, lon: s.lng, lat: s.lat, altM: s.altM, vsMs: s.vrMs, track, speedMs: s.speedMs, at, fixEpoch: s.t, seen: now, live: !!s.live };
       if (!prev) {
         const state: PlaneState = { id: s.id, ...common, dLon: s.lng, dLat: s.lat, dAlt: s.altM, dTrack: track, trail: s.live ? [[s.lng, s.lat, trailAlt(s.ground, s.altM), at]] : [] };
         const t = targetOf(state, now);
@@ -120,7 +124,11 @@ export class PlaneTracker {
       prev.seen = now;
       // the same fix again, or an older one (the overview after the detailed view): nothing new
       if (s.t <= prev.fixEpoch) continue;
-      const last = prev.trail[prev.trail.length - 1];
+      let last = prev.trail[prev.trail.length - 1];
+      if (s.live && last && at - last[3] > TRAIL_GAP_MS) {
+        prev.trail.length = 0;
+        last = undefined;
+      }
       // the trail comes from live data only (not the overview snapshot); an aircraft that did not move since the last report adds no point
       if (s.live && (!last || metres(last[0], last[1], s.lng, s.lat) >= (s.ground ? TRAIL_STEP_GROUND_M : TRAIL_STEP_M))) {
         prev.trail.push([s.lng, s.lat, trailAlt(s.ground, s.altM), at]);

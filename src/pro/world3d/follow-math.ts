@@ -73,7 +73,9 @@ export function slerp(a: [number, number], b: [number, number], k: number): [num
 // independent of latitude: the zoom of the map is this plus log2(cos lat). `t`: how much of a globe the map is.
 
 const MIN_GAP_RADII = 0.1;
-const MIN_GAP_SHARE = 0.3;
+const MIN_GAP_SHARE = 0.05;
+/** ...but never more than this (m): even at cruise altitude the camera may get this close */
+const MAX_GAP_M = 550;
 const MAX_CENTRE_LAT = 85;
 
 /** Camera distance in earth radii at zoom 0; `toCentre`: the camera's distance to the map centre in pixels. */
@@ -95,7 +97,7 @@ export function distanceZoomFor(mapZoom: number, altM: number, pitch: number, t:
 
 /** The nearest the camera may get on the globe, as a zoom of the distance; the same from every side. */
 export function maxDistanceZoom(altM: number, toCentre: number): number {
-  const gap = Math.min(MIN_GAP_RADII, (altM / EARTH_RADIUS_M) * MIN_GAP_SHARE);
+  const gap = Math.min(MIN_GAP_RADII, (altM / EARTH_RADIUS_M) * MIN_GAP_SHARE, MAX_GAP_M / EARTH_RADIUS_M);
   return gap > 0 ? Math.log2(distanceAtZoom0(toCentre) / gap) : Infinity;
 }
 

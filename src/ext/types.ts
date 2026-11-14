@@ -24,6 +24,8 @@ export interface TrackSample {
   heli: boolean;
   /** ADS-B emitter category (A1 … A7, B…), '' when unknown */
   category: string;
+  /** ICAO aircraft type designator (B738, A320 …), when known; selects a detailed 3D model */
+  type?: string;
   emergency: boolean;
   military: boolean;
   /** colour of the 2D icon as '#rrggbb' (altitude, military, emergency), so both presentations agree */

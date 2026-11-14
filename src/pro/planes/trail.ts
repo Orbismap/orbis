@@ -9,7 +9,7 @@ import type { PlaneState } from './smoothing';
 
 export const TRAIL_COLOR = '#ff6a2b';
 /** a trail fades out over this time (the one of the selected aircraft stays complete) */
-export const TRAIL_FADE_MS = 60_000;
+export const TRAIL_FADE_MS = 20_000;
 /** the wall below a trail only exists at low altitude (take-off, landing, helicopters): full below, gone above */
 export const WALL_FULL_M = 800;
 export const WALL_MAX_M = 1500;

@@ -87,6 +87,15 @@ describe('trail from live data only', () => {
     t.feed([sample()], NOW, EPOCH);
     expect(t.planes.get('abc123')!.trail).toHaveLength(1);
   });
+  it('a long gap between live reports starts the trail anew instead of bridging it', () => {
+    const t = new PlaneTracker();
+    t.feed([sample()], NOW, EPOCH);
+    t.feed([sample({ lng: 10.1, t: EPOCH + 10_000 })], NOW + 10_000, EPOCH + 10_000);
+    expect(t.planes.get('abc123')!.trail).toHaveLength(2);
+    // 2 minutes without a live report, then one far away
+    t.feed([sample({ lng: 12, t: EPOCH + 130_000 })], NOW + 130_000, EPOCH + 130_000);
+    expect(t.planes.get('abc123')!.trail).toHaveLength(1);
+  });
 });
 
 describe('easing to a new report', () => {
