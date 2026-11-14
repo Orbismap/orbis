@@ -6,7 +6,7 @@ import { inQuad, segmentDistance, type Point } from '../world3d/hit';
 import { GeoInstances } from '../world3d/instances';
 import { outlineMaterial } from '../world3d/outline';
 import type { Stage, StagePart } from '../world3d/stage';
-import { hullGeometries, planeGeometries } from './models';
+import { hullGeometries, MAX_SPINNERS, MODEL_BOOST, MODEL_MIN_SCALE, MODEL_COLOR, MODEL_PARTS, planeGeometries, SPINNERS, spinnerGeometries } from './models';
 import { PlaneTracker, type PlaneState } from './smoothing';
 import { growScale, sizeScale, stepGrow } from '../world3d/size';
 import { TrailRig, TRAIL_FADE_MS, WALL_MAX_M } from './trail';
@@ -35,6 +35,10 @@ const PICK_SHADOW_PX = 18;
 const PICK_MIN_PX = 8;
 const PICK_LINE_PX = 6;
 
+/** the models of ordinary aircraft; helicopters, drones and vehicles are drawn this much larger when none of these is shown */
+const REGULAR_MODELS = new Set(['light', 'narrow', 'wide']);
+const ONLY_SPECIAL_SCALE = 2;
+
 const FLATTEN = new THREE.Matrix4().makeScale(1, 1, 0.002);
 
 export class PlanesPart implements StagePart {
@@ -47,6 +51,13 @@ export class PlanesPart implements StagePart {
   private hovered: string | null = null;
   private active = false;
   private models = new GeoInstances(planeGeometries());
+  /** the turning rotors (helicopters, drones): own instances, turned about their pivot every frame */
+  private rotors = new GeoInstances(spinnerGeometries());
+  /** only helicopters, drones and vehicles are shown (e.g. the layer's filter): they are drawn larger then */
+  private onlySpecial = false;
+  private pivot = new THREE.Matrix4();
+  private turn = new THREE.Matrix4();
+  private spun = new THREE.Matrix4();
   private shadows: GeoInstances;
   /** inverted hull of the selected aircraft: the model's back faces, pushed out along their normals */
   private outline: GeoInstances;
@@ -85,7 +96,7 @@ export class PlanesPart implements StagePart {
     this.outline.object.renderOrder = 1;
     this.drops.frustumCulled = false;
     this.drops.renderOrder = 2;
-    this.object.add(this.models.object, this.outline.object, this.shadows.object, this.drops);
+    this.object.add(this.models.object, this.rotors.object, this.outline.object, this.shadows.object, this.drops);
     this.object.visible = false;
     this.labelBox.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1';
     this.label.style.cssText =
@@ -113,7 +124,10 @@ export class PlanesPart implements StagePart {
   /** A new list of reports (the channel publishes the whole filtered list). */
   feed(items: readonly TrackSample[]) {
     if (!items.length) this.tracker.clear(); // the layer is off or has nothing: no grace time
-    else this.tracker.feed(items, performance.now(), Date.now());
+    else {
+      this.tracker.feed(items, performance.now(), Date.now());
+      this.onlySpecial = ![...this.tracker.planes.values()].some((p) => REGULAR_MODELS.has(p.model));
+    }
     this.stage.wake();
   }
 
@@ -165,6 +179,7 @@ export class PlanesPart implements StagePart {
     this.shadowHits = [];
     this.dropHits = [];
     this.models.start(frame, this.tracker.planes.size);
+    this.rotors.start(frame, this.tracker.planes.size * MAX_SPINNERS);
     this.shadows.start(frame, this.tracker.planes.size);
     this.outline.start(frame, 1);
     const dropPos: number[] = [];
@@ -177,10 +192,11 @@ export class PlanesPart implements StagePart {
       const air = !p.ground && p.dAlt > 3;
       // metres per screen pixel: the models keep a readable size when zoomed out
       const k = growScale(zoom, this.grow.get(p.id) ?? 0);
-      const boost = Math.max(1, share * frame.metresPerPixel(p.dLon, p.dLat, alt)) * k;
+      const boost = Math.max(MODEL_MIN_SCALE[p.model] ?? 1, share * (MODEL_BOOST[p.model] ?? 1) * frame.metresPerPixel(p.dLon, p.dLat, alt)) * k * (this.onlySpecial ? ONLY_SPECIAL_SCALE : 1);
       const color = p.color;
       frame.place(this.matrix, p.dLon, p.dLat, alt, p.dTrack, boost);
-      this.models.add(p.model, this.matrix, color);
+      this.models.add(p.model, this.matrix, MODEL_COLOR[p.model] ?? color);
+      this.addParts(p, now);
       if (p.id === this.selected) {
         // constant in screen pixels: the offset is in model units, which the instance matrix scales by `boost`
         this.outlineWidth.value = (OUTLINE_PX * frame.metresPerPixel(p.dLon, p.dLat, alt)) / boost;
@@ -203,9 +219,11 @@ export class PlanesPart implements StagePart {
       }
     }
     this.models.finish();
+    this.rotors.finish();
     this.shadows.finish();
     this.outline.finish();
     this.models.update(frame);
+    this.rotors.update(frame);
     this.outline.update(frame);
     this.shadows.update(frame);
     this.setDrops(dropPos);
@@ -227,6 +245,31 @@ export class PlanesPart implements StagePart {
     }
     this.syncLabel(frame);
     return visible.length > 0 || growing;
+  }
+
+  /** The extra instances of a model (glass, wheels, flashing beacon) and its turning rotors, placed like the model (`this.matrix`). */
+  private addParts(p: PlaneState, now: number) {
+    for (const part of MODEL_PARTS[p.model] ?? []) {
+      let c = part.color;
+      if (part.beacon) {
+        // flashes about twice a second; each vehicle with its own phase
+        const on = Math.sin(now / 160 + (p.id.charCodeAt(p.id.length - 1) || 0)) > 0;
+        c = on ? part.color : (part.color >> 1) & 0x7f7f7f;
+      }
+      this.models.add(part.key, this.matrix, c);
+    }
+    const spinners = SPINNERS[p.model];
+    // an aircraft standing on the ground does not turn its rotors
+    if (!spinners || (p.ground && p.speedMs < 1)) return;
+    const phase = (p.id.charCodeAt(0) || 0) * 0.7;
+    for (const sp of spinners) {
+      const angle = (now / 1000) * sp.rps * Math.PI * 2 + phase;
+      this.pivot.makeTranslation(sp.pivot[0], sp.pivot[1], sp.pivot[2]);
+      if (sp.axis === 'z') this.turn.makeRotationZ(angle);
+      else this.turn.makeRotationX(angle);
+      this.spun.copy(this.matrix).multiply(this.pivot).multiply(this.turn);
+      this.rotors.add(sp.key, this.spun, sp.color);
+    }
   }
 
   private chooseTrails(visible: PlaneState[], centre: { lng: number; lat: number }) {
@@ -364,6 +407,7 @@ export class PlanesPart implements StagePart {
   dispose() {
     this.dropRigs(() => true);
     this.models.dispose();
+    this.rotors.dispose();
     this.shadows.dispose();
     this.outline.dispose();
     this.drops.geometry.dispose();

@@ -1,7 +1,7 @@
 // trackLayer: moving objects (aircraft, ships, satellites). Positions are dead-reckoned between data updates and pushed
 // to the map at most 10 Hz, only while the tab is visible.
 import { effect, signal, type ReadonlySignal } from '@preact/signals';
-import type { FilterSpecification } from 'maplibre-gl';
+import type { ExpressionSpecification, FilterSpecification } from 'maplibre-gl';
 import type { Feature, FeatureCollection, Point } from 'geojson';
 import { destination } from '../core/geo';
 import type { Resource } from '../data/resource';
@@ -33,7 +33,7 @@ export interface TrackLayerOptions {
   name?: string;
   color: Dyn<string | Expr>;
   /** Icon of the objects; rotated by heading unless `rotate` is given. */
-  symbol: { icon: string; size: Dyn<NumOrExpr>; rotate?: Dyn<NumOrExpr> };
+  symbol: { icon: string; /** per-feature icon expression and the names it can give (all are loaded) */ iconExpr?: ExpressionSpecification; icons?: string[]; size: Dyn<NumOrExpr>; rotate?: Dyn<NumOrExpr> };
   /** Halo (outline) of the icons, same meaning as in pointLayer. */
   stroke?: { color: string; width: number };
   /** Radius of the selection ring in px, default 14. */
@@ -51,9 +51,16 @@ export interface TrackLayerOptions {
   count?: ReadonlySignal<number | undefined>;
 }
 
+/** Aircraft on the ground or below this height (m) that went silent have most likely landed: they stop soon. */
+export const LOW_ALT_M = 150;
+export const LOW_ALT_MAX_MS = 30_000;
+
 /** Position of a track `now`, assuming it keeps heading and speed. */
 export function extrapolate(t: TrackObject, now: number, maxMs: number): [number, number] {
   if (!t.speed || t.heading === undefined) return [t.lng, t.lat];
+  const p = t.props;
+  // aircraft (they carry `gnd` and `alt`): a silent one near the ground has landed, it does not fly on for minutes
+  if (p && 'gnd' in p && (p.gnd || (typeof p.alt === 'number' && p.alt < LOW_ALT_M))) maxMs = Math.min(maxMs, LOW_ALT_MAX_MS);
   const dt = Math.max(0, Math.min(now - t.t, maxMs));
   return destination([t.lng, t.lat], t.heading, (t.speed * dt) / 1000 / 1000);
 }
@@ -71,8 +78,8 @@ export function trackLayer(ctx: LayerContext, o: TrackLayerOptions): LayerHandle
   const slot = o.slot ?? 'points';
 
   engine.addSource(src, { type: 'geojson', data: EMPTY_FC, promoteId: 'id' });
-  ensureIcons(ml, [o.symbol.icon]);
-  const symbol: SymbolStyle = { icon: o.symbol.icon, size: peek(o.symbol.size), rotate: o.symbol.rotate === undefined ? ['get', 'heading'] : peek(o.symbol.rotate) };
+  ensureIcons(ml, [o.symbol.icon, ...(o.symbol.icons ?? [])]);
+  const symbol: SymbolStyle = { icon: o.symbol.icon, iconExpr: o.symbol.iconExpr, size: peek(o.symbol.size), rotate: o.symbol.rotate === undefined ? ['get', 'heading'] : peek(o.symbol.rotate) };
   const specs = pointSpecs(base, src, undefined, { radius: o.ringRadius ?? 14, color: peek(o.color), stroke: o.stroke, symbol, minZoom: o.minZoom }, andFilter(o.filter?.peek()), 'id');
   engine.addLayer(specs.main, slot);
   engine.addLayer(specs.ring, slot);

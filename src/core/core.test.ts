@@ -125,6 +125,15 @@ describe('url', () => {
     expect(parseHash(h)).toEqual(s);
     expect(parseHash('#/?p=1,2,%E0%A4%A').place).toBeUndefined();
   });
+  it('round-trips a followed aircraft or ship', () => {
+    const s = { view: { lat: 28.1882, lng: -82.1512, zoom: 15.27, bearing: 99, pitch: 65 }, globe: true, follow: { kind: 'flug' as const, id: '3c6444' } };
+    const h = serializeHash(s);
+    expect(h).toBe('#/@28.1882,-82.1512,15.27z,99b,65p?g=1&f=flug:3c6444');
+    expect(parseHash(h)).toEqual(s);
+    expect(parseHash('#/?f=schiff:244123456').follow).toEqual({ kind: 'schiff', id: '244123456' });
+    expect(parseHash('#/?f=auto:1').follow).toBeUndefined();
+    expect(parseHash('#/?f=flug:a%20b').follow).toBeUndefined();
+  });
   it('handles empty and broken hashes', () => {
     expect(parseHash('')).toEqual({});
     expect(parseHash('#/@abc')).toEqual({});

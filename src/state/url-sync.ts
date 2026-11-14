@@ -1,6 +1,7 @@
 // Hash <-> state. Reads the URL once at start (and on hashchange), writes throttled with replaceState.
 import { effect, batch } from '@preact/signals';
 import { throttle } from '../core/scheduler';
+import { followCurrent, followWanted } from '../ext/channels';
 import { parseHash, serializeHash, type UrlState } from '../core/url';
 import { editKarte, getKarte } from '../karten/store';
 import { hasLayer } from '../layers/registry';
@@ -31,6 +32,8 @@ export function applyUrlState(u: UrlState): void {
       }
     }
     if (u.time !== undefined) setTime(u.time);
+    // a new object each time: the same object asked for again starts the follow again
+    followWanted.value = u.follow ? { ...u.follow } : null;
     if (u.place && !isMobile.peek()) {
       const cur = place.peek();
       if (!cur || cur.title !== u.place.title || cur.lat !== u.place.lat || cur.lng !== u.place.lng) selectPlace({ id: `url:${u.place.title}`, title: u.place.title, subtitle: u.place.subtitle, lng: u.place.lng, lat: u.place.lat, kind: u.place.kind });
@@ -49,6 +52,7 @@ export function currentUrlState(): UrlState {
     layers: shown ? k.layers.filter((l) => l.visible).map((l) => l.id) : undefined,
     time: live.value ? undefined : time.value,
     globe: projection.value === 'globe',
+    follow: followCurrent.value ?? undefined,
     place: place.value ? { lat: place.value.lat, lng: place.value.lng, title: place.value.title, subtitle: place.value.subtitle, kind: place.value.kind } : undefined,
   };
 }

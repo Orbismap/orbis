@@ -6,7 +6,7 @@
 //  - `present()` only hides the layer's own icons; data, polling, selection and cards keep working.
 //  - When the last presenter releases (or the extension is disposed), the 2D presentation is back at once.
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
-import type { CardAction, ShipSample, TrackSample, TracksChannel } from './types';
+import type { CardAction, FollowRef, ShipSample, TrackSample, TracksChannel } from './types';
 
 /** The side of the layer: everything of `TracksChannel` plus what only the publishing layer may do. */
 export interface TracksPublisher<T = TrackSample> extends TracksChannel<T> {
@@ -99,3 +99,8 @@ export function createTracksChannel<T = TrackSample>(): TracksPublisher<T> {
 export const tracksChannel: TracksPublisher = createTracksChannel();
 /** The one channel for ships (layer `schiffe`). */
 export const shipsChannel: TracksPublisher<ShipSample> = createTracksChannel<ShipSample>();
+
+/** What the URL wants followed (written by the URL sync, read by the extension). */
+export const followWanted = signal<FollowRef | null>(null);
+/** What the extension follows right now (written by the extension, read by the URL sync). */
+export const followCurrent = signal<FollowRef | null>(null);

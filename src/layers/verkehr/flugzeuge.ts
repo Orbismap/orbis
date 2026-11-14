@@ -35,6 +35,9 @@ const CATEGORY: Record<string, string> = {
 };
 
 const color = ['case', ['get', 'emerg'], EMERGENCY, ['get', 'mil'], MILITARY, COLOR] as unknown as ExpressionSpecification;
+// helicopters, drones and airport vehicles have icons of their own (the 2D map shows the same kinds as the 3D models)
+const ICON_EXPR = ['case', ['get', 'heli'], 'helicopter', ['==', ['get', 'cat'], 'B6'], 'drone', ['in', ['get', 'cat'], ['literal', ['C1', 'C2']]], 'car', 'plane'] as unknown as ExpressionSpecification;
+const ICONS = ['helicopter', 'drone', 'car'];
 const size = ['interpolate', ['linear'], ['zoom'],
   3, ['case', ['get', 'emerg'], 0.42, ['get', 'heli'], 0.26, 0.3],
   8, ['case', ['get', 'emerg'], 0.6, ['get', 'heli'], 0.36, 0.45],
@@ -92,8 +95,9 @@ export default defineLayer({
   options: [
     { id: 'milOnly', label: 'Nur Militär', type: 'toggle', default: false },
     { id: 'minAlt', label: 'Mindesthöhe', type: 'range', min: 0, max: 12000, step: 500, default: 0, unit: 'm' },
-    { id: 'kind', label: 'Anzeigen', type: 'select', choices: [{ value: 'all', label: 'Alle Luftfahrzeuge' }, { value: 'heli', label: 'Nur Hubschrauber' }], default: 'all' },
+    { id: 'kind', label: 'Anzeigen', type: 'select', choices: [{ value: 'all', label: 'Alle Luftfahrzeuge' }, { value: 'heli', label: 'Nur Hubschrauber' }, { value: 'drone', label: 'Nur Drohnen' }, { value: 'vehicle', label: 'Nur Flughafenfahrzeuge' }], default: 'all' },
     { id: 'ground', label: 'Flugzeuge am Boden', type: 'toggle', default: false },
+    { id: 'vehicles', label: 'Flughafenfahrzeuge', type: 'toggle', default: true },
   ],
   legend: {
     type: 'classes',
@@ -132,9 +136,14 @@ export default defineLayer({
     const filter = computed<FilterSpecification | undefined>(() => {
       const o = ctx.options.value;
       const clauses: unknown[] = [];
-      if (!o.ground) clauses.push(['!', ['get', 'gnd']]);
+      const vehicle: unknown = ['in', ['get', 'cat'], ['literal', ['C1', 'C2']]];
+      const noVehicles = o.vehicles === false && o.kind !== 'vehicle';
+      if (!o.ground) clauses.push(noVehicles ? ['!', ['get', 'gnd']] : ['any', ['!', ['get', 'gnd']], vehicle]);
+      if (noVehicles) clauses.push(['!', vehicle]);
       if (Number(o.minAlt) > 0) clauses.push(['any', ['get', 'emerg'], ['>=', ['get', 'alt'], Number(o.minAlt)]]);
       if (o.kind === 'heli') clauses.push(['get', 'heli']);
+      if (o.kind === 'drone') clauses.push(['==', ['get', 'cat'], 'B6']);
+      if (o.kind === 'vehicle') clauses.push(vehicle);
       if (o.milOnly) clauses.push(['get', 'mil']);
       return clauses.length ? (['all', ...clauses] as FilterSpecification) : undefined;
     });
@@ -142,9 +151,13 @@ export default defineLayer({
       const o = ctx.options.peek();
       const min = Number(o.minAlt);
       const p = t.props as unknown as AircraftProps;
-      if (!o.ground && p.gnd) return false;
+      const vehicle = p.cat === 'C1' || p.cat === 'C2';
+      if (vehicle && o.vehicles === false && o.kind !== 'vehicle') return false;
+      if (!o.ground && p.gnd && !vehicle) return false;
       if (min > 0 && p.alt < min && !p.emerg) return false;
       if (o.kind === 'heli' && !p.heli) return false;
+      if (o.kind === 'drone' && p.cat !== 'B6') return false;
+      if (o.kind === 'vehicle' && !vehicle) return false;
       if (o.milOnly && !p.mil) return false;
       return true;
     };
@@ -156,7 +169,7 @@ export default defineLayer({
 
     // status of the layer: the overview below zoom 5, the detailed view above
     const stopStatus = effect(() => {
-      const wide = zoom.value < DETAIL_SHOW_ZOOM;
+      const wide = zoom.value < DETAIL_SHOW_ZOOM || detail.res.data.value === undefined;
       const list = wide ? world.value : detail.res.data.value;
       const note = wide
         ? oskDown.value ? (fallback.data.value ? 'Weltübersicht von OpenSky nicht verfügbar oder veraltet: Näherung aus Abfragen um große Drehkreuze' : 'Weltübersicht von OpenSky nicht verfügbar oder veraltet') : milRes.error.value
@@ -235,12 +248,13 @@ export default defineLayer({
     // --- channel for extensions (3D): the detailed view plus the rest of the overview, filtered like the 2D icons; built only while someone listens ---
     const samples = (): TrackSample[] => {
       const out: TrackSample[] = [];
+      const liveIds = new Set((detail.res.data.peek() ?? []).map((t) => t.id));
       for (const t of preferFirst(detail.res.data.peek() ?? [], world.peek() ?? [])) {
         if (!passes(t)) continue;
         const p = t.props as unknown as AircraftProps;
         out.push({
           id: t.id, lng: t.lng, lat: t.lat, altM: p.gnd ? 0 : p.alt, track: p.trk >= 0 ? p.trk : t.heading, speedMs: t.speed ?? 0, vrMs: p.vr,
-          ground: p.gnd, heli: p.heli, category: p.cat, emergency: p.emerg, military: p.mil, color: aircraftColor(p), label: p.call || p.reg || p.hex.toUpperCase(), t: t.t,
+          ground: p.gnd, heli: p.heli, category: p.cat, emergency: p.emerg, military: p.mil, color: aircraftColor(p), label: p.call || p.reg || p.hex.toUpperCase(), t: t.t, live: liveIds.has(t.id),
         });
       }
       return out;
@@ -309,7 +323,7 @@ export default defineLayer({
 
     // --- layers ---
     const worldH = trackLayer(silent, {
-      name: 'world', data: world, color, symbol: { icon: 'plane', size: worldSize }, ringRadius: 12, maxExtrapolateMs: 5 * MINUTE, tickMs: 2000,
+      name: 'world', data: world, color, symbol: { icon: 'plane', iconExpr: ICON_EXPR, icons: ICONS, size: worldSize }, ringRadius: 12, maxExtrapolateMs: 5 * MINUTE, tickMs: 2000,
       filter, describe, hidden: tracksChannel.presented,
       feed: (tracks) =>
         tracks.filter((t) => (t.props as unknown as AircraftProps).emerg).map((t) => {
@@ -318,14 +332,19 @@ export default defineLayer({
         }),
     });
     const detailH = trackLayer(silent, {
-      data: detail.res, color, symbol: { icon: 'plane', size }, ringRadius: 16, maxExtrapolateMs: 30_000, filter, minZoom: DETAIL_SHOW_ZOOM, describe, hidden: tracksChannel.presented,
+      data: detail.res, color, symbol: { icon: 'plane', iconExpr: ICON_EXPR, icons: ICONS, size }, ringRadius: 16, maxExtrapolateMs: 30_000, filter, minZoom: DETAIL_SHOW_ZOOM, describe, hidden: tracksChannel.presented,
     });
     // the overview ends where the detailed view starts (layer ranges are disjoint, so no aircraft is drawn twice)
-    for (const id of [`${ctx.id}.world-symbols`, `${ctx.id}.world-ring`]) if (ml.getLayer(id)) ml.setLayerZoomRange(id, 0, DETAIL_SHOW_ZOOM);
+    // Until the detailed view has data (still loading, or the proxy fails), the overview stays visible above zoom 5:
+    // slightly older positions are better than none. The detailed view takes over as soon as its first answer is in.
+    const stopRange = effect(() => {
+      const max = detail.res.data.value === undefined ? 24 : DETAIL_SHOW_ZOOM;
+      for (const id of [`${ctx.id}.world-symbols`, `${ctx.id}.world-ring`]) if (ml.getLayer(id)) ml.setLayerZoomRange(id, 0, max);
+    });
 
     return {
       destroy() {
-        stopStatus(); stopSel(); stopUpdate(); stopPublish(); stopSelectedId(); stopActions(); offSelect(); tracksChannel.reset(); stopRoute(); stopFallback(); stopRemember();
+        stopStatus(); stopSel(); stopUpdate(); stopPublish(); stopSelectedId(); stopActions(); offSelect(); tracksChannel.reset(); stopRoute(); stopFallback(); stopRemember(); stopRange();
         clearInterval(routeTimer);
         ml.off('zoomend', onZoom);
         ml.off('moveend', onZoom);

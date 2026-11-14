@@ -1,13 +1,17 @@
 // Orbis Pro: the 3D extension. Everything in this folder is independent of the base app except for the types in
 // ../ext/types (the contract) - it can move to its own repository unchanged (see docs/ARCHITECTURE.md, "Erweiterungen
 // und Orbis Pro"). three.js is imported only from here, so it ends up in its own lazy chunk.
-import type { ExtensionHost, OrbisExtension, TracksChannel } from '../ext/types';
+import { effect } from '@preact/signals';
+import type { ExtensionHost, FollowRef, OrbisExtension, TracksChannel } from '../ext/types';
 import { PlanesPart } from './planes/planes';
 import { ShipsPart } from './ships/ships';
 import { Follow } from './world3d/follow';
 import { Stage, type StagePart } from './world3d/stage';
 
 /** What the extension needs of a part that presents a channel (aircraft, ships). */
+/** how long a followed object from the URL is waited for (ms): the data may take a while to arrive */
+const FOLLOW_WAIT_MS = 90_000;
+
 interface TrackPart<T> extends StagePart {
   /** the object with the highlighted model */
   selected: string | null;
@@ -29,6 +33,34 @@ export const extension: OrbisExtension = {
     stage.add(planes);
     host.addCustomLayer(stage, 'points');
 
+    // Following from the URL: starts once the object is in the data (and selects it, so its card opens); ends when the URL
+    // no longer asks for it. What is followed is reported back, so the URL carries it.
+    let pending: { ref: FollowRef; until: number } | null = null;
+    const tryPending = () => {
+      if (!pending) return;
+      if (performance.now() > pending.until) { pending = null; return; }
+      const { ref } = pending;
+      const [part, channel] = ref.kind === 'flug' ? [planes, host.tracks] : [ships, host.ships];
+      if (!part.positionOf(ref.id)) return;
+      pending = null;
+      channel.select(ref.id);
+      follow.start(part, ref.id);
+    };
+    const stopWanted = effect(() => {
+      const ref = host.follow.wanted.value;
+      if (!ref) {
+        pending = null;
+        if (follow.id !== null) follow.stop();
+        return;
+      }
+      pending = { ref, until: performance.now() + FOLLOW_WAIT_MS };
+      tryPending();
+    });
+    const stopReport = follow.listen(() => {
+      const id = follow.id;
+      host.follow.report(id === null ? null : { kind: follow.followedPart === planes ? 'flug' : 'schiff', id });
+    });
+
     // One presenter per channel: 3D at every zoom as soon as the channel has something to show (the base's 2D icons
     // stay otherwise), its own selection, its own follow button. The channels know nothing of each other.
     const bind = <T>(channel: TracksChannel<T>, part: TrackPart<T>, size: () => number) => {
@@ -46,6 +78,7 @@ export const extension: OrbisExtension = {
       const unsubscribe = channel.subscribe((items) => {
         part.feed(items);
         evaluate();
+        tryPending();
       });
 
       // A click on a 3D object opens the real card of the layer; the object is highlighted.
@@ -86,6 +119,8 @@ export const extension: OrbisExtension = {
     const unbindPlanes = bind(host.tracks, planes, () => planes.tracker.planes.size);
     const unbindShips = bind(host.ships, ships, () => ships.tracker.ships.size);
     return () => {
+      stopWanted();
+      stopReport();
       unbindPlanes();
       unbindShips();
       follow.dispose();

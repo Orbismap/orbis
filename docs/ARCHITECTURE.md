@@ -366,7 +366,9 @@ Breakpoint), `settings` (Einheiten, Thema, Bewegung, Schlüssel).
 - Persistenz: `core/storage` (localStorage, versioniert, jede geladene Struktur wird validiert).
 - URL: `#/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&t=<iso>&g=1` – `core/url` liest beim
   Start und schreibt gedrosselt (`replaceState`, `state/url-sync.ts`). `t` entfällt im Live-Modus, `g=1` Globus,
-  `g=0` Mercator.
+  `g=0` Mercator. `f=flug:<hex>` / `f=schiff:<mmsi>`: das verfolgte Flugzeug oder Schiff (Orbis Pro, Follow-Kamera). Die
+  Erweiterung meldet es über `host.follow.report`, die URL fragt es über `host.follow.wanted` an; beim Laden wartet die
+  Erweiterung bis zu 90 s, bis das Objekt in den Daten ist, wählt es dann aus und folgt ihm.
 
 ### Ergänzungen des Fundaments
 
