@@ -87,7 +87,7 @@ export function autobahnCard(f: AnyFeature): InspectCard {
 export default defineLayer({
   id: 'autobahn',
   category: 'verkehr',
-  title: 'Autobahn: Staus & Baustellen',
+  title: 'Staus & Baustellen',
   summary: 'Staus, Sperrungen und Baustellen auf deutschen Autobahnen live',
   icon: 'car',
   color: '#ffb020',

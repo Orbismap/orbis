@@ -4,7 +4,7 @@ import type { CustomLayerInterface, LayerSpecification, SourceSpecification } fr
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { effect } from '@preact/signals';
 import { throttle } from '../core/scheduler';
-import { detailOpen } from '../state/hud';
+import { collapseKarteDetail } from '../state/hud';
 import { clearSelection, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
 import { camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
@@ -72,7 +72,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     ml,
     (at) => {
       if (isMobile.peek()) return setProbe(at);
-      if (at) (clearSelection(), (detailOpen.value = false));
+      if (at) (clearSelection(), collapseKarteDetail());
       else setProbe(null);
     },
     (at) => {

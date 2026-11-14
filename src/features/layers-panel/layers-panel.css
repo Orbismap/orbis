@@ -570,6 +570,7 @@
   .lgrp-head .lgrp-grip {
     margin-left: 0;
     margin-top: var(--s-2);
+    height: 14px; /* not taller than the title, so edit mode does not change the vertical spacing */
     opacity: 0.8;
   }
   .lgrp-head .lgrp-grip + .lgrp-title {
@@ -741,5 +742,28 @@
     .lrow-subw.is-open {
       animation: none;
     }
+  }
+}
+
+@layer features {
+  /* key button sits right behind the title; an empty filler keeps the rest of the row clickable and pushes the dots to the right */
+  .lrow-head { flex: 0 1 auto; }
+  .lrow-fill { flex: 1 1 0; align-self: stretch; min-width: 0; }
+  .lrow-keybtn { margin-left: 4px; }
+}
+
+@layer features {
+  /* edit mode: the grips grow in from zero width, so the rows slide to the right instead of jumping */
+  .lrow-grip { animation: lrow-grip-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  @keyframes lrow-grip-in {
+    from { width: 0; margin-left: 0; opacity: 0; }
+  }
+  /* the category title loses its left margin when the grip appears: animate that too, otherwise it jumps */
+  .lgrp-head .lgrp-grip + .lgrp-title { animation: lgrp-title-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  @keyframes lgrp-title-in {
+    from { margin-left: var(--s-3); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lrow-grip, .lgrp-head .lgrp-grip + .lgrp-title { animation: none; }
   }
 }

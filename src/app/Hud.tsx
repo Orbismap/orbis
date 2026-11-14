@@ -1,3 +1,4 @@
+import { getLayer } from '../layers/registry';
 import { createPortal } from 'preact/compat';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { localResults, placeResult } from '../features/search/results';
@@ -13,10 +14,11 @@ import { detailPage, editMode } from '../features/layers-panel/themes-state';
 import { PlaceCard } from '../features/place/PlaceCard';
 import { ProbeCard } from '../features/probe/ProbeCard';
 import '../features/karten-bar/karten-bar.css';
+import type { Karte } from '../karten/types';
 import { createKarte, isDirty, karten } from '../karten/store';
 import { clearSelection, inspector, place, probe, selectPlace } from '../state/selection';
 import { activeKarte, setActiveKarte } from '../state/session';
-import { closeKarteDetail, detailOpen, detailVisible, hudSearchFocus, HUD_DETAIL_W, HUD_GAP, HUD_MAIN_DEFAULT, hudMainWidth, setHudMainWidth } from '../state/hud';
+import { closeKarteDetail, collapseKarteDetail, collapsedKarten, dismissKarte, expandKarte, detailOpen, detailVisible, hudSearchFocus, HUD_DETAIL_W, HUD_GAP, HUD_MAIN_DEFAULT, hudMainWidth, setHudMainWidth } from '../state/hud';
 import { leftPanelOpen, leftView } from '../state/ui';
 import { Button, IconButton } from '../ui/Button';
 import { SettingsView } from '../features/settings/Settings';
@@ -362,7 +364,10 @@ function DetailPanel() {
       {!pushed && (
         <header class="hudd-head">
           <h2>{k.name}</h2>
-          <IconButton icon="close" label="Schließen" shortcut="Esc" class="hud-rbtn" onClick={closeKarteDetail} />
+          <span class="hudd-btns">
+            <IconButton icon="chevron-up" label="Einklappen" class="hud-rbtn" onClick={collapseKarteDetail} />
+            <IconButton icon="close" label="Schließen" shortcut="Esc" class="hud-rbtn" onClick={closeKarteDetail} />
+          </span>
         </header>
       )}
       {!pushed && <KartenChangeRow short />}
@@ -374,17 +379,63 @@ function DetailPanel() {
   );
 }
 
+/** Folded Karte: title, number of active layers, buttons to unfold and to close (layers off). */
+function CollapsedCard({ k }: { k: Karte }) {
+  const names = k.layers.filter((l) => l.visible).map((l) => getLayer(l.id)?.title ?? l.id);
+  const list = useRef<HTMLUListElement>(null);
+  const [hidden, setHidden] = useState(0);
+  const shownN = useRef(0); // keeps the number while the chip fades out
+  if (hidden > 0) shownN.current = hidden;
+  // chips that are not fully visible yet: shown as "+n" at the right end
+  useEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const measure = () => {
+      const edge = el.getBoundingClientRect().right;
+      // the "+n" chip counts the chips that are still completely out of view; it fades out as soon as the last one shows
+      setHidden([...el.children].filter((c) => c.getBoundingClientRect().left >= edge - 1).length);
+    };
+    measure();
+    el.addEventListener('scroll', measure, { passive: true });
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => (el.removeEventListener('scroll', measure), ro.disconnect());
+  }, [names.join('|')]);
+  return (
+    <Panel as="section" class="hudk" aria-label={k.name}>
+      <header class="hudk-head">
+        <h2>{k.name}</h2>
+        <IconButton icon="chevron-down" label="Ausklappen" class="hud-rbtn" onClick={() => expandKarte(k.id)} />
+        <IconButton icon="close" label="Schließen" class="hud-rbtn" onClick={() => dismissKarte(k.id)} />
+      </header>
+      <div class="hudk-wrap">
+        <ul class="hudk-list" aria-label="Aktive Ebenen" tabIndex={0} ref={list}>
+          {names.map((n, i) => (
+            <li key={i}>{n}</li>
+          ))}
+        </ul>
+        {shownN.current > 0 && (
+          <span class="hudk-more" data-on={hidden > 0} aria-hidden="true">
+            +{shownN.current}
+          </span>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
 /** Left HUD of the desktop layout: main menu (hideable, resizable) and, next to it, the detail menu. */
 export function LeftHud() {
   const open = leftPanelOpen.value;
   const detail = detailVisible.value;
+  const collapsed = collapsedKarten.value;
   return (
     <div class="hudl" data-main={open ? 'open' : 'closed'} style={{ '--hud-main-w': `${hudMainWidth.value}px`, '--hud-detail-w': `${HUD_DETAIL_W}px`, '--hud-gap': `${HUD_GAP}px` }}>
       <div class="hudl-main" {...(open ? {} : ({ inert: '' } as object))}>
         <MainPanel />
         <Grip />
       </div>
-      {detail && <DetailPanel />}
+      {detail ? <DetailPanel /> : collapsed.length > 0 && <div class="hudk-stack">{collapsed.map((k) => <CollapsedCard key={k.id} k={k} />)}</div>}
       {!open && (
         <Panel as="div" class="hudl-mini">
           <h1>
