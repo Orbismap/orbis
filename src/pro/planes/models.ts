@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { hullsOf } from '../world3d/outline';
 import type { PlaneModel } from './smoothing';
 
 // Procedural low-poly aircraft (metres, nose towards +y, x east, z up, wheels at z = 0). Ported from the old app's
@@ -92,39 +93,7 @@ export function planeGeometries(): Record<PlaneModel, THREE.BufferGeometry> {
   return { light: airliner(0.35), narrow: airliner(1), wide: airliner(1.68), heli: helicopter() };
 }
 
-/**
- * The same shapes for an outline (inverted hull): normals averaged over the corners that share a place, so that pushing
- * every vertex out along its normal keeps hard edges closed. The stored normals are used, not the winding: the mirrored
- * wing panels have the opposite winding.
- */
-function hull(g: THREE.BufferGeometry): THREE.BufferGeometry {
-  const pos = g.getAttribute('position') as THREE.BufferAttribute;
-  const nor = g.getAttribute('normal') as THREE.BufferAttribute;
-  const key = (i: number) => `${Math.round(pos.getX(i) * 1000)},${Math.round(pos.getY(i) * 1000)},${Math.round(pos.getZ(i) * 1000)}`;
-  const sums = new Map<string, THREE.Vector3>();
-  for (let i = 0; i < pos.count; i++) {
-    const k = key(i);
-    const s = sums.get(k) ?? sums.set(k, new THREE.Vector3()).get(k)!;
-    s.x += nor.getX(i);
-    s.y += nor.getY(i);
-    s.z += nor.getZ(i);
-  }
-  const out = g.clone();
-  const n = out.getAttribute('normal') as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i++) {
-    const s = sums.get(key(i))!.clone().normalize();
-    n.setXYZ(i, s.x, s.y, s.z);
-  }
-  return out;
-}
-
-/** One outline geometry per model (see `hull`); the caller owns them. */
+/** One outline geometry per model (see `hull` in world3d/outline); the caller owns them. */
 export function hullGeometries(): Record<PlaneModel, THREE.BufferGeometry> {
-  const g = planeGeometries();
-  const out = {} as Record<PlaneModel, THREE.BufferGeometry>;
-  for (const k of Object.keys(g) as PlaneModel[]) {
-    out[k] = hull(g[k]);
-    g[k].dispose();
-  }
-  return out;
+  return hullsOf(planeGeometries());
 }

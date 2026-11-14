@@ -394,7 +394,7 @@ Breakpoint), `settings` (Einheiten, Thema, Bewegung, Schlüssel).
 ## Erweiterungen und Orbis Pro
 
 Die Basis-App ist vollständig und läuft ohne Erweiterung. **Orbis Pro** ist die erste: eine 3D-Darstellung für
-ausgewählte Ebenen (Start: Flugzeuge). Pro liegt in `src/pro/`, wird nur bei eingeschaltetem Pro nachgeladen und kennt die
+ausgewählte Ebenen (Flugzeuge und Schiffe). Pro liegt in `src/pro/`, wird nur bei eingeschaltetem Pro nachgeladen und kennt die
 Basis ausschließlich über eine schmale Schnittstelle. Der Ordner kann später ohne Umbau in ein eigenes Repo wandern.
 
 ### Was die Basis garantiert
@@ -424,7 +424,8 @@ interface ExtensionHost {
   map: MlMap;                                   // MapLibre (nur Typ aus dem Paket)
   addCustomLayer(layer, slot: 'points' | 'labels' | 'top'): void;   removeLayer(id): void;
   projection: ReadonlySignal<'globe' | 'mercator'>;
-  tracks: TracksChannel;                        // Kanal für bewegte Objekte (Flugzeuge)
+  tracks: TracksChannel;                        // Kanal für bewegte Objekte: Flugzeuge (TrackSample)
+  ships: TracksChannel<ShipSample>;             // dasselbe für Schiffe
   reducedMotion(): boolean;
 }
 ```
@@ -436,7 +437,7 @@ kommen als neue Felder am Host oder als neuer Kanal dazu, nie als Import von Bas
 ### Kanäle (`src/ext/channels.ts`)
 
 Neutrale Datenkanäle: Basis-Ebenen **veröffentlichen**, was eine Erweiterung anders darstellen darf, Erweiterungen **hören zu**.
-Heute gibt es einen, `tracksChannel` (Ebene `flugzeuge`):
+Heute gibt es zwei, gleich gebaut (`createTracksChannel<T>()`, `TracksChannel<T>`): `tracksChannel` (Ebene `flugzeuge`, `TrackSample`) und `shipsChannel` (Ebene `schiffe`, `ShipSample`). Die Tabelle gilt für beide:
 
 | Seite | Was |
 |---|---|
@@ -448,15 +449,18 @@ Heute gibt es einen, `tracksChannel` (Ebene `flugzeuge`):
 
 Beim Abschalten der Ebene sendet `reset()` eine leere Liste und vergisst die Auswahl.
 
+`ShipSample` (Ebene `schiffe`): MMSI als `id`, Position, Kurs über Grund und wahre Peilung (je `undefined`, wenn AIS „nicht verfügbar“ meldet), Geschwindigkeit m/s, `moving` (ab 0,5 kn), Klasse (`cls`) samt Klassenfarbe (`SHIP_CLASSES`, eine Quelle für Symbol, Legende und 3D), Name oder `MMSI …`, Länge und Breite aus den AIS-Stammdaten (wenn bekannt) und Zeit der Meldung. Gefiltert wie die 2D-Symbole (Optionen „Nur fahrende Schiffe“ und „Schiffstyp“); Digitraffic, BarentsWatch (Norwegen) und Stream sind schon zu einer Liste zusammengeführt.
+
 ### Pro-Paket (`src/pro/`)
 
 ```
-index.ts            OrbisExtension: Bühne, Flugzeuge, Folgekamera, Umschalten 2D <-> 3D
+index.ts            OrbisExtension: Bühne, Flugzeuge, Schiffe, Folgekamera, Umschalten 2D <-> 3D (je Kanal)
 world3d/            die Bühne: EIN MapLibre-Custom-Layer 'orbis-stage' mit EINEM three.js-Renderer für alles 3D
   frame.ts          Koordinaten und Matrizen (Globus, Mercator, Übergang), place/position/toScreen/occluded
   stage.ts          Custom-Layer, Teile (StagePart), Picking/Hover/Klick, Neuzeichnen nur bei Bedarf
   instances.ts      Instanzen: tausende gleiche Modelle in einem Aufruf
   follow.ts, follow-math.ts   Folgekamera: folgt jedem Teil mit positionOf, Klick auf anderes Objekt wechselt das Ziel
+  size.ts           Größenkurve (lesbare Mindestgröße, Wachsen der Auswahl), outline.ts: Kontur per umgestülpter Hülle
   hit.ts            Treffertests am Bildschirm (Segmentabstand, Dreieck, Viereck)
   line.ts, wall.ts  Linie konstanter Pixelbreite und „Vorhang“ zum Boden, mit Globus-Verdeckung
 planes/             Teil „Flugzeuge“
@@ -464,6 +468,10 @@ planes/             Teil „Flugzeuge“
   models.ts         prozedurale Modelle: light, narrow, wide, heli
   trail.ts          Spur in echter Höhe + Wand
   planes.ts         der StagePart: Modelle, Schatten, Fallinie, Spuren, Beschriftung, Picking
+ships/              Teil „Schiffe“
+  smoothing.ts      Zustand zwischen Meldungen (Koppelnavigation nur bei Fahrt, bis 10 min), rein und getestet
+  models.ts         prozedurale Modelle je Klasse: cargo, tanker, passenger, fishing, tug, pleasure, other; Hilfsattribut `aLight`
+  ships.ts          der StagePart: Modelle auf der Wasserlinie, Kontur der Auswahl, Beschriftung, Picking
 ```
 
 **Bühne.** Auf der flachen Karte zeichnet die Bühne direkt in die Karte (Tiefentest gegen die 2,5D-Gebäude). Auf dem
@@ -493,18 +501,20 @@ App), Fallinie und Bodenschatten; höchstens 60 Spuren plus die der Auswahl (die
 Tipp auf Modell, Schatten, Fallinie, Spur oder Wand → `tracks.select(id)` → die bestehende Karte der Ebene `flugzeuge` (Route, Foto). Das gewählte
 Flugzeug ist hervorgehoben.
 
+**Schiffe.** Genauso immer und nur 3D, sobald die Ebene `schiffe` Schiffe meldet (Stream, Digitraffic und BarentsWatch, bis zu 8000 aus dem Stream), auf jedem Zoom; `present()` des Schiffskanals blendet Symbole und Ring aus, die Spur und die Routenlinie des gewählten Schiffs zeichnet weiter die Basis (Kartenlinie, funktioniert auch unter 3D). Je Klasse ein Low-Poly-Modell (Fracht mit Containerstapeln, Tanker mit Deckleitung und Luken, Passagierschiff mit gestaffelten Decks und Schornstein, Fischer, Schlepper/Spezial, Segelboot mit Mast und Segel, Sonstige) als **eine** zusammengeführte Geometrie mit Zusatzattribut `aLight`: ein Material mischt die Klassenfarbe (wie Legende und 2D-Symbol) je Vertex zu Weiß (Rumpf 0, Aufbauten und Segel hell), sodass Details in jeder Klassenfarbe lesbar bleiben. Länge aus den AIS-Stammdaten (8–400 m), sonst typisch je Klasse; nie kürzer als ~22 px auf dem Bildschirm (fällt unter Zoom 9 sanft wie bei den Flugzeugen). Koppelnavigation nur, solange das Schiff fährt, höchstens 10 min (wie die 2D-Ebene), angeglichen an jede neue Meldung (kein Zurückziehen, Sprung nach langer Pause); der Bug folgt der wahren Peilung, sonst dem Kurs, ein liegendes Schiff behält seine Drehung. Schiffe, die 90 s nicht in der Liste sind, verschwinden (die Liste kommt etwa jede Sekunde, das einzelne Schiff meldet selten). Klick → `ships.select(id)` → die echte Karte der Ebene (Foto, Ziel, ETA) mit der Schaltfläche „Folgen“; das gewählte Schiff wächst und bekommt eine weiße Kontur, Name über Zeiger, Auswahl und Folgeziel. Klick auf ein Schiff während man einem Flugzeug folgt (oder umgekehrt) wechselt das Ziel. Schiffe liegen unter den Flugzeugen (Reihenfolge der Bühne). Die Bühne meldet `ships` und `shipsDrawn`.
+
 **Folgekamera.** Schaltfläche „Folgen“ / „Folgen beenden“ auf der Karte. Sie verschiebt nur die Kartenmitte (auf der flachen
 Karte samt Mittenhöhe, sodass das Flugzeug mittig bleibt; auf dem Globus über `focusCentre`) und lässt Zoom, Drehung und Neigung
 unberührt: `map/limits.ts` (Neigungsgrenze nach Zoom, Gummiband, Nord-Rückstellung) greift also wie ohne Folgen, und Rad/
 Pinch zoomen um die Mitte. Folgen endet beim Ziehen der Karte, bei jeder anderen Kamerafahrt (Suche, „Hierhin fliegen“), bei
-Abwahl der Karte, beim Verschwinden des Flugzeugs und mit Esc. Solange gefolgt wird, bleibt 3D auch unter Zoom 8,7 an.
+Abwahl der Karte, beim Verschwinden des Objekts und mit Esc. Die Folgekamera ist für alle Teile mit `positionOf` gleich; ein Schiff liegt auf Höhe 0 (Wasserlinie), dort entfällt die Mindestentfernung, die für Flugzeuge aus der Flughöhe folgt. Solange gefolgt wird, bleibt 3D auch unter Zoom 8,7 an.
 
 ### Prüfung
 
 `src/ext/ext.test.ts` (Kanal, kein statischer Import), `src/pro/world3d/frame.test.ts` (Rahmen-Mathematik),
-`src/pro/planes/smoothing.test.ts` (Glättung), `follow-math.test.ts` (Folgekamera). Rauchtest Punkt 8: Pro an, `flugzeuge`
+`src/pro/planes/smoothing.test.ts` und `ships/smoothing.test.ts` (Glättung), `world3d/size.test.ts`, `follow-math.test.ts` (Folgekamera). Rauchtest Punkt 8: Pro an, `flugzeuge`
 an, Frankfurt auf Zoom 9,6 → die Bühne meldet Flugzeuge, die 2D-Symbole sind ausgeblendet, keine Seitenfehler; Pro aus →
-Symbole zurück, Bühne entfernt. `window.__orbis.ext` (nur `?smoke`/Dev) liefert dafür `status()`, `tracks` und `stage()`.
+Symbole zurück, Bühne entfernt. `window.__orbis.ext` (nur `?smoke`/Dev) liefert dafür `status()`, `tracks`, `ships` und `stage()`. Schiffe hat der Rauchtest nicht (die AIS-Daten brauchen den Proxy).
 
 ## Qualität
 

@@ -4,10 +4,11 @@ import type { TrackSample } from '../../ext/types';
 import type { GeoFrame } from '../world3d/frame';
 import { inQuad, segmentDistance, type Point } from '../world3d/hit';
 import { GeoInstances } from '../world3d/instances';
+import { outlineMaterial } from '../world3d/outline';
 import type { Stage, StagePart } from '../world3d/stage';
 import { hullGeometries, planeGeometries } from './models';
 import { PlaneTracker, type PlaneState } from './smoothing';
-import { growScale, sizeScale, stepGrow } from './size';
+import { growScale, sizeScale, stepGrow } from '../world3d/size';
 import { TrailRig, TRAIL_FADE_MS, WALL_MAX_M } from './trail';
 
 // 3D aircraft: a part of the stage. Models at the real altitude, moved smoothly between reports (smoothing.ts), around
@@ -78,13 +79,7 @@ export class PlanesPart implements StagePart {
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false }),
     );
     this.shadows.object.renderOrder = 1;
-    const hullMat = new THREE.MeshBasicMaterial({ color: OUTLINE_COLOR, side: THREE.BackSide });
-    hullMat.onBeforeCompile = (shader) => {
-      shader.uniforms.uOutline = this.outlineWidth;
-      shader.vertexShader = shader.vertexShader
-        .replace('void main() {', 'uniform float uOutline;\nvoid main() {')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += normal * uOutline;');
-    };
+    const hullMat = outlineMaterial(this.outlineWidth, OUTLINE_COLOR);
     this.outline = new GeoInstances(hullGeometries(), hullMat);
     // after the models: opaque, depth-tested against them, so it only shows around them
     this.outline.object.renderOrder = 1;

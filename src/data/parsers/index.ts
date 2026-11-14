@@ -26,6 +26,7 @@ import { bfsDose, stukDose, hcDose, safecastDose } from './radiation';
 import { aircraftReadsb } from './readsb';
 import { openskyStates } from './opensky';
 import { aisLocations, aisVessels } from './ais';
+import { barentswatchLatest } from './barentswatch';
 import { tleParse } from './tle';
 import { launchesParse } from './launches';
 import { launchTracker } from './launchtrack';
@@ -94,6 +95,7 @@ export const parsers = {
   openskyStates,
   aisLocations,
   aisVessels,
+  barentswatchLatest,
   tleParse,
   launchesParse,
   launchTracker,
