@@ -91,8 +91,24 @@
   /* ---- detail menu ---- */
   .hudd-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 11px 10px 4px 18px; }
   .hudd-head h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.2; padding-top: 2px; }
+  .hudd-btns { display: flex; gap: 6px; }
+  /* folded Karten: compact cards under each other, top aligned */
+  .hudk-stack { flex: none; width: var(--hud-detail-w); display: flex; flex-direction: column; gap: var(--hud-gap); align-self: flex-start; animation: hud-in 240ms var(--ease); }
+  .hudk { padding: 10px 6px 8px 18px; }
+  .hudk-head { display: flex; align-items: center; gap: 6px; padding-right: 4px; }
+  .hudk-head h2 { flex: 1; min-width: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* active layers: one row of chips, scrolls sideways */
+  .hudk-wrap { position: relative; }
+  .hudk-more { position: absolute; right: -2px; top: 0; height: 22px; padding: 0 11px 0 8px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--text-1); pointer-events: none; background: linear-gradient(var(--g-fill), var(--g-fill)), var(--ink-1); border-radius: 999px; border-left: 1px solid color-mix(in srgb, var(--line) 55%, transparent); transition: opacity 160ms var(--ease), transform 160ms var(--ease); }
+  .hudk-more[data-on='false'] { opacity: 0; transform: translateX(10px); }
+  .hudk-list { list-style: none; display: flex; gap: 4px; overflow-x: auto; margin: 4px 0 0 -10px; padding: 0 12px 0 10px; border-radius: 999px; scrollbar-width: none; }
+  .hudk-list::-webkit-scrollbar { display: none; }
+  .hudk-list li { flex: none; height: 22px; padding: 0 9px; border-radius: 999px; background: var(--g-fill); color: var(--text-2); font-size: 12px; font-weight: 500; line-height: 22px; white-space: nowrap; }
   .hudd-scroll { flex: 1; min-height: 0; }
   .hudd .lcontent { padding: 0 var(--s-1); }
+  /* layer page without the Karte header: keep the content clear of the rounded top edge */
+  .hudd[data-bar='false'] .lcontent { padding-top: 14px; }
+  .hudd[data-bar='false'] .ltabs { display: none; }
   .hudd[data-bar='true'] .lnav,
   .hudd[data-bar='true'] .feed { padding-bottom: 60px; }
 
@@ -119,7 +135,7 @@
   .cat-modal .cat-scroll { padding: 0 10px; }
   .cat-modal .crow-state { width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--limb); color: var(--limb); opacity: 1; }
   .cat-modal .crow.is-on .crow-state { background: var(--limb); color: var(--ink-0); }
-  .cat-foot { display: flex; justify-content: flex-end; padding: 12px 16px; background: var(--g-fill); }
+  .cat-foot { display: flex; justify-content: flex-end; padding: 12px 16px; background: var(--g-fill); border-radius: 0 999px 999px 0; }
 
   /* ---- history ---- */
   .hud-sect { font-size: 11px; font-weight: 600; color: var(--text-3); padding: 14px 10px 4px; letter-spacing: 0.01em; }

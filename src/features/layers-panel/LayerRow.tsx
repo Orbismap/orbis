@@ -104,6 +104,7 @@ export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGr
             <span class="lrow-keybtn-text">Eintragen</span>
           </button>
         )}
+        <span class="lrow-fill" aria-hidden="true" onPointerDown={onGrip} onClick={toggle} />
         <SettingsButton def={def} onClick={openPage} />
       </div>
       {st.state === 'loading' && <span class="lrow-strip" role="progressbar" aria-label={`${def.title} lädt`} />}

@@ -743,3 +743,10 @@
     }
   }
 }
+
+@layer features {
+  /* key button sits right behind the title; an empty filler keeps the rest of the row clickable and pushes the dots to the right */
+  .lrow-head { flex: 0 1 auto; }
+  .lrow-fill { flex: 1 1 0; align-self: stretch; min-width: 0; }
+  .lrow-keybtn { margin-left: 4px; }
+}
