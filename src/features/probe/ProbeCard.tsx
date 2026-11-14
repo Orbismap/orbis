@@ -3,6 +3,7 @@ import { getLayer } from '../../layers/registry';
 import { clearSelection, probe } from '../../state/selection';
 import { Button, IconButton } from '../../ui/Button';
 import { copyText, flyToPoint } from '../shared/map';
+import { RouteButton } from '../routes/RouteButton';
 import { share } from '../place/PlaceCard';
 import { useReverse } from '../place/reverse';
 import { probeValues } from './values';
@@ -30,6 +31,7 @@ export function ProbeCard() {
         <IconButton icon="close" label="Schließen" shortcut="Esc" class="place-close" onClick={clearSelection} />
       </header>
       <div class="insp-actions place-actions">
+        <RouteButton title={rev?.title ?? formatCoord(p.lat, p.lng, 4)} subtitle={sub} lng={p.lng} lat={p.lat} />
         <Button variant="primary" icon="pin" onClick={() => flyToPoint(p.lng, p.lat, 12)}>
           Hinfliegen
         </Button>

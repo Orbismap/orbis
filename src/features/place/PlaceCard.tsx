@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { formatCoord } from '../../core/format';
 import { getLayer } from '../../layers/registry';
 import { clearSelection, place } from '../../state/selection';
+import { RouteButton } from '../routes/RouteButton';
+import { isPlaceSaved, toggleSavedPlace } from '../../state/routes';
+import { toast } from '../../ui/toast';
 import { Button, IconButton } from '../../ui/Button';
 import { cx } from '../../ui/hooks';
 import { copyText, flyToPoint } from '../shared/map';
@@ -92,11 +95,17 @@ export function PlaceCard() {
         <IconButton icon="close" label="Schließen" shortcut="Esc" class="place-close" onClick={clearSelection} />
       </header>
       <div class="insp-actions place-actions">
+        <RouteButton title={p.title} subtitle={p.subtitle} lng={p.lng} lat={p.lat} />
         <Button variant="primary" icon="pin" onClick={() => flyToPoint(p.lng, p.lat, 11)}>
           Hinfliegen
         </Button>
         <Button variant="secondary" icon="copy" onClick={() => void copyText(plain, 'Koordinate kopiert')}>
           Koordinate
+        </Button>
+      </div>
+      <div class="insp-actions place-actions">
+        <Button variant="secondary" icon="bookmark" onClick={() => toast(toggleSavedPlace({ title: p.title, subtitle: p.subtitle, lng: p.lng, lat: p.lat }) ? 'Ort gesichert' : 'Ort entfernt', { kind: 'ok' })}>
+          {isPlaceSaved(p.lng, p.lat) ? 'Gesichert' : 'Sichern'}
         </Button>
       </div>
       {wiki && <Info wiki={wiki} />}

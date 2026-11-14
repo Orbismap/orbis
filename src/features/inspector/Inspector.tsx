@@ -5,6 +5,7 @@ import { now } from '../../state/time';
 import { Button, IconButton } from '../../ui/Button';
 import { Icon } from '../../ui/icons/Icon';
 import { copyText, flyToPoint } from '../shared/map';
+import { RouteButton } from '../routes/RouteButton';
 import { Media } from './Media';
 import './inspector.css';
 
@@ -70,6 +71,7 @@ export function InspectorCard({ card, layerId }: { card: InspectCard; layerId: s
         <p class="insp-coord num">{formatCoord(card.location[1], card.location[0])}</p>
       )}
       <div class="insp-actions">
+        {card.location && <RouteButton title={card.title} lng={card.location[0]} lat={card.location[1]} />}
         {card.actions?.map((a) => (
           <Button key={a.id} variant={a.active ? 'primary' : 'secondary'} icon={a.icon} aria-pressed={a.active} onClick={a.run}>
             {a.label}

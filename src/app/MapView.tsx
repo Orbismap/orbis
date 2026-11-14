@@ -7,6 +7,7 @@ import { mapEngine, pointerLngLat } from '../state/ui';
 import { placeCursorTip } from '../features/legend/CursorTip';
 import { cursorTipHidden } from '../features/legend/pointer-value';
 import { startProbeMarker } from '../features/probe/marker';
+import { startRouteOverlay } from '../features/routes/overlay';
 
 /** Hosts the MapLibre map. Reads no signals, so it never re-renders. */
 export const MapView = memo(function MapView() {
@@ -46,7 +47,7 @@ export const MapView = memo(function MapView() {
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerleave', onLeave);
     engine.ml.on('movestart', onMoveStart);
-    const stops = [startProbeMarker(), () => (cancelAnimationFrame(raf), el.removeEventListener('pointermove', onMove), el.removeEventListener('pointerleave', onLeave), engine.ml.off('movestart', onMoveStart))];
+    const stops = [startProbeMarker(), startRouteOverlay(), () => (cancelAnimationFrame(raf), el.removeEventListener('pointermove', onMove), el.removeEventListener('pointerleave', onLeave), engine.ml.off('movestart', onMoveStart))];
     return () => {
       stops.forEach((s) => s());
       stopRuntime();
