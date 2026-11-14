@@ -8,7 +8,9 @@ import stromnetz from '../layers/infrastruktur/stromnetz';
 import telekomnetz from '../layers/infrastruktur/telekomnetz';
 import vermittlungsstellen from '../layers/infrastruktur/vermittlungsstellen';
 import oelgasleitungen from '../layers/infrastruktur/oelgasleitungen';
-import wassernetz from '../layers/infrastruktur/wassernetz';
+import wasserleitungen from '../layers/wasser/wasserleitungen';
+import wasserwerke from '../layers/wasser/wasserwerke';
+import stauseen from '../layers/wasser/stauseen';
 
 /** Mounts a layer against a recording fake engine and returns what it would add to the map. */
 async function specsOf(def: Pick<typeof stromnetz, 'id' | 'options' | 'mount'>) {
@@ -29,7 +31,7 @@ async function specsOf(def: Pick<typeof stromnetz, 'id' | 'options' | 'mount'>) 
 }
 
 describe('OpenInfraMap layers', () => {
-  for (const def of [stromnetz, telekomnetz, vermittlungsstellen, oelgasleitungen, wassernetz]) {
+  for (const def of [stromnetz, telekomnetz, vermittlungsstellen, oelgasleitungen, wasserleitungen, wasserwerke, stauseen]) {
     it(`${def.id}: layer specs are a valid style`, async () => {
       const { sources, layers } = await specsOf(def);
       expect(layers.length).toBeGreaterThan(1);

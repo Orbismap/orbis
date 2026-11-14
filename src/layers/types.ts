@@ -4,7 +4,7 @@ import type { Resource, ResourceSpec } from '../data/resource';
 import type { MapEngine } from '../map/types';
 import type { IconName } from '../ui/icons/names';
 
-export type CategoryId = 'wetter' | 'gefahren' | 'verkehr' | 'infrastruktur' | 'erde' | 'meer' | 'medien' | 'gesellschaft';
+export type CategoryId = 'wetter' | 'gefahren' | 'verkehr' | 'infrastruktur' | 'wasser' | 'erde' | 'meer' | 'medien' | 'gesellschaft';
 export type LayerForm = 'field' | 'raster' | 'points' | 'lines' | 'areas' | 'tracks';
 export type Cadence = 'live' | 'minutes' | 'hourly' | 'daily' | 'static';
 
