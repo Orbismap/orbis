@@ -76,6 +76,12 @@ export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
       paint: { 'line-color': c.rail, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.3, 12, 0.8, 18, 2.5] },
     },
     {
+      // footways, cycle ways, tracks and service roads: thin lines (the street-scale layer draws them at real width)
+      id: id('paths'), type: 'line', source: 'ofm', 'source-layer': 'transportation', minzoom: 13.5, layout: roadLayout,
+      filter: ['in', ['get', 'class'], ['literal', ['path', 'service', 'track', 'pedestrian']]],
+      paint: { 'line-color': c.roadMinor, 'line-width': ['interpolate', ['linear'], ['zoom'], 13.5, 0.3, 16, 0.8, 19, 2] },
+    },
+    {
       id: id('roads-minor-casing'), type: 'line', source: 'ofm', 'source-layer': 'transportation', minzoom: 12, layout: roadLayout,
       filter: ['in', ['get', 'class'], minorClasses], paint: { 'line-color': c.casing, 'line-width': roadWidth(1.05) },
     },

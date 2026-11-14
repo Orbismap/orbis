@@ -54,6 +54,7 @@ import { transitousTrips } from './transitous';
 import { autobahnItems } from './autobahn';
 import { overpassRoutes } from './oepnv';
 import { overpassRoadmarks } from './roadmark';
+import { roadNet } from './roadnet';
 import { gbfsStations } from './gbfs';
 import { blitzerdeMarkers } from './blitzerde';
 import { radarFlow, radarTile } from './radar';
@@ -116,6 +117,7 @@ export const parsers = {
   blitzerdeMarkers,
   gbfsStations,
   overpassRoadmarks,
+  roadNet,
   overpassRoutes,
   autobahnItems,
   transitousTrips,
