@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { CustomLayerInterface, CustomRenderMethodInput, MapMouseEvent, Map as MlMap } from 'maplibre-gl';
-import { GeoFrame } from './frame';
+import { GeoFrame, type Vec3 } from './frame';
 
 // One custom layer and one three.js renderer for everything 3D on a map. Parts (aircraft today, ships or
 // buildings tomorrow) register with the stage; it draws them together, in one pass, with one depth buffer.
@@ -28,9 +28,23 @@ export interface StagePart {
   click?(id: string): void;
   /** The pointer is over `id` (null: over nothing of this part). */
   hover?(id: string | null): void;
+  /** Where object `id` is now [lon, lat, altitude m], null: unknown. A part that has this can be followed. */
+  positionOf?(id: string): Vec3 | null;
+  /** Brings the displayed state to `now`; the follow camera calls it before `positionOf`, the stage then draws the same instant. */
+  step?(now: number): void;
+  /** The camera follows `id` (null: nothing is followed any more); the part may keep its label visible. */
+  setFollowed?(id: string | null): void;
   /** Numbers for the test hook. */
   stats?(): Record<string, number>;
   dispose?(): void;
+}
+
+/** What the follow camera does with clicks (see follow.ts). */
+export interface ClickGate {
+  /** The click belongs to a drag: nobody reacts to it. */
+  readonly wasDrag: boolean;
+  /** Called before the part gets the click, so a switch of the followed object comes before the selection changes. */
+  retarget(part: StagePart, id: string): void;
 }
 
 /** how often the cursor looks for something below it (ms): when the mouse moves, and when only the objects do */
@@ -66,6 +80,8 @@ export class Stage implements CustomLayerInterface {
   frame: GeoFrame | null = null;
   /** set: the time parts are drawn at, so that a moving focus and the camera following it agree exactly */
   clock: number | null = null;
+  /** set by the follow camera */
+  clicks: ClickGate | null = null;
   private renderer?: THREE.WebGLRenderer;
   private target?: THREE.WebGLRenderTarget;
   private scene = new THREE.Scene();
@@ -233,8 +249,11 @@ export class Stage implements CustomLayerInterface {
   };
 
   private onClick = (e: MapMouseEvent) => {
+    if (this.clicks?.wasDrag) return;
     const hit = this.pick(e.point.x, e.point.y);
-    if (hit) hit.part.click?.(hit.id);
+    if (!hit) return;
+    this.clicks?.retarget(hit.part, hit.id);
+    hit.part.click?.(hit.id);
   };
 
   /** The part and id at a screen point (CSS px); parts in the order they were added, the last one on top. */

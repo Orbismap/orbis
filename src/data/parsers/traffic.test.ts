@@ -8,7 +8,7 @@ import { tleParse } from './tle';
 import { launchesParse, groupByPad } from './launches';
 import { airportsParse } from './airports';
 import { groundMotion, groundTrack, initSats, positionAt } from './orbit';
-import { altitudeText, compass, countdownText, rateText, scaleColor, speedText } from './traffic';
+import { aircraftColor, altitudeText, compass, countdownText, rateText, scaleColor, speedText } from './traffic';
 import { runParser } from '../worker/pool';
 
 const NOW = 1794342293000;
@@ -266,5 +266,13 @@ describe('traffic helpers', () => {
     expect(compass(359)).toBe('N');
     expect(scaleColor([[0, '#000000'], [10, '#ffffff']], 5)).toBe('#808080');
     expect(scaleColor([[0, '#000000'], [10, '#ffffff']], 99)).toBe('#ffffff');
+  });
+});
+
+describe('aircraftColor', () => {
+  it('is pink for military, red for emergencies, yellow for everything else', () => {
+    expect(aircraftColor({ emerg: true, mil: true })).toBe('#ff3b3b');
+    expect(aircraftColor({ emerg: false, mil: true })).toBe('#ff4fb8');
+    expect(aircraftColor({ emerg: false, mil: false })).toBe('#ffd84a');
   });
 });

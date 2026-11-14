@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { EARTH_RADIUS_M, toMercator, toUnit, type GeoFrame, type Vec3 } from './frame';
+import { segmentDistance } from './hit';
 import type { StagePart } from './stage';
 
 // Thick line of constant pixel width through lon / lat / altitude. Each segment is a quad carrying both
@@ -140,12 +141,6 @@ export interface GeoLineOptions {
   dash?: [number, number];
   /** a point has faded out this long after its time (ms) */
   fadeMs?: number;
-}
-
-function segmentDistance(x: number, y: number, a: [number, number], b: [number, number]) {
-  const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
-  const t = dx || dy ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy))) : 0;
-  return Math.hypot(x - (a[0] + t * dx), y - (a[1] + t * dy));
 }
 
 export class GeoLine implements StagePart {

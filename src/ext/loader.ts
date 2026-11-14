@@ -30,6 +30,7 @@ function makeHost(engine: MapEngine): ExtensionHost {
     removeLayer: (id) => engine.remove({ layers: [id] }),
     projection,
     tracks: tracksChannel,
+    holdCamera: () => engine.holdCamera(),
     reducedMotion,
   };
 }

@@ -4,7 +4,7 @@ import { GONE_MS, PlaneTracker, metres, modelOf, shortestDelta, targetOf } from 
 
 const sample = (over: Partial<TrackSample> = {}): TrackSample => ({
   id: 'abc123', lng: 10, lat: 50, altM: 10000, track: 90, speedMs: 230, vrMs: 0, ground: false, heli: false, category: 'A3',
-  emergency: false, military: false, label: 'DLH1', t: 1_000_000, ...over,
+  emergency: false, military: false, color: '#ffd84a', label: 'DLH1', t: 1_000_000, ...over,
 });
 const NOW = 5000;
 const EPOCH = 1_000_000; // a report made exactly now
@@ -124,5 +124,15 @@ describe('reports', () => {
     expect(modelOf({ heli: false, category: 'A5' })).toBe('wide');
     expect(modelOf({ heli: false, category: 'A1' })).toBe('light');
     expect(modelOf({ heli: false, category: '' })).toBe('narrow');
+  });
+});
+
+describe('older reports', () => {
+  it('are ignored (the overview after the detailed view)', () => {
+    const t = new PlaneTracker();
+    t.feed([sample({ lng: 10.5 })], NOW, EPOCH);
+    t.feed([sample({ lng: 10, t: EPOCH - 60_000 })], NOW + 1000, EPOCH + 1000);
+    expect(t.planes.get('abc123')!.lon).toBe(10.5);
+    expect(t.planes.get('abc123')!.trail).toHaveLength(1);
   });
 });

@@ -40,3 +40,13 @@ export function openskyStates(raw: unknown): TrackObject[] {
   }
   return out;
 }
+
+/** Snapshots older than this are not shown as the overview (the collector uploads every 90 s). */
+export const SNAPSHOT_MAX_AGE = 10 * 60_000;
+
+/** True when the newest position in the snapshot is older than `maxAge` (or there is none). Positions trail the snapshot `time` by a few seconds. */
+export function snapshotStale(list: readonly TrackObject[], now: number, maxAge = SNAPSHOT_MAX_AGE): boolean {
+  let newest = 0;
+  for (const t of list) if (t.t > newest) newest = t.t;
+  return now - newest > maxAge;
+}

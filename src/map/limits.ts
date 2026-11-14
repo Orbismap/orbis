@@ -4,7 +4,7 @@
 // restore a squeezed tilt: the animation only interpolates values it was asked to change.
 import type { Map as MlMap } from 'maplibre-gl';
 import { reducedMotion } from '../state/settings';
-import { BEARING_FREE, BEARING_STRETCH, NORTH_MAX_ZOOM, REBOUND_MS, REBOUND_SNAP_BELOW, STRETCH_PITCH_CEILING, TILT_ROOM, needsNorthReset, pitchStretch, reboundDuration, reboundExcess, rubberBand, rubberBandInverse, tiltAvailable, tiltLimit, wrapBearing } from './camera';
+import { BEARING_FREE, BEARING_STRETCH, NORTH_MAX_ZOOM, REBOUND_MS, REBOUND_SNAP_BELOW, STRETCH_PITCH_CEILING, TILT_ROOM, needsNorthReset, pitchStretch, reboundDuration, reboundExcess, rubberBand, rubberBandInverse, clampCamera, tiltAvailable, tiltLimit, wrapBearing } from './camera';
 
 type Tr = { setMaxPitch(p: number): void; setBearing(b: number): void; setPitch(p: number): void };
 interface CameraInternals { applyTransformChange(change: (tr: Tr) => void): void }
@@ -20,6 +20,13 @@ const bearingRaw = (v: number) => Math.sign(v) * rubberBandInverse(Math.abs(v), 
 export interface CameraLimits {
   /** Prepares the limit for a target zoom before a jump/flight that sets zoom and pitch together. */
   ensureFor(zoom: number): void;
+  /**
+   * Something else (the follow camera) steers pitch and bearing: until the returned function is called the limits do
+   * nothing (no clamp, no rebound, no rubber band, no own drag) and the tilt may go up to STRETCH_PITCH_CEILING.
+   * Calling it with `ease` lets go with ONE smooth motion onto what the limits allow at the current zoom (tilt down,
+   * north when far out) together with `ease.elevation`. Without: only lets go, the usual rebound brings the camera back.
+   */
+  hold(): (ease?: { elevation: number }) => void;
   destroy(): void;
 }
 
@@ -43,6 +50,9 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
   let own: { id: number; x: number; y: number; rawB: number; rawP: number } | null = null; // right/ctrl mouse drag (our own, see below)
   let slider = false; // the tilt slider is being dragged
   const gesture = () => pointers.size > 0 || slider;
+  let held = false;
+  /** after a hold: the camera is on its way back to the limits, the room above the limit stays until it arrives */
+  let easing = false;
 
   const setMax = (v: number) => {
     if (Math.abs(ml.getMaxPitch() - v) < 1e-6) return;
@@ -51,12 +61,15 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
   };
   const maxFor = (zoom: number) => {
     const lim = tiltLimit(zoom);
-    return gesture() || rotating || raf ? Math.min(STRETCH_PITCH_CEILING, lim + TILT_ROOM) : lim;
+    return gesture() || rotating || raf || easing ? Math.min(STRETCH_PITCH_CEILING, lim + TILT_ROOM) : lim;
   };
-  const ensureFor = (zoom: number) => setMax(maxFor(zoom));
+  const ensureFor = (zoom: number) => {
+    if (!held) setMax(maxFor(zoom));
+  };
 
   let touchPitchOn = true;
   const syncLimits = () => {
+    if (held) return;
     const z = ml.getZoom();
     setMax(maxFor(z));
     const avail = tiltAvailable(z);
@@ -75,7 +88,7 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
     raf = 0;
   };
   const startRebound = (fromGesture = false) => {
-    if (raf || gesture() || rotating) return;
+    if (raf || gesture() || rotating || held || easing) return;
     const z0 = ml.getZoom();
     const excessP = ml.getPitch() - tiltLimit(z0);
     const overP = excessP > 0.01 && ml.getMaxPitch() > tiltLimit(z0) + 1e-6;
@@ -127,7 +140,7 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
   // ---- rubber band while a gesture runs: pitch and bearing changes of the gesture are summed up unclamped ("raw") and
   // written back stretched ----
   const onGestureMove = () => {
-    if (!gesture() || own || slider) return; // mouse drags and the slider write their own stretched values
+    if (held || !gesture() || own || slider) return; // mouse drags and the slider write their own stretched values
     const z = ml.getZoom();
     const lim = tiltLimit(z);
     const dp = ml.getPitch() - lastP;
@@ -148,6 +161,7 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
     onBearingFrame();
   };
   const onDown = (e: PointerEvent) => {
+    if (held) return;
     if (e.pointerType === 'mouse') pointers.clear(); // a lost mouseup must not keep the gesture alive
     const wasGesture = gesture();
     pointers.add(e.pointerId);
@@ -191,7 +205,7 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
   container.addEventListener('contextmenu', onContext);
   // like MapLibre's own: 0.8 degrees of bearing per pixel across, 0.5 degrees of tilt per pixel up
   const onPointerMove = (e: PointerEvent) => {
-    if (!own || e.pointerId !== own.id) return;
+    if (held || !own || e.pointerId !== own.id) return;
     if (e.buttons === 0) return release();
     own.rawB += (e.clientX - own.x) * 0.8;
     own.rawP = Math.max(0, own.rawP - (e.clientY - own.y) * 0.5);
@@ -206,39 +220,43 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
   ml.dragRotate.disable();
   tiltStretch.set(ml, {
     begin() {
+      if (held) return;
       cancelRebound();
       slider = true;
       syncLimits();
     },
     to(raw) {
+      if (held) return;
       const lim = tiltLimit(ml.getZoom());
       ml.jumpTo({ pitch: rubberBand(Math.max(0, raw), lim, pitchStretch(lim)) });
     },
     end() {
-      if (!slider) return;
+      if (held || !slider) return;
       slider = false;
       startRebound(true);
     },
   });
 
   const onMove = () => {
+    if (held) return;
     onGestureMove();
     syncLimits();
     startNorth();
   };
   const onRotateStart = () => {
-    if (gesture()) return;
+    if (held || gesture()) return;
     rotating = true;
     cancelRebound();
   };
   const onRotateEnd = () => {
+    if (held) return;
     rotating = false;
     startNorth();
   };
   // A jump sets zoom and pitch in one go; the limit for the new zoom has to be in place first (callers anywhere may jump).
   const jumpTo = ml.jumpTo.bind(ml) as MlMap['jumpTo'];
   ml.jumpTo = (options, eventData) => {
-    if (typeof options?.zoom === 'number') ensureFor(options.zoom);
+    if (!held && typeof options?.zoom === 'number') ensureFor(options.zoom);
     return jumpTo(options, eventData);
   };
   ml.on('move', onMove);
@@ -247,8 +265,46 @@ export function attachCameraLimits(ml: MlMap, onBearingFrame: () => void): Camer
   ml.on('rotateend', onRotateEnd);
   syncLimits();
 
+  const hold = () => {
+    if (held) return () => {};
+    held = true;
+    easing = false;
+    cancelRebound();
+    pointers.clear();
+    own = null;
+    slider = false;
+    rotating = false;
+    // the tilt the follow camera needs; the transform's own clamp would cut it at the limit of the zoom
+    setMax(STRETCH_PITCH_CEILING);
+    return (ease?: { elevation: number }) => {
+      if (!held) return;
+      held = false;
+      if (!ease) {
+        easing = false;
+        startRebound(false);
+        return;
+      }
+      const z = ml.getZoom();
+      const to = clampCamera({ zoom: z, pitch: ml.getPitch(), bearing: ml.getBearing() });
+      const moves = to.pitch !== ml.getPitch() || to.bearing !== ml.getBearing() || ml.getCenterElevation() !== ease.elevation;
+      if (!moves) {
+        syncLimits();
+        return;
+      }
+      // one motion for all of it; the room above the limit stays until it has arrived, and no rebound of our own runs meanwhile
+      easing = true;
+      ml.once('moveend', () => {
+        easing = false;
+        syncLimits();
+        onBearingFrame();
+      });
+      ml.easeTo({ pitch: to.pitch, bearing: to.bearing, elevation: ease.elevation, duration: reducedMotion() ? 0 : NORTH_EASE_MS });
+    };
+  };
+
   return {
     ensureFor,
+    hold,
     destroy() {
       cancelRebound();
       container.removeEventListener('pointerdown', onDown);

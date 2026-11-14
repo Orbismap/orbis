@@ -44,6 +44,8 @@ export interface MapEngine {
   /** Panel/sheet padding; camera targets stay inside the remaining area. */
   setPadding(p: Partial<Padding>): void;
   getBasemap(): BasemapId;
+  /** An extension steers pitch and bearing itself: the limits stand back until the returned function is called (see CameraLimits.hold). */
+  holdCamera(): (ease?: { elevation: number }) => void;
   /** Browser geolocation, resolves the position and flies there. */
   locate(): Promise<{ lng: number; lat: number; accuracy: number }>;
 }

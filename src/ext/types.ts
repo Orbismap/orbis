@@ -26,6 +26,8 @@ export interface TrackSample {
   category: string;
   emergency: boolean;
   military: boolean;
+  /** colour of the 2D icon as '#rrggbb' (altitude, military, emergency), so both presentations agree */
+  color: string;
   /** callsign (or registration), for labels; may be empty */
   label: string;
   /** time of the position fix, ms since epoch */
@@ -74,6 +76,12 @@ export interface ExtensionHost {
   /** 'globe' | 'mercator' */
   readonly projection: ReadonlySignal<'globe' | 'mercator'>;
   readonly tracks: TracksChannel;
+  /**
+   * The extension steers the camera's tilt and bearing itself (a follow camera): the base's tilt and north limits stand
+   * back until the returned function is called. Called with `ease`, the camera eases once back onto the limits (and to
+   * that centre elevation); called without, it only lets go and the base's own rebound brings it back.
+   */
+  holdCamera(): (ease?: { elevation: number }) => void;
   /** True when the user wants less motion (setting or OS). */
   reducedMotion(): boolean;
 }

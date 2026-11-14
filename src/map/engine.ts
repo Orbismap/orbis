@@ -183,6 +183,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     flyTo(target: CameraTarget) {
       flyToTarget(ml, target, padding.peek());
     },
+    holdCamera: () => limits.hold(),
     requestRender() {
       ml.triggerRepaint();
     },

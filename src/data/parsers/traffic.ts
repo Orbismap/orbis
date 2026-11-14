@@ -67,10 +67,14 @@ export function scaleColor(stops: [number, string][], v: number): string {
 export const stopsExpr = (prop: string, stops: [number, string][]) =>
   ['interpolate', ['linear'], ['get', prop], ...stops.flat()] as unknown as import('maplibre-gl').ExpressionSpecification;
 
-/** Altitude colour scale in metres (aircraft and balloons). */
-export const ALT_STOPS: [number, string][] = [
-  [0, '#ff9d3d'], [1500, '#ffd84a'], [4000, '#8fe05c'], [7000, '#2fcfc4'], [10000, '#4a8dff'], [13000, '#b06bff'],
-];
+export const AIRCRAFT_EMERGENCY = '#ff3b3b';
+export const AIRCRAFT_MILITARY = '#ff4fb8';
+export const AIRCRAFT_COLOR = '#ffd84a';
+
+/** Colour of an aircraft, in 2D and 3D: military pink, emergency red, everything else yellow (on the ground too). */
+export function aircraftColor(p: { emerg: boolean; mil: boolean }): string {
+  return p.emerg ? AIRCRAFT_EMERGENCY : p.mil ? AIRCRAFT_MILITARY : AIRCRAFT_COLOR;
+}
 
 /** Parses an ISO-ish timestamp, NaN when unusable. */
 export const ts = (s: unknown): number => (typeof s === 'string' ? Date.parse(s) : typeof s === 'number' ? s : NaN);

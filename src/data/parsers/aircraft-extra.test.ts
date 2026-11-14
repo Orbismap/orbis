@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GnssStore, cellsGeoJson } from './gnss';
-import { openskyStates } from './opensky';
+import { openskyStates, snapshotStale } from './opensky';
 import { aircraftReadsb, navQuality, type AircraftProps } from './readsb';
 
 describe('opensky', () => {
@@ -19,6 +19,13 @@ describe('opensky', () => {
     expect((t[1]!.props as unknown as AircraftProps).gnd).toBe(true);
   });
   it('tolerates garbage', () => { expect(openskyStates(null)).toEqual([]); expect(openskyStates({ states: null })).toEqual([]); });
+  it('treats a snapshot without a recent position as stale', () => {
+    const t = openskyStates(raw);
+    const newest = 1794401075 * 1000;
+    expect(snapshotStale(t, newest + 5 * 60_000)).toBe(false);
+    expect(snapshotStale(t, newest + 11 * 60_000)).toBe(true);
+    expect(snapshotStale([], newest)).toBe(true);
+  });
 });
 
 describe('navigation quality', () => {
