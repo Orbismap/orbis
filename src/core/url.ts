@@ -1,5 +1,7 @@
-// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&t=<iso>&g=1&p=<lat>,<lng>,<name>,<region>[,<kind>]
+// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&t=<iso>&g=1&f=flug:<hex>|schiff:<mmsi>&p=<lat>,<lng>,<name>,<region>[,<kind>]
 // (p = a searched place; name, region and kind are percent-encoded, so their commas do not split)
+import type { FollowRef } from '../ext/types';
+
 export interface UrlView { lat: number; lng: number; zoom: number; bearing?: number; pitch?: number }
 export interface UrlState {
   view?: UrlView;
@@ -9,6 +11,8 @@ export interface UrlState {
   time?: number;
   /** true = globe (g=1), false = mercator (g=0), undefined = default. */
   globe?: boolean;
+  /** Followed aircraft or ship (f=flug:<hex> / f=schiff:<mmsi>). */
+  follow?: FollowRef;
   /** Searched place shown in the detail menu. */
   place?: { lat: number; lng: number; title: string; subtitle: string; kind?: string };
 }
@@ -58,6 +62,8 @@ export function parseHash(hash: string): UrlState {
       /* malformed escape: ignore the place */
     }
   }
+  const f = /^(flug|schiff):([A-Za-z0-9_-]{1,32})$/.exec(q.get('f') ?? '');
+  if (f) out.follow = { kind: f[1] as FollowRef['kind'], id: f[2]! };
   const g = q.get('g');
   if (g === '1') out.globe = true;
   else if (g === '0') out.globe = false;
@@ -77,6 +83,7 @@ export function serializeHash(s: UrlState): string {
   if (s.layers) q.push(`l=${s.layers.map(encodeURIComponent).join(',')}`);
   if (s.time !== undefined) q.push(`t=${new Date(s.time).toISOString().slice(0, 16)}Z`);
   if (s.globe !== undefined) q.push(`g=${s.globe ? 1 : 0}`);
+  if (s.follow) q.push(`f=${s.follow.kind}:${encodeURIComponent(s.follow.id)}`);
   if (s.place) q.push(`p=${[round(s.place.lat, 5), round(s.place.lng, 5), encodeURIComponent(s.place.title), encodeURIComponent(s.place.subtitle), ...(s.place.kind ? [encodeURIComponent(s.place.kind)] : [])].join(',')}`);
   return `#/${path}${q.length ? `?${q.join('&')}` : ''}`;
 }

@@ -96,6 +96,12 @@ export interface TracksChannel<T = TrackSample> {
   contributeActions(provider: (id: string) => CardAction[]): { changed(): void; dispose(): void };
 }
 
+/** An object the follow camera keeps in the middle: an aircraft (`flug`, ICAO hex) or a ship (`schiff`, MMSI). Also what the URL carries (`f=flug:3c6444`). */
+export interface FollowRef {
+  kind: 'flug' | 'schiff';
+  id: string;
+}
+
 /** What the base gives an extension. */
 export interface ExtensionHost {
   /** The MapLibre map (the extension adds its custom layer to it). */
@@ -116,6 +122,11 @@ export interface ExtensionHost {
   holdCamera(): (ease?: { elevation: number }) => void;
   /** True when the user wants less motion (setting or OS). */
   reducedMotion(): boolean;
+  /**
+   * Following, in sync with the URL. `wanted`: what the URL asks to follow (a new object each time it is applied; null: nothing,
+   * which ends a follow). The extension starts it as soon as the object is in the data and reports what it follows with `report`.
+   */
+  readonly follow: { readonly wanted: ReadonlySignal<FollowRef | null>; report(ref: FollowRef | null): void };
 }
 
 export interface OrbisExtension {

@@ -5,6 +5,8 @@ import { DARK_HALO, HOVER, LIMB, mapOutputs, type Expr, type NumOrExpr } from '.
 export interface SymbolStyle {
   /** Name from render/icons.ts (dot, triangle, arrow, plane, ship, diamond, square, star, bolt, flame, volcano, tower, camera). */
   icon: string;
+  /** Icon chosen per feature (an expression giving icon names); `icon` is the fallback and what `ensureIcons` loads, other names must be listed by the caller. */
+  iconExpr?: ExpressionSpecification;
   /** Scale factor, 1 = 32 css px. May be a (zoom) expression. */
   size: NumOrExpr;
   /** Degrees clockwise, e.g. ['get', 'heading']. Rotates with the map. */
@@ -55,7 +57,7 @@ export function pointSpecs(id: string, source: string, sourceLayer: string | und
     main = {
       id: `${id}-symbols`, type: 'symbol', source, ...sl, ...zoom, ...(filter ? { filter } : {}),
       layout: {
-        'icon-image': s.symbol.icon, 'icon-size': s.symbol.size as ExpressionSpecification | number,
+        'icon-image': s.symbol.iconExpr ?? s.symbol.icon, 'icon-size': s.symbol.size as ExpressionSpecification | number,
         'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',
         ...(s.symbol.rotate !== undefined ? { 'icon-rotate': s.symbol.rotate as ExpressionSpecification | number } : {}),
         ...(s.sortKey !== undefined ? { 'symbol-sort-key': s.sortKey as ExpressionSpecification | number } : {}),

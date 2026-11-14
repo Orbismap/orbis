@@ -9,7 +9,7 @@ import { mapEngine } from '../state/ui';
 import { projection } from '../state/view';
 import { reducedMotion } from '../state/settings';
 import type { MapEngine } from '../map/types';
-import { shipsChannel, tracksChannel } from './channels';
+import { followCurrent, followWanted, shipsChannel, tracksChannel } from './channels';
 import { proEnabled } from './licence';
 import type { ExtensionHost, OrbisExtension } from './types';
 
@@ -33,6 +33,7 @@ function makeHost(engine: MapEngine): ExtensionHost {
     ships: shipsChannel,
     holdCamera: () => engine.holdCamera(),
     reducedMotion,
+    follow: { wanted: followWanted, report: (ref) => { followCurrent.value = ref; } },
   };
 }
 
@@ -48,6 +49,7 @@ export function startExtensions(): () => void {
   const dispose = () => {
     token++;
     stop?.();
+    followCurrent.value = null;
     stop = undefined;
     status = status && { ...status, running: false };
   };

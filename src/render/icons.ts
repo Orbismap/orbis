@@ -34,6 +34,59 @@ export const SHAPES = {
   triangle: poly([[0.5, 0.04], [0.98, 0.94], [0.02, 0.94]]),
   arrow: poly([[0.5, 0], [1, 1], [0.5, 0.74], [0, 1]]),
   plane: poly([[0.5, 0], [0.56, 0.12], [0.57, 0.36], [0.98, 0.62], [0.98, 0.72], [0.57, 0.58], [0.55, 0.86], [0.68, 0.95], [0.68, 1], [0.5, 0.95], [0.32, 1], [0.32, 0.95], [0.45, 0.86], [0.43, 0.58], [0.02, 0.72], [0.02, 0.62], [0.43, 0.36], [0.44, 0.12]]),
+  // helicopter from above, nose up: cabin, tail boom with fin, main rotor as a cross
+  helicopter: (g) => {
+    g.beginPath();
+    g.ellipse(0.5, 0.4, 0.14, 0.2, 0, 0, Math.PI * 2);
+    g.rect(0.465, 0.52, 0.07, 0.4);
+    g.rect(0.38, 0.86, 0.24, 0.07);
+    g.fill();
+    g.lineWidth = 0.06;
+    g.lineCap = 'round';
+    g.strokeStyle = '#fff';
+    g.beginPath();
+    g.moveTo(0.06, 0.12);
+    g.lineTo(0.94, 0.68);
+    g.moveTo(0.94, 0.12);
+    g.lineTo(0.06, 0.68);
+    g.stroke();
+  },
+  // quadcopter from above: body, four arms with a rotor disc each
+  drone: (g) => {
+    g.lineWidth = 0.07;
+    g.lineCap = 'round';
+    g.strokeStyle = '#fff';
+    g.beginPath();
+    g.moveTo(0.2, 0.2);
+    g.lineTo(0.8, 0.8);
+    g.moveTo(0.8, 0.2);
+    g.lineTo(0.2, 0.8);
+    g.stroke();
+    g.beginPath();
+    g.rect(0.36, 0.36, 0.28, 0.28);
+    for (const [x, y] of [[0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]] as const) {
+      g.moveTo(x + 0.15, y);
+      g.arc(x, y, 0.15, 0, Math.PI * 2);
+    }
+    g.fill();
+  },
+  // airport vehicle from above, nose up, with a windscreen cut out
+  car: (g) => {
+    g.beginPath();
+    g.moveTo(0.3, 0.04);
+    g.lineTo(0.7, 0.04);
+    g.lineTo(0.8, 0.22);
+    g.lineTo(0.8, 0.96);
+    g.lineTo(0.2, 0.96);
+    g.lineTo(0.2, 0.22);
+    g.closePath();
+    g.moveTo(0.3, 0.3);
+    g.lineTo(0.7, 0.3);
+    g.lineTo(0.7, 0.46);
+    g.lineTo(0.3, 0.46);
+    g.closePath();
+    g.fill('evenodd');
+  },
   ship: poly([[0.5, 0], [0.78, 0.28], [0.78, 0.92], [0.7, 1], [0.3, 1], [0.22, 0.92], [0.22, 0.28]]),
   diamond: poly([[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]]),
   square: poly([[0.08, 0.08], [0.92, 0.08], [0.92, 0.92], [0.08, 0.92]]),

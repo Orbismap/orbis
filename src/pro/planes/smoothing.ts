@@ -7,7 +7,7 @@
 // are dropped after a short grace time.
 import type { TrackSample } from '../../ext/types';
 
-export type PlaneModel = 'light' | 'narrow' | 'wide' | 'heli';
+export type PlaneModel = 'light' | 'narrow' | 'wide' | 'heli' | 'drone' | 'car' | 'tug' | 'firetruck';
 
 export interface PlaneState {
   id: string;
@@ -64,8 +64,12 @@ export function metres(aLon: number, aLat: number, bLon: number, bLat: number): 
 }
 
 /** Which model an aircraft gets. */
-export function modelOf(s: Pick<TrackSample, 'heli' | 'category'>): PlaneModel {
+export function modelOf(s: Pick<TrackSample, 'heli' | 'category'> & { label?: string }): PlaneModel {
   if (s.heli) return 'heli';
+  if (s.category === 'B6') return 'drone';
+  if (s.category === 'C1') return 'firetruck';
+  // service vehicles: the callsign tells a follow-me / ops car from a tug (no better information in ADS-B)
+  if (s.category === 'C2') return /follow|^fm\b|^fmc|ops|van|car|^me\d/i.test(s.label ?? '') ? 'car' : 'tug';
   if (s.category === 'A5' || s.category === 'A6') return 'wide';
   if (s.category === 'A1' || s.category === 'A2' || s.category === 'B1' || s.category === 'B4') return 'light';
   return 'narrow';
@@ -105,7 +109,7 @@ export class PlaneTracker {
       const prev = this.planes.get(s.id);
       const common = { label: s.label, model: modelOf(s), emergency: s.emergency, military: s.military, ground: s.ground, color: Number.parseInt(s.color.slice(1), 16) || 0xffffff, lon: s.lng, lat: s.lat, altM: s.altM, vsMs: s.vrMs, track, speedMs: s.speedMs, at, fixEpoch: s.t, seen: now, live: !!s.live };
       if (!prev) {
-        const state: PlaneState = { id: s.id, ...common, dLon: s.lng, dLat: s.lat, dAlt: s.altM, dTrack: track, trail: [[s.lng, s.lat, trailAlt(s.ground, s.altM), at]] };
+        const state: PlaneState = { id: s.id, ...common, dLon: s.lng, dLat: s.lat, dAlt: s.altM, dTrack: track, trail: s.live ? [[s.lng, s.lat, trailAlt(s.ground, s.altM), at]] : [] };
         const t = targetOf(state, now);
         state.dLon = t.lon;
         state.dLat = t.lat;
@@ -117,8 +121,8 @@ export class PlaneTracker {
       // the same fix again, or an older one (the overview after the detailed view): nothing new
       if (s.t <= prev.fixEpoch) continue;
       const last = prev.trail[prev.trail.length - 1];
-      // an aircraft that did not move since the last report adds no trail point
-      if (!last || metres(last[0], last[1], s.lng, s.lat) >= (s.ground ? TRAIL_STEP_GROUND_M : TRAIL_STEP_M)) {
+      // the trail comes from live data only (not the overview snapshot); an aircraft that did not move since the last report adds no point
+      if (s.live && (!last || metres(last[0], last[1], s.lng, s.lat) >= (s.ground ? TRAIL_STEP_GROUND_M : TRAIL_STEP_M))) {
         prev.trail.push([s.lng, s.lat, trailAlt(s.ground, s.altM), at]);
         if (prev.trail.length > TRAIL_MAX) prev.trail.shift();
       }
