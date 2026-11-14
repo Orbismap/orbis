@@ -46,6 +46,8 @@ export interface TrackLayerOptions {
   describe(track: TrackObject, now: number): InspectCard;
   feed?(tracks: TrackObject[]): FeedItem[];
   minZoom?: number;
+  /** True: icons and ring are hidden and no positions are pushed (data, status and feed keep running); an extension presents the objects. */
+  hidden?: ReadonlySignal<boolean>;
   count?: ReadonlySignal<number | undefined>;
 }
 
@@ -98,12 +100,21 @@ export function trackLayer(ctx: LayerContext, o: TrackLayerOptions): LayerHandle
   // dead reckoning while the tab is visible and something moves
   const tick = setInterval(() => {
     if (typeof document !== 'undefined' && document.hidden) return;
+    if (o.hidden?.peek()) return;
     const list = data.peek();
     if (list?.some((t) => t.speed && t.heading !== undefined)) push();
   }, o.tickMs ?? 100);
   clean.add(() => clearInterval(tick));
 
   if (o.feed) clean.add(effect(() => { const l = data.value; if (l) ctx.feed(withCards(o.feed!(l), (id) => l.find((t) => t.id === id), (t) => o.describe(t, Date.now()))); }));
+  if (o.hidden) {
+    const hidden = o.hidden;
+    clean.add(effect(() => {
+      const off = hidden.value;
+      for (const id of [specs.main.id, specs.ring.id]) if (ml.getLayer(id)) ml.setLayoutProperty(id, 'visibility', off ? 'none' : 'visible');
+      if (!off) push();
+    }));
+  }
   clean.add(trackStatus(ctx, data, o.resources ?? ('reload' in o.data ? [o.data] : []), o.count));
   clean.add(bindProp(ml, main, 'paint', 'icon-color', o.color));
   if (isSignal(o.symbol.size)) clean.add(bindProp(ml, main, 'layout', 'icon-size', o.symbol.size));

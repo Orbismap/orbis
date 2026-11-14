@@ -19,13 +19,15 @@
     "maplibre-gl": "^6.17.0",
     "pmtiles": "^4.5.0",
     "preact": "^10.29.8",
-    "satellite.js": "^7.1.0"
+    "satellite.js": "^7.1.0",
+    "three": "0.183.2"
   },
   "devDependencies": {
     "@maplibre/maplibre-gl-style-spec": "^26.6.0",
     "@preact/preset-vite": "^2.10.6",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^22.20.5",
+    "@types/three": "0.183.1",
     "playwright-core": "^1.65.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.8",

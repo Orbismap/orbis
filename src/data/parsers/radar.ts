@@ -4,12 +4,14 @@ import { computeFlow, pixelsToBytes } from '../../render/gl/radar-values';
 /** PNG bytes of a RainViewer tile -> rain-rate bytes (see render/gl/radar-values.ts). */
 export async function radarTile(png: ArrayBuffer): Promise<{ bytes: Uint8Array; size: number }> {
   const bmp = await createImageBitmap(new Blob([png], { type: 'image/png' }));
+  // read the size before close(): a closed bitmap reports width and height 0 (getImageData then throws "source height is 0")
   const size = bmp.width;
-  const c = new OffscreenCanvas(size, bmp.height);
+  const height = bmp.height;
+  const c = new OffscreenCanvas(size, height);
   const cx = c.getContext('2d', { willReadFrequently: true })!;
   cx.drawImage(bmp, 0, 0);
   bmp.close();
-  return { bytes: pixelsToBytes(cx.getImageData(0, 0, size, bmp.height).data, size), size };
+  return { bytes: pixelsToBytes(cx.getImageData(0, 0, size, height).data, size), size };
 }
 
 export interface RadarFlowArgs { a: Uint8Array; sa: number; b: Uint8Array; sb: number }

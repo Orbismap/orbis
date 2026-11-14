@@ -16,6 +16,8 @@ import { acquireDetail, circleFeed, OVERVIEW_HUBS, DETAIL_LOAD_ZOOM, DETAIL_SHOW
 import { parseAircraftRecord, parsePhoto, parseRoute, routeFeatures, type AircraftPhoto, type AircraftRecord, type FlightRoute } from '../../data/parsers/flightinfo';
 import type { AircraftProps } from '../../data/parsers/readsb';
 import { ALT_STOPS, altitudeText, rateText, speedText } from '../../data/parsers/traffic';
+import { tracksChannel } from '../../ext/channels';
+import type { TrackSample } from '../../ext/types';
 import { extrapolate, trackLayer, type TrackObject } from '../../render/tracks';
 import { defineLayer } from '../define';
 import type { InspectCard, LayerContext } from '../types';
@@ -138,18 +140,20 @@ export default defineLayer({
       if (o.milOnly) clauses.push(['get', 'mil']);
       return clauses.length ? (['all', ...clauses] as FilterSpecification) : undefined;
     });
+    const passes = (t: TrackObject): boolean => {
+      const o = ctx.options.peek();
+      const min = Number(o.minAlt);
+      const p = t.props as unknown as AircraftProps;
+      if (!o.ground && p.gnd) return false;
+      if (min > 0 && p.alt < min && !p.emerg) return false;
+      if (o.kind === 'heli' && !p.heli) return false;
+      if (o.milOnly && !p.mil) return false;
+      return true;
+    };
     const countOf = (list: TrackObject[] | undefined) => {
       if (!list) return undefined;
-      const o = ctx.options.value;
-      const min = Number(o.minAlt);
-      return list.filter((t) => {
-        const p = t.props as unknown as AircraftProps;
-        if (!o.ground && p.gnd) return false;
-        if (min > 0 && p.alt < min && !p.emerg) return false;
-        if (o.kind === 'heli' && !p.heli) return false;
-        if (o.milOnly && !p.mil) return false;
-        return true;
-      }).length;
+      ctx.options.value; // re-run when the options change
+      return list.filter(passes).length;
     };
 
     // status of the layer: the overview below zoom 5, the detailed view above
@@ -206,7 +210,9 @@ export default defineLayer({
       if (p.mil) facts.push({ label: 'Hinweis', value: 'Militärisch (Datenbankflag)' });
       if (en?.photo) facts.push({ label: 'Foto', value: `© ${en.photo.photographer} (Planespotters.net)` });
       facts.push({ label: 'Letzte Meldung', value: age < 2 ? 'gerade eben' : `vor ${age}${NNBSP}s` });
+      const actions = tracksChannel.actionsFor(p.hex);
       return {
+        ...(actions.length ? { actions } : {}),
         title,
         subtitle: p.call && reg ? reg : sq ?? (p.heli ? 'Hubschrauber' : p.mil ? 'Militärflugzeug' : 'Flugzeug'),
         color: sq ? EMERGENCY : p.mil ? MILITARY : p.gnd ? GROUND : COLOR,
@@ -229,6 +235,32 @@ export default defineLayer({
       mine.add(card);
       return card;
     };
+    // --- channel for extensions (3D): the detailed view, filtered like the 2D icons; built only while someone listens ---
+    const samples = (): TrackSample[] => {
+      const out: TrackSample[] = [];
+      for (const t of detail.res.data.peek() ?? []) {
+        if (!passes(t)) continue;
+        const p = t.props as unknown as AircraftProps;
+        out.push({
+          id: t.id, lng: t.lng, lat: t.lat, altM: p.gnd ? 0 : p.alt, track: p.trk >= 0 ? p.trk : t.heading, speedMs: t.speed ?? 0, vrMs: p.vr,
+          ground: p.gnd, heli: p.heli, category: p.cat, emergency: p.emerg, military: p.mil, label: p.call || p.reg || p.hex.toUpperCase(), t: t.t,
+        });
+      }
+      return out;
+    };
+    const stopPublish = effect(() => { detail.res.data.value; ctx.options.value; tracksChannel.publish(samples); });
+    const stopSelectedId = effect(() => { tracksChannel.setSelectedId(selHex.value); });
+    // an extension changed its card buttons: rebuild the card (version.peek: the effect must not read what it writes)
+    const stopActions = effect(() => { tracksChannel.actionsVersion.value; version.value = version.peek() + 1; });
+    const offSelect = tracksChannel.onSelect((id) => {
+      if (id === null) { if (selHex.peek()) ctx.select(null); return; }
+      const t = detail.res.data.peek()?.find((x) => x.id === id) ?? trackOf(id);
+      if (!t) return;
+      const card = describe(t, Date.now());
+      card.location ??= posOf(t);
+      ctx.select(card);
+    });
+
     // a card of another layer (or none) in the inspector: forget the selection
     const stopSel = effect(() => { const c = ctx.selection.value; if (!c || !mine.has(c)) selHex.value = null; });
     // enrichment arrived: update the card in place (ownSelection keeps the selection ring)
@@ -289,14 +321,14 @@ export default defineLayer({
         }),
     });
     const detailH = trackLayer(silent, {
-      data: detail.res, color, symbol: { icon: 'plane', size }, ringRadius: 16, maxExtrapolateMs: 30_000, filter, minZoom: DETAIL_SHOW_ZOOM, describe,
+      data: detail.res, color, symbol: { icon: 'plane', size }, ringRadius: 16, maxExtrapolateMs: 30_000, filter, minZoom: DETAIL_SHOW_ZOOM, describe, hidden: tracksChannel.presented,
     });
     // the overview ends where the detailed view starts (layer ranges are disjoint, so no aircraft is drawn twice)
     for (const id of [`${ctx.id}.world-symbols`, `${ctx.id}.world-ring`]) if (ml.getLayer(id)) ml.setLayerZoomRange(id, 0, DETAIL_SHOW_ZOOM);
 
     return {
       destroy() {
-        stopStatus(); stopSel(); stopUpdate(); stopRoute(); stopFallback(); stopRemember();
+        stopStatus(); stopSel(); stopUpdate(); stopPublish(); stopSelectedId(); stopActions(); offSelect(); tracksChannel.reset(); stopRoute(); stopFallback(); stopRemember();
         clearInterval(routeTimer);
         ml.off('zoomend', onZoom);
         ml.off('moveend', onZoom);

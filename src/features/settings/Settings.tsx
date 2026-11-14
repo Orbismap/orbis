@@ -4,6 +4,7 @@ import { leftView, shortcutsOpen } from '../../state/ui';
 import { Button, IconButton } from '../../ui/Button';
 import { Segmented } from '../../ui/Segmented';
 import { BoostSection } from '../boost/BoostSection';
+import { ProSection } from './ProSection';
 import { allSources } from '../attribution/credits';
 import './settings.css';
 
@@ -70,6 +71,7 @@ export function SettingsView() {
         </div>
       </section>
       <BoostSection />
+      <ProSection />
       <section class="set-sec" aria-labelledby="set-about">
         <h3 id="set-about">Über Orbis Map</h3>
         <div class="setgroup set-about">

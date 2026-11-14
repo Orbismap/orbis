@@ -371,6 +371,68 @@ async function main() {
       }
     }
 
+    // radar zoomed in far (over-zoomed z7 tiles over Europe): ready, not error. Regression: the tile decoder read the bitmap
+    // height after close() (0), every tile failed and the layer reported "RainViewer antwortet nicht" once 4 tiles had failed.
+    {
+      const r = await page.evaluate(async ([s]) => {
+        const o = window.__orbis;
+        o.view.setProjection('mercator');
+        o.karten.editKarte(s, (k) => ({ ...k, layers: [{ id: 'radar', visible: true, opacity: 1 }] }));
+        o.engine.ml.jumpTo({ center: [8.57, 50.03], zoom: 10, pitch: 0, bearing: 0 });
+        const t0 = performance.now();
+        let st;
+        // give the tiles time to arrive and fail (if they do): the error state needs several failed tiles
+        while (performance.now() - t0 < 12000) {
+          st = o.session.layerStatus.peek().radar;
+          if (st && st.state === 'error') break;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        st = o.session.layerStatus.peek().radar;
+        return { state: st?.state, note: st?.note };
+      }, [scratch]);
+      report(r.state === 'ready', '4 radar at zoom 10 over Europe: ready, no error', `${r.state}${r.note ? ' ' + r.note : ''}`);
+      await page.evaluate((s) => window.__orbis.karten.editKarte(s, (k) => ({ ...k, layers: [] })), scratch);
+    }
+
+    // Pro (3D extension): flugzeuge + Pro on, a busy area at a zoom where 3D takes over -> the stage reports aircraft,
+    // the 2D icons are hidden, no page errors; Pro off -> 2D icons back, stage gone
+    {
+      const hasPro = await page.evaluate(() => !!window.__orbis?.ext?.available);
+      if (!hasPro) info('Pro folder not in this build: Pro check skipped');
+      else {
+        const e0 = errors.length;
+        // the check moves the camera to Frankfurt at zoom 9.6: put it back afterwards (later checks, e.g. the radar tiles, assume the earlier view)
+        const cam0 = await page.evaluate(() => { const ml = window.__orbis.engine.ml; const c = ml.getCenter(); return { center: [c.lng, c.lat], zoom: ml.getZoom(), pitch: ml.getPitch(), bearing: ml.getBearing() }; });
+        const vis = () => page.evaluate(() => { const ml = window.__orbis.engine.ml; return ml.getLayer('flugzeuge-symbols') ? ml.getLayoutProperty('flugzeuge-symbols', 'visibility') ?? 'visible' : 'missing'; });
+        await page.evaluate(([s]) => {
+          const o = window.__orbis;
+          o.view.setProjection('mercator');
+          o.settings.updateSettings({ pro: true });
+          o.karten.editKarte(s, (k) => ({ ...k, layers: [{ id: 'flugzeuge', visible: true, opacity: 1 }] }));
+          o.engine.ml.jumpTo({ center: [8.57, 50.03], zoom: 9.6, pitch: 0, bearing: 0 }); // Frankfurt: busy airspace
+        }, [scratch]);
+        let st;
+        for (let i = 0; i < 90; i++) {
+          st = await page.evaluate(() => window.__orbis.ext.stage());
+          if (st && st.aircraft > 0 && st.drawn > 0 && st.frames > 0) break;
+          await sleep(500);
+        }
+        const hidden = await vis();
+        const running = await page.evaluate(() => !!window.__orbis.ext.status()?.running);
+        report(running && !!st && st.aircraft > 0 && st.drawn > 0 && hidden === 'none' && errors.length === e0, '8 pro: 3D aircraft, 2D icons hidden, no errors',
+          `running ${running} stage ${JSON.stringify(st)} 2D visibility ${hidden}${errors.length > e0 ? ' ' + errors[e0] : ''}`);
+        // idle cost: the stage only keeps rendering while aircraft move; report how often (not a pass/fail limit, planes do move)
+        const renders = await page.evaluate(async () => { const ml = window.__orbis.engine.ml; let n = 0; const f = () => n++; ml.on('render', f); await new Promise((r) => setTimeout(r, 3000)); ml.off('render', f); return n; });
+        info(`pro idle render events in 3 s with moving aircraft: ${renders}`);
+        await page.evaluate(() => window.__orbis.settings.updateSettings({ pro: false }));
+        let back = await vis();
+        for (let i = 0; i < 20 && back !== 'visible'; i++) { await sleep(100); back = await vis(); }
+        const gone = await page.evaluate(() => !window.__orbis.engine.ml.getLayer('orbis-stage') && !window.__orbis.ext.status()?.running);
+        report(back === 'visible' && gone && errors.length === e0, '8 pro off: 2D icons back, stage removed', `2D visibility ${back} stageGone ${gone}`);
+        await page.evaluate(([s, cam]) => { const ml = window.__orbis.engine.ml; window.__orbis.karten.editKarte(s, (k) => ({ ...k, layers: [] })); ml.jumpTo(cam); }, [scratch, cam0]);
+      }
+    }
+
     // every builtin Karte activates and all its visible layers settle
     if (!flag('only-core') || true) {
       const kids = await page.evaluate(() => window.__orbis.karten.karten.peek().filter((k) => k.builtin).map((k) => k.id));

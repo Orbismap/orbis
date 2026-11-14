@@ -44,6 +44,8 @@ src/
   karten/               Karten-Modell, Standardkarten, Persistenz
   state/                Signale: view, session, time, selection, ui, settings
   ui/                   Designsystem: tokens.css, base.css, Primitive, icons/
+  ext/                  Erweiterungs-Schnittstelle (types, channels, licence, loader), kein three.js
+  pro/                  Orbis Pro (3D), optional, eigener Chunk, siehe „Erweiterungen und Orbis Pro“
   features/             zusammengesetzte Oberfläche: karten-bar, layers-panel, catalog, timeline, legend, inspector, probe, search, settings, attribution, toasts
 test/                   Rauchtest (Playwright)
 docs/                   ARCHITECTURE, DESIGN, LAYERS (Ebene anlegen), DATA (Quellen)
@@ -388,6 +390,120 @@ Breakpoint), `settings` (Einheiten, Thema, Bewegung, Schlüssel).
   mit großen Sammlungen.
 - Kein Layout-Thrashing: UI liest Kartenwerte aus Signalen, die `map/` gedrosselt setzt.
 - `content-visibility`, virtuelle Listen ab 200 Einträgen (Katalog, Feed).
+
+## Erweiterungen und Orbis Pro
+
+Die Basis-App ist vollständig und läuft ohne Erweiterung. **Orbis Pro** ist die erste: eine 3D-Darstellung für
+ausgewählte Ebenen (Start: Flugzeuge). Pro liegt in `src/pro/`, wird nur bei eingeschaltetem Pro nachgeladen und kennt die
+Basis ausschließlich über eine schmale Schnittstelle. Der Ordner kann später ohne Umbau in ein eigenes Repo wandern.
+
+### Was die Basis garantiert
+
+- **Pro ist optional im Build.** `src/ext/loader.ts` lädt per `import.meta.glob('../pro/index.ts')` (lazy). Ohne `src/pro`
+  ist der Glob leer: Build und App laufen unverändert, `proAvailable` ist falsch, die Einstellungen zeigen keinen Schalter.
+  Mit dem Ordner landet three.js samt allem Pro-Code in **einem** eigenen Chunk (`pro-*.js`), der erst lädt, wenn Pro
+  einschaltet wird. Er steckt nicht im Start-Bundle.
+- **Kein statischer Import von Pro.** Außerhalb von `src/pro` importiert nichts aus `/pro/`, außer dem Glob im Loader, und
+  nichts importiert `three`. `src/ext/ext.test.ts` prüft beides per Textsuche über `src`. Derselbe Test sorgt dafür, dass
+  `src/pro` selbst nur sich, Pakete und die Typen aus `ext/types` (nur `import type`) importiert: nur so bleibt der Ordner
+  verschiebbar.
+- **Freischaltung an einer Stelle.** `ext/licence.ts` exportiert `proEnabled` (Signal). Heute ist es nur der lokale Schalter
+  `settings.pro` („Einstellungen → Orbis Pro“); dort kommt später die Prüfung von Konto/Lizenz hin. Niemand liest
+  `settings.pro` direkt.
+- **Lebenszyklus.** `startExtensions()` (einmal in `main.tsx`) startet die Erweiterung, sobald `proEnabled` wahr ist und eine
+  Karte existiert, und ruft deren Aufräumfunktion bei Pro aus (oder wenn die Karte verschwindet). Ein-/Ausschalten ist
+  beliebig oft möglich; nach dem Ausschalten ist die 2D-Darstellung sofort zurück und kein Layer, Listener oder Timer bleibt.
+- **Daten bleiben der Basis.** Eine Ebene lädt, pollt, filtert und beschreibt ihre Objekte weiter selbst. Die Erweiterung
+  bekommt nur eine Sicht darauf, nie die Ebene.
+
+### Vertrag (`src/ext/types.ts`)
+
+```ts
+interface OrbisExtension { id: string; start(host: ExtensionHost): () => void }   // Rückgabe: stoppt und räumt auf
+interface ExtensionHost {
+  map: MlMap;                                   // MapLibre (nur Typ aus dem Paket)
+  addCustomLayer(layer, slot: 'points' | 'labels' | 'top'): void;   removeLayer(id): void;
+  projection: ReadonlySignal<'globe' | 'mercator'>;
+  tracks: TracksChannel;                        // Kanal für bewegte Objekte (Flugzeuge)
+  reducedMotion(): boolean;
+}
+```
+
+Diese Datei ist das Einzige, was eine Erweiterung aus der Basis importieren darf, und nur als Typ. Sie ist bewusst klein
+und dokumentiert: beim Umzug in ein eigenes Repo wird sie kopiert oder als Typenpaket veröffentlicht. Neue Fähigkeiten
+kommen als neue Felder am Host oder als neuer Kanal dazu, nie als Import von Basis-Internem.
+
+### Kanäle (`src/ext/channels.ts`)
+
+Neutrale Datenkanäle: Basis-Ebenen **veröffentlichen**, was eine Erweiterung anders darstellen darf, Erweiterungen **hören zu**.
+Heute gibt es einen, `tracksChannel` (Ebene `flugzeuge`):
+
+| Seite | Was |
+|---|---|
+| Ebene → Kanal | `publish(build)`: aktuelle `TrackSample[]` (id, lng, lat, Höhe m, Kurs, Geschwindigkeit, Steigrate, Boden, Hubschrauber, Kategorie, Notfall, Militär, Rufzeichen, Zeit der Meldung), gefiltert wie die 2D-Symbole (nur die Detailansicht ab Zoom 5). `build` läuft nur, wenn jemand zuhört: **ohne Zuhörer kostet Veröffentlichen eine Zuweisung.** |
+| Ebene → Kanal | `setSelectedId`, `onSelect(handler)`: welche Karte die Ebene gerade zeigt, und wie ein `select(id)` der Erweiterung ihre echte Karte (Route, Foto) öffnet |
+| Ebene ← Kanal | `presented`: wahr, solange eine Erweiterung die Darstellung übernommen hat. `trackLayer` (Option `hidden`) blendet dann Symbole und Ring aus; Daten, Polling, Status und Feed laufen weiter |
+| Ebene ← Kanal | `actionsFor(id)`, `actionsVersion`: Schaltflächen, die Erweiterungen zur Karte beisteuern; die Ebene baut ihre Karte bei jeder Änderung neu (`InspectCard.actions`, der Inspektor zeigt sie als normale Schaltflächen) |
+| Erweiterung | `subscribe(fn)` (bekommt sofort die letzte Liste), `selectedId`, `select(id)`, `present()` (Rückgabe: gibt die Darstellung zurück; Aufrufe zählen, 2D kommt zurück, wenn der letzte losgelassen hat), `contributeActions(provider)` |
+
+Beim Abschalten der Ebene sendet `reset()` eine leere Liste und vergisst die Auswahl.
+
+### Pro-Paket (`src/pro/`)
+
+```
+index.ts            OrbisExtension: Bühne, Flugzeuge, Folgekamera, Umschalten 2D <-> 3D
+world3d/            die Bühne: EIN MapLibre-Custom-Layer 'orbis-stage' mit EINEM three.js-Renderer für alles 3D
+  frame.ts          Koordinaten und Matrizen (Globus, Mercator, Übergang), place/position/toScreen/occluded
+  stage.ts          Custom-Layer, Teile (StagePart), Picking/Hover/Klick, Neuzeichnen nur bei Bedarf
+  instances.ts      Instanzen: tausende gleiche Modelle in einem Aufruf
+  line.ts, wall.ts  Linie konstanter Pixelbreite und „Vorhang“ zum Boden, mit Globus-Verdeckung
+planes/             Teil „Flugzeuge“
+  smoothing.ts      Zustand zwischen Meldungen (Koppelnavigation + Angleichen), rein und getestet
+  models.ts         prozedurale Modelle: light, narrow, wide, heli
+  trail.ts          Spur in echter Höhe + Wand
+  planes.ts         der StagePart: Modelle, Schatten, Fallinie, Spuren, Beschriftung, Picking
+  follow.ts, follow-math.ts   Folgekamera
+```
+
+**Bühne.** Auf der flachen Karte zeichnet die Bühne direkt in die Karte (Tiefentest gegen die 2,5D-Gebäude). Auf dem
+Globus geht das nicht: MapLibres Tiefenpuffer enthält dort die Entfernung zur Horizontebene statt echter Tiefe. Deshalb
+bekommt die Szene dort einen eigenen Framebuffer mit eigenem Tiefenpuffer (4× MSAA, Halbfloat) und wird danach über die Karte
+gelegt (Komposit-Shader, sRGB-kodiert); der Globus selbst verdeckt per Strahltest (`GeoFrame.occluded`, Fragment-Shader der
+Linien) und per unsichtbarer Erdkugel im Tiefenpuffer. Alles wird relativ zur Kartenmitte in doppelter Genauigkeit gerechnet,
+die GPU sieht nur kleine Zahlen. Vor dem Zeichnen setzt die Bühne den GL-Zustand von three.js zurück (`resetState`);
+MapLibre setzt seinen eigenen nach Custom-Layern zurück. Zuordnung im Layerstapel: Slot `points` (über 2,5D-Gebäuden und
+Bodenlayern, unter den eigenen Beschriftungen).
+
+**Nur rendern, wenn sich etwas ändert.** MapLibre ruft `render` bei Kamera- und Stiländerungen. Ein Teil, der sich bewegt,
+antwortet in `update` mit `true`; die Bühne plant dann das nächste Bild: volle Rate, solange die Kamera sich bewegt,
+sonst alle 50 ms (≈ 20 fps), nie bei verstecktem Tab. Ohne Flugzeuge in Sicht oder ohne eingeschaltete Ebene rendert nichts.
+
+**Nächsten 3D-Teil ergänzen.** (1) Die Basis-Ebene bekommt einen Kanal in `ext/channels.ts` (neuer Typ in `ext/types.ts`,
+`publish`, `present`-Anbindung wie bei `trackLayer.hidden`). (2) In `src/pro/<teil>/` ein `StagePart` schreiben
+(`object`, `update(frame, now)`, optional `pick`, `click`, `hover`, `stats`, `dispose`); Platzierung nur mit
+`frame.place/position`, Linien mit `GeoLine`/`GeoWall`, Massen mit `GeoInstances`. (3) In `pro/index.ts`: `stage.add(part)`,
+Kanal abonnieren, Umschaltschwelle (mit Hysterese) wählen, `present()` rufen, wenn der Teil zeichnet. Nichts davon darf
+three.js oder Pro-Code in die Basis ziehen.
+
+**Flugzeuge.** 3D ab Zoom **9** (zurück unter **8,7**, wie die Schwelle der alten App; darunter bleiben die 2D-Symbole). Modelle
+in echter Höhe, zwischen Meldungen per Koppelnavigation bewegt und an jede neue Meldung angeglichen (kein Zurückziehen
+entlang des Kurses, Hüpfen ausgeschlossen); Spur in echter Höhe mit schwacher Wand zum Boden (nur tief, wie in der alten
+App), Fallinie und Bodenschatten; höchstens 60 Spuren plus die der Auswahl (die nächsten zur Kartenmitte). Klick oder
+Tipp auf Modell oder Spur → `tracks.select(id)` → die bestehende Karte der Ebene `flugzeuge` (Route, Foto). Das gewählte
+Flugzeug ist hervorgehoben.
+
+**Folgekamera.** Schaltfläche „Folgen“ / „Folgen beenden“ auf der Karte. Sie verschiebt nur die Kartenmitte (auf der flachen
+Karte samt Mittenhöhe, sodass das Flugzeug mittig bleibt; auf dem Globus über `focusCentre`) und lässt Zoom, Drehung und Neigung
+unberührt: `map/limits.ts` (Neigungsgrenze nach Zoom, Gummiband, Nord-Rückstellung) greift also wie ohne Folgen, und Rad/
+Pinch zoomen um die Mitte. Folgen endet beim Ziehen der Karte, bei jeder anderen Kamerafahrt (Suche, „Hierhin fliegen“), bei
+Abwahl der Karte, beim Verschwinden des Flugzeugs und mit Esc. Solange gefolgt wird, bleibt 3D auch unter Zoom 8,7 an.
+
+### Prüfung
+
+`src/ext/ext.test.ts` (Kanal, kein statischer Import), `src/pro/world3d/frame.test.ts` (Rahmen-Mathematik),
+`src/pro/planes/smoothing.test.ts` (Glättung), `follow-math.test.ts` (Folgekamera). Rauchtest Punkt 8: Pro an, `flugzeuge`
+an, Frankfurt auf Zoom 9,6 → die Bühne meldet Flugzeuge, die 2D-Symbole sind ausgeblendet, keine Seitenfehler; Pro aus →
+Symbole zurück, Bühne entfernt. `window.__orbis.ext` (nur `?smoke`/Dev) liefert dafür `status()`, `tracks` und `stage()`.
 
 ## Qualität
 

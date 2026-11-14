@@ -48,6 +48,8 @@ export interface InspectCard {
   media?: { type: 'image' | 'video' | 'audio' | 'hls'; url: string; poster?: string; refresh?: number };
   links?: { label: string; url: string }[];
   location?: [lng: number, lat: number];
+  /** Extra buttons of the card, e.g. contributed by an extension ("Folgen"). Rendered by the inspector as plain buttons. */
+  actions?: { id: string; label: string; icon?: IconName; active?: boolean; run(): void }[];
 }
 
 export interface FeedItem { id: string; title: string; subtitle?: string; time?: number; magnitude?: number; color?: string; location: [number, number];

@@ -70,6 +70,10 @@
     color: var(--text-2);
     line-height: var(--lh-text);
   }
+  .set-pro-note {
+    padding: 0 var(--s-3) var(--s-3);
+    font-size: var(--fs-small);
+  }
   .set-details summary {
     cursor: pointer;
     min-height: var(--hit, 28px);

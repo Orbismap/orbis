@@ -4,6 +4,8 @@ import './ui/base.css';
 import { App } from './app/App';
 import * as karten from './karten/store';
 import { initKartenStore } from './karten/store';
+import { tracksChannel } from './ext/channels';
+import { extensionStatus, proAvailable, startExtensions } from './ext/loader';
 import { allLayers, getLayer } from './layers/registry';
 import { getEngine } from './map/engine';
 import { buildingsTiltState } from './map/buildings-tilt';
@@ -25,6 +27,7 @@ initUi();
 startClock();
 watchRange();
 startUrlSync();
+startExtensions();
 
 render(<App />, document.getElementById('app')!);
 
@@ -35,5 +38,12 @@ if (location.search.includes('smoke') || import.meta.env.DEV) {
     karten, session, selection, view, time, settings,
     registry: { allLayers, getLayer },
     buildingsTilt: buildingsTiltState,
+    // Extensions: what is running, the aircraft channel, and what the 3D stage (custom layer 'orbis-stage') reports about itself
+    ext: {
+      available: proAvailable,
+      status: extensionStatus,
+      tracks: tracksChannel,
+      stage: () => (getEngine()?.ml.getLayer('orbis-stage') as unknown as { implementation?: { stats?(): unknown } } | undefined)?.implementation?.stats?.(),
+    },
   };
 }
