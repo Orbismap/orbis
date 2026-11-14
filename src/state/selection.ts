@@ -8,7 +8,7 @@ export const inspector = signal<Inspected | null>(null);
 export const probe = signal<{ lng: number; lat: number } | null>(null);
 
 /** A searched place (desktop detail menu). It also sets the point query, so the marker and field values come for free. */
-export interface PlaceSel { id: string; title: string; subtitle: string; lng: number; lat: number; kind?: string }
+export interface PlaceSel { id: string; title: string; subtitle: string; lng: number; lat: number; kind?: string; /** type line, e.g. "Café" */ category?: string }
 export const place = signal<PlaceSel | null>(null);
 export function selectPlace(p: PlaceSel): void {
   batch(() => {
