@@ -34,10 +34,12 @@ export function Option({ spec, value, onChange }: { spec: OptionSpec; value: num
   if (spec.type === 'toggle') return <Switch label={spec.label} checked={value === true} onChange={onChange} />;
   if (spec.type === 'select') {
     const choices = spec.choices;
+    // a segmented control only while the labels fit in one row; otherwise a dropdown
+    const compact = choices.length <= 3 && choices.reduce((n, c) => n + c.label.length, 0) <= 24;
     return (
       <div class="ld-field">
         <span class="ld-label">{spec.label}</span>
-        {choices.length <= 3 ? (
+        {compact ? (
           <Segmented aria-label={spec.label} size="sm" value={String(value)} options={choices} onChange={onChange} />
         ) : (
           <Select aria-label={spec.label} value={String(value)} options={choices} onChange={onChange} />

@@ -35,9 +35,10 @@ const THEMES: Record<string, KarteTheme[]> = {
     T('rad-fuss', 'Rad und Fuß', 'pin', ['leihraeder', 'wegenetze']),
   ],
   infrastruktur: [
-    T('energie', 'Energie', 'power', ['kraftwerke', 'windraeder']),
-    T('netze', 'Netze', 'cable', ['seekabel', 'rechenzentren', 'internetknoten']),
-    T('rohstoffe', 'Rohstoffe', 'mine', ['rohstoffe', 'pipelines']),
+    T('energie', 'Energie', 'power', ['kraftwerke', 'stromnetz']),
+    T('netze', 'Netze', 'cable', ['telekomnetz', 'vermittlungsstellen', 'rechenzentren', 'internetknoten']),
+    T('rohstoffe', 'Rohstoffe', 'mine', ['rohstoffe', 'oelgasleitungen']),
+    T('wasser', 'Wasser', 'drop', ['wasserleitungen', 'wasserwerke', 'stauseen']),
     T('kameras', 'Kameras', 'camera', ['webcams', 'ueberwachung', 'kennzeichen']),
   ],
   erde: [
@@ -78,7 +79,7 @@ const DEFS: Karte[] = [
   },
   {
     id: 'infrastruktur', name: 'Infrastruktur', icon: 'power', color: '#58D0A0', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,
-    layers: [on('kraftwerke'), on('seekabel'), on('rechenzentren'), off('windraeder'), off('internetknoten'), off('rohstoffe'), off('pipelines')],
+    layers: [on('kraftwerke'), on('telekomnetz'), on('rechenzentren'), off('stromnetz'), off('vermittlungsstellen'), off('internetknoten'), off('rohstoffe'), off('oelgasleitungen'), off('wasserleitungen'), off('wasserwerke'), off('stauseen')],
   },
   {
     id: 'erde', name: 'Erde & Meer', icon: 'globe', color: '#8FDCFF', builtin: true, basemap: 'satellite', labels: true, terminator: true,

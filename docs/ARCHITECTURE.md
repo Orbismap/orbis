@@ -210,7 +210,7 @@ Anzahl passt sich an Fläche, Zoom und gemessene Bildrate an (Desktop bis 12 000
 ## Ebenen (`src/layers`)
 
 ```ts
-export type CategoryId = 'wetter' | 'gefahren' | 'verkehr' | 'infrastruktur' | 'erde' | 'meer' | 'medien' | 'gesellschaft';
+export type CategoryId = 'wetter' | 'gefahren' | 'verkehr' | 'infrastruktur' | 'wasser' | 'erde' | 'meer' | 'medien' | 'gesellschaft';
 export type LayerForm = 'field' | 'raster' | 'points' | 'lines' | 'areas' | 'tracks';
 export type Cadence = 'live' | 'minutes' | 'hourly' | 'daily' | 'static';
 

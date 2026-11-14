@@ -1,12 +1,17 @@
-// Power plants: one layer for all fuels (WRI Global Power Plant Database), parsed in the worker.
+// Power plants, wind parks, wind turbines and storage from two sources in one layer: OpenStreetMap (OpenInfraMap tiles, from zoom 5)
+// and the WRI Global Power Plant Database (parsed in the worker). WRI plants that OpenStreetMap also has are hidden (data/plantMerge).
 // Colour = fuel class, area = capacity, the world view shows only the large plants.
-import { computed, signal } from '@preact/signals';
+import { computed, effect, signal } from '@preact/signals';
 import type { ExpressionSpecification, FilterSpecification } from 'maplibre-gl';
 import { formatNumber } from '../../core/format';
 import { bucketUrl } from '../../data/endpoints';
 import { FUELS, FUEL_ORDER, type FuelClass, type PlantCollection, type PlantProps } from '../../data/parsers/powerplants';
+import { PlantMatcher, fuelClassOfOsm } from '../../data/plantMerge';
 import type { AnyFeature } from '../../render/common';
 import { pointLayer } from '../../render/points';
+import { vectorTileLayer } from '../../render/vectortiles';
+import { OIM_ATTRIBUTION, OIM_SOURCE, oimTiles } from '../../data/openinframap';
+import { OSM_PLANTS_MIN_ZOOM, OSM_SOURCES, describeOsmPlant, osmPlantFilter, osmPlantParts } from '../../data/oimPlants';
 import { defineLayer } from '../define';
 
 const COLOR = '#F5B73D';
@@ -26,24 +31,30 @@ export default defineLayer({
   id: 'kraftwerke',
   category: 'infrastruktur',
   title: 'Kraftwerke',
-  summary: 'Kraftwerke weltweit, Farbe nach Energieträger, Fläche nach Leistung',
+  summary: 'Kraftwerke, Windparks, Windräder und Speicher, Farbe nach Energieträger, Größe nach Leistung',
   icon: 'power',
   color: COLOR,
   form: 'points',
-  cadence: 'static',
-  sources: [{
-    name: 'WRI Global Power Plant Database', url: 'https://datasets.wri.org/dataset/globalpowerplantdatabase',
-    license: 'CC BY 4.0, World Resources Institute', manifest: { bucket: 'data', key: 'wri/powerplants.json' },
-  }],
+  cadence: 'daily',
+  sources: [
+    OIM_SOURCE,
+    {
+      name: 'WRI Global Power Plant Database', url: 'https://datasets.wri.org/dataset/globalpowerplantdatabase',
+      license: 'CC BY 4.0, World Resources Institute', manifest: { bucket: 'data', key: 'wri/powerplants.json' },
+    },
+  ],
   options: [
-    { id: 'fuel', label: 'Energieträger', type: 'select', default: 'all', choices: [{ value: 'all', label: 'Alle' }, ...FUEL_ORDER.map((k) => ({ value: k, label: FUELS[k].label }))] },
+    {
+      id: 'fuel', label: 'Energieträger', type: 'select', default: 'all',
+      choices: [{ value: 'all', label: 'Alle' }, ...FUEL_ORDER.map((k) => ({ value: k, label: FUELS[k].label })), { value: 'storage', label: 'Speicher (nur OpenStreetMap)' }],
+    },
     { id: 'minMw', label: 'Mindestleistung', type: 'range', min: 0, max: 2000, step: 10, default: 0, unit: 'MW' },
   ],
   legend: {
     type: 'classes',
-    items: FUEL_ORDER.map((k) => ({ color: FUELS[k].color, label: FUELS[k].label })),
+    items: [...FUEL_ORDER.map((k) => ({ color: FUELS[k].color, label: FUELS[k].label })), { color: OSM_SOURCES.battery!.color, label: 'Batterie (OpenStreetMap)' }],
   },
-  keywords: ['strom', 'energie', 'wind', 'solar', 'kohle', 'gas', 'atom', 'kernkraft', 'wasserkraft', 'power plant', 'wri'],
+  keywords: ['windrad', 'windräder', 'windpark', 'windkraft', 'turbine', 'speicher', 'pumpspeicher', 'batterie', 'openinframap', 'osm', 'strom', 'energie', 'wind', 'solar', 'kohle', 'gas', 'atom', 'kernkraft', 'wasserkraft', 'power plant', 'wri'],
 
   mount(ctx) {
     const plants = ctx.resource<PlantCollection>({ key: 'data:wri-powerplants', url: bucketUrl('data', 'wri/powerplants.json'), parse: 'powerPlants', timeout: 40_000 });
@@ -53,12 +64,56 @@ export default defineLayer({
     const onZoom = () => { const z = Math.floor(ml.getZoom()); if (z !== zoom.peek()) zoom.value = z; };
     ml.on('zoom', onZoom);
 
+    // --- OpenStreetMap: its plants are always drawn (from zoom 5, where the tiles have them)
+    const osmFilter = computed<FilterSpecification>(() => osmPlantFilter(String(ctx.options.value.fuel ?? 'all'), Number(ctx.options.value.minMw ?? 0)));
+    const osmSource = `${ctx.id}.osm-src`;
+    // the WRI layer reports the status of the row (the OSM tiles are not requested below zoom 5)
+    const osm = vectorTileLayer({ ...ctx, status: () => {} }, { tiles: oimTiles('power'), name: 'osm', attribution: OIM_ATTRIBUTION, parts: osmPlantParts(osmFilter), describe: describeOsmPlant });
+
+    // --- duplicate check: WRI plants with an OSM counterpart are hidden. The OSM objects come from the loaded tiles.
+    let matcher = new PlantMatcher(undefined);
+    const hiddenCount = signal(0);
+    const alive = { v: true };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const OSM_LIVE = ['all', ['!=', ['get', 'disused'], true], ['!=', ['get', 'construction'], true]] as FilterSpecification;
+    const scan = () => {
+      if (!alive.v || !ml.getSource(osmSource)) return;
+      let changed = false;
+      for (const sourceLayer of ['power_plant_point', 'power_generator'] as const) {
+        for (const f of ml.querySourceFeatures(osmSource, { sourceLayer, filter: OSM_LIVE })) {
+          if (f.geometry.type !== 'Point') continue;
+          const [lng, lat] = f.geometry.coordinates as [number, number];
+          if (matcher.addPoint(lng, lat, fuelClassOfOsm(f.properties?.source))) changed = true;
+        }
+      }
+      for (const f of ml.querySourceFeatures(osmSource, { sourceLayer: 'power_plant', filter: OSM_LIVE })) {
+        const ring = f.geometry.type === 'Polygon' ? f.geometry.coordinates.flat() : f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates.flat(2) : [];
+        if (!ring.length) continue;
+        let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
+        for (const [lng, lat] of ring as [number, number][]) (lng < w && (w = lng), lng > e && (e = lng), lat < s && (s = lat), lat > n && (n = lat));
+        if (matcher.addArea([w, s, e, n], fuelClassOfOsm(f.properties?.source))) changed = true;
+      }
+      if (changed) hiddenCount.value = matcher.hidden.size;
+    };
+    const schedule = () => { clearTimeout(timer); timer = setTimeout(scan, 250); };
+    const onSourceData = (e: { sourceId?: string }) => { if (e.sourceId === osmSource) schedule(); };
+    ml.on('sourcedata', onSourceData as never);
+    ml.on('moveend', schedule);
+    const stopMatcher = effect(() => {
+      matcher = new PlantMatcher(plants.data.value);
+      hiddenCount.value = 0;
+      schedule();
+    });
+
+    // --- WRI
     const filter = computed<FilterSpecification>(() => {
       const o = ctx.options.value;
-      const min = Math.max(Number(o.minMw ?? 0), minMwAt(zoom.value));
       const fuel = String(o.fuel ?? 'all');
-      const parts: unknown[] = [['>=', ['get', 'mw'], min]];
+      if (fuel === 'storage') return ['==', ['get', 'mw'], -1] as FilterSpecification; // WRI has no storage
+      const parts: unknown[] = [['>=', ['get', 'mw'], Math.max(Number(o.minMw ?? 0), minMwAt(zoom.value))]];
       if (fuel !== 'all') parts.push(['==', ['get', 'fuel'], fuel]);
+      // matches only count while the OSM plants are on the map: zoomed out below their zoom, WRI shows everything again
+      if (zoom.value >= OSM_PLANTS_MIN_ZOOM && hiddenCount.value > 0) parts.push(['!', ['in', ['get', 'id'], ['literal', [...matcher.hidden]]]]);
       return ['all', ...parts] as FilterSpecification;
     });
 
@@ -74,7 +129,7 @@ export default defineLayer({
         const fuel = FUELS[p.fuel as FuelClass];
         return {
           title: p.name,
-          subtitle: `${fuel.label}${p.country ? ` · ${p.country}` : ''}`,
+          subtitle: `${fuel.label}${p.country ? ` · ${p.country}` : ''} · WRI`,
           color: fuel.color,
           icon: 'power',
           facts: [
@@ -88,6 +143,17 @@ export default defineLayer({
         };
       },
     });
-    return { destroy() { ml.off('zoom', onZoom); handle.destroy(); } };
+    return {
+      destroy() {
+        alive.v = false;
+        clearTimeout(timer);
+        stopMatcher();
+        ml.off('zoom', onZoom);
+        ml.off('sourcedata', onSourceData as never);
+        ml.off('moveend', schedule);
+        osm.destroy();
+        handle.destroy();
+      },
+    };
   },
 });

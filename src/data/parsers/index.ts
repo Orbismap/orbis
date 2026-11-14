@@ -1,7 +1,6 @@
 // Parser registry. To add a parser: create a pure function file in this folder and add ONE line below.
 // Parsers run in the worker pool (data/worker); they take the raw payload (decoded JSON, text or ArrayBuffer,
 // according to the ResourceSpec format) and may be async. Typed arrays in the result are transferred, not copied.
-import { cableLines } from './cables';
 import { emscQuakes } from './emsc';
 import { marineWaves } from './marine';
 import { marineSamples } from './oceangrid';
@@ -68,7 +67,6 @@ export const parsers = {
   usgsQuakes,
   emscQuakes,
   mergeQuakes,
-  cableLines,
   ndbcBuoys,
   pegelStations,
   plateBoundaries,

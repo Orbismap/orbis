@@ -7,12 +7,12 @@ Konfiguration in `src/data/endpoints.ts`, überschreibbar per `.env` (`.env.exam
 | Bucket | Standardadresse | Inhalt | Manifest |
 |---|---|---|---|
 | `live` | `orbis-live.maltee.dev` | Minuten-Snapshots: `events/usgs-2.5_week.geojson`, `events/emsc-europe.json`, GDACS, FIRMS, TLE … | ja |
-| `data` | `orbis-data.maltee.dev` | täglich/wöchentlich: `osm-cables/cables.json`, Vulkane, Kraftwerke, Cams, Radio … | ja |
+| `data` | `orbis-data.maltee.dev` | täglich/wöchentlich: Vulkane, Kraftwerke, Cams, Radio … | ja |
 | `osm` | `orbis-osm.maltee.dev` | PMTiles (`cctv`, `blitzer`, `alpr`, `webcam`, `wind`, `resource`) und `heat/` | ja |
 | `wetter` | `orbis-wetter.maltee.dev` | ICON-Felder im Format OWX, `v1/latest.json` | nein |
 | `assets` | `orbis-assets.maltee.dev` | statische Dateien | nein |
 
-`bucketUrl('data', 'osm-cables/cables.json')` baut die Adresse.
+`bucketUrl('data', '<Schlüssel>')` baut die Adresse.
 
 ## Manifest
 
@@ -45,7 +45,7 @@ aus dem Register abgeleitet, `runParser(name, input, { format, args })` (`data/w
 dürfen `async` sein; Typed Arrays im Ergebnis werden transferiert. Ohne `Worker` (Tests) läuft der Parser inline.
 
 Vorhanden: `usgsQuakes`, `emscQuakes` (beide liefern schlankes GeoJSON `{id, mag, depth, place, time, url, tsunami, src}`),
-`mergeQuakes` (USGS gewinnt bei Doppelten: ±2 min, ±1 Magnitude, ≤ 100 km), `cableLines`, `owxDecode`.
+`mergeQuakes` (USGS gewinnt bei Doppelten: ±2 min, ±1 Magnitude, ≤ 100 km), `owxDecode`.
 Jeder Parser hat einen Vitest-Test mit kleinem Fixture neben sich.
 
 ## OWX (Wetterfelder)

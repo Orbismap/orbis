@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { usgsQuakes } from './usgs';
 import { emscQuakes, titleCaseRegion } from './emsc';
 import { mergeQuakes } from './quakes';
-import { cableLines } from './cables';
 import { runParser } from '../worker/pool';
 
 const usgs = {
@@ -59,16 +58,3 @@ describe('quake parsers', () => {
   });
 });
 
-describe('cableLines', () => {
-  it('keeps lines, fills defaults', () => {
-    const fc = cableLines({
-      features: [
-        { type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] }, properties: { id: 5, name: 'CANTAT 3', operator: 'BT', since: '', color: '#4fc3f7' } },
-        { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} },
-        { type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [2, 2]] }, properties: {} },
-      ],
-    });
-    expect(fc.features).toHaveLength(2);
-    expect(fc.features[1]!.properties.name).toBe('Unbenanntes Kabel');
-  });
-});

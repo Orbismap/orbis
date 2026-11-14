@@ -37,10 +37,10 @@ immer über `core/format` und `core/units`.
 mount: (ctx) => gibsLayer(ctx, { layer: 'VIIRS_Black_Marble', format: 'png', matrixSet: 'GoogleMapsCompatible_Level8', date: '2016-01-01' })
 ```
 
-## Beispiel 3: Linien aus dem Daten-Bucket (`infrastruktur/seekabel.ts`)
+## Beispiel 3: Fremde Vektorkacheln (`infrastruktur/stromnetz.ts`)
 
-`ctx.resource({ key, url: bucketUrl('data', 'osm-cables/cables.json'), parse: 'cableLines' })` (730 KB, wird im Worker
-geparst) und `lineLayer` mit Farbe aus der Property `color`, Zoom-abhängiger Breite, Kontur (`casing`) und `describe`.
+`vectorTileLayer` mit der Kachel-URL von OpenInfraMap (`oimTiles('power')`) und mehreren `parts` (Linien nach Spannung, Umspannwerke als Punkte).
+Es lädt nichts selbst: MapLibre holt die Kacheln, `describe` baut die Karte aus den Kachel-Attributen.
 
 ## Bausteine (`src/render`)
 
@@ -58,6 +58,7 @@ brauchen `properties.id` (Hover, Auswahl); fehlt es, ergänzt der Baustein es.
 | `radarLayer(ctx, o)` | WebGL-Radar (`render/gl/radarLayer.ts`): `frames: ReadonlySignal<{time, url}[]>` (URL-Vorlage `{z}/{x}/{y}` der RainViewer-PNG-Kacheln, Farbschema 2), `attribution` (Pflicht), `maxzoom`, `maxGap?` (20 min), `sourceName?`, `failure?`, `name?`. Liest die Kachelfarben im Worker in Regenraten (mm/h) zurück, schätzt je Kachel die Verschiebung zwischen zwei Zeitschritten, mischt im Shader und färbt danach nach einer Skala (`radar-values.ts`); Globus und Mercator, `probe` liefert mm/h |
 | `gibsLayer(ctx, o)` | `layer`, `format: 'png' \| 'jpg'`, `matrixSet` (z. B. `GoogleMapsCompatible_Level8`, bestimmt Maximalzoom), `date?: 'yesterday' \| 'YYYY-MM-DD' \| ReadonlySignal<string>` (ohne: Layer ohne Zeitdimension), `product?`, `attribution?`, `slot?`, `name?` |
 | `pmtilesLayer(ctx, o)` | `url`, `sourceLayer`, `slot?`, `name?`, `idKey?`, `radius`, `color`, `stroke?`, `symbol?`, `sortKey?`, `filter?`, `describe`, `minZoom?`, `maxZoom?`, `attribution?` |
+| `vectorTileLayer(ctx, o)` | Fremde Vektorkacheln (`tiles`-Vorlage, `attribution` Pflicht), `parts: VtPart[]` (`sourceLayer`, `kind: line\|circle\|fill`, `filter?` (auch Signal), `color`, `size`, `dash?`, `casing?`, `minZoom?`, `pick?`), `idKey?` (`osm_id`), `describe(feature, part)`. Genutzt für OpenInfraMap (`data/openinframap.ts`: Kachel-URLs, Spannungsklassen): `stromnetz`, `telekomnetz`, `oelgasleitungen`, `wasserleitungen`, `wasserwerke`, `stauseen`; `kraftwerke` nutzt ihn für die OSM-Quelle |
 | `trackLayer(ctx, o)` | `data: Resource<TrackObject[]> \| ReadonlySignal<TrackObject[] \| undefined>` mit `TrackObject = {id, lng, lat, heading?, speed? (m/s), t, props?}`, `resources?`, `symbol: {icon, size, rotate?}`, `color: Dyn`, `ringRadius?`, `maxExtrapolateMs?` (2 min), `tickMs?` (100), `filter?`, `describe(track, now)`, `feed?(tracks)`, `minZoom?`, `count?` |
 | `cameraLayer(ctx, o)` | `color` (einzige Farbe), `detail: CameraSource \| CameraSource[]`, `overview?: CameraSource`, `count?`, `resources?` (hart: Fehler/Laden), `softResources?` (nur Anzahl/Alter), `slot?`; `CameraSource = {name, data: {kind:'pmtiles', url, sourceLayer, attribution?} \| {kind:'geojson', data}, minZoom?, describe?, idKey?, dirKey?}` |
 

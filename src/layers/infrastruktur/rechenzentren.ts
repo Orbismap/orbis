@@ -50,7 +50,6 @@ export default defineLayer({
     return pointLayer({ ...ctx, status: (s) => ctx.status(pdb.error.peek() && !pdb.data.peek() && s.state === 'ready' ? { ...s, note: 'PeeringDB gerade nicht erreichbar (Abrufgrenze), nur OpenStreetMap' } : s) }, {
       data: merged,
       resources: [pdb, osm],
-      cluster: { radius: 42, maxZoom: 7 },
       radius: ['interpolate', ['linear'], ['zoom'], 1, size(0.7), 8, size(1), 14, size(1.5)] as ExpressionSpecification,
       color: ['match', ['get', 'src'], 'pdb', COLOR, OSM] as ExpressionSpecification,
       stroke: { color: 'rgba(10, 14, 40, 0.85)', width: 1 },
