@@ -20,7 +20,7 @@ export const relayUrl = (proxy = PROXY): string => {
   u.search = '';
   return u.toString();
 };
-const TYPES = ['PositionReport', 'StandardClassBPositionReport', 'ShipStaticData'];
+const TYPES = ['PositionReport', 'StandardClassBPositionReport', 'ShipStaticData', 'StaticDataReport'];
 
 export class AisClient {
   private ws: WebSocket | null = null;

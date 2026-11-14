@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AisBook, etaText, parseAisMessage, parseAisTime, subscriptionBoxes } from './aisstream';
+import { AisBook, etaText, parseAisMessage, parseAisTime, restingAngle, shipDirection, subscriptionBoxes } from './aisstream';
 import { relayUrl } from './aisclient';
 import { commonsSearchUrl, parseCommonsPhoto } from './shipphoto';
 
@@ -51,5 +51,26 @@ describe('aisstream', () => {
     expect(parseCommonsPhoto(raw, { imo: 0, name: 'LADY 8' })).toBeNull();
     expect(parseCommonsPhoto({ query: { pages: [page('File:EVER GIVEN.jpg', 'All rights reserved')] } }, { imo: 0, name: 'EVER GIVEN' })).toBeNull();
     expect(commonsSearchUrl('IMO 1')).toContain('origin=*');
+  });
+});
+
+describe('class B static data and directions', () => {
+  it('merges the two parts of a StaticDataReport without erasing known fields', () => {
+    const b = new AisBook();
+    const partA = '{"MetaData":{"MMSI":244000001,"ShipName":"X"},"MessageType":"StaticDataReport","Message":{"StaticDataReport":{"PartNumber":false,"ReportA":{"Valid":true,"Name":"ZEEMEEUW@@"},"ReportB":{"Valid":false}}}}';
+    const partB = '{"MetaData":{"MMSI":244000001,"ShipName":"ZEEMEEUW"},"MessageType":"StaticDataReport","Message":{"StaticDataReport":{"PartNumber":true,"ReportA":{"Valid":false},"ReportB":{"Valid":true,"ShipType":37,"CallSign":"PD1234","Dimension":{"A":6,"B":4,"C":2,"D":1}}}}}';
+    b.apply(parseAisMessage(partA)!);
+    b.apply(parseAisMessage(partB)!);
+    expect(b.statics.get(244000001)).toMatchObject({ name: 'ZEEMEEUW', type: 37, call: 'PD1234', len: 10, wid: 3 });
+  });
+
+  it('points a ship without heading along its last movement, else at a stable angle', () => {
+    const east = shipDirection(1, [[10, 60, 0], [10.01, 60, 30_000]]);
+    expect(east.real).toBe(true);
+    expect(east.heading).toBeCloseTo(90, 0);
+    const still = shipDirection(244000001, [[10, 60, 0]]);
+    expect(still).toEqual({ heading: restingAngle(244000001), real: false });
+    expect(restingAngle(244000001)).toBe(restingAngle(244000001));
+    expect(new Set([1, 2, 3, 4, 5, 6].map(restingAngle)).size).toBeGreaterThan(3);
   });
 });

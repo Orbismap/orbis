@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ShipSample } from '../../ext/types';
 import { metres } from '../planes/smoothing';
-import { GONE_MS, MAX_EXTRAPOLATE_S, modelOf, ShipTracker, targetOf, TYPICAL_LEN_M } from './smoothing';
+import { MAX_EXTRAPOLATE_S, modelOf, ShipTracker, targetOf, TYPICAL_LEN_M } from './smoothing';
 
 const sample = (over: Partial<ShipSample> = {}): ShipSample => ({
   id: '211000000', lng: 10, lat: 54, course: 90, heading: 90, speedMs: 10, moving: true, cls: 'cargo', color: '#4fc3f7', label: 'TESTSHIP', t: 1_000_000, ...over,
@@ -125,12 +125,10 @@ describe('rotation', () => {
 });
 
 describe('who is there', () => {
-  it('drops a ship after the grace time and clears everything', () => {
+  it('drops a ship missing from the list at once (filter, prune) and clears everything', () => {
     const t = new ShipTracker();
     t.feed([sample(), sample({ id: 'b' })], NOW, EPOCH);
-    t.feed([sample({ id: 'b', t: EPOCH + 1000 })], NOW + GONE_MS - 1, EPOCH + 1000);
-    expect([...t.ships.keys()].sort()).toEqual(['211000000', 'b']);
-    t.feed([sample({ id: 'b', t: EPOCH + 2000 })], NOW + GONE_MS + 1, EPOCH + 2000);
+    t.feed([sample({ id: 'b', t: EPOCH + 1000 })], NOW + 1000, EPOCH + 1000);
     expect([...t.ships.keys()]).toEqual(['b']);
     t.clear();
     expect(t.ships.size).toBe(0);

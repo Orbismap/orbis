@@ -32,15 +32,8 @@ export interface ShipState {
   at: number;
   /** epoch ms of the last fix, to recognise a repeated report */
   fixEpoch: number;
-  /** when the ship was last in the data */
-  seen: number;
 }
 
-/**
- * A ship missing from the data this long is gone (left the view, filtered out, lost reception). Short: the list is
- * republished every second, only the single ship reports rarely, and the layer keeps all ships it knows in it.
- */
-export const GONE_MS = 90_000;
 /** an extrapolation never runs longer than this (s); the same as the 2D layer's `maxExtrapolateMs` */
 export const MAX_EXTRAPOLATE_S = 600;
 const M_PER_DEG = 111320;
@@ -82,13 +75,15 @@ export class ShipTracker {
    * same moment (a report's time `t` is epoch).
    */
   feed(samples: readonly ShipSample[], now: number, epoch: number): void {
+    // the layer always publishes its whole (filtered) list: a ship missing from it is gone at once (filtered out, pruned)
+    const ids = new Set(samples.map((s) => s.id));
+    for (const id of this.ships.keys()) if (!ids.has(id)) this.ships.delete(id);
     for (const s of samples) {
       const prev = this.ships.get(s.id);
       const model = modelOf(s.cls);
       // identity: may arrive later than the first position (static AIS data), so it is always taken over
       const identity = { label: s.label, model, color: Number.parseInt(s.color.slice(1), 16) || 0xffffff, lenM: s.lenM && s.lenM > 0 ? s.lenM : TYPICAL_LEN_M[model] };
       if (prev) {
-        prev.seen = now;
         Object.assign(prev, identity);
         // the same fix again, or an older one (the two sources of the layer): nothing new
         if (s.t <= prev.fixEpoch) continue;
@@ -99,7 +94,7 @@ export class ShipTracker {
       // a ship at anchor is noise) and without one the ship keeps the rotation it had
       const rot = s.heading ?? (s.moving ? s.course : undefined) ?? prev?.rot ?? 0;
       const dir = s.course ?? s.heading ?? prev?.dir ?? rot;
-      const kin = { lon: s.lng, lat: s.lat, moving: s.moving && s.speedMs > 0, speedMs: s.speedMs, dir, rot, at, fixEpoch: s.t, seen: now };
+      const kin = { lon: s.lng, lat: s.lat, moving: s.moving && s.speedMs > 0, speedMs: s.speedMs, dir, rot, at, fixEpoch: s.t };
       if (prev) {
         Object.assign(prev, kin);
         continue;
@@ -110,7 +105,6 @@ export class ShipTracker {
       state.dLat = t.lat;
       this.ships.set(s.id, state);
     }
-    for (const [id, p] of this.ships) if (now - p.seen > GONE_MS) this.ships.delete(id);
   }
 
   /** Advance the displayed state to `now` (performance.now ms). */
