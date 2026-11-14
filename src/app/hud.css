@@ -1,0 +1,168 @@
+/* Desktop left HUD: main menu + detail menu, full window height. Layer "materials" so the panel radius wins over .panel. */
+@layer materials {
+  .hudl {
+    --hud-edge: 8px;
+    --hud-mini-h: 40px;
+    position: absolute;
+    top: var(--hud-edge);
+    left: var(--hud-edge);
+    bottom: var(--hud-edge);
+    display: flex;
+    gap: var(--hud-gap);
+    pointer-events: none;
+    transition: top 260ms var(--ease);
+  }
+  .hudl > * { pointer-events: auto; }
+  .hudl[data-main='closed'] { top: calc(var(--hud-edge) + var(--hud-mini-h) + var(--hud-gap)); }
+
+  .hudl-main {
+    position: relative;
+    flex: none;
+    width: var(--hud-main-w);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    transition: margin 260ms var(--ease), opacity 200ms var(--ease), transform 260ms var(--ease);
+  }
+  /* the main menu only slides sideways: its negative top margin cancels the downward move of .hudl */
+  .hudl[data-main='closed'] .hudl-main {
+    margin-left: calc(-1 * (var(--hud-main-w) + var(--hud-gap)));
+    margin-top: calc(-1 * (var(--hud-mini-h) + var(--hud-gap)));
+    opacity: 0;
+    transform: translateX(-12px);
+    pointer-events: none;
+  }
+  .hudl .panel { border-radius: 20px; }
+  .hudm, .hudd { display: flex; flex-direction: column; min-height: 0; }
+  .hudm { flex: 1; }
+  .hudd { flex: none; width: var(--hud-detail-w); animation: hud-in 240ms var(--ease); }
+  @keyframes hud-in { from { opacity: 0; transform: translateX(-10px); } }
+
+  .hudl-mini {
+    position: absolute;
+    top: calc(-1 * (var(--hud-mini-h) + var(--hud-gap)));
+    left: 0;
+    width: max-content; /* .hudl is ~0 wide when both menus are closed: without this the logo shrinks to nothing */
+    height: var(--hud-mini-h);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 6px 0 10px;
+    border-radius: 999px !important;
+    animation: hud-in 240ms var(--ease);
+  }
+  .hudl-mini h1 .orbis-mark, .hudm-head h1 .orbis-mark { flex: none; }
+  .hudl-mini h1 { display: flex; align-items: center; gap: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
+
+  /* ---- main menu ---- */
+  .hudm-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 6px 14px; }
+  .hudm-head h1 { display: flex; align-items: center; gap: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .hudm-search {
+    display: flex; align-items: center; gap: 7px; margin: 6px 12px 8px; height: 32px; padding: 0 10px;
+    border-radius: 999px; background: var(--g-fill); color: var(--text-3); text-align: left; font-size: 14px;
+  }
+  .hudm-search:hover { background: var(--g-fill-hover); color: var(--text-2); }
+  .hudm-search:focus-within { background: var(--g-fill); color: var(--text-1); box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--limb) 70%, transparent); }
+  .hudm-search input { flex: 1; min-width: 0; height: 100%; background: none; border: 0; outline: none; color: var(--text-1); font: inherit; }
+  .hudm-search input::placeholder { color: var(--text-3); }
+  .hudm-search input::-webkit-search-cancel-button { appearance: none; }
+  /* results of the place search: a popover under the field (portalled, so its backdrop blur renders) */
+  .popover.hud-sres { position: fixed; z-index: calc(var(--z-panel, 10) + 10); min-width: 0; max-width: none; overflow-y: auto; padding: 6px 6px 10px; backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); }
+  .hudm-clear { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--text-3); color: var(--ink-0); }
+  .hud-row[role='option'][aria-selected='true'] { background: var(--g-fill-active); }
+  .hudm-scroll { flex: 1; min-height: 0; padding: 0 8px 12px; }
+  .hud-rows { list-style: none; padding: 0; }
+  .hud-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 2px 10px; border-radius: 8px; text-align: left; font-size: 14px; }
+  @media (hover: hover) { .hud-row:hover { background: var(--g-fill-hover); } }
+  .hud-row[aria-current='true'] { background: var(--g-fill-active); }
+  .hud-rt { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hud-chev { color: var(--text-3); opacity: 0.7; flex: none; }
+  .hud-badge { flex: none; width: 28px; height: 26px; display: grid; place-items: center; color: var(--text-1); }
+  .hud-badge-quiet { color: var(--text-2); }
+  .hud-rbtn { width: 28px; height: 28px; border-radius: 50%; background: var(--g-fill); color: var(--text-2); flex: none; }
+  .hud-rbtn:hover { background: var(--g-fill-hover); color: var(--text-1); }
+
+  /* drag handle on the right edge of the main menu */
+  .hud-grip { position: absolute; top: 24px; bottom: 24px; right: calc(var(--hud-gap) / -2 - 5px); width: 10px; cursor: col-resize; touch-action: none; z-index: 2; }
+  .hud-grip::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--limb); opacity: 0; transition: opacity 120ms; }
+  .hud-grip:hover::after, .hud-grip[data-drag='true']::after { opacity: 0.8; }
+  .app:has(.hud-grip[data-drag='true']) { cursor: col-resize; user-select: none; }
+
+  /* ---- detail menu ---- */
+  .hudd-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 11px 10px 4px 18px; }
+  .hudd-head h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.2; padding-top: 2px; }
+  .hudd-scroll { flex: 1; min-height: 0; }
+  .hudd .lcontent { padding: 0 var(--s-1); }
+  .hudd[data-bar='true'] .lnav,
+  .hudd[data-bar='true'] .feed { padding-bottom: 60px; }
+
+  /* floating capsule: add layer, edit Karte */
+  .hudd-fbar {
+    position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 3;
+    display: flex; padding: 3px 5px; border-radius: 999px;
+    background: color-mix(in srgb, var(--g-pop) 100%, transparent);
+    -webkit-backdrop-filter: var(--g-blur-control); backdrop-filter: var(--g-blur-control);
+  }
+  .hudd-fbar .iconbtn { width: 34px; height: 32px; border-radius: 999px; }
+  .hudd-fpop { position: absolute; left: 8px; right: 8px; bottom: 54px; height: 0; z-index: 4; }
+  .hud-fmenu { min-width: 0; width: 100%; max-height: min(60vh, 420px); overflow-y: auto; }
+
+  /* ---- "Ebene hinzufügen" sheet ---- */
+  .hudc-scrim { position: fixed; inset: 0; z-index: var(--z-sheet, 20); display: grid; place-items: center; background: rgba(0, 0, 0, 0.28); pointer-events: auto; animation: hud-fade 160ms; }
+  @keyframes hud-fade { from { opacity: 0; } }
+  .hudc { width: min(380px, calc(100vw - 24px)); height: min(560px, calc(100vh - 48px)); border-radius: 28px !important; display: flex; flex-direction: column; overflow: hidden; animation: hud-pop 200ms var(--ease); }
+  @keyframes hud-pop { from { opacity: 0; transform: scale(0.96); } }
+  .cat-modal .cat-head { justify-content: center; padding: 18px 16px 12px; min-height: 0; }
+  .cat-modal .cat-title { flex: none; font-size: 15px; font-weight: 700; }
+  .cat-modal .cat-search { margin: 0 16px 8px; min-height: 38px; border-radius: 999px; border: 0; background: var(--g-fill); box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--limb) 70%, transparent); color: var(--text-2); }
+  .cat-modal .cat-input { font-size: 15px; }
+  .cat-modal .cat-scroll { padding: 0 10px; }
+  .cat-modal .crow-state { width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--limb); color: var(--limb); opacity: 1; }
+  .cat-modal .crow.is-on .crow-state { background: var(--limb); color: var(--ink-0); }
+  .cat-foot { display: flex; justify-content: flex-end; padding: 12px 16px; background: var(--g-fill); }
+
+  /* ---- history ---- */
+  .hud-sect { font-size: 11px; font-weight: 600; color: var(--text-3); padding: 14px 10px 4px; letter-spacing: 0.01em; }
+  .hud-sect-first { padding-top: 6px; }
+  .hud-secthead { display: flex; align-items: flex-end; justify-content: space-between; padding-right: 6px; }
+  .hud-filter { position: relative; padding-bottom: 2px; }
+  .hud-filterbtn { display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 6px; border-radius: 6px; color: var(--limb); font-size: 12px; font-weight: 500; }
+  /* portalled to <body>: inside the blurred panel a backdrop blur does not render */
+  .hud-filterwrap { position: fixed; z-index: calc(var(--z-panel, 10) + 10); }
+  .popover.hud-filtermenu { position: static; min-width: 140px; backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2); }
+  .hud-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 6px 6px; }
+  .hud-chip { height: 24px; padding: 0 10px; border-radius: 999px; background: var(--g-fill); color: var(--text-2); font-size: 12px; font-weight: 500; }
+  @media (hover: hover) { .hud-chip:hover { background: var(--g-fill-hover); } }
+  .hud-chip[aria-pressed='true'] { background: var(--limb); color: var(--ink-0); }
+  .hud-row-2 { align-items: center; }
+  .hud-rt2 { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .hud-rt2 b { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hud-rt2 small { color: var(--text-3); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hud-none { color: var(--text-3); padding: 8px 10px; }
+  .hud-clear { color: var(--limb); font-size: 12px; padding: 8px 10px; }
+  .hud-more { color: var(--limb); font-size: 12px; padding: 6px 10px; }
+}
+
+@layer materials {
+  /* desktop layer rows: no switch (a row sits in "Aktiv" or in the suggestions), age as tooltip, hide button only on hover (a click on the row opens the settings) */
+  .hud-desktop .lrow-switch,
+  .hud-desktop .lrow-trail { display: none; }
+  .hud-desktop .lrow.is-suggest { cursor: pointer; }
+  .lrow-hide { flex: none; align-self: stretch; display: grid; place-items: center; min-width: 28px; color: var(--text-2); }
+  @media (hover: hover) {
+    .lrow-hide { opacity: 0; transition: opacity 120ms; }
+    .lrow:hover .lrow-hide, .lrow-hide:focus-visible { opacity: 1; }
+    .lrow-hide:hover { color: var(--text-1); }
+  }
+}
+
+@layer materials {
+  /* place detail menu: "Info" and "Details" as h3-sized headings (must live in this layer to beat .hud-sect) */
+  .place-info .hud-sect, .place-details .hud-sect { padding: 14px 0 6px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--text-1); }
+}
+
+@layer materials {
+  .hudc-set { width: min(460px, calc(100vw - 24px)); height: min(680px, calc(100vh - 48px)); }
+  .hudc-body { flex: 1; min-height: 0; }
+  .set-head-modal { justify-content: center; padding-top: 14px; }
+}

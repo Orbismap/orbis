@@ -4,13 +4,14 @@ import { allLayers } from '../../layers/registry';
 import { categoryById } from '../../layers/categories';
 import { activeKarte, setActiveKarte } from '../../state/session';
 import { updateSettings } from '../../state/settings';
-import { setProbe } from '../../state/selection';
+import { selectPlace, setProbe } from '../../state/selection';
 import { goLive } from '../../state/time';
-import { leftPanelOpen, leftView, shortcutsOpen } from '../../state/ui';
+import { isMobile, leftPanelOpen, leftView, shortcutsOpen } from '../../state/ui';
 import { projection, setProjection } from '../../state/view';
 import { scoreLayer, scoreText } from '../catalog/fuzzy';
 import { flyToPoint } from '../shared/map';
 import { mapEngine } from '../../state/ui';
+import { record } from '../../state/history';
 import { coordinateLabel, parseCoordinate, type Place, type Result } from './sources';
 
 interface Command { id: string; title: string; subtitle?: string; icon: Result['icon']; words: string[]; run(): void }
@@ -35,11 +36,16 @@ export function placeResult(p: Place): Result {
     title: p.title,
     subtitle: p.subtitle,
     run: () => {
-      const b = p.bounds;
-      if (b && (b[2] - b[0] > 0.002 || b[3] - b[1] > 0.002)) mapEngine.peek()?.flyTo({ bounds: b, maxZoom: 13, padding: { top: 40, bottom: 40, left: 40, right: 40 } });
-      else flyToPoint(p.lng, p.lat, 12);
+      record({ key: `s:${p.id}`, kind: 'search', title: p.title, sub: p.subtitle ?? 'Suche', icon: 'search', color: '#72C8F0', lng: p.lng, lat: p.lat, placeKind: p.kind, ...(p.bounds ? { bounds: p.bounds as [number, number, number, number] } : {}) });
+      if (!isMobile.peek()) selectPlace({ id: p.id, title: p.title, subtitle: p.subtitle, lng: p.lng, lat: p.lat, kind: p.kind });
+      flyToPlace(p.bounds, p.lng, p.lat);
     },
   };
+}
+
+export function flyToPlace(b: Place['bounds'], lng: number, lat: number): void {
+  if (b && (b[2] - b[0] > 0.002 || b[3] - b[1] > 0.002)) mapEngine.peek()?.flyTo({ bounds: b, maxZoom: 13, padding: { top: 40, bottom: 40, left: 40, right: 40 } });
+  else flyToPoint(lng, lat, 12);
 }
 
 /** Local (synchronous) results for a query: coordinates, layers, Karten, commands. */

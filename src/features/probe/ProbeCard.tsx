@@ -1,69 +1,69 @@
-import { formatCoord, formatNumber } from '../../core/format';
-import { sunAltitude } from '../../core/geo';
-import { clearSelection, probe } from '../../state/selection';
+import { formatCoord } from '../../core/format';
 import { getLayer } from '../../layers/registry';
-import { time } from '../../state/time';
+import { clearSelection, probe } from '../../state/selection';
 import { Button, IconButton } from '../../ui/Button';
-import { Icon } from '../../ui/icons/Icon';
-import { formatSelected } from '../timeline/math';
 import { copyText, flyToPoint } from '../shared/map';
+import { share } from '../place/PlaceCard';
+import { useReverse } from '../place/reverse';
 import { probeValues } from './values';
 import '../inspector/inspector.css';
+import '../place/place.css';
 import './probe.css';
 
-function sunPhase(alt: number): string {
-  if (alt > 0) return 'Tag';
-  if (alt > -6) return 'bürgerliche Dämmerung';
-  if (alt > -12) return 'nautische Dämmerung';
-  if (alt > -18) return 'astronomische Dämmerung';
-  return 'Nacht';
-}
-
-/** Point query card: coordinate, sun position at the selected time, values of field layers. */
+/** Point query (long press on the map): what sits there (address or name), "in der Nähe von", coordinate and field values. */
 export function ProbeCard() {
   const p = probe.value;
   if (!p) return null;
-  const t = time.value;
-  const alt = sunAltitude(p.lng, p.lat, t);
+  const rev = useReverse(p.lng, p.lat);
   const plain = `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
-  const vals = probeValues.value;
+  const title = rev?.title ?? 'Markierter Standort';
+  const sub = rev?.title ? 'Markierter Standort' : rev?.near ? `In der Nähe von ${rev.near}` : undefined;
+  const lines = rev?.lines ?? [];
   return (
-    <article class="insp probe" aria-label="Punktabfrage">
-      <header class="insp-head">
-        <span class="insp-icon" style={{ ['--c' as string]: 'var(--limb)' }}>
-          <Icon name="locate" size={18} />
-        </span>
-        <div class="insp-titles">
-          <h2 class="insp-title">Punktabfrage</h2>
-          <p class="insp-sub">{formatSelected(t)}</p>
+    <article class="insp probe place" aria-label="Markierter Standort">
+      <header class="place-head">
+        <IconButton icon="share" label="Link teilen" class="place-share" onClick={() => share(title)} />
+        <div class="place-titles">
+          <h2 class="place-title">{title}</h2>
+          {sub && <p class="place-sub">{sub}</p>}
         </div>
-        <IconButton icon="close" label="Schließen" shortcut="Esc" onClick={clearSelection} />
+        <IconButton icon="close" label="Schließen" shortcut="Esc" class="place-close" onClick={clearSelection} />
       </header>
-      <div class="probe-coord">
-        <span class="probe-coord-v num">{formatCoord(p.lat, p.lng, 4)}</span>
-        <IconButton icon="copy" label="Koordinate kopieren" onClick={() => void copyText(plain, 'Koordinate kopiert')} />
-      </div>
-      <dl class="insp-facts">
-        <div class="insp-fact">
-          <dt>Sonnenhöhe</dt>
-          <dd class="num">{`${formatNumber(alt, 1)} °`}</dd>
-        </div>
-        <div class="insp-fact">
-          <dt>Tageslicht</dt>
-          <dd>{sunPhase(alt)}</dd>
-        </div>
-        {vals.map((v) => (
-          <div class="insp-fact" key={v.layerId}>
-            <dt>{getLayer(v.layerId)?.title ?? v.label}</dt>
-            <dd class="num">{v.value}</dd>
-          </div>
-        ))}
-      </dl>
-      <div class="insp-actions">
-        <Button variant="secondary" icon="pin" onClick={() => flyToPoint(p.lng, p.lat, 9)}>
-          Hierhin fliegen
+      <div class="insp-actions place-actions">
+        <Button variant="primary" icon="pin" onClick={() => flyToPoint(p.lng, p.lat, 12)}>
+          Hinfliegen
+        </Button>
+        <Button variant="secondary" icon="copy" onClick={() => void copyText(plain, 'Koordinate kopiert')}>
+          Koordinate
         </Button>
       </div>
+      <section class="place-details">
+        <h3 class="hud-sect">Details</h3>
+        <dl class="insp-facts">
+          {lines.length > 0 && (
+            <div class="insp-fact">
+              <dt>{rev?.isAddress ? 'Adresse' : 'Standort'}</dt>
+              <dd>
+                {lines.map((w) => (
+                  <span class="place-line" key={w}>
+                    {w}
+                  </span>
+                ))}
+              </dd>
+            </div>
+          )}
+          <div class="insp-fact">
+            <dt>Koordinaten</dt>
+            <dd class="num">{formatCoord(p.lat, p.lng, 5)}</dd>
+          </div>
+          {probeValues.value.map((v) => (
+            <div class="insp-fact" key={v.layerId}>
+              <dt>{getLayer(v.layerId)?.title ?? v.label}</dt>
+              <dd class="num">{v.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
     </article>
   );
 }

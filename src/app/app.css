@@ -37,74 +37,6 @@
   }
 
   /* ---------- desktop ---------- */
-  .left {
-    position: absolute;
-    top: var(--edge);
-    left: var(--edge);
-    bottom: calc(var(--dock-h, 90px) + var(--dock-bottom) + var(--edge));
-    width: var(--panel-left);
-    display: flex;
-    flex-direction: column;
-    pointer-events: none;
-    transition: transform var(--t-panel) var(--ease), opacity var(--t-panel) var(--ease);
-  }
-  .left[data-open='false'] {
-    transform: translateX(calc(-100% - var(--edge)));
-    opacity: 0;
-  }
-  .left-panel {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    max-height: 100%;
-    pointer-events: auto;
-  }
-  .left[data-fill='true'] .left-panel {
-    height: 100%;
-  }
-  .lhead {
-    display: flex;
-    align-items: center;
-    gap: var(--s-2);
-    padding: var(--s-2) var(--s-2) var(--s-1) var(--s-4);
-  }
-  .lname {
-    flex: 1;
-    font-size: 1.0625rem;
-    line-height: 1;
-    font-weight: 600;
-  }
-  .lhead .orbis-mark {
-    flex: none;
-    display: block;
-  }
-  .lsearch-wrap {
-    padding: 0 var(--s-2) var(--s-2);
-  }
-  .lsearch {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: var(--s-2);
-    height: 34px;
-    padding: 0 var(--s-3);
-    border-radius: var(--r-round);
-    color: var(--text-3);
-    text-align: left;
-    transition: background var(--t-panel) var(--ease);
-  }
-  .lsearch span:not(.kbd-group) {
-    flex: 1;
-    font-size: var(--fs-ui);
-  }
-  @media (hover: hover) {
-  @media (hover: hover) {
-    .lsearch:hover {
-        background: var(--g-fill-hover);
-        color: var(--text-2);
-      }
-    }
-  }
   .lcontent {
     display: flex;
     flex-direction: column;
@@ -150,11 +82,6 @@
   .lfoot {
     padding: var(--s-1) var(--s-2) var(--s-2);
   }
-  .reopen {
-    position: absolute;
-    top: var(--edge);
-    left: var(--edge);
-  }
   .topbar-pos {
     position: absolute;
     top: var(--rail-inset);
@@ -165,35 +92,9 @@
     top: calc(var(--rail-inset) + var(--top-h) + var(--rail-gap));
     right: var(--rail-inset);
   }
-  .right {
-    position: absolute;
-    top: calc(var(--rail-inset) + var(--top-h) + var(--rail-gap));
-    right: calc(var(--rail-inset) + var(--rail-w) + 12px);
-    width: var(--panel-right);
-    bottom: calc(var(--dock-h, 90px) + var(--dock-bottom) + var(--edge));
-    display: flex;
-    flex-direction: column;
-    pointer-events: none;
-    animation: right-in var(--t-panel) var(--ease);
-  }
-  @keyframes right-in {
-    from {
-      opacity: 0;
-      transform: translateX(16px);
-    }
-  }
-  .right-panel {
-    max-height: 100%;
-    display: flex;
-    flex-direction: column;
-    pointer-events: auto;
-  }
-  .right-scroll {
-    flex: 1;
-  }
   .dock {
     position: absolute;
-    left: var(--edge);
+    left: var(--map-left, var(--edge));
     right: var(--edge);
     bottom: var(--dock-bottom);
     display: flex;
@@ -222,11 +123,7 @@
     left: var(--map-left, 0px);
     bottom: calc(var(--dock-h, 90px) + var(--dock-bottom) + 10px);
     right: calc(var(--rail-inset) + var(--rail-w) + 12px);
-    padding-left: var(--edge);
     transition: left var(--t-panel) var(--ease);
-  }
-  .hud-desktop:has(> .right) .maplegend-pos {
-    right: calc(var(--rail-inset) + var(--rail-w) + 12px + var(--panel-right) + 12px);
   }
   .hud-desktop .attr-pos {
     position: absolute;

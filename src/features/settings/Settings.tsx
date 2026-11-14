@@ -18,14 +18,14 @@ const UNIT_ROWS: { key: keyof Units; label: string; options: { value: string; la
   { key: 'distance', label: 'Entfernung', options: [{ value: 'km', label: 'km' }, { value: 'mi', label: 'mi' }] },
 ];
 
-/** Settings view inside the left panel / sheet (no modal dialog). */
-export function SettingsView() {
+/** Settings view: in the mobile sheet with a back button, or (`modal`) as the body of the desktop sheet. */
+export function SettingsView({ modal }: { modal?: boolean } = {}) {
   const s = settings.value;
   const sources = allSources();
   return (
     <div class="set">
-      <div class="set-head">
-        <IconButton icon="chevron-left" label="Zurück zu den Ebenen" onClick={() => (leftView.value = 'layers')} />
+      <div class={modal ? 'set-head set-head-modal' : 'set-head'}>
+        {!modal && <IconButton icon="chevron-left" label="Zurück zu den Ebenen" onClick={() => (leftView.value = 'layers')} />}
         <h2>Einstellungen</h2>
       </div>
       <section class="set-sec" aria-labelledby="set-units">

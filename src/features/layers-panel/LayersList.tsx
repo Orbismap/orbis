@@ -5,7 +5,7 @@ import type { Karte, KarteLayer } from '../../karten/types';
 import { getLayer } from '../../layers/registry';
 import type { LayerDef } from '../../layers/types';
 import { activeKarte } from '../../state/session';
-import { leftView } from '../../state/ui';
+import { isMobile, leftView } from '../../state/ui';
 import { Icon } from '../../ui/icons/Icon';
 import { useFlip } from './flip';
 import { LayerPage } from './LayerPage';
@@ -208,6 +208,7 @@ export function LayersList() {
       <ActiveSection karte={k} rows={active} />
       <FieldSection karte={k} fields={fields} />
       <SuggestSection karte={k} activeIds={activeIds} />
+      {isMobile.value && (
       <section class="lsec">
         <h3 class="lsec-title">Alle Ebenen</h3>
         <button type="button" class="ladd" data-nav onClick={() => (leftView.value = 'catalog')}>
@@ -220,6 +221,7 @@ export function LayersList() {
           </span>
         </button>
       </section>
+      )}
     </div>
   );
 }

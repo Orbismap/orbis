@@ -7,9 +7,9 @@ import { localResults, placeResult } from './results';
 import { searchPlaces, type Place, type Result, type ResultGroup } from './sources';
 import './search.css';
 
-const ORDER: ResultGroup[] = ['Koordinate', 'Ebenen', 'Karten', 'Befehle', 'Orte'];
+export const ORDER: ResultGroup[] = ['Koordinate', 'Ebenen', 'Karten', 'Befehle', 'Orte'];
 
-function usePlaces(q: string) {
+export function usePlaces(q: string) {
   const [state, set] = useState<{ q: string; status: 'idle' | 'loading' | 'ok' | 'error'; places: Place[] }>({ q: '', status: 'idle', places: [] });
   useEffect(() => {
     const query = q.trim();

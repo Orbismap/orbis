@@ -19,6 +19,7 @@ import { initSettings } from './state/settings';
 import { startClock, watchRange } from './state/time';
 import { initUi } from './state/ui';
 import { startUrlSync } from './state/url-sync';
+import { startHistory } from './state/history';
 
 initSettings();
 initKartenStore();
@@ -27,6 +28,7 @@ initUi();
 startClock();
 watchRange();
 startUrlSync();
+startHistory();
 startExtensions();
 
 render(<App />, document.getElementById('app')!);

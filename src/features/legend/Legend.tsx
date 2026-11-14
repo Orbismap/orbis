@@ -2,6 +2,7 @@ import { getLayer } from '../../layers/registry';
 import type { LegendSpec } from '../../layers/types';
 import { BASEMAPS } from '../../map/basemaps';
 import { activeKarte, legends } from '../../state/session';
+import { detailOpen } from '../../state/hud';
 import { leftPanelOpen, leftTab, leftView, isMobile, sheetDetent } from '../../state/ui';
 import { closeDetail, openDetail } from '../layers-panel/themes-state';
 import { MAX_ITEMS, MAX_LEGENDS, pickTicks } from './compact';
@@ -27,6 +28,7 @@ function reveal(): void {
   leftView.value = 'layers';
   leftTab.value = 'layers';
   leftPanelOpen.value = true;
+  detailOpen.value = true;
   if (isMobile.peek() && sheetDetent.peek() === 'peek') sheetDetent.value = 'half';
 }
 const openLayer = (id: string) => (reveal(), openDetail(activeKarte.peek().id, id, 'Karte'));

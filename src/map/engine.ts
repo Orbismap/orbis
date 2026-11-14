@@ -4,7 +4,9 @@ import type { CustomLayerInterface, LayerSpecification, SourceSpecification } fr
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { effect } from '@preact/signals';
 import { throttle } from '../core/scheduler';
-import { setProbe } from '../state/selection';
+import { detailOpen } from '../state/hud';
+import { clearSelection, setProbe } from '../state/selection';
+import { isMobile } from '../state/ui';
 import { camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, composeStyle, skyFor } from './basemaps';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
@@ -64,7 +66,19 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
 
   const disposeBuildingsTilt = installBuildingsTilt(ml);
   const terminator = createTerminator(ml);
-  const picking = createPicking(ml, setProbe);
+  // Desktop: a plain click on empty map closes the detail menu (selection and Karte menu, layers stay on); the point
+  // query needs a 1 s press. Mobile keeps tap-to-query.
+  const picking = createPicking(
+    ml,
+    (at) => {
+      if (isMobile.peek()) return setProbe(at);
+      if (at) (clearSelection(), (detailOpen.value = false));
+      else setProbe(null);
+    },
+    (at) => {
+      if (!isMobile.peek()) setProbe(at);
+    },
+  );
 
   const ready = new Promise<void>((resolve) => {
     ml.once('style.load', () => {

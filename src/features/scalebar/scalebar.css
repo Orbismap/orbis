@@ -39,7 +39,7 @@
   .sb-bar .dk {
     background: rgb(40, 44, 48);
   }
-  /* top centre of the whole window, just under the top edge; never takes clicks */
+  /* just under the top edge; never takes clicks */
   .scalebar-pos {
     position: absolute;
     z-index: 1;
@@ -49,8 +49,11 @@
     justify-content: center;
     pointer-events: none;
   }
+  /* desktop: centred between the right edge of the left menus and the right edge of the window */
   .hud-desktop .scalebar-pos {
     top: calc(env(safe-area-inset-top, 0px) + 7px);
+    left: var(--map-left, 0px);
+    transition: left var(--t-panel) var(--ease);
   }
   /* mobile: directly under the search header */
   .hud-mobile .scalebar-pos {

@@ -5,7 +5,7 @@ import { Feed } from '../features/feed/Feed';
 import { Catalog } from '../features/catalog/Catalog';
 import { LayersList } from '../features/layers-panel/LayersList';
 import { SettingsView } from '../features/settings/Settings';
-import { leftTab, leftView, isMobile } from '../state/ui';
+import { leftTab, leftView, isMobile, type LeftView } from '../state/ui';
 import { Button } from '../ui/Button';
 import { Segmented } from '../ui/Segmented';
 import { ScrollArea } from '../ui/ScrollArea';
@@ -50,8 +50,8 @@ function Tabs() {
 }
 
 /** Content of the left panel / sheet: layers, feed, catalog or settings. */
-export function LeftBody() {
-  const view = leftView.value;
+export function LeftBody({ view: forced }: { view?: LeftView } = {}) {
+  const view = forced ?? leftView.value;
   if (view === 'catalog') return <Catalog />;
   if (view === 'settings')
     return (
