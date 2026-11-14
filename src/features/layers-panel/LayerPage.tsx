@@ -48,13 +48,6 @@ export function LayerPage({ layer, def, karteId, from, removable }: { layer: Kar
         <Switch class="lpage-switch" label="Auf der Karte zeigen" checked={layer.visible} onChange={(v) => setLayerVisible(karteId, def.id, v)} />
       </div>
       <LayerNotes def={def} karteId={karteId} />
-      <h4 class="lpage-h">Daten</h4>
-      <dl class="lpage-group lpage-facts">
-        <div><dt>Abdeckung</dt><dd>{def.coverage ?? 'Welt'}</dd></div>
-        <div><dt>Aktualisierung</dt><dd>{CADENCE_LABEL[def.cadence]}</dd></div>
-        {st?.count !== undefined && <div><dt>Einträge</dt><dd class="num">{formatCompact(st.count)}</dd></div>}
-      </dl>
-      <SourceList def={def} />
       {sections.map((sec) => (
         <div key={sec.title} class="lpage-sec">
           <h4 class="lpage-h">{sec.title}</h4>
@@ -68,6 +61,13 @@ export function LayerPage({ layer, def, karteId, from, removable }: { layer: Kar
         <OpacityField layer={layer} def={def} karteId={karteId} />
       </div>
       <LayerLegend def={def} />
+      <h4 class="lpage-h">Daten</h4>
+      <dl class="lpage-group lpage-facts">
+        <div><dt>Abdeckung</dt><dd>{def.coverage ?? 'Welt'}</dd></div>
+        <div><dt>Aktualisierung</dt><dd>{CADENCE_LABEL[def.cadence]}</dd></div>
+        {st?.count !== undefined && <div><dt>Einträge</dt><dd class="num">{formatCompact(st.count)}</dd></div>}
+      </dl>
+      <SourceList def={def} />
       {removable && <RemoveAction def={def} karteId={karteId} />}
     </section>
   );
