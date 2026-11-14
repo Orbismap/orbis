@@ -4,9 +4,11 @@ import type { TrackSample } from '../../ext/types';
 import type { GeoFrame } from '../world3d/frame';
 import { inQuad, segmentDistance, type Point } from '../world3d/hit';
 import { GeoInstances } from '../world3d/instances';
-import { outlineMaterial } from '../world3d/outline';
+import { hull, outlineMaterial } from '../world3d/outline';
 import type { Stage, StagePart } from '../world3d/stage';
 import { hullGeometries, MAX_SPINNERS, MODEL_BOOST, MODEL_MIN_SCALE, MODEL_COLOR, MODEL_PARTS, planeGeometries, SPINNERS, spinnerGeometries } from './models';
+import { glbFor } from './aircraft-models';
+import { loadGlb } from './glb';
 import { PlaneTracker, type PlaneState } from './smoothing';
 import { growScale, sizeScale, stepGrow } from '../world3d/size';
 import { TrailRig, TRAIL_FADE_MS, WALL_MAX_M } from './trail';
@@ -40,6 +42,11 @@ const REGULAR_MODELS = new Set(['light', 'narrow', 'wide']);
 const ONLY_SPECIAL_SCALE = 2;
 
 const FLATTEN = new THREE.Matrix4().makeScale(1, 1, 0.002);
+
+/** the detailed models carry their own colours: the altitude colour only tints them by this share (an emergency or military aircraft keeps its full colour) */
+const GLB_TINT = 0.35;
+/** the detailed models show (and load) from this zoom on; further out the simple coloured ones are enough */
+const GLB_MIN_ZOOM = 11;
 
 export class PlanesPart implements StagePart {
   readonly object = new THREE.Group();
@@ -77,7 +84,11 @@ export class PlanesPart implements StagePart {
   private shadowHits: { id: string; x: number; y: number }[] = [];
   private dropHits: { id: string; a: Point; b: Point }[] = [];
   private matrix = new THREE.Matrix4();
+  private tint = new THREE.Color();
   private drawn = 0;
+  private disposed = false;
+  /** detailed models by id: the keys of their parts once loaded, null while loading or when loading failed */
+  private glb = new Map<string, string[] | null>();
 
   constructor(
     private map: MlMap,
@@ -194,17 +205,27 @@ export class PlanesPart implements StagePart {
       const k = growScale(zoom, this.grow.get(p.id) ?? 0);
       const boost = Math.max(MODEL_MIN_SCALE[p.model] ?? 1, share * (MODEL_BOOST[p.model] ?? 1) * frame.metresPerPixel(p.dLon, p.dLat, alt)) * k * (this.onlySpecial ? ONLY_SPECIAL_SCALE : 1);
       const color = p.color;
-      frame.place(this.matrix, p.dLon, p.dLat, alt, p.dTrack, boost);
-      this.models.add(p.model, this.matrix, MODEL_COLOR[p.model] ?? color);
-      this.addParts(p, now);
+      // a detailed model of the aircraft's type, once loaded; until then (and for types without one) the simple model
+      const detail = zoom >= GLB_MIN_ZOOM ? this.detailOf(p) : undefined;
+      const size = boost * (detail?.factor ?? 1);
+      const keys = detail?.keys ?? [p.model];
+      frame.place(this.matrix, p.dLon, p.dLat, alt, p.dTrack, size);
+      if (detail) {
+        const full = p.emergency || p.military;
+        this.tint.set(0xffffff).lerp(new THREE.Color(color), full ? 1 : GLB_TINT);
+        for (const key of keys) this.models.add(key, this.matrix, this.tint.getHex());
+      } else {
+        this.models.add(p.model, this.matrix, MODEL_COLOR[p.model] ?? color);
+        this.addParts(p, now);
+      }
       if (p.id === this.selected) {
-        // constant in screen pixels: the offset is in model units, which the instance matrix scales by `boost`
-        this.outlineWidth.value = (OUTLINE_PX * frame.metresPerPixel(p.dLon, p.dLat, alt)) / boost;
-        this.outline.add(p.model, this.matrix, OUTLINE_COLOR);
+        // constant in screen pixels: the offset is in model units, which the instance matrix scales by `size`
+        this.outlineWidth.value = (OUTLINE_PX * frame.metresPerPixel(p.dLon, p.dLat, alt)) / size;
+        for (const key of keys) this.outline.add(key, this.matrix, OUTLINE_COLOR);
       }
       if (air) {
-        frame.place(this.matrix, p.dLon, p.dLat, 0.1, p.dTrack, boost).multiply(FLATTEN);
-        this.shadows.add(p.model, this.matrix, 0x000000);
+        frame.place(this.matrix, p.dLon, p.dLat, 0.1, p.dTrack, size).multiply(FLATTEN);
+        for (const key of keys) this.shadows.add(key, this.matrix, 0x000000);
         const foot = frame.position(p.dLon, p.dLat, 0.1);
         const top = frame.position(p.dLon, p.dLat, alt);
         dropPos.push(foot[0], foot[1], foot[2], top[0], top[1], top[2]);
@@ -245,6 +266,33 @@ export class PlanesPart implements StagePart {
     }
     this.syncLabel(frame);
     return visible.length > 0 || growing;
+  }
+
+  /** The detailed model of an aircraft's type: its part keys and stretch, once loaded (loading starts with the first aircraft of a type). */
+  private detailOf(p: PlaneState): { keys: string[]; factor: number } | undefined {
+    const g = glbFor(p.type);
+    if (!g) return undefined;
+    const have = this.glb.get(g.id);
+    if (have) return { keys: have, factor: g.factor };
+    if (have === undefined) {
+      this.glb.set(g.id, null);
+      loadGlb(g.id).then(
+        (parts) => {
+          if (this.disposed) return;
+          const keys = parts.map((part, i) => {
+            const key = `glb:${g.id}:${i}`;
+            this.models.addGeometry(key, part.geometry, part.material);
+            this.shadows.addGeometry(key, part.geometry.clone());
+            this.outline.addGeometry(key, hull(part.geometry));
+            return key;
+          });
+          this.glb.set(g.id, keys);
+          this.stage.wake();
+        },
+        (e) => console.warn(`aircraft model ${g.id} failed to load`, e),
+      );
+    }
+    return undefined;
   }
 
   /** The extra instances of a model (glass, wheels, flashing beacon) and its turning rotors, placed like the model (`this.matrix`). */
@@ -405,6 +453,7 @@ export class PlanesPart implements StagePart {
   }
 
   dispose() {
+    this.disposed = true;
     this.dropRigs(() => true);
     this.models.dispose();
     this.rotors.dispose();

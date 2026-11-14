@@ -254,7 +254,7 @@ export default defineLayer({
         const p = t.props as unknown as AircraftProps;
         out.push({
           id: t.id, lng: t.lng, lat: t.lat, altM: p.gnd ? 0 : p.alt, track: p.trk >= 0 ? p.trk : t.heading, speedMs: t.speed ?? 0, vrMs: p.vr,
-          ground: p.gnd, heli: p.heli, category: p.cat, emergency: p.emerg, military: p.mil, color: aircraftColor(p), label: p.call || p.reg || p.hex.toUpperCase(), t: t.t, live: liveIds.has(t.id),
+          ground: p.gnd, heli: p.heli, category: p.cat, type: p.type, emergency: p.emerg, military: p.mil, color: aircraftColor(p), label: p.call || p.reg || p.hex.toUpperCase(), t: t.t, live: liveIds.has(t.id),
         });
       }
       return out;

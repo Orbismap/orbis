@@ -4,7 +4,7 @@ import { distanceZoomFor, focusCentre, highestDistanceZoom, latScale, maxDistanc
 
 // Follow camera: keeps one object of a stage part (an aircraft, later a ship or a satellite) in the middle of the
 // screen while it moves. Dragging turns and tilts the camera around it, the wheel and pinch zoom towards it. A click
-// on another object of a part that can be followed switches to it without stopping. Ported from the old app's GeoFocus.
+// on an object of a part that can be followed starts following it, or switches to it without stopping. Ported from the old app's GeoFocus.
 //
 // The map's own input handlers are off meanwhile: they would be cancelled by every camera update of a moving
 // aircraft, and a left drag would pan. Bearing, tilt and zoom (as the distance to the aircraft, not to the map
@@ -76,9 +76,9 @@ export class Follow {
     return this.target !== null && this.dragged;
   }
 
-  /** A click hit `id` of `part`: while following, the camera moves over to it (no-op on the followed object itself). */
+  /** A click hit `id` of `part`: the camera follows it, from where it is (no-op on the followed object itself). */
   retarget(part: StagePart, id: string) {
-    if (this.target !== null && part.positionOf) this.start(part, id);
+    if (part.positionOf) this.start(part, id);
   }
 
   dispose() {

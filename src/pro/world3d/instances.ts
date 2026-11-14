@@ -17,10 +17,19 @@ export class GeoInstances {
   private capacity = 0;
   private colour = new THREE.Color();
 
+  /** materials of single keys (models loaded later, with their own textures); the others use the shared one */
+  private materials = new Map<string, THREE.Material>();
+
   constructor(
     private geometries: Record<string, THREE.BufferGeometry>,
     private material: THREE.Material = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }),
   ) {}
+
+  /** A model that arrives after construction; owned from now on (disposed with the rest). */
+  addGeometry(key: string, geometry: THREE.BufferGeometry, material?: THREE.Material) {
+    this.geometries[key] = geometry;
+    if (material) this.materials.set(key, material);
+  }
 
   /** A new set of up to `count` objects, with matrices of this frame. */
   start(frame: GeoFrame, count: number) {
@@ -41,7 +50,7 @@ export class GeoInstances {
     if (!slot) {
       const geometry = this.geometries[key];
       if (!geometry) return;
-      const mesh = new THREE.InstancedMesh(geometry, this.material, this.capacity);
+      const mesh = new THREE.InstancedMesh(geometry, this.materials.get(key) ?? this.material, this.capacity);
       mesh.frustumCulled = false;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       this.object.add(mesh);
@@ -79,5 +88,6 @@ export class GeoInstances {
     for (const { mesh } of this.slots.values()) mesh.dispose();
     for (const geometry of Object.values(this.geometries)) geometry.dispose();
     this.material.dispose();
+    for (const m of this.materials.values()) m.dispose();
   }
 }
