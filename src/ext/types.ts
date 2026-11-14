@@ -34,6 +34,34 @@ export interface TrackSample {
   t: number;
 }
 
+/** One tracked ship (AIS) as the base layer knows it. Positions are the last report, not extrapolated. */
+export interface ShipSample {
+  /** MMSI as a string, the id the layer uses for its cards */
+  id: string;
+  lng: number;
+  lat: number;
+  /** course over ground in degrees clockwise from north; undefined when unknown */
+  course?: number;
+  /** true heading (where the bow points) in degrees; undefined when unknown (AIS 511) */
+  heading?: number;
+  /** m/s over ground */
+  speedMs: number;
+  /** under way (AIS speed of at least 0.5 kn), the layer's own notion; false: at rest, speed and course mean nothing */
+  moving: boolean;
+  /** ship class id of the layer's legend: passenger, cargo, tanker, fishing, pleasure, special or other */
+  cls: string;
+  /** colour of the class as '#rrggbb' (2D icon and legend), so both presentations agree */
+  color: string;
+  /** name, or `MMSI …` when the ship has none */
+  label: string;
+  /** length in metres from AIS static data; undefined when unknown */
+  lenM?: number;
+  /** beam in metres from AIS static data; undefined when unknown */
+  beamM?: number;
+  /** time of the position fix, ms since epoch */
+  t: number;
+}
+
 /** A button an extension adds to the inspector card of a selected object. */
 export interface CardAction {
   id: string;
@@ -45,14 +73,14 @@ export interface CardAction {
 }
 
 /**
- * Channel for moving objects. A base layer publishes, an extension listens. Everything on this side is the
+ * Channel for moving objects (`T`: aircraft by default). A base layer publishes, an extension listens. Everything on this side is the
  * extension's view of it: it never sees the layer, only its data, its selection and what it may do with it.
  */
-export interface TracksChannel {
+export interface TracksChannel<T = TrackSample> {
   /** True while at least one extension listens. Publishing is free otherwise. */
   readonly listening: boolean;
   /** Calls `fn` with the latest list now (if any) and after every publish. Returns the unsubscribe function. */
-  subscribe(fn: (items: readonly TrackSample[]) => void): () => void;
+  subscribe(fn: (items: readonly T[]) => void): () => void;
   /** Id of the object whose card the inspector shows, or null. */
   readonly selectedId: ReadonlySignal<string | null>;
   /** Opens the real card of the layer for this object (null: clears the selection). */
@@ -76,6 +104,8 @@ export interface ExtensionHost {
   /** 'globe' | 'mercator' */
   readonly projection: ReadonlySignal<'globe' | 'mercator'>;
   readonly tracks: TracksChannel;
+  /** Channel for ships (layer `schiffe`). */
+  readonly ships: TracksChannel<ShipSample>;
   /**
    * The extension steers the camera's tilt and bearing itself (a follow camera): the base's tilt and north limits stand
    * back until the returned function is called. Called with `ease`, the camera eases once back onto the limits (and to

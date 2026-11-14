@@ -1,6 +1,7 @@
 // Ships from AIS. Worldwide: aisstream.io through the proxy's /ais WebSocket relay (the worker holds the key; subscribes to
 // the view from zoom 3, throttled to one map update per second, reconnect with back-off, at most 8000 ships), merged with
-// Digitraffic Marine (Fintraffic) for the Baltic. The visitor's own aisstream key (settings) is the fallback when the
+// Digitraffic Marine (Fintraffic) for the Baltic and BarentsWatch (Kystverket) for Norway: a snapshot of the central loop of
+// Orbismap/data in orbis-live (the API needs an OAuth client, so the browser never asks it directly). The visitor's own aisstream key (settings) is the fallback when the
 // relay is unavailable. Selected ship: destination and ETA from AIS static data, trail of the positions seen in this
 // session, photo from Wikimedia Commons when one can be matched by IMO number or name.
 import { computed, effect, signal } from '@preact/signals';
@@ -9,12 +10,16 @@ import { formatNumber } from '../../core/format';
 import { MINUTE } from '../../core/time';
 import { AisClient } from '../../data/parsers/aisclient';
 import { AisBook, etaText, parseAisMessage, subscriptionBoxes } from '../../data/parsers/aisstream';
-import { SHIP_CLASSES, shipClass, shipTypeName, type ShipProps, type ShipVessel } from '../../data/parsers/ais';
+import { KN, SHIP_CLASSES, shipClass, shipTypeName, type ShipProps, type ShipVessel } from '../../data/parsers/ais';
+import type { NorwayAis } from '../../data/parsers/barentswatch';
 import { greatCircle } from '../../data/parsers/flightinfo';
 import { PortIndex, type DestPort, type PortRow } from '../../data/parsers/shipdest';
 import { commonsFileUrl, commonsSearchUrl, parseCommonsFile, parseCommonsPhoto, parseWikidataImage, wikidataImoUrl, type ShipPhoto } from '../../data/parsers/shipphoto';
 import { speedText } from '../../data/parsers/traffic';
+import { shipsChannel } from '../../ext/channels';
+import type { ShipSample } from '../../ext/types';
 import { extrapolate, trackLayer, type TrackObject } from '../../render/tracks';
+import { bucketUrl } from '../../data/endpoints';
 import { fetchJson } from '../../data/http';
 import { defineLayer } from '../define';
 import type { InspectCard } from '../types';
@@ -71,10 +76,11 @@ export default defineLayer({
   color: COLOR,
   form: 'tracks',
   cadence: 'live',
-  coverage: 'Welt (AIS-Stream im Ausschnitt ab Zoom 3) · Ostsee komplett',
+  coverage: 'Welt (AIS-Stream im Ausschnitt ab Zoom 3) · Ostsee und Norwegen komplett',
   sources: [
     { name: 'aisstream.io (über den Daten-Proxy)', url: 'https://aisstream.io/', license: 'kostenlos, Quellenangabe' },
     { name: 'Fintraffic Digitraffic Marine (AIS)', url: 'https://www.digitraffic.fi/en/marine-traffic/', license: 'CC BY 4.0' },
+    { name: 'BarentsWatch / Kystverket (AIS Norwegen, zentral abgerufen)', url: 'https://www.barentswatch.no/en/articles/open-data-via-barentswatch/', license: 'NLOD 2.0' },
     { name: 'Wikidata + Wikimedia Commons (Fotos über die IMO-Nummer, wenn vorhanden)', url: 'https://www.wikidata.org/', license: 'je Foto, Urheber und Lizenz in der Karte' },
     { name: 'World Port Index (NGA) / UN/LOCODE (Zielhafen aus dem AIS-Zieltext)', url: 'https://msi.nga.mil/Publications/WPI', license: 'gemeinfrei bzw. CC BY 4.0' },
   ],
@@ -86,8 +92,8 @@ export default defineLayer({
       choices: [{ value: 'all', label: 'Alle' }, ...SHIP_CLASSES.map((c) => ({ value: c.id, label: c.label }))],
     },
   ],
-  legend: { type: 'classes', items: SHIP_CLASSES.map((c) => ({ color: c.color, label: c.label })) },
-  keywords: ['schiff', 'ais', 'fähre', 'ostsee', 'finnland', 'ship', 'vessel', 'tanker', 'frachter', 'hafen', 'weltweit', 'aisstream'],
+  legend: { type: 'classes', items: [...SHIP_CLASSES.map((c) => ({ color: c.color, label: c.label })), { color: COLOR, label: 'Abdeckung Norwegen (BarentsWatch)', shape: 'line' as const }] },
+  keywords: ['schiff', 'ais', 'fähre', 'ostsee', 'finnland', 'norwegen', 'barentswatch', 'kystverket', 'ship', 'vessel', 'tanker', 'frachter', 'hafen', 'weltweit', 'aisstream'],
 
   mount(ctx) {
     const ml = ctx.map.ml;
@@ -99,6 +105,10 @@ export default defineLayer({
       timeout: 40_000,
     });
     const vessels = ctx.resource<Record<string, ShipVessel>>({ key: 'digitraffic:ais-vessels', url: `${BASE}/vessels`, parse: 'aisVessels', refresh: 30 * MINUTE, timeout: 60_000 });
+    // Norway: positions and static data in one file, newest report per MMSI of the last 30 minutes (loop every 60 s)
+    const norway = ctx.resource<NorwayAis>({ key: 'barentswatch:latest', url: bucketUrl('live', 'ais/barentswatch-latest.json'), parse: 'barentswatchLatest', refresh: MINUTE, timeout: 30_000 });
+    /** static data of a ship from Digitraffic, else BarentsWatch */
+    const vesselOf = (id: string): ShipVessel | undefined => vessels.data.peek()?.[id] ?? norway.data.peek()?.vessels[id];
 
     // --- worldwide stream ---
     const book = new AisBook(8000);
@@ -147,13 +157,22 @@ export default defineLayer({
         return { ...t, props: { ...t.props, cls: shipClass(m?.type), name: m?.name ?? '' } };
       });
     });
-    const stopTrail = effect(() => { for (const t of loc.data.value ?? []) book.addTrail(Number(t.id), t.lng, t.lat, t.t); });
+    const stopTrail = effect(() => { for (const t of [...(loc.data.value ?? []), ...(norway.data.value?.tracks ?? [])]) book.addTrail(Number(t.id), t.lng, t.lat, t.t); });
+    // a snapshot whose loop stopped: its ships fall out after 30 minutes like everywhere else
+    const norwegian = computed<TrackObject[] | undefined>(() => {
+      const n = norway.data.value?.tracks;
+      if (!n) return undefined;
+      const now = Date.now();
+      return n.filter((t) => now - t.t < 30 * MINUTE);
+    });
     const tracks = computed<TrackObject[] | undefined>(() => {
       const b = baltic.value;
+      const no = norwegian.value;
       const s = streamTracks.value;
-      if (!b && !s.length) return undefined;
+      if (!b && !no && !s.length) return undefined;
       const m = new Map<string, TrackObject>();
       for (const t of b ?? []) m.set(t.id, t);
+      for (const t of no ?? []) { const o = m.get(t.id); if (!o || t.t >= o.t) m.set(t.id, t); }
       for (const t of s) { const o = m.get(t.id); if (!o || t.t >= o.t) m.set(t.id, t); }
       return [...m.values()];
     });
@@ -165,11 +184,13 @@ export default defineLayer({
       if (o.cls && o.cls !== 'all') clauses.push(['==', ['get', 'cls'], String(o.cls)]);
       return clauses.length ? (['all', ...clauses] as FilterSpecification) : undefined;
     });
+    // the options as the 2D icons apply them (same as `filter`): one predicate for the count and the channel
+    const passes = (x: TrackObject, o = ctx.options.peek()) => (!o.moving || (x.props as unknown as ShipProps).moving) && (!o.cls || o.cls === 'all' || (x.props as { cls: string }).cls === o.cls);
     const count = computed(() => {
       const t = tracks.value;
       if (!t) return undefined;
       const o = ctx.options.value;
-      return t.filter((x) => (!o.moving || (x.props as unknown as ShipProps).moving) && (!o.cls || o.cls === 'all' || (x.props as { cls: string }).cls === o.cls)).length;
+      return t.filter((x) => passes(x, o)).length;
     });
 
     // --- card with destination, ETA, photo ---
@@ -182,7 +203,7 @@ export default defineLayer({
     const trackOf = (id: string) => tracks.peek()?.find((t) => t.id === id);
     const cardOf = (t: TrackObject, now: number): InspectCard => {
       const p = t.props as unknown as ShipProps & { cls: string; name: string };
-      const m = vessels.data.peek()?.[t.id];
+      const m = vesselOf(t.id);
       const st = book.statics.get(p.mmsi);
       const type = st?.type || m?.type;
       const cls = SHIP_CLASSES.find((c) => c.id === p.cls) ?? SHIP_CLASSES[SHIP_CLASSES.length - 1]!;
@@ -212,7 +233,9 @@ export default defineLayer({
       if (trail > 1) facts.push({ label: 'Spur', value: `${trail} Positionen seit dem Öffnen der Karte` });
       const age = Math.round((now - t.t) / MINUTE);
       facts.push({ label: 'Letzte Meldung', value: age < 1 ? 'gerade eben' : `vor ${age} min` });
+      const actions = shipsChannel.actionsFor(t.id);
       return {
+        ...(actions.length ? { actions } : {}),
         title: name || `MMSI ${p.mmsi}`,
         subtitle: cls.label,
         color: cls.color,
@@ -230,7 +253,7 @@ export default defineLayer({
       const p = t.props as unknown as ShipProps & { name: string };
       selId.value = t.id;
       const st = book.statics.get(p.mmsi);
-      const m = vessels.data.peek()?.[t.id];
+      const m = vesselOf(t.id);
       const imo = st?.imo || m?.imo || 0;
       const name = st?.name || m?.name || p.name;
       const key = `${imo}|${name}`;
@@ -244,6 +267,37 @@ export default defineLayer({
       return card;
     };
     const stopSel = effect(() => { const c = ctx.selection.value; if (!c || !mine.has(c)) selId.value = null; });
+    // --- channel for extensions (3D): filtered like the 2D icons; built only while someone listens ---
+    const samples = (): ShipSample[] => {
+      const out: ShipSample[] = [];
+      const o = ctx.options.peek();
+      for (const t of tracks.peek() ?? []) {
+        if (!passes(t, o)) continue;
+        const p = t.props as unknown as ShipProps & { cls: string; name: string };
+        const st = book.statics.get(p.mmsi);
+        const m = vesselOf(t.id);
+        const len = st?.len || m?.len;
+        const wid = st?.wid || m?.wid;
+        const cls = SHIP_CLASSES.find((c) => c.id === p.cls) ?? SHIP_CLASSES[SHIP_CLASSES.length - 1]!;
+        out.push({
+          id: t.id, lng: t.lng, lat: t.lat, course: p.cog >= 0 ? p.cog : undefined, heading: p.hdg >= 0 ? p.hdg : undefined, speedMs: p.moving ? p.sog * KN : 0, moving: p.moving,
+          cls: cls.id, color: cls.color, label: st?.name || m?.name || p.name || `MMSI ${p.mmsi}`, ...(len ? { lenM: len } : {}), ...(wid ? { beamM: wid } : {}), t: t.t,
+        });
+      }
+      return out;
+    };
+    const stopPublish = effect(() => { tracks.value; ctx.options.value; shipsChannel.publish(samples); });
+    const stopSelectedId = effect(() => { shipsChannel.setSelectedId(selId.value); });
+    // an extension changed its card buttons: rebuild the card (version.peek: the effect must not read what it writes)
+    const stopActions = effect(() => { shipsChannel.actionsVersion.value; version.value = version.peek() + 1; });
+    const offSelect = shipsChannel.onSelect((id) => {
+      if (id === null) { if (selId.peek()) ctx.select(null); return; }
+      const t = trackOf(id);
+      if (!t) return;
+      const card = describe(t, Date.now());
+      card.location ??= extrapolate(t, Date.now(), 10 * MINUTE);
+      ctx.select(card);
+    });
     let lastVersion = 0;
     const stopUpdate = effect(() => {
       const v = version.value;
@@ -255,6 +309,27 @@ export default defineLayer({
       const card = { ...cardOf(t, Date.now()), location: extrapolate(t, Date.now(), 10 * MINUTE) };
       mine.add(card);
       ctx.select(card);
+    });
+
+    // coverage of the Norwegian data (BarentsWatch's open AIS area, mirrored once per loop run): a dashed outline with a faint
+    // fill, so a visitor sees where Norway's ships come from. No dimming outside: the stream covers the rest of the world.
+    const area = ctx.resource<GeoJSON.Feature | null>({
+      key: 'barentswatch:area',
+      url: bucketUrl('live', 'ais/barentswatch-area.json'),
+      parse: (raw) => {
+        const g = raw as GeoJSON.Geometry | null;
+        return g && (g.type === 'MultiPolygon' || g.type === 'Polygon') ? { type: 'Feature', geometry: g, properties: {} } : null;
+      },
+      refresh: 6 * 60 * MINUTE,
+      timeout: 30_000,
+    });
+    const asrc = `${ctx.id}.area-src`;
+    ctx.map.addSource(asrc, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    ctx.map.addLayer({ id: `${ctx.id}.area-fill`, type: 'fill', source: asrc, paint: { 'fill-color': COLOR, 'fill-opacity': 0.035 } }, 'areas');
+    ctx.map.addLayer({ id: `${ctx.id}.area-line`, type: 'line', source: asrc, layout: { 'line-join': 'round' }, paint: { 'line-color': COLOR, 'line-width': 1.2, 'line-opacity': 0.5, 'line-dasharray': [4, 3] } }, 'lines');
+    const stopArea = effect(() => {
+      const f = area.data.value;
+      (ml.getSource(asrc) as { setData(d: unknown): void } | undefined)?.setData({ type: 'FeatureCollection', features: f ? [f] : [] });
     });
 
     // trail of the selected ship
@@ -274,7 +349,7 @@ export default defineLayer({
       if (t) {
         const p = t.props as unknown as ShipProps;
         const st = book.statics.get(p.mmsi);
-        const dp = destPortOf(t, st?.dest || vessels.data.peek()?.[t.id]?.dest);
+        const dp = destPortOf(t, st?.dest || vesselOf(t.id)?.dest);
         if (dp) {
           // the line continues on the same side of the antimeridian as the ship
           const at = pts[pts.length - 1]!;
@@ -293,17 +368,17 @@ export default defineLayer({
       const s = link.value;
       const z = zoom.value;
       const n = count.value;
-      const note = z < AIS_MIN_ZOOM ? 'Weltweite AIS-Daten ab Zoom 3, hier nur die Ostsee'
+      const note = z < AIS_MIN_ZOOM ? 'Weltweite AIS-Daten ab Zoom 3, hier nur Ostsee und Norwegen'
         : s.state === 'relay' ? 'Weltweit live über den Daten-Proxy (aisstream.io)'
         : s.state === 'key' ? 'Weltweit live mit deinem aisstream.io-Schlüssel'
-        : s.state === 'down' ? `${s.note ?? 'AIS-Stream nicht erreichbar'}; Ostsee über Digitraffic` : 'Verbinde mit dem AIS-Stream …';
+        : s.state === 'down' ? `${s.note ?? 'AIS-Stream nicht erreichbar'}; Ostsee und Norwegen weiter verfügbar` : 'Verbinde mit dem AIS-Stream …';
       if (n === undefined) { ctx.status(loc.state.value === 'error' && s.state !== 'relay' && s.state !== 'key' ? { state: 'error', note: loc.error.value } : { state: 'loading' }); return; }
       ctx.status({ state: n === 0 ? 'empty' : 'ready', count: n, updatedAt: loc.updatedAt.value, note });
     });
 
     const handle = trackLayer({ ...ctx, status: () => {} }, {
       data: tracks,
-      resources: [loc, vessels],
+      resources: [loc, vessels, norway],
       color: colorExpr,
       symbol: { icon: 'ship', size },
       filter,
@@ -311,6 +386,7 @@ export default defineLayer({
       maxExtrapolateMs: 10 * MINUTE,
       tickMs: 1000,
       describe,
+      hidden: shipsChannel.presented,
     });
     return {
       destroy() {
@@ -319,9 +395,9 @@ export default defineLayer({
         clearInterval(trailTimer);
         ml.off('moveend', onMove);
         client.close();
-        stopKey(); stopTrail(); stopSel(); stopUpdate(); stopTrailDraw(); stopStatus();
+        stopKey(); stopTrail(); stopSel(); stopUpdate(); stopTrailDraw(); stopStatus(); stopArea(); stopPublish(); stopSelectedId(); stopActions(); offSelect(); shipsChannel.reset();
         handle.destroy();
-        ctx.map.remove({ layers: [`${ctx.id}.route-port`, `${ctx.id}.route`, `${ctx.id}.trail`], sources: [tsrc] });
+        ctx.map.remove({ layers: [`${ctx.id}.route-port`, `${ctx.id}.route`, `${ctx.id}.trail`, `${ctx.id}.area-line`, `${ctx.id}.area-fill`], sources: [tsrc, asrc] });
       },
     };
   },

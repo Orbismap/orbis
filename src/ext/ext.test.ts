@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createTracksChannel } from './channels';
-import type { TrackSample } from './types';
+import type { ShipSample, TrackSample } from './types';
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
 
@@ -133,5 +133,23 @@ describe('tracks channel', () => {
     expect(ch.actionsVersion.value).toBe(v0 + 2);
     h.dispose();
     expect(ch.actionsFor('a')).toEqual([]);
+  });
+});
+
+describe('generic channel', () => {
+  it('carries ship samples with their own selection', () => {
+    const ships = createTracksChannel<ShipSample>();
+    const planes = createTracksChannel();
+    const ship: ShipSample = { id: '211000000', lng: 8, lat: 54, speedMs: 5, moving: true, cls: 'cargo', color: '#4fc3f7', label: 'MMSI 211000000', t: 1 };
+    ships.publish(() => [ship]);
+    ships.setSelectedId('211000000');
+    const seen: string[] = [];
+    ships.subscribe((items) => seen.push(...items.map((i) => i.cls)));
+    expect(seen).toEqual(['cargo']);
+    expect(ships.selectedId.value).toBe('211000000');
+    // the two channels do not share anything
+    expect(planes.selectedId.value).toBeNull();
+    expect(planes.listening).toBe(false);
+    expect(ships.listening).toBe(true);
   });
 });

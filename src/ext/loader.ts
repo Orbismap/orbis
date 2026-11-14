@@ -9,7 +9,7 @@ import { mapEngine } from '../state/ui';
 import { projection } from '../state/view';
 import { reducedMotion } from '../state/settings';
 import type { MapEngine } from '../map/types';
-import { tracksChannel } from './channels';
+import { shipsChannel, tracksChannel } from './channels';
 import { proEnabled } from './licence';
 import type { ExtensionHost, OrbisExtension } from './types';
 
@@ -30,6 +30,7 @@ function makeHost(engine: MapEngine): ExtensionHost {
     removeLayer: (id) => engine.remove({ layers: [id] }),
     projection,
     tracks: tracksChannel,
+    ships: shipsChannel,
     holdCamera: () => engine.holdCamera(),
     reducedMotion,
   };
