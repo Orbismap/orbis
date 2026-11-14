@@ -32,6 +32,8 @@ export interface TrackSample {
   label: string;
   /** time of the position fix, ms since epoch */
   t: number;
+  /** from the detailed live view (not the overview snapshot): an aircraft first seen live snaps to its true place */
+  live?: boolean;
 }
 
 /** One tracked ship (AIS) as the base layer knows it. Positions are the last report, not extrapolated. */

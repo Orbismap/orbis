@@ -156,7 +156,7 @@ export default defineLayer({
 
     // status of the layer: the overview below zoom 5, the detailed view above
     const stopStatus = effect(() => {
-      const wide = zoom.value < DETAIL_SHOW_ZOOM;
+      const wide = zoom.value < DETAIL_SHOW_ZOOM || detail.res.data.value === undefined;
       const list = wide ? world.value : detail.res.data.value;
       const note = wide
         ? oskDown.value ? (fallback.data.value ? 'Weltübersicht von OpenSky nicht verfügbar oder veraltet: Näherung aus Abfragen um große Drehkreuze' : 'Weltübersicht von OpenSky nicht verfügbar oder veraltet') : milRes.error.value
@@ -235,12 +235,13 @@ export default defineLayer({
     // --- channel for extensions (3D): the detailed view plus the rest of the overview, filtered like the 2D icons; built only while someone listens ---
     const samples = (): TrackSample[] => {
       const out: TrackSample[] = [];
+      const liveIds = new Set((detail.res.data.peek() ?? []).map((t) => t.id));
       for (const t of preferFirst(detail.res.data.peek() ?? [], world.peek() ?? [])) {
         if (!passes(t)) continue;
         const p = t.props as unknown as AircraftProps;
         out.push({
           id: t.id, lng: t.lng, lat: t.lat, altM: p.gnd ? 0 : p.alt, track: p.trk >= 0 ? p.trk : t.heading, speedMs: t.speed ?? 0, vrMs: p.vr,
-          ground: p.gnd, heli: p.heli, category: p.cat, emergency: p.emerg, military: p.mil, color: aircraftColor(p), label: p.call || p.reg || p.hex.toUpperCase(), t: t.t,
+          ground: p.gnd, heli: p.heli, category: p.cat, emergency: p.emerg, military: p.mil, color: aircraftColor(p), label: p.call || p.reg || p.hex.toUpperCase(), t: t.t, live: liveIds.has(t.id),
         });
       }
       return out;
@@ -321,11 +322,16 @@ export default defineLayer({
       data: detail.res, color, symbol: { icon: 'plane', size }, ringRadius: 16, maxExtrapolateMs: 30_000, filter, minZoom: DETAIL_SHOW_ZOOM, describe, hidden: tracksChannel.presented,
     });
     // the overview ends where the detailed view starts (layer ranges are disjoint, so no aircraft is drawn twice)
-    for (const id of [`${ctx.id}.world-symbols`, `${ctx.id}.world-ring`]) if (ml.getLayer(id)) ml.setLayerZoomRange(id, 0, DETAIL_SHOW_ZOOM);
+    // Until the detailed view has data (still loading, or the proxy fails), the overview stays visible above zoom 5:
+    // slightly older positions are better than none. The detailed view takes over as soon as its first answer is in.
+    const stopRange = effect(() => {
+      const max = detail.res.data.value === undefined ? 24 : DETAIL_SHOW_ZOOM;
+      for (const id of [`${ctx.id}.world-symbols`, `${ctx.id}.world-ring`]) if (ml.getLayer(id)) ml.setLayerZoomRange(id, 0, max);
+    });
 
     return {
       destroy() {
-        stopStatus(); stopSel(); stopUpdate(); stopPublish(); stopSelectedId(); stopActions(); offSelect(); tracksChannel.reset(); stopRoute(); stopFallback(); stopRemember();
+        stopStatus(); stopSel(); stopUpdate(); stopPublish(); stopSelectedId(); stopActions(); offSelect(); tracksChannel.reset(); stopRoute(); stopFallback(); stopRemember(); stopRange();
         clearInterval(routeTimer);
         ml.off('zoomend', onZoom);
         ml.off('moveend', onZoom);

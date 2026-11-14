@@ -51,9 +51,16 @@ export interface TrackLayerOptions {
   count?: ReadonlySignal<number | undefined>;
 }
 
+/** Aircraft on the ground or below this height (m) that went silent have most likely landed: they stop soon. */
+export const LOW_ALT_M = 150;
+export const LOW_ALT_MAX_MS = 30_000;
+
 /** Position of a track `now`, assuming it keeps heading and speed. */
 export function extrapolate(t: TrackObject, now: number, maxMs: number): [number, number] {
   if (!t.speed || t.heading === undefined) return [t.lng, t.lat];
+  const p = t.props;
+  // aircraft (they carry `gnd` and `alt`): a silent one near the ground has landed, it does not fly on for minutes
+  if (p && 'gnd' in p && (p.gnd || (typeof p.alt === 'number' && p.alt < LOW_ALT_M))) maxMs = Math.min(maxMs, LOW_ALT_MAX_MS);
   const dt = Math.max(0, Math.min(now - t.t, maxMs));
   return destination([t.lng, t.lat], t.heading, (t.speed * dt) / 1000 / 1000);
 }

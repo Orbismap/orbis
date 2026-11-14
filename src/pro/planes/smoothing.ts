@@ -34,6 +34,8 @@ export interface PlaneState {
   at: number;
   /** epoch ms of the last fix, to recognise a repeated report */
   fixEpoch: number;
+  /** the last report came from the detailed live view (not the overview snapshot) */
+  live: boolean;
   /** when the aircraft was last in the data */
   seen: number;
   /** [lon, lat, altitude m, time (performance.now ms)] of the positions reported so far */
@@ -44,6 +46,9 @@ export interface PlaneState {
 export const GONE_MS = 25_000;
 /** an extrapolation never runs longer than this (s); the overview reports an aircraft only every 2 min or so */
 export const MAX_EXTRAPOLATE_S = 300;
+/** below this height (m) an aircraft that stopped reporting has most likely landed; it is extrapolated this long (s) at most */
+export const LOW_ALT_M = 150;
+export const LOW_ALT_MAX_S = 30;
 export const TRAIL_MAX = 150;
 const M_PER_DEG = 111320;
 /** a position closer than this to the last trail point adds nothing (m); on the ground less */
@@ -72,7 +77,9 @@ const trailAlt = (ground: boolean, altM: number) => (ground ? 0.3 : altM);
 /** Where an aircraft is `now` according to its last report. */
 export function targetOf(p: Pick<PlaneState, 'lon' | 'lat' | 'altM' | 'vsMs' | 'track' | 'speedMs' | 'ground' | 'at'>, now: number): { lon: number; lat: number; alt: number } {
   const elapsed = Math.max(0, Math.min(MAX_EXTRAPOLATE_S, (now - p.at) / 1000));
-  const dist = p.speedMs * elapsed;
+  // on the ground or low and silent: most likely landed, so it stops instead of flying on for minutes
+  const posElapsed = p.ground || p.altM < LOW_ALT_M ? Math.min(elapsed, LOW_ALT_MAX_S) : elapsed;
+  const dist = p.speedMs * posElapsed;
   const cosLat = Math.max(0.2, Math.cos(rad(p.lat)));
   return {
     lat: p.lat + (dist * Math.cos(rad(p.track))) / M_PER_DEG,
@@ -96,7 +103,7 @@ export class PlaneTracker {
       const age = Math.max(0, Math.min(MAX_EXTRAPOLATE_S * 1000, epoch - s.t));
       const at = now - age;
       const prev = this.planes.get(s.id);
-      const common = { label: s.label, model: modelOf(s), emergency: s.emergency, military: s.military, ground: s.ground, color: Number.parseInt(s.color.slice(1), 16) || 0xffffff, lon: s.lng, lat: s.lat, altM: s.altM, vsMs: s.vrMs, track, speedMs: s.speedMs, at, fixEpoch: s.t, seen: now };
+      const common = { label: s.label, model: modelOf(s), emergency: s.emergency, military: s.military, ground: s.ground, color: Number.parseInt(s.color.slice(1), 16) || 0xffffff, lon: s.lng, lat: s.lat, altM: s.altM, vsMs: s.vrMs, track, speedMs: s.speedMs, at, fixEpoch: s.t, seen: now, live: !!s.live };
       if (!prev) {
         const state: PlaneState = { id: s.id, ...common, dLon: s.lng, dLat: s.lat, dAlt: s.altM, dTrack: track, trail: [[s.lng, s.lat, trailAlt(s.ground, s.altM), at]] };
         const t = targetOf(state, now);
@@ -115,7 +122,16 @@ export class PlaneTracker {
         prev.trail.push([s.lng, s.lat, trailAlt(s.ground, s.altM), at]);
         if (prev.trail.length > TRAIL_MAX) prev.trail.shift();
       }
+      const wasLive = prev.live;
       Object.assign(prev, common);
+      // the first live report of an aircraft known only from the overview snapshot: snap to the true place, no easing
+      if (prev.live && !wasLive) {
+        const t = targetOf(prev, now);
+        prev.dLon = t.lon;
+        prev.dLat = t.lat;
+        prev.dAlt = t.alt;
+        prev.dTrack = track;
+      }
     }
     for (const [id, p] of this.planes) if (now - p.seen > GONE_MS) this.planes.delete(id);
   }

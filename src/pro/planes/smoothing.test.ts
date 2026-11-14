@@ -40,6 +40,34 @@ describe('extrapolation', () => {
   });
 });
 
+describe('silent aircraft near the ground', () => {
+  const low = { lon: 10, lat: 50, altM: 60, vsMs: -0.3, track: 70, speedMs: 66, ground: false, at: 0 };
+  it('stops after 30 s instead of flying on', () => {
+    expect(metres(10, 50, targetOf(low, 30_000).lon, targetOf(low, 30_000).lat)).toBeCloseTo(metres(10, 50, targetOf(low, 170_000).lon, targetOf(low, 170_000).lat), 0);
+  });
+  it('an aircraft at cruising height keeps flying', () => {
+    const hi = { ...low, altM: 10000 };
+    expect(metres(10, 50, targetOf(hi, 170_000).lon, targetOf(hi, 170_000).lat)).toBeGreaterThan(10_000);
+  });
+});
+
+describe('snapshot -> live data', () => {
+  it('snaps to the true place on the first live report, then eases again', () => {
+    const t = new PlaneTracker();
+    t.feed([sample()], NOW, EPOCH); // overview snapshot
+    const p = t.planes.get('abc123')!;
+    for (let ms = 0; ms <= 10_000; ms += 50) t.step(NOW + ms);
+    // the live view reports it 5 km north
+    t.feed([sample({ lat: 50.045, lng: 10.0 + 0.0001, t: EPOCH + 10_000, live: true })], NOW + 10_000, EPOCH + 10_000);
+    const want = targetOf(p, NOW + 10_000);
+    expect(metres(want.lon, want.lat, p.dLon, p.dLat)).toBeLessThan(1);
+    // the next live report eases as before
+    t.feed([sample({ lat: 50.046, lng: 10.0 + 0.0001, t: EPOCH + 20_000, live: true })], NOW + 20_000, EPOCH + 20_000);
+    const before = { lon: p.dLon, lat: p.dLat };
+    expect(metres(before.lon, before.lat, targetOf(p, NOW + 20_000).lon, targetOf(p, NOW + 20_000).lat)).toBeGreaterThan(0);
+  });
+});
+
 describe('easing to a new report', () => {
   it('does not jump: the displayed position moves a fraction towards the new one', () => {
     const t = new PlaneTracker();
