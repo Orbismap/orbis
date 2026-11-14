@@ -12,6 +12,11 @@ pnpm test         # Vitest
 pnpm typecheck
 ```
 
+Deployment (Cloudflare, `maps.maltee.dev`): `wrangler.jsonc` liefert `dist/` als statische Assets aus und bindet die
+Domain als Custom Domain; der DNS-Eintrag entsteht beim ersten `pnpm build && pnpm dlx wrangler deploy` automatisch.
+Der Workflow `.github/workflows/deploy.yml` läuft vorerst nur manuell (Secrets `CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID`).
+
 Daten kommen aus den Buckets von [Orbismap/data](https://github.com/Orbismap/data); Adressen lassen sich per `.env`
 überschreiben (`.env.example`).
 
