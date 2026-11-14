@@ -23,7 +23,7 @@ const LOC: Record<string, string> = { underwater: 'Seekabel', underground: 'Erdk
 export default defineLayer({
   id: 'telekomnetz',
   category: 'infrastruktur',
-  title: 'Telekom-Leitungen (OSM)',
+  title: 'Telekom-Leitungen',
   summary: 'Seekabel sowie Erdkabel und Freileitungen der Telekommunikation aus OpenStreetMap',
   icon: 'cable',
   color: SEA,

@@ -32,7 +32,7 @@ const USAGE: Record<string, string> = { transmission: 'Fernleitung', distributio
 export default defineLayer({
   id: 'oelgasleitungen',
   category: 'infrastruktur',
-  title: 'Öl- und Gasleitungen (OSM)',
+  title: 'Öl- und Gasleitungen',
   summary: 'Fernleitungen für Erdgas, Erdöl, Wasserstoff und Chemikalien aus OpenStreetMap, Farbe nach Stoff',
   icon: 'flame',
   color: COLOR,

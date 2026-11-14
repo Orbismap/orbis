@@ -11,7 +11,7 @@ import type { AnyFeature } from '../../render/common';
 import { pointLayer } from '../../render/points';
 import { vectorTileLayer } from '../../render/vectortiles';
 import { OIM_ATTRIBUTION, OIM_SOURCE, oimTiles } from '../../data/openinframap';
-import { OSM_SOURCES, describeOsmPlant, osmPlantFilter, osmPlantParts } from '../../data/oimPlants';
+import { OSM_PLANTS_MIN_ZOOM, OSM_SOURCES, describeOsmPlant, osmPlantFilter, osmPlantParts } from '../../data/oimPlants';
 import { defineLayer } from '../define';
 
 const COLOR = '#F5B73D';
@@ -112,7 +112,8 @@ export default defineLayer({
       if (fuel === 'storage') return ['==', ['get', 'mw'], -1] as FilterSpecification; // WRI has no storage
       const parts: unknown[] = [['>=', ['get', 'mw'], Math.max(Number(o.minMw ?? 0), minMwAt(zoom.value))]];
       if (fuel !== 'all') parts.push(['==', ['get', 'fuel'], fuel]);
-      if (hiddenCount.value > 0) parts.push(['!', ['in', ['get', 'id'], ['literal', [...matcher.hidden]]]]);
+      // matches only count while the OSM plants are on the map: zoomed out below their zoom, WRI shows everything again
+      if (zoom.value >= OSM_PLANTS_MIN_ZOOM && hiddenCount.value > 0) parts.push(['!', ['in', ['get', 'id'], ['literal', [...matcher.hidden]]]]);
       return ['all', ...parts] as FilterSpecification;
     });
 

@@ -1,4 +1,4 @@
-// Mineral and fuel deposits: Wikidata mines and oil/gas/coal fields (clustered world view, parsed in the worker),
+// Mineral and fuel deposits: Wikidata mines and oil/gas/coal fields (single points from the world view on, parsed in the worker),
 // plus OpenStreetMap quarries, shafts and wells from resource.pmtiles once zoomed in.
 import { computed, signal } from '@preact/signals';
 import type { ExpressionSpecification } from 'maplibre-gl';
@@ -71,7 +71,6 @@ export default defineLayer({
       data: shown,
       resources: [wd],
       name: 'wikidata',
-      cluster: { radius: 36, maxZoom: 6 },
       radius: ['interpolate', ['linear'], ['zoom'], 1, 2.6, 8, 4.5, 14, 7] as ExpressionSpecification,
       color: groupColor,
       stroke: { color: 'rgba(12, 14, 20, 0.8)', width: 0.8 },

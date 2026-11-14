@@ -20,7 +20,7 @@ const KIND: Record<string, string> = { exchange: 'Vermittlungsstelle', telephone
 export default defineLayer({
   id: 'vermittlungsstellen',
   category: 'infrastruktur',
-  title: 'Vermittlungsstellen (OSM)',
+  title: 'Vermittlungsstellen',
   summary: 'Telefon- und Datenvermittlungsstellen aus OpenStreetMap, ab Zoomstufe 3',
   icon: 'radio',
   color: COLOR,

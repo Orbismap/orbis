@@ -38,7 +38,7 @@ const KIND: Record<string, { title: string; icon: 'drop' | 'wave'; color: string
 export default defineLayer({
   id: 'wassernetz',
   category: 'infrastruktur',
-  title: 'Wasserversorgung (OSM)',
+  title: 'Wasserversorgung',
   summary: 'Wasser- und Abwasserleitungen, Wasserwerke, Kläranlagen, Speicher und Pumpwerke aus OpenStreetMap',
   icon: 'drop',
   color: COLOR,
