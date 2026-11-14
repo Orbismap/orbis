@@ -14,7 +14,7 @@ import { gbfsStations } from './gbfs';
 import { gtfsRtVehicles } from './gtfsrt';
 import { BIKE_SYSTEMS } from './bikesystems';
 import { overpassRoutes } from './oepnv';
-import { overpassRoadmarks } from './roadmark';
+import { backFromEnd, crossingStyle, laneArrows, leftHandTraffic, overpassRoadmarks } from './roadmark';
 import { decodePolyline, pointAt, segmentFixes, transitousTrips } from './transitous';
 import { kindOfMode } from './vehicles';
 
@@ -163,7 +163,7 @@ describe('Overpass parsers', () => {
     const g = [{ lat: 52, lon: 13 }, { lat: 52.001, lon: 13 }, { lat: 52.001, lon: 13.001 }, { lat: 52, lon: 13 }];
     const r = overpassRoadmarks({ elements: [
       { type: 'way', id: 1, tags: { crossing: 'zebra' }, geometry: g.slice(0, 2) },
-      { type: 'way', id: 2, tags: { crossing: 'marked' }, geometry: g.slice(0, 2) },
+      { type: 'way', id: 2, tags: { crossing: 'lines' }, geometry: g.slice(0, 2) },
       { type: 'way', id: 3, tags: { road_marking: 'solid_line', 'road_marking:stroke': 'dashed' }, geometry: g.slice(0, 2) },
       { type: 'way', id: 4, tags: { highway: 'secondary', overtaking: 'no' }, geometry: g.slice(0, 2) },
       { type: 'way', id: 5, tags: { traffic_island: 'yes' }, geometry: g },
@@ -172,6 +172,82 @@ describe('Overpass parsers', () => {
     expect(r.features.map((f) => f.properties.kind)).toEqual(['zebra', 'cross', 'marking', 'over', 'island']);
     expect(r.features[2]!.properties.dash).toBe(true);
     expect(r.features[4]!.geometry.type).toBe('Polygon');
+  });
+});
+
+describe('road markings from road tags', () => {
+  // a north-south street of ~220 m with a signal at its end node
+  const way = (id: number, tags: Record<string, string>, nodes: number[], lons = 13): object => ({ type: 'way', id, tags: { highway: 'secondary', ...tags }, nodes, geometry: nodes.map((_, i) => ({ lat: 52 + i * 0.001, lon: lons })) });
+  it('parses turn lanes per lane', () => {
+    expect(laneArrows('left|through;right||')).toEqual(['l', 'sr', 's', 's']);
+    expect(laneArrows('left;through;right|reverse')).toEqual(['lsr', '']);
+    expect(laneArrows(undefined)).toEqual([]);
+  });
+  it('puts turn arrows into the right lanes, right of the centreline in right-hand traffic', () => {
+    const r = overpassRoadmarks({ elements: [way(1, { 'turn:lanes:forward': 'left|through', 'lanes:forward': '2', 'lanes:backward': '1' }, [1, 2, 3])] });
+    const a = r.features.filter((f) => f.properties.kind === 'arrow');
+    expect(a.map((f) => f.properties.icon)).toEqual(['l', 's']);
+    expect(a[0]!.properties.rot).toBe(0);
+    const [x0, x1] = a.map((f) => (f.geometry as GeoJSON.Point).coordinates[0]!);
+    expect(x0!).toBeGreaterThan(13); // east of the road = right of northbound travel
+    expect(x1!).toBeGreaterThan(x0!);
+  });
+  it('mirrors lanes in left-hand traffic', () => {
+    const r = overpassRoadmarks({ elements: [{ ...(way(1, { 'turn:lanes:forward': 'through', 'lanes:forward': '1', 'lanes:backward': '1' }, [1, 2, 3], -0.1) as object) }] });
+    const a = r.features.find((f) => f.properties.kind === 'arrow')!;
+    expect((a.geometry as GeoJSON.Point).coordinates[0]!).toBeLessThan(-0.1);
+  });
+  it('derives surface, dividers and centre of a four-lane road', () => {
+    const r = overpassRoadmarks({ elements: [way(2, { lanes: '4' }, [1, 2])] });
+    const k = r.features.map((f) => f.properties.kind);
+    expect(k.filter((x) => x === 'surf')).toHaveLength(1);
+    expect(k).not.toContain('edge');
+    expect(k.filter((x) => x === 'centre')).toHaveLength(1);
+    expect(k.filter((x) => x === 'lane')).toHaveLength(2);
+    expect(r.features.find((f) => f.properties.kind === 'surf')!.properties.w).toBeCloseTo(13.4);
+  });
+  it('draws no multi-lane surface for ordinary two-lane roads', () => {
+    expect(overpassRoadmarks({ elements: [way(3, { lanes: '2' }, [1, 2])] }).features).toHaveLength(0);
+  });
+  it('adds a stop line before a signal at the end of a road, only for the allowed direction', () => {
+    const els = [way(4, {}, [1, 2, 3]), { type: 'node', id: 3, lat: 52.002, lon: 13, tags: { highway: 'traffic_signals' } }];
+    const r = overpassRoadmarks({ elements: els });
+    const s = r.features.filter((f) => f.properties.kind === 'stop');
+    expect(s).toHaveLength(1);
+    const g = s[0]!.geometry as GeoJSON.LineString;
+    expect(g.coordinates[0]![1]).toBeCloseTo(g.coordinates[1]![1]!, 5); // crosses the road
+    expect(g.coordinates[0]![1]).toBeLessThan(52.002); // before the node
+    const one = overpassRoadmarks({ elements: [way(5, { oneway: '-1' }, [1, 2, 3]), els[1]!] });
+    expect(one.features.filter((f) => f.properties.kind === 'stop')).toHaveLength(0); // traffic runs away from that node
+  });
+  it('draws a zebra across the road at a crossing node, and two lines at a signalised one', () => {
+    const road = way(7, { lanes: '2' }, [1, 2, 3]);
+    const mid = (tags: Record<string, string>) => ({ type: 'node', id: 2, lat: 52.001, lon: 13, tags: { highway: 'crossing', ...tags } });
+    const z = overpassRoadmarks({ elements: [road, mid({ crossing: 'zebra' })] }).features.filter((f) => f.properties.kind === 'zebra');
+    expect(z).toHaveLength(1);
+    const g = z[0]!.geometry as GeoJSON.LineString;
+    expect(g.coordinates[0]![1]).toBeCloseTo(g.coordinates[1]![1]!, 5); // across the north-south road
+    expect(Math.abs(g.coordinates[1]![0]! - g.coordinates[0]![0]!) * 68000).toBeGreaterThan(6); // about the road width
+    const s = overpassRoadmarks({ elements: [road, mid({ crossing: 'traffic_signals' })] }).features.filter((f) => f.properties.kind === 'cross');
+    expect(s).toHaveLength(1);
+    // already mapped as a crossing way next to the node: no second zebra
+    const dup = overpassRoadmarks({ elements: [road, mid({ crossing: 'zebra' }), { type: 'way', id: 9, tags: { highway: 'footway', crossing: 'zebra' }, geometry: [{ lat: 52.001, lon: 12.9997 }, { lat: 52.001, lon: 13.0003 }] }] });
+    expect(dup.features.filter((f) => f.properties.kind === 'zebra')).toHaveLength(1);
+  });
+  it('knows how crossings are painted (New York style ladder, US uncontrolled, signals)', () => {
+    expect(crossingStyle({ crossing: 'marked', 'crossing:markings': 'ladder' })).toBe('zebra');
+    expect(crossingStyle({ crossing: 'uncontrolled' })).toBe('zebra');
+    expect(crossingStyle({ crossing: 'traffic_signals' })).toBe('cross');
+    expect(crossingStyle({ crossing: 'traffic_signals', 'crossing:markings': 'zebra' })).toBe('zebra');
+    expect(crossingStyle({ crossing: 'marked', 'crossing:markings': 'lines' })).toBe('cross');
+    expect(crossingStyle({ crossing: 'unmarked' })).toBeUndefined();
+    expect(crossingStyle({ crossing: 'marked', 'crossing:markings': 'no' })).toBeUndefined();
+  });
+  it('helpers', () => {
+    expect(leftHandTraffic(-0.1, 51.5)).toBe(true);
+    expect(leftHandTraffic(13.4, 52.5)).toBe(false);
+    expect(backFromEnd([[13, 52], [13, 52.001]], 50)!.p[1]).toBeCloseTo(52.001 - 50 / 111320, 6);
+    expect(backFromEnd([[13, 52], [13, 52.0001]], 50)).toBeUndefined();
   });
 });
 
