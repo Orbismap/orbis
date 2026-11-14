@@ -48,6 +48,8 @@ export interface InspectCard {
   media?: { type: 'image' | 'video' | 'audio' | 'hls'; url: string; poster?: string; refresh?: number };
   links?: { label: string; url: string }[];
   location?: [lng: number, lat: number];
+  /** Desktop: show this as the place card (like a searched place) instead of the inspector card. Needs `location`; `subtitle` is the type line. */
+  asPlace?: boolean;
   /** Extra buttons of the card, e.g. contributed by an extension ("Folgen"). Rendered by the inspector as plain buttons. */
   actions?: { id: string; label: string; icon?: IconName; active?: boolean; run(): void }[];
 }

@@ -7,7 +7,8 @@ import { settings } from '../state/settings';
 import { scopeEngine, type ScopeRecord } from '../map/scope';
 import type { BasemapId, MapEngine, SlotId } from '../map/types';
 import { clearLayerSession, activeKarte, setFeed, setLayerStatus, setLegend, activeKarteId } from '../state/session';
-import { inspector, selectCard } from '../state/selection';
+import { inspector, selectCard, selectPlace } from '../state/selection';
+import { isMobile } from '../state/ui';
 import { effectiveTheme } from '../state/settings';
 import { time, timeSources } from '../state/time';
 import { getLayer } from './registry';
@@ -86,6 +87,10 @@ export function startRuntime(engine: MapEngine): () => void {
       key: keySignal,
       select: (card) => {
         if (card) own.add(card);
+        if (alive() && card?.asPlace && card.location && !isMobile.peek()) {
+          selectPlace({ id: `${id}:${card.title}`, title: card.title, subtitle: '', lng: card.location[0], lat: card.location[1], category: card.subtitle });
+          return;
+        }
         return alive() && selectCard(id, card);
       },
       ownSelection: (card) => !!card && own.has(card),

@@ -47,6 +47,7 @@ const THEMES: Record<string, KarteTheme[]> = {
     T('gewaesser', 'Küste und Gewässer', 'drop', ['fluesse', 'pegel', 'gezeiten', 'bojen', 'schiffsrouten']),
   ],
   gesellschaft: [
+    T('orte', 'Orte und Läden', 'pin', ['orte']),
     T('wahlen', 'Wahlen und Politik', 'vote', ['wahlen', 'wahlen-usa', 'us-kongress-geld']),
     T('proteste', 'Proteste', 'people', ['demos', 'us-proteste']),
     T('geld', 'Geld und Hilfe', 'globe', ['geldfluesse', 'ukraine-hilfe']),

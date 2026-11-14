@@ -103,6 +103,12 @@ export function PlaceCard() {
       <section class="place-details">
         <h3 class="hud-sect">Details</h3>
         <dl class="insp-facts">
+          {p.category && (
+            <div class="insp-fact">
+              <dt>Art</dt>
+              <dd>{p.category}</dd>
+            </div>
+          )}
           {where.length > 0 && (
             <div class="insp-fact">
               <dt>Standort</dt>
