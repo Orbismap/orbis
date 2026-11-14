@@ -18,7 +18,9 @@ import type { Karte } from '../karten/types';
 import { createKarte, isDirty, karten } from '../karten/store';
 import { clearSelection, inspector, place, probe, selectPlace } from '../state/selection';
 import { activeKarte, setActiveKarte } from '../state/session';
-import { closeKarteDetail, collapseKarteDetail, collapsedKarten, dismissKarte, expandKarte, detailOpen, detailVisible, hudSearchFocus, HUD_DETAIL_W, HUD_GAP, HUD_MAIN_DEFAULT, hudMainWidth, setHudMainWidth } from '../state/hud';
+import { RoutePanel } from '../features/routes/RoutePanel';
+import { SavedPlaces } from '../features/routes/SavedPlaces';
+import { closeKarteDetail, collapseKarteDetail, orteView, collapsedKarten, dismissKarte, expandKarte, detailOpen, detailVisible, hudSearchFocus, HUD_DETAIL_W, HUD_GAP, HUD_MAIN_DEFAULT, hudMainWidth, setHudMainWidth } from '../state/hud';
 import { leftPanelOpen, leftView } from '../state/ui';
 import { Button, IconButton } from '../ui/Button';
 import { SettingsView } from '../features/settings/Settings';
@@ -37,6 +39,7 @@ import './hud.css';
 
 function pickKarte(id: string) {
   clearSelection();
+  orteView.value = null;
   leftView.value = 'layers';
   setActiveKarte(id);
   detailOpen.value = true;
@@ -201,7 +204,7 @@ function MainPanel() {
   // the first five stay visible; the rest and "Neue Karte" sit behind "Mehr anzeigen"
   const expanded = more;
   const list = expanded ? all : all.slice(0, KARTEN_SHOWN);
-  const showing = detailVisible.value && leftView.value !== 'settings' && !inspector.value && !probe.value;
+  const showing = detailVisible.value && leftView.value !== 'settings' && !inspector.value && !probe.value && !orteView.value;
   return (
     <Panel as="section" class="hudm" aria-label="Orbis Karten">
       <header class="hudm-head">
@@ -251,7 +254,20 @@ function MainPanel() {
           document.body,
         )}
       <ScrollArea class="hudm-scroll">
-        <h2 class="hud-sect hud-sect-first">Karten</h2>
+        <h2 class="hud-sect hud-sect-first">Orte</h2>
+        <ul class="hud-rows" role="list" aria-label="Orte">
+          {([['places', 'bookmark', 'Gespeicherte Orte'], ['routes', 'route', 'Routen']] as const).map(([id, icon, label]) => (
+            <li key={id}>
+              <button type="button" class="hud-row" aria-current={orteView.value === id ? 'true' : undefined} onClick={() => (clearSelection(), (orteView.value = orteView.peek() === id ? null : id))}>
+                <span class="hud-badge">
+                  <Icon name={icon} size={18} />
+                </span>
+                <span class="hud-rt">{label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <h2 class="hud-sect">Karten</h2>
         <ul class="hud-rows" role="list" aria-label="Karten">
           {list.map((k) => (
             <li key={k.id}>
@@ -345,6 +361,8 @@ function BottomBar() {
 
 /** Detail menu: map selection, or the active Karte (layers, feed), or the catalog / settings view. */
 function DetailPanel() {
+  if (orteView.value === 'routes') return <RoutePanel />;
+  if (orteView.value === 'places') return <SavedPlaces />;
   const sel = inspector.value;
   const p = probe.value;
   const k = activeKarte.value;
