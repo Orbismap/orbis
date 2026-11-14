@@ -1,31 +1,32 @@
-// Aircraft. Below zoom 5 the worldwide overview (OpenSky `states/all` via the proxy, every 2 min, plus the military list of
-// adsb.lol); from zoom 5 the detailed regional view (readsb circles from adsb.lol, every 10 s). Positions are dead-reckoned
-// between polls by trackLayer. Selecting an aircraft loads route (adsbdb), aircraft record (adsbdb) and a photo
+// Aircraft. Below zoom 5 the worldwide overview (OpenSky `states/all`, one central fetch every 90 s uploaded to the bucket
+// orbis-live as aircraft/opensky-states.json, read every 75 s, plus the military list of adsb.lol); from zoom 5 the
+// detailed regional view (readsb circles from adsb.lol, every 10 s). Positions are dead-reckoned between polls by
+// trackLayer. Selecting an aircraft loads route (adsbdb), aircraft record (adsbdb) and a photo
 // (planespotters.net) and draws the dashed great-circle line origin -> aircraft -> destination.
 //
-// NOTE: none of the sources sends CORS headers; requests go through the Orbismap proxy (data/endpoints `proxied`).
-// OpenSky currently answers 522 through the Cloudflare worker (OpenSky blocks Cloudflare addresses); then the overview is
-// approximated with circle requests around the view centre (adsb.lol) and says so in the status note.
+// NOTE: adsb.lol, adsbdb and planespotters send no CORS headers; requests go through the Orbismap proxy (data/endpoints `proxied`).
+// OpenSky blocks Cloudflare and sends no CORS, so visitors never call it: the snapshot comes from the bucket. When it is
+// missing or older than 10 min, the overview is approximated with circle requests around hubs (adsb.lol) and the status says so.
 import { computed, effect, signal } from '@preact/signals';
 import type { ExpressionSpecification, FilterSpecification } from 'maplibre-gl';
 import { formatNumber, NNBSP } from '../../core/format';
 import { MINUTE } from '../../core/time';
-import { proxied } from '../../data/endpoints';
+import { bucketUrl, proxied } from '../../data/endpoints';
 import { fetchJson } from '../../data/http';
-import { acquireDetail, circleFeed, OVERVIEW_HUBS, DETAIL_LOAD_ZOOM, DETAIL_SHOW_ZOOM, liveSeen, mergeOverview, rememberLive } from '../../data/parsers/adsbview';
+import { acquireDetail, circleFeed, OVERVIEW_HUBS, DETAIL_LOAD_ZOOM, DETAIL_SHOW_ZOOM, liveSeen, mergeOverview, preferFirst, rememberLive } from '../../data/parsers/adsbview';
+import { snapshotStale } from '../../data/parsers/opensky';
 import { parseAircraftRecord, parsePhoto, parseRoute, routeFeatures, type AircraftPhoto, type AircraftRecord, type FlightRoute } from '../../data/parsers/flightinfo';
 import type { AircraftProps } from '../../data/parsers/readsb';
-import { ALT_STOPS, altitudeText, rateText, speedText } from '../../data/parsers/traffic';
+import { AIRCRAFT_COLOR, AIRCRAFT_EMERGENCY, AIRCRAFT_MILITARY, aircraftColor, altitudeText, rateText, speedText } from '../../data/parsers/traffic';
 import { tracksChannel } from '../../ext/channels';
 import type { TrackSample } from '../../ext/types';
 import { extrapolate, trackLayer, type TrackObject } from '../../render/tracks';
 import { defineLayer } from '../define';
 import type { InspectCard, LayerContext } from '../types';
 
-const COLOR = '#4a8dff';
-const GROUND = '#7b8798';
-const EMERGENCY = '#ff3b3b';
-const MILITARY = '#ff4fb8';
+const COLOR = AIRCRAFT_COLOR;
+const EMERGENCY = AIRCRAFT_EMERGENCY;
+const MILITARY = AIRCRAFT_MILITARY;
 
 const SQUAWK: Record<string, string> = { '7500': 'Flugzeugentführung', '7600': 'Funkausfall', '7700': 'Notfall' };
 const CATEGORY: Record<string, string> = {
@@ -33,8 +34,7 @@ const CATEGORY: Record<string, string> = {
   B1: 'Segelflugzeug', B2: 'Ballon / Luftschiff', B4: 'Ultraleicht', B6: 'Drohne', B7: 'Raumfahrzeug', C1: 'Rettungsfahrzeug', C2: 'Servicefahrzeug',
 };
 
-const altExpr = (prop: string) => ['interpolate', ['linear'], ['get', prop], ...ALT_STOPS.flat()] as unknown as ExpressionSpecification;
-const color = ['case', ['get', 'emerg'], EMERGENCY, ['get', 'mil'], MILITARY, ['get', 'gnd'], GROUND, altExpr('alt')] as unknown as ExpressionSpecification;
+const color = ['case', ['get', 'emerg'], EMERGENCY, ['get', 'mil'], MILITARY, COLOR] as unknown as ExpressionSpecification;
 const size = ['interpolate', ['linear'], ['zoom'],
   3, ['case', ['get', 'emerg'], 0.42, ['get', 'heli'], 0.26, 0.3],
   8, ['case', ['get', 'emerg'], 0.6, ['get', 'heli'], 0.36, 0.45],
@@ -76,7 +76,7 @@ export default defineLayer({
   id: 'flugzeuge',
   category: 'verkehr',
   title: 'Flugzeuge',
-  summary: 'Flugzeuge weltweit in Echtzeit, Farbe nach Flughöhe, Militär und Notfälle hervorgehoben',
+  summary: 'Flugzeuge weltweit in Echtzeit, Militär und Notfälle hervorgehoben',
   icon: 'plane',
   color: COLOR,
   form: 'tracks',
@@ -100,12 +100,7 @@ export default defineLayer({
     items: [
       { color: MILITARY, label: 'Militär' },
       { color: EMERGENCY, label: 'Notfall-Squawk' },
-      { color: '#4a8dff', label: 'Reiseflughöhe (10 km)' },
-      { color: '#2fcfc4', label: '7 km' },
-      { color: '#8fe05c', label: '4 km' },
-      { color: '#ffd84a', label: '1,5 km' },
-      { color: '#ff9d3d', label: 'Bodennah' },
-      { color: GROUND, label: 'Am Boden' },
+      { color: COLOR, label: 'Flugzeug' },
     ],
   },
   keywords: ['flug', 'ads-b', 'adsb', 'luftfahrt', 'aircraft', 'plane', 'hubschrauber', 'transponder', 'militär', 'military', 'opensky', 'route'],
@@ -116,14 +111,17 @@ export default defineLayer({
     const detail = acquireDetail(ml);
 
     // --- worldwide overview ---
-    const osk = ctx.resource<TrackObject[]>({ key: 'opensky:states-all', url: proxied('https://opensky-network.org/api/states/all?extended=1'), parse: 'openskyStates', refresh: 2 * MINUTE, timeout: 30_000 });
+    const osk = ctx.resource<TrackObject[]>({ key: 'opensky:states-all', url: bucketUrl('live', 'aircraft/opensky-states.json'), parse: 'openskyStates', refresh: 75_000, timeout: 30_000 });
+    // a stale snapshot counts as unavailable (collector down): then the hub circles take over
+    const oskList = computed(() => { const d = osk.data.value; return d && !snapshotStale(d, Date.now()) ? d : undefined; });
+    const oskDown = computed(() => !oskList.value && (osk.state.value === 'error' || osk.data.value !== undefined));
     const milRes = ctx.resource<TrackObject[]>({ key: 'adsblol:mil', url: proxied('https://api.adsb.lol/v2/mil'), parse: 'aircraftReadsb', refresh: 2 * MINUTE, timeout: 40_000 });
-    const fallback = circleFeed({ ml, minZoom: 0, maxZoom: DETAIL_LOAD_ZOOM, maxCircles: 10, hubs: OVERVIEW_HUBS, pollMs: 2 * MINUTE, active: () => osk.state.peek() === 'error' && !osk.data.peek() });
-    const stopFallback = effect(() => { if (osk.state.value === 'error' && !osk.data.value) fallback.reload(); });
+    const fallback = circleFeed({ ml, minZoom: 0, maxZoom: DETAIL_LOAD_ZOOM, maxCircles: 10, hubs: OVERVIEW_HUBS, pollMs: 2 * MINUTE, active: () => oskDown.peek() });
+    const stopFallback = effect(() => { if (oskDown.value) fallback.reload(); });
     const stopRemember = effect(() => { const d = detail.res.data.value; if (d) rememberLive(d); });
     const world = computed<TrackObject[] | undefined>(() => {
       detail.res.data.value; // newer detailed positions replace overview ones
-      return mergeOverview(osk.data.value ?? fallback.data.value, milRes.data.value, !!ctx.options.value.milOnly);
+      return mergeOverview(oskList.value ?? fallback.data.value, milRes.data.value, !!ctx.options.value.milOnly);
     });
 
     const zoom = signal(ml.getZoom());
@@ -160,12 +158,11 @@ export default defineLayer({
     const stopStatus = effect(() => {
       const wide = zoom.value < DETAIL_SHOW_ZOOM;
       const list = wide ? world.value : detail.res.data.value;
-      const oskDown = osk.state.value === 'error' && !osk.data.value;
       const note = wide
-        ? oskDown ? (fallback.data.value ? 'OpenSky über den Daten-Proxy nicht erreichbar: Näherung aus Abfragen um große Drehkreuze' : 'OpenSky über den Daten-Proxy nicht erreichbar') : milRes.error.value
+        ? oskDown.value ? (fallback.data.value ? 'Weltübersicht von OpenSky nicht verfügbar oder veraltet: Näherung aus Abfragen um große Drehkreuze' : 'Weltübersicht von OpenSky nicht verfügbar oder veraltet') : milRes.error.value
         : detail.res.error.value;
       if (list === undefined) {
-        const failed = wide ? oskDown && fallback.state.value === 'error' : detail.res.state.value === 'error';
+        const failed = wide ? oskDown.value && fallback.state.value === 'error' : detail.res.state.value === 'error';
         ctx.status(failed ? { state: 'error', note } : { state: 'loading' });
         return;
       }
@@ -215,7 +212,7 @@ export default defineLayer({
         ...(actions.length ? { actions } : {}),
         title,
         subtitle: p.call && reg ? reg : sq ?? (p.heli ? 'Hubschrauber' : p.mil ? 'Militärflugzeug' : 'Flugzeug'),
-        color: sq ? EMERGENCY : p.mil ? MILITARY : p.gnd ? GROUND : COLOR,
+        color: sq ? EMERGENCY : p.mil ? MILITARY : COLOR,
         icon: 'plane',
         facts,
         ...(en?.photo ? { media: { type: 'image' as const, url: en.photo.src } } : {}),
@@ -235,20 +232,20 @@ export default defineLayer({
       mine.add(card);
       return card;
     };
-    // --- channel for extensions (3D): the detailed view, filtered like the 2D icons; built only while someone listens ---
+    // --- channel for extensions (3D): the detailed view plus the rest of the overview, filtered like the 2D icons; built only while someone listens ---
     const samples = (): TrackSample[] => {
       const out: TrackSample[] = [];
-      for (const t of detail.res.data.peek() ?? []) {
+      for (const t of preferFirst(detail.res.data.peek() ?? [], world.peek() ?? [])) {
         if (!passes(t)) continue;
         const p = t.props as unknown as AircraftProps;
         out.push({
           id: t.id, lng: t.lng, lat: t.lat, altM: p.gnd ? 0 : p.alt, track: p.trk >= 0 ? p.trk : t.heading, speedMs: t.speed ?? 0, vrMs: p.vr,
-          ground: p.gnd, heli: p.heli, category: p.cat, emergency: p.emerg, military: p.mil, label: p.call || p.reg || p.hex.toUpperCase(), t: t.t,
+          ground: p.gnd, heli: p.heli, category: p.cat, emergency: p.emerg, military: p.mil, color: aircraftColor(p), label: p.call || p.reg || p.hex.toUpperCase(), t: t.t,
         });
       }
       return out;
     };
-    const stopPublish = effect(() => { detail.res.data.value; ctx.options.value; tracksChannel.publish(samples); });
+    const stopPublish = effect(() => { detail.res.data.value; world.value; ctx.options.value; tracksChannel.publish(samples); });
     const stopSelectedId = effect(() => { tracksChannel.setSelectedId(selHex.value); });
     // an extension changed its card buttons: rebuild the card (version.peek: the effect must not read what it writes)
     const stopActions = effect(() => { tracksChannel.actionsVersion.value; version.value = version.peek() + 1; });
@@ -313,7 +310,7 @@ export default defineLayer({
     // --- layers ---
     const worldH = trackLayer(silent, {
       name: 'world', data: world, color, symbol: { icon: 'plane', size: worldSize }, ringRadius: 12, maxExtrapolateMs: 5 * MINUTE, tickMs: 2000,
-      filter, describe,
+      filter, describe, hidden: tracksChannel.presented,
       feed: (tracks) =>
         tracks.filter((t) => (t.props as unknown as AircraftProps).emerg).map((t) => {
           const p = t.props as unknown as AircraftProps;

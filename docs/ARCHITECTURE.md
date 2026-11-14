@@ -440,7 +440,7 @@ Heute gibt es einen, `tracksChannel` (Ebene `flugzeuge`):
 
 | Seite | Was |
 |---|---|
-| Ebene → Kanal | `publish(build)`: aktuelle `TrackSample[]` (id, lng, lat, Höhe m, Kurs, Geschwindigkeit, Steigrate, Boden, Hubschrauber, Kategorie, Notfall, Militär, Rufzeichen, Zeit der Meldung), gefiltert wie die 2D-Symbole (nur die Detailansicht ab Zoom 5). `build` läuft nur, wenn jemand zuhört: **ohne Zuhörer kostet Veröffentlichen eine Zuweisung.** |
+| Ebene → Kanal | `publish(build)`: aktuelle `TrackSample[]` (id, lng, lat, Höhe m, Kurs, Geschwindigkeit, Steigrate, Boden, Hubschrauber, Kategorie, Notfall, Militär, Farbe des 2D-Symbols (`aircraftColor`, eine Quelle für Karte, Legende und 3D), Rufzeichen, Zeit der Meldung), gefiltert wie die 2D-Symbole (nur die Detailansicht ab Zoom 5). `build` läuft nur, wenn jemand zuhört: **ohne Zuhörer kostet Veröffentlichen eine Zuweisung.** |
 | Ebene → Kanal | `setSelectedId`, `onSelect(handler)`: welche Karte die Ebene gerade zeigt, und wie ein `select(id)` der Erweiterung ihre echte Karte (Route, Foto) öffnet |
 | Ebene ← Kanal | `presented`: wahr, solange eine Erweiterung die Darstellung übernommen hat. `trackLayer` (Option `hidden`) blendet dann Symbole und Ring aus; Daten, Polling, Status und Feed laufen weiter |
 | Ebene ← Kanal | `actionsFor(id)`, `actionsVersion`: Schaltflächen, die Erweiterungen zur Karte beisteuern; die Ebene baut ihre Karte bei jeder Änderung neu (`InspectCard.actions`, der Inspektor zeigt sie als normale Schaltflächen) |
@@ -456,13 +456,14 @@ world3d/            die Bühne: EIN MapLibre-Custom-Layer 'orbis-stage' mit EINE
   frame.ts          Koordinaten und Matrizen (Globus, Mercator, Übergang), place/position/toScreen/occluded
   stage.ts          Custom-Layer, Teile (StagePart), Picking/Hover/Klick, Neuzeichnen nur bei Bedarf
   instances.ts      Instanzen: tausende gleiche Modelle in einem Aufruf
+  follow.ts, follow-math.ts   Folgekamera: folgt jedem Teil mit positionOf, Klick auf anderes Objekt wechselt das Ziel
+  hit.ts            Treffertests am Bildschirm (Segmentabstand, Dreieck, Viereck)
   line.ts, wall.ts  Linie konstanter Pixelbreite und „Vorhang“ zum Boden, mit Globus-Verdeckung
 planes/             Teil „Flugzeuge“
   smoothing.ts      Zustand zwischen Meldungen (Koppelnavigation + Angleichen), rein und getestet
   models.ts         prozedurale Modelle: light, narrow, wide, heli
   trail.ts          Spur in echter Höhe + Wand
   planes.ts         der StagePart: Modelle, Schatten, Fallinie, Spuren, Beschriftung, Picking
-  follow.ts, follow-math.ts   Folgekamera
 ```
 
 **Bühne.** Auf der flachen Karte zeichnet die Bühne direkt in die Karte (Tiefentest gegen die 2,5D-Gebäude). Auf dem
@@ -485,11 +486,11 @@ sonst alle 50 ms (≈ 20 fps), nie bei verstecktem Tab. Ohne Flugzeuge in Sicht 
 Kanal abonnieren, Umschaltschwelle (mit Hysterese) wählen, `present()` rufen, wenn der Teil zeichnet. Nichts davon darf
 three.js oder Pro-Code in die Basis ziehen.
 
-**Flugzeuge.** 3D ab Zoom **9** (zurück unter **8,7**, wie die Schwelle der alten App; darunter bleiben die 2D-Symbole). Modelle
+**Flugzeuge.** Immer und nur 3D, sobald die Ebene Flugzeuge meldet: die Ebene veröffentlicht die Detailansicht und den Rest der Weltübersicht (`preferFirst`: bei gleicher Hex-Kennung gewinnt die Detailansicht), `present()` blendet beide 2D-Ebenen aus (Detail und Übersicht, auch unter Zoom 5). Übersichtsflugzeuge kommen aus dem OpenSky-Schnappschuss im Bucket `orbis-live` (`aircraft/opensky-states.json`, zentral alle 90 s abgerufen, von der App alle 75 s gelesen, älter als 10 min = Rückfall auf Hub-Abfragen) und werden bis zu 5 min fortgeschrieben; ältere Meldungen als die bekannte werden ignoriert. Modellfarbe wie das 2D-Symbol (Militär rosa, Notfall rot, sonst gelb), Auswahl behält die Farbe und bekommt eine weiße Kontur (umgestülpte Hülle, ~1,25 px); Größe fällt unter Zoom 9 sanft bis auf 0,35 (`planes/size.ts`). Modelle
 in echter Höhe, zwischen Meldungen per Koppelnavigation bewegt und an jede neue Meldung angeglichen (kein Zurückziehen
 entlang des Kurses, Hüpfen ausgeschlossen); Spur in echter Höhe mit schwacher Wand zum Boden (nur tief, wie in der alten
 App), Fallinie und Bodenschatten; höchstens 60 Spuren plus die der Auswahl (die nächsten zur Kartenmitte). Klick oder
-Tipp auf Modell oder Spur → `tracks.select(id)` → die bestehende Karte der Ebene `flugzeuge` (Route, Foto). Das gewählte
+Tipp auf Modell, Schatten, Fallinie, Spur oder Wand → `tracks.select(id)` → die bestehende Karte der Ebene `flugzeuge` (Route, Foto). Das gewählte
 Flugzeug ist hervorgehoben.
 
 **Folgekamera.** Schaltfläche „Folgen“ / „Folgen beenden“ auf der Karte. Sie verschiebt nur die Kartenmitte (auf der flachen

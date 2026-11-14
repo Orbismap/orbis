@@ -71,7 +71,7 @@ describe.skipIf(!existsSync(join(SRC, 'pro')))('src/pro stays movable to its own
   });
 });
 
-const sample = (id: string): TrackSample => ({ id, lng: 1, lat: 2, altM: 3, speedMs: 4, vrMs: 0, ground: false, heli: false, category: 'A3', emergency: false, military: false, label: id, t: 1 });
+const sample = (id: string): TrackSample => ({ id, lng: 1, lat: 2, altM: 3, speedMs: 4, vrMs: 0, ground: false, heli: false, category: 'A3', emergency: false, military: false, color: '#ffd84a', label: id, t: 1 });
 
 describe('tracks channel', () => {
   it('does not build the list while nobody listens', () => {

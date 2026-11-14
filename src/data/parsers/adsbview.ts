@@ -191,6 +191,15 @@ export function mergeOverview(base: TrackObject[] | undefined, mil: TrackObject[
   return out;
 }
 
+/** `primary` plus those of `secondary` whose id is not in it: the detailed view wins over the overview (ids are the ICAO hex in both). */
+export function preferFirst(primary: readonly TrackObject[], secondary: readonly TrackObject[]): TrackObject[] {
+  const ids = new Set<string>();
+  for (const t of primary) ids.add(t.id);
+  const out = primary.slice();
+  for (const t of secondary) if (!ids.has(t.id)) out.push(t);
+  return out;
+}
+
 /** Busy airspaces used for the worldwide overview when OpenSky is unreachable (circles of 200 nm). */
 export const OVERVIEW_HUBS = ([
   [50, 8], [51.5, -0.5], [40.4, -3.7], [41.9, 12.5], [41, 29], [25.2, 55.4], [28.6, 77.1], [40, 116], [31.2, 121.8], [35.7, 139.7], [1.4, 103.9], [-33.9, 151.2],

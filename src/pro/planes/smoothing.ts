@@ -16,6 +16,8 @@ export interface PlaneState {
   emergency: boolean;
   military: boolean;
   ground: boolean;
+  /** colour of the model (0xrrggbb), as the base colours its 2D icon */
+  color: number;
   /** last report */
   lon: number;
   lat: number;
@@ -40,8 +42,8 @@ export interface PlaneState {
 
 /** an aircraft missing from the data this long is gone (landed, left the area, filtered out) */
 export const GONE_MS = 25_000;
-/** an extrapolation never runs longer than this (s) */
-export const MAX_EXTRAPOLATE_S = 120;
+/** an extrapolation never runs longer than this (s); the overview reports an aircraft only every 2 min or so */
+export const MAX_EXTRAPOLATE_S = 300;
 export const TRAIL_MAX = 150;
 const M_PER_DEG = 111320;
 /** a position closer than this to the last trail point adds nothing (m); on the ground less */
@@ -94,7 +96,7 @@ export class PlaneTracker {
       const age = Math.max(0, Math.min(MAX_EXTRAPOLATE_S * 1000, epoch - s.t));
       const at = now - age;
       const prev = this.planes.get(s.id);
-      const common = { label: s.label, model: modelOf(s), emergency: s.emergency, military: s.military, ground: s.ground, lon: s.lng, lat: s.lat, altM: s.altM, vsMs: s.vrMs, track, speedMs: s.speedMs, at, fixEpoch: s.t, seen: now };
+      const common = { label: s.label, model: modelOf(s), emergency: s.emergency, military: s.military, ground: s.ground, color: Number.parseInt(s.color.slice(1), 16) || 0xffffff, lon: s.lng, lat: s.lat, altM: s.altM, vsMs: s.vrMs, track, speedMs: s.speedMs, at, fixEpoch: s.t, seen: now };
       if (!prev) {
         const state: PlaneState = { id: s.id, ...common, dLon: s.lng, dLat: s.lat, dAlt: s.altM, dTrack: track, trail: [[s.lng, s.lat, trailAlt(s.ground, s.altM), at]] };
         const t = targetOf(state, now);
@@ -105,7 +107,8 @@ export class PlaneTracker {
         continue;
       }
       prev.seen = now;
-      if (prev.fixEpoch === s.t) continue; // the same fix again: nothing new
+      // the same fix again, or an older one (the overview after the detailed view): nothing new
+      if (s.t <= prev.fixEpoch) continue;
       const last = prev.trail[prev.trail.length - 1];
       // an aircraft that did not move since the last report adds no trail point
       if (!last || metres(last[0], last[1], s.lng, s.lat) >= (s.ground ? TRAIL_STEP_GROUND_M : TRAIL_STEP_M)) {
