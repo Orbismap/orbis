@@ -27,6 +27,7 @@ const TUNNEL = '#1b1e27';
 const FOOT = '#3b4660';
 const CYCLE = '#35505a';
 const STEPS = '#5d6a88';
+const ZEBRA = '#8d95a6';
 const TUNNEL_KERB = '#2a3142';
 const RAD = Math.PI / 180;
 
@@ -104,7 +105,9 @@ export default defineLayer({
       specs.push({ ...spec, id: full, type, paint, ...(o.filter ? { filter: o.filter } : {}) } as unknown as LayerSpecification);
     };
     const round = { 'line-cap': 'round', 'line-join': 'round' };
-    const roads = `${ctx.id}.roads`, marks = `${ctx.id}.marks`, kerbs = `${ctx.id}.kerbs`;
+    const roads = `${ctx.id}.roads`, marks = `${ctx.id}.marks`, kerbs = `${ctx.id}.kerbs`, zebras = `${ctx.id}.zebras`, arrowPts = `${ctx.id}.arrows`;
+    ctx.map.addSource(arrowPts, { type: 'geojson', data: EMPTY as never });
+    ctx.map.addSource(zebras, { type: 'geojson', data: EMPTY as never });
     ctx.map.addSource(kerbs, { type: 'geojson', data: EMPTY as never });
     ctx.map.addSource(roads, { type: 'geojson', data: EMPTY as never });
     ctx.map.addSource(marks, { type: 'geojson', data: EMPTY as never });
@@ -165,16 +168,14 @@ export default defineLayer({
     };
     const arrowSize = arrowSizeOf(3.2), turnArrowSize = arrowSizeOf(3.6);
     add('oneway', {
-      source: roads, type: 'symbol', minzoom: ARROW_FROM,
+      source: arrowPts, type: 'symbol', minzoom: ARROW_FROM,
       layout: {
-        'symbol-placement': 'line', 'symbol-spacing': 240, 'icon-image': arrowId('s'), 'icon-allow-overlap': true, 'icon-ignore-placement': true,
-        'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map', 'icon-keep-upright': false,
-        // the icon points up; along a line the icon's x axis follows the direction, so turn it a quarter
-        'icon-rotate': ['case', ['<', ['get', 'ow'], 0], -90, 90],
+        'icon-image': arrowId('s'), 'icon-rotate': ['get', 'rot'], 'icon-allow-overlap': true, 'icon-ignore-placement': true,
+        'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',
         'icon-size': arrowSize(k),
       },
       paint: {},
-    }, { filter: all(['!=', ['get', 'ow'], 0] as unknown as Expr, ['in', ['get', 'cls'], ['literal', ['primary', 'secondary', 'tertiary', 'minor']]] as unknown as Expr), fade: [ARROW_FROM, 16.4, 0.7] });
+    }, { fade: [ARROW_FROM, 16.4, 0.7] });
     dyn.push({ id: `${ctx.id}.oneway`, prop: 'icon-size', make: arrowSize });
 
     // (2) OpenStreetMap
@@ -182,8 +183,10 @@ export default defineLayer({
     const kinds = (...x: string[]) => kindIs(...x);
     add('island-fill', { ...osm, type: 'fill', minzoom: 15, paint: { 'fill-color': '#cfd8dc' } }, { filter: all(kinds('island'), ['==', ['geometry-type'], 'Polygon'] as unknown as Expr), fade: [15, 16, 0.4] });
     add('island-line', { ...osm, minzoom: 15, paint: { 'line-color': WHITE } }, { filter: kinds('island'), w: [0.3, 0.8], fade: [15, 16, 0.7] });
-    // zebra: stripes of 0.8 m (gap 0.7 m) across a 3.2 m deep crossing; a floor on the depth keeps it readable from afar
-    add('zebra', { ...osm, minzoom: 15.5, layout: { 'line-cap': 'butt' }, paint: { 'line-color': WHITE } }, { filter: kinds('zebra'), w: [3.2, 4], dash: [0.25, 0.22], fade: [15.5, 16.2, 0.95] });
+    // zebra crossings derived from the network (a footway crossing a street): same look as the mapped ones, but only where none is mapped
+    add('zebra.derived', { source: zebras, type: 'fill', minzoom: 15.5, paint: { 'fill-color': ZEBRA, 'fill-antialias': true } }, { fade: [15.5, 16.2, 0.95] });
+    // zebra: stripes of 0.17 m (gap 0.33 m, so over 10 on a normal street) across a 3 m deep crossing, in true metres at every zoom (no pixel floor: it would stretch the stripes when zooming out)
+    add('zebra', { ...osm, minzoom: 15.5, layout: { 'line-cap': 'butt' }, paint: { 'line-color': ZEBRA } }, { filter: kinds('zebra'), w: [3], dash: [0.057, 0.11], fade: [15.5, 16.2, 0.95] });
     // marked crossing without stripes: two dashed lines 3.2 m apart, running across the road
     for (const side of [-1, 1]) add(`cross${side}`, { ...osm, minzoom: 16, layout: { 'line-cap': 'butt' }, paint: { 'line-color': WHITE } }, { filter: kinds('cross'), w: [0.3, 1], off: side * 1.6, dash: [2.5, 2.5], fade: [16, 16.8, 0.9] });
     add('line', { ...osm, minzoom: 15, layout: { 'line-cap': 'butt' }, paint: { 'line-color': WHITE } }, { filter: all(kinds('marking', 'over'), ['!=', ['get', 'dash'], true] as unknown as Expr), w: [0.22, 0.8], fade: [15, 16, 0.9] });
@@ -220,6 +223,17 @@ export default defineLayer({
     // Cheap by design: the heavy part runs in a worker, it only runs when the view left the area built last time or new
     // tiles arrived, and an answer for an outdated view is dropped.
     const NET_ZOOM = 15.2;
+    type DerivedZebra = { type: 'Feature'; geometry: unknown; properties: { lv: number; mid: number[] } };
+    let derived: DerivedZebra[] = [];
+    // a derived zebra (it follows the footway) is dropped where a crossing is mapped in OpenStreetMap
+    let mapped: number[][] = []; // vertices of the mapped crossings
+    const showDerived = () => {
+      const keep = derived.filter((f) => {
+        const [mx, my] = f.properties.mid as [number, number], k = Math.cos(my * Math.PI / 180) * 111320;
+        return !mapped.some((q) => Math.hypot((q[0]! - mx) * k, (q[1]! - my) * 111320) < 9);
+      });
+      (ml.getSource(zebras) as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: keep } as never);
+    };
     let hadNet = false;
     let dirty = true;
     let seq = 0;
@@ -230,7 +244,7 @@ export default defineLayer({
       if (!rs || !ms) return;
       if (ml.getZoom() < NET_ZOOM) {
         seq++; built = undefined; dirty = true;
-        if (hadNet) { rs.setData(EMPTY as never); ms.setData(EMPTY as never); (ml.getSource(kerbs) as GeoJSONSource | undefined)?.setData(EMPTY as never); hadNet = false; }
+        if (hadNet) { rs.setData(EMPTY as never); ms.setData(EMPTY as never); (ml.getSource(kerbs) as GeoJSONSource | undefined)?.setData(EMPTY as never); (ml.getSource(arrowPts) as GeoJSONSource | undefined)?.setData(EMPTY as never); derived = []; showDerived(); hadNet = false; }
         return;
       }
       const b = ml.getBounds();
@@ -257,6 +271,9 @@ export default defineLayer({
         rs.setData(net.roads as never);
         ms.setData(net.marks as never);
         (ml.getSource(kerbs) as GeoJSONSource | undefined)?.setData(net.kerbs as never);
+        (ml.getSource(arrowPts) as GeoJSONSource | undefined)?.setData(net.arrows as never);
+        derived = net.zebras.features as DerivedZebra[];
+        showDerived();
         built = area;
         hadNet = true;
       } catch { dirty = true; }
@@ -276,6 +293,8 @@ export default defineLayer({
       const features = [...(da?.features ?? []), ...(db?.features ?? [])].filter((f) => { const k = `${f.properties.kind}:${f.properties.id}`; return !seen.has(k) && !!seen.add(k); });
       (ml.getSource(src) as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features } as never);
       const zoomedOut = ml.getZoom() < 15.5;
+      mapped = features.filter((f) => f.properties.kind === 'zebra' || f.properties.kind === 'cross').flatMap((f) => f.geometry.type === 'LineString' ? f.geometry.coordinates : []);
+      showDerived();
       const n = (kind: string) => features.filter((f) => f.properties.kind === kind).length;
       const err = da === undefined && db === undefined ? (resA.error.value ?? resB.error.value) : undefined;
       if (da === undefined && db === undefined) ctx.status(err ? { state: 'error', note: err } : { state: 'loading' });
@@ -298,6 +317,6 @@ export default defineLayer({
         ctx.select(card);
       },
     });
-    return { destroy: () => { off(); stopData(); stopOpacity(); ml.off('moveend', onMove); ml.off('moveend', schedule); ml.off('sourcedata', onSource); clearTimeout(netTimer); ml.off('styleimagemissing', onMissing); resA.dispose(); resB.dispose(); ctx.map.remove({ layers: [...ids].reverse(), sources: [src, roads, marks, kerbs] }); } };
+    return { destroy: () => { off(); stopData(); stopOpacity(); ml.off('moveend', onMove); ml.off('moveend', schedule); ml.off('sourcedata', onSource); clearTimeout(netTimer); ml.off('styleimagemissing', onMissing); resA.dispose(); resB.dispose(); ctx.map.remove({ layers: [...ids].reverse(), sources: [src, roads, marks, kerbs, zebras, arrowPts] }); } };
   },
 });

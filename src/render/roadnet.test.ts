@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cutLine, junctionZones, lineLength, smooth, kerbStrips, takeFromStart, type XY } from './roadgeom';
+import { pathCrossings, cutLine, junctionZones, lineLength, smooth, zebraStripes, snapNetwork, kerbStrips, takeFromStart, type XY } from './roadgeom';
 import { buildRoadNet, lerpColour, mergeChains, roadClass, roadSpec } from './roadnet';
 
 const L = (pts: XY[]) => lineLength(pts);
@@ -43,6 +43,16 @@ describe('roadgeom', () => {
     ]);
     expect(z.get(0)).toBeDefined();
     expect(z.get(1)!.some(([a, b]) => a < 49.5 && b > 49.5)).toBe(true);
+  });
+});
+
+describe('snapNetwork', () => {
+  it('pins a vertex that two lines share (an X crossing at a mapped node)', () => {
+    const { pinned } = snapNetwork([[[-30, 0], [0, 0], [30, 0]], [[0, -30], [0, 0], [0, 30]]]);
+    expect(pinned[0]![1]).toBe(true);
+    expect(pinned[1]![1]).toBe(true);
+    const s = smooth([[-30, 0], [0, 0], [0, 30]], [14, 7], pinned[0]!.slice(0, 3));
+    expect(s.some((p) => p[0] === 0 && p[1] === 0)).toBe(true); // the shared point survives smoothing
   });
 });
 
@@ -114,5 +124,56 @@ describe('roadnet', () => {
     expect(mergeChains([mk([[0, 0], [50, 0]]), mk([[50, 0], [50, 50]], 0, 'service')])).toHaveLength(2);
     expect(mergeChains([mk([[0, 0], [50, 0]], 1), mk([[50, 50], [50, 0]], 1)])).toHaveLength(2);
     expect(mergeChains([mk([[0, 0], [50, 0]]), mk([[50, 0], [50, 50]]), mk([[50, 0], [100, 0]])])).toHaveLength(3);
+  });
+  it('derives a zebra where a footway crosses a street, not where it runs along or crosses a bridge', () => {
+    const deg = (m: number) => m / 111320;
+    const net = buildRoadNet([
+      { cls: 'minor', oneway: 0, level: 0, coords: [[13 - deg(80) * 1.6, 52], [13 + deg(80) * 1.6, 52]] }, // east-west street
+      { cls: 'foot', oneway: 0, level: 0, coords: [[13, 52 - deg(20)], [13, 52 + deg(20)]] }, // crosses it
+      { cls: 'foot', oneway: 0, level: 0, coords: [[13 - deg(60) * 1.6, 52 + deg(6)], [13 + deg(60) * 1.6, 52 + deg(6)]] }, // runs along it
+      { cls: 'foot', oneway: 0, level: 1, coords: [[13 + deg(30) * 1.6, 52 - deg(20)], [13 + deg(30) * 1.6, 52 + deg(20)]] }, // footbridge
+    ], 13, 52);
+    expect(net.zebras.features).toHaveLength(1);
+    expect(net.zebras.features[0]!.geometry.coordinates.length).toBeGreaterThanOrEqual(10); // more than ten stripes across a 5 m street
+  });
+  it('zebra stripes stay parallel to the road, the band follows the footway, nothing leaves the road', () => {
+    const hw = 2.5;
+    for (const deg of [90, 60, 30]) {
+      const a = (deg * Math.PI) / 180;
+      const stripes = zebraStripes([0, 0], [Math.cos(a), Math.sin(a)], [1, 0], hw);
+      expect(stripes.length).toBeGreaterThanOrEqual(10);
+      for (const poly of stripes) {
+        for (const p of poly) expect(Math.abs(p[1])).toBeLessThanOrEqual(hw + 1e-9);
+        expect(poly[0]![1]).toBeCloseTo(poly[1]![1], 9); // parallel to the road (the x axis)
+        const cy = (poly[0]![1] + poly[2]![1]) / 2, cx = (poly[0]![0] + poly[2]![0]) / 2;
+        expect(cx).toBeCloseTo(cy / Math.tan(a), 6); // stripe centres lie on the footway line
+      }
+      const ys = stripes.map((p) => (p[0]![1] + p[2]![1]) / 2);
+      expect(Math.min(...ys)).toBeLessThan(-hw + 0.3); // fills the road from edge to edge
+      expect(Math.max(...ys)).toBeGreaterThan(hw - 0.3);
+    }
+  });
+  it('markings only where there is space: dashes stop at a zebra, an arrow does not sit on it', () => {
+    const kx = Math.cos((52 * Math.PI) / 180) * 111320;
+    const lon = (x: number) => 13 + x / kx, lat = (y: number) => 52 + y / 111320;
+    const x = (lonv: number) => (lonv - 13) * kx;
+    // a oneway primary road (dashed divider and arrows) from x = -18, a footway crosses it at x = 0 (arc length 18: where the first arrow would be)
+    const net = buildRoadNet([
+      { cls: 'primary', oneway: 1, level: 0, coords: [[lon(-18), lat(0)], [lon(182), lat(0)]] },
+      { cls: 'foot', oneway: 0, level: 0, coords: [[lon(0), lat(-20)], [lon(0), lat(20)]] },
+    ], 13, 52);
+    expect(net.zebras.features).toHaveLength(1);
+    for (const f of net.marks.features) for (const c of f.geometry.coordinates) expect(Math.abs(x(c[0]!)) < 1.4).toBe(false); // no dash through the crossing
+    expect(net.marks.features.length).toBeGreaterThan(1);
+    const arrowXs = net.arrows.features.map((f) => x(f.geometry.coordinates[0]!));
+    expect(arrowXs.length).toBeGreaterThan(2);
+    for (const ax of arrowXs) expect(Math.abs(ax) > 3).toBe(true); // none on the crossing
+    // no dash under an arrow
+    for (const ax of arrowXs) for (const f of net.marks.features) for (const c of f.geometry.coordinates) expect(Math.abs(x(c[0]!) - ax) > 2).toBe(true);
+    expect(net.arrows.features[0]!.properties.rot).toBe(90); // east
+  });
+  it('pathCrossings counts a path split at the street once', () => {
+    const c = pathCrossings([{ pts: [[0, -10], [0, 0], [0, 10]], level: 0 }], [{ pts: [[-20, 0], [20, 0]], level: 0 }]);
+    expect(c).toHaveLength(1);
   });
 });

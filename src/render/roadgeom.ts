@@ -50,6 +50,16 @@ export function smooth(pts: XY[], limits: number[] = [14, 7], pinned?: boolean[]
 export function snapNetwork(input: XY[][], reach = 2.5): { lines: XY[][]; pinned: boolean[][] } {
   const lines = input.map((l) => [...l]);
   const pinned = lines.map((l) => l.map((_, i) => i === 0 || i === l.length - 1));
+  // a place where two lines share a vertex (an X or T crossing at a mapped node) is a junction too: smoothing must not pull them apart
+  const shared = new Map<string, Set<number>>();
+  lines.forEach((l, li) => l.forEach((p) => {
+    const k = `${Math.round(p[0] / 0.5)},${Math.round(p[1] / 0.5)}`;
+    const set = shared.get(k);
+    if (set) set.add(li); else shared.set(k, new Set([li]));
+  }));
+  lines.forEach((l, li) => l.forEach((p, i) => {
+    if ((shared.get(`${Math.round(p[0] / 0.5)},${Math.round(p[1] / 0.5)}`)?.size ?? 0) > 1) pinned[li]![i] = true;
+  }));
   const CELL = 12, OFF = 1 << 14, W = 1 << 15;
   const segLine: number[] = [], segPos: number[] = [];
   const cells = new Map<number, number[]>();
@@ -288,4 +298,100 @@ export function kerbStrips(center: XY[], hw: number, from: number, to: number, f
     }
   }
   return out;
+}
+
+export interface PathCrossing { p: XY; /** unit tangent of the road there */ tan: XY; /** unit direction of the path there */ dir: XY; road: number; /** arc length along the road at the crossing, metres */ roadS: number }
+
+/**
+ * Places where a path crosses a road (same level, not at a shallow angle). `paths` and `roads` are lists of polylines; the
+ * result holds the crossing point, the road's and the path's direction and the index of the road. Several hits within 3 m count as one
+ * (a path that is split at the road crosses it at a vertex, which both of its segments report).
+ */
+export function pathCrossings(paths: { pts: XY[]; level: number }[], roads: { pts: XY[]; level: number }[]): PathCrossing[] {
+  const CELL = 20, OFF = 1 << 14, W = 1 << 15;
+  const cells = new Map<number, [number, number][]>();
+  roads.forEach((r, ri) => {
+    for (let si = 0; si < r.pts.length - 1; si++) {
+      const a = r.pts[si]!, b = r.pts[si + 1]!;
+      for (let cx = Math.floor(Math.min(a[0], b[0]) / CELL); cx <= Math.floor(Math.max(a[0], b[0]) / CELL); cx++) {
+        for (let cy = Math.floor(Math.min(a[1], b[1]) / CELL); cy <= Math.floor(Math.max(a[1], b[1]) / CELL); cy++) {
+          const k = (cx + OFF) * W + (cy + OFF);
+          const l = cells.get(k);
+          if (l) l.push([ri, si]); else cells.set(k, [[ri, si]]);
+        }
+      }
+    }
+  });
+  const roadCum = roads.map((r) => { const c = [0]; for (let i = 1; i < r.pts.length; i++) c.push(c[i - 1]! + len(r.pts[i - 1]!, r.pts[i]!)); return c; });
+  const out: PathCrossing[] = [];
+  const taken = new Set<number>();
+  for (const path of paths) {
+    for (let pi = 0; pi < path.pts.length - 1; pi++) {
+      const a0 = path.pts[pi]!, a1 = path.pts[pi + 1]!;
+      const la = len(a0, a1);
+      if (la < 1e-6) continue;
+      const dax = (a1[0] - a0[0]) / la, day = (a1[1] - a0[1]) / la;
+      const tried = new Set<number>();
+      for (let cx = Math.floor(Math.min(a0[0], a1[0]) / CELL); cx <= Math.floor(Math.max(a0[0], a1[0]) / CELL); cx++) {
+        for (let cy = Math.floor(Math.min(a0[1], a1[1]) / CELL); cy <= Math.floor(Math.max(a0[1], a1[1]) / CELL); cy++) {
+          for (const [ri, si] of cells.get((cx + OFF) * W + (cy + OFF)) ?? []) {
+            const road = roads[ri]!;
+            const id = ri * 100000 + si;
+            if (road.level !== path.level || tried.has(id)) continue;
+            tried.add(id);
+            const b0 = road.pts[si]!, b1 = road.pts[si + 1]!;
+            const lb = len(b0, b1);
+            if (lb < 1e-6) continue;
+            const dbx = (b1[0] - b0[0]) / lb, dby = (b1[1] - b0[1]) / lb;
+            const cross = dax * dby - day * dbx;
+            if (Math.abs(cross) < 0.5) continue; // shallower than 30 degrees: runs along the road
+            const ex = b0[0] - a0[0], ey = b0[1] - a0[1];
+            const t = (ex * dby - ey * dbx) / cross, u = (ex * day - ey * dax) / cross;
+            if (t < -0.01 || t > la + 0.01 || u < 0 || u > lb) continue;
+            const p: XY = [a0[0] + dax * t, a0[1] + day * t];
+            const key = Math.round(p[0] / 3) * 1_000_003 + Math.round(p[1] / 3);
+            if (taken.has(key)) continue;
+            taken.add(key);
+            out.push({ p, tan: [dbx, dby], dir: [dax, day], road: ri, roadS: roadCum[ri]![si]! + u });
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The stripes of a zebra crossing as polygons. The stripes run PARALLEL to the road (unit tangent `tan`), `depth` long, `stripe`
+ * wide with `gap` between, filling the road from edge to edge (`hw` = half width). The crossing follows the footway: each
+ * stripe is moved along `dir` (the footway) to where the footway is at that point of the road, so a footway arriving at an
+ * angle gives a slanted band of parallel stripes (a parallelogram) that never reaches beyond the road edges.
+ */
+export function zebraStripes(c: XY, dir: XY, tan: XY, hw: number, depth = 3, stripe = 0.17, gap = 0.33): XY[][] {
+  const m: XY = [-tan[1], tan[0]]; // road normal
+  let md = dir[0] * m[0] + dir[1] * m[1]; // how fast the footway moves across the road
+  if (Math.abs(md) < 0.3) md = md < 0 ? -0.3 : 0.3;
+  const pitch = stripe + gap;
+  const n = Math.floor((2 * hw + gap) / pitch);
+  const first = -((n - 1) * pitch) / 2;
+  const out: XY[][] = [];
+  for (let i = 0; i < n; i++) {
+    const l = first + i * pitch; // across the road, from its centre line
+    const s = l / md; // along the footway
+    const cx = c[0] + dir[0] * s, cy = c[1] + dir[1] * s;
+    const corner = (a: number, b: number): XY => [cx + tan[0] * a + m[0] * b, cy + tan[1] * a + m[1] * b];
+    out.push([corner(-depth / 2, -stripe / 2), corner(depth / 2, -stripe / 2), corner(depth / 2, stripe / 2), corner(-depth / 2, stripe / 2)]);
+  }
+  return out;
+}
+
+/** The point at arc length `s` of a polyline and the heading there (degrees clockwise from north, x east / y north). */
+export function pointAlong(pts: XY[], s: number): { p: XY; bearing: number } | undefined {
+  let acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1]!, b = pts[i]!, l = len(a, b);
+    if (l > 0 && acc + l >= s) return { p: lerp(a, b, (s - acc) / l), bearing: ((Math.atan2(b[0] - a[0], b[1] - a[1]) * 180) / Math.PI + 360) % 360 };
+    acc += l;
+  }
+  return undefined;
 }

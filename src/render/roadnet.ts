@@ -1,7 +1,7 @@
 // Turns the road lines of the OpenFreeMap tiles (as queried from the map) into what the street-scale rendering draws:
 // smoothed lines with a real width, and marking lines (centre / lane dividers) that stop at junctions.
-import type { Feature, FeatureCollection, LineString, Polygon } from 'geojson';
-import { cutLine, junctionZones, localFrame, smooth, kerbStrips, lineLength, snapNetwork, takeFromStart, type NetLine, type XY } from './roadgeom';
+import type { Feature, FeatureCollection, LineString, MultiPolygon, Point, Polygon } from 'geojson';
+import { cutLine, junctionZones, localFrame, smooth, kerbStrips, lineLength, pathCrossings, pointAlong, snapNetwork, takeFromStart, zebraStripes, type NetLine, type XY } from './roadgeom';
 
 /** level from the OSM `layer` tag (and bridge/tunnel): -1 below ground (tunnel, underpass), 0 ground, 1 and 2 raised (bridges, stacked bridges) */
 export interface RawRoad { cls: string; oneway: number; level: number; coords: number[][] }
@@ -105,7 +105,7 @@ export function mergeChains(runs: Run[]): Run[] {
   return lines.filter((l): l is Run => !!l);
 }
 
-export function buildRoadNet(raw: RawRoad[], lon0: number, lat0: number): { roads: RoadFC; marks: MarkFC; kerbs: KerbFC } {
+export function buildRoadNet(raw: RawRoad[], lon0: number, lat0: number): { roads: RoadFC; marks: MarkFC; kerbs: KerbFC; arrows: FeatureCollection<Point, { rot: number; lv: number }>; zebras: FeatureCollection<MultiPolygon, { lv: number; mid: number[] }> } {
   const fr = localFrame(lon0, lat0);
   // tiles overlap in their buffers: the same segment can arrive twice, so lines are cut where a segment was already seen
   const seen = new Set<string>();
@@ -127,7 +127,7 @@ export function buildRoadNet(raw: RawRoad[], lon0: number, lat0: number): { road
   const joined = mergeChains(runs);
   // junctions first (ends snapped onto the road they join, those places pinned), then the corners are rounded around them
   const snapped = snapNetwork(joined.map((x) => x.pts));
-  const lines = joined.map((x, i) => ({ r: x.r, pts: smooth(snapped.lines[i]!, PATH_CLASSES.includes(x.r.cls) ? [3.5, 1.8] : [14, 7], snapped.pinned[i]), spec: x.spec }));
+  const lines = joined.map((x, i) => ({ r: x.r, pts: smooth(snapped.lines[i]!, PATH_CLASSES.includes(x.r.cls) ? [1.2] : [14, 7], snapped.pinned[i]), spec: x.spec }));
   const roads: Feature<LineString, RoadProps>[] = lines.map(({ r, pts, spec }) => ({
     type: 'Feature', geometry: { type: 'LineString', coordinates: pts.map(fr.from) },
     properties: { cls: r.cls, rank: spec.rank, w: spec.w, ow: r.oneway, mid: spec.mid, lv: r.level, pth: PATH_CLASSES.includes(r.cls) ? 1 : 0 },
@@ -137,13 +137,10 @@ export function buildRoadNet(raw: RawRoad[], lon0: number, lat0: number): { road
   const net: NetLine[] = [];
   lines.forEach(({ r, pts, spec }, i) => { if (!PATH_CLASSES.includes(r.cls)) { roadIdx.push(i); net.push({ pts, hw: spec.w / 2, level: r.level }); } });
   const roadZones = junctionZones(net);
-  const zones = new Map<number, [number, number][]>();
-  for (const [k, z] of roadZones) zones.set(roadIdx[k]!, z);
-  const marks: Feature<LineString, { mid: Mid; lv: number }>[] = [];
-  lines.forEach(({ r: r0, pts, spec }, i) => {
-    if (!spec.mid || r0.level < 0) return;
-    for (const part of cutLine(pts, zones.get(i) ?? [], 3)) marks.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: part.map(fr.from) }, properties: { mid: spec.mid, lv: r0.level } });
-  });
+  // everything that stops the markings of a line: junctions, crossings and arrows (zones in metres along the line)
+  const zonesAll = new Map<number, [number, number][]>();
+  const addZone = (i: number, a: number, b: number) => { const z = zonesAll.get(i); if (z) z.push([a, b]); else zonesAll.set(i, [[a, b]]); };
+  for (const [k, z] of roadZones) for (const [a, b] of z) addZone(roadIdx[k]!, a, b);
   // Bridge kerbs: full width along the whole bridge; the transition to the normal kerb (width and colour) lies on the road that
   // leads to the bridge, so it is found as the line that ends at the bridge end (a straight run-out when there is none).
   const ends = new Map<string, { li: number; atStart: boolean }[]>();
@@ -187,5 +184,40 @@ export function buildRoadNet(raw: RawRoad[], lon0: number, lat0: number): { road
       kerbs.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [q.ring.map(fr.from)] }, properties: { lv: r.level, c: lerpColour(KERB_BRIDGE, KERB_GROUND, q.t) } });
     }
   });
-  return { kerbs: { type: 'FeatureCollection', features: kerbs }, roads: { type: 'FeatureCollection', features: roads }, marks: { type: 'FeatureCollection', features: marks } };
+  // Zebra crossings where a footway crosses a street on the same level, along the footway (the layer drops those that OpenStreetMap maps itself)
+  const CROSSED = new Set(['minor', 'tertiary', 'secondary', 'primary', 'trunk']);
+  const roadList = lines.map((l, i) => ({ l, i })).filter(({ l }) => CROSSED.has(l.r.cls));
+  const footList = lines.filter((l) => l.r.cls === 'foot');
+  const zebras: Feature<MultiPolygon, { lv: number; mid: number[] }>[] = [];
+  for (const c of pathCrossings(footList.map((l) => ({ pts: l.pts, level: l.r.level })), roadList.map(({ l }) => ({ pts: l.pts, level: l.r.level })))) {
+    const road = roadList[c.road]!.l;
+    const stripes = zebraStripes(c.p, c.dir, c.tan, road.spec.w / 2);
+    if (!stripes.length) continue;
+    // the markings of the street stop around the crossing (the band reaches further along the street when the footway is slanted)
+    const along = 1.5 + ((road.spec.w / 2) * Math.abs(c.dir[0] * c.tan[0] + c.dir[1] * c.tan[1])) / Math.max(0.3, Math.abs(c.dir[1] * c.tan[0] - c.dir[0] * c.tan[1])) + 0.8;
+    addZone(roadList[c.road]!.i, c.roadS - along, c.roadS + along);
+    zebras.push({ type: 'Feature', geometry: { type: 'MultiPolygon', coordinates: stripes.map((p) => [[...p, p[0]!].map(fr.from)]) }, properties: { lv: road.r.level, mid: fr.from(c.p) } });
+  }
+  // Oneway arrows, placed here (not by the renderer) so that they only appear where there is space: not at junctions,
+  // not on a crossing; and the dashes of a centre line stop around them.
+  const arrows: Feature<Point, { rot: number; lv: number }>[] = [];
+  const ARROW_CLASSES = new Set(['primary', 'secondary', 'tertiary', 'minor']);
+  const clear = (i: number, s: number, r: number) => !(zonesAll.get(i) ?? []).some(([a, b]) => a < s + r && b > s - r);
+  lines.forEach(({ r, pts }, i) => {
+    if (r.oneway === 0 || r.level < 0 || !ARROW_CLASSES.has(r.cls)) return;
+    const total = lineLength(pts);
+    for (let s = Math.min(18, total / 2); s < total - 6; s += 36) {
+      if (!clear(i, s, 2.6)) continue;
+      const at = pointAlong(pts, s);
+      if (!at) continue;
+      addZone(i, s - 2.4, s + 2.4);
+      arrows.push({ type: 'Feature', geometry: { type: 'Point', coordinates: fr.from(at.p) }, properties: { rot: Math.round((at.bearing + (r.oneway < 0 ? 180 : 0)) % 360), lv: r.level } });
+    }
+  });
+  const marks: Feature<LineString, { mid: Mid; lv: number }>[] = [];
+  lines.forEach(({ r: r0, pts, spec }, i) => {
+    if (!spec.mid || r0.level < 0) return;
+    for (const part of cutLine(pts, zonesAll.get(i) ?? [], 3)) marks.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: part.map(fr.from) }, properties: { mid: spec.mid, lv: r0.level } });
+  });
+  return { arrows: { type: 'FeatureCollection', features: arrows }, zebras: { type: 'FeatureCollection', features: zebras }, kerbs: { type: 'FeatureCollection', features: kerbs }, roads: { type: 'FeatureCollection', features: roads }, marks: { type: 'FeatureCollection', features: marks } };
 }
