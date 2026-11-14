@@ -36,12 +36,12 @@ export function barentswatchLatest(raw: unknown): NorwayAis {
     const hdgRaw = num(r.trueHeading);
     const hdg = hdgRaw !== undefined && hdgRaw >= 0 && hdgRaw < 360 ? hdgRaw : -1;
     const moving = sog >= 0.5;
-    const heading = moving && cog >= 0 ? cog : hdg >= 0 ? hdg : cog >= 0 ? cog : 0;
+    const heading = moving && cog >= 0 ? cog : hdg >= 0 ? hdg : cog >= 0 ? cog : undefined; // undefined: the layer fills it in
     const type = num(r.shipType) ?? 0;
     const name = str(r.name);
     const id = String(mmsi);
     out.tracks.push({
-      id, lng, lat, heading, speed: moving ? sog * KN : 0, t,
+      id, lng, lat, heading, speed: moving && heading !== undefined ? sog * KN : 0, t,
       props: { mmsi, sog, cog, hdg, nav: num(r.navigationalStatus) ?? 15, moving, cls: shipClass(type), name } satisfies ShipProps & { cls: string; name: string },
     });
     const dims = (num(r.dimensionA) ?? 0) + (num(r.dimensionB) ?? 0);

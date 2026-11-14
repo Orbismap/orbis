@@ -78,7 +78,7 @@ export function aisVessels(raw: unknown): Record<string, ShipVessel> {
 
 export type ShipProps = { mmsi: number; sog: number; cog: number; hdg: number; nav: number; moving: boolean };
 
-/** `/locations` GeoJSON -> tracks. Heading is the course over ground while moving, else the true heading, else the course. */
+/** `/locations` GeoJSON -> tracks. Heading is the course over ground while moving, else the true heading, else the course, else undefined. */
 export function aisLocations(raw: unknown): TrackObject[] {
   const list = (raw as { features?: Record<string, unknown>[] } | null)?.features;
   if (!Array.isArray(list)) return [];
@@ -94,13 +94,13 @@ export function aisLocations(raw: unknown): TrackObject[] {
     const cog = p.cog >= 0 && p.cog < 360 ? p.cog : -1;
     const hdg = p.heading >= 0 && p.heading < 360 ? p.heading : -1;
     const moving = sog >= 0.5;
-    const heading = moving && cog >= 0 ? cog : hdg >= 0 ? hdg : cog >= 0 ? cog : 0;
+    const heading = moving && cog >= 0 ? cog : hdg >= 0 ? hdg : cog >= 0 ? cog : undefined; // undefined: the layer fills it in
     out.push({
       id: String(mmsi),
       lng,
       lat,
       heading,
-      speed: moving ? sog * KN : 0,
+      speed: moving && heading !== undefined ? sog * KN : 0,
       t: p.timestampExternal,
       props: { mmsi, sog, cog, hdg, nav: p.navStat ?? 15, moving } satisfies ShipProps,
     });

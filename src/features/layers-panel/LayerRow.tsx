@@ -41,8 +41,8 @@ export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGr
   const needsKey = raw?.needsKey;
   /** Required key that is still missing (full button with text while the layer is on). */
   const missingKey = needsKey ?? def.keys?.find((r) => r.required && !hasKey(r.id))?.id;
-  /** Every layer with a key (required or optional) gets the key button; otherwise it is icon only. */
-  const keyId = missingKey ?? def.keys?.find((r) => !hasKey(r.id))?.id ?? def.keys?.[0]?.id;
+  /** The key button shows only while a key (required or optional) is still missing; once all are set it goes (settings manage them). */
+  const keyId = missingKey ?? def.keys?.find((r) => !hasKey(r.id))?.id;
   const needsConfirm = raw?.needsConfirm;
   const below = useBelowZoom(layer.visible ? def.minZoom : undefined);
   const onKey = (e: KeyboardEvent) => {

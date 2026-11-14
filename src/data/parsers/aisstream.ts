@@ -50,7 +50,51 @@ export function parseAisMessage(text: string, now = Date.now()): AisMsg | null {
       len: (Number(d.A) || 0) + (Number(d.B) || 0), wid: (Number(d.C) || 0) + (Number(d.D) || 0), draught: Number(body.MaximumStaticDraught) || 0, eta,
     };
   }
+ if (type === 'StaticDataReport') {
+    // class B (leisure craft, small fishing and work boats): message 24 in two parts, A with the name, B with type, call
+    // sign and dimensions; each part fills only its own fields, the book merges them
+    const a = (body.ReportA ?? {}) as Any;
+    const b = (body.ReportB ?? {}) as Any;
+    const d = (b.Dimension ?? {}) as Any;
+    const partB = b.Valid === true;
+    return {
+      kind: 'static', mmsi: meta.MMSI, name: String((a.Valid === true ? a.Name : '') || meta.ShipName || '').replace(/@+/g, '').trim(), type: partB ? Number(b.ShipType) || 0 : 0,
+      dest: '', call: partB ? String(b.CallSign ?? '').replace(/@+/g, '').trim() : '', imo: 0,
+      len: partB ? (Number(d.A) || 0) + (Number(d.B) || 0) : 0, wid: partB ? (Number(d.C) || 0) + (Number(d.D) || 0) : 0, draught: 0, eta: null,
+    };
+  }
   return null;
+}
+
+/** Bearing (degrees) of the last movement in a trail, at least `minKm` long; null without one. */
+export function trailBearing(tr: readonly TrailPoint[] | undefined, minKm = 0.05): number | null {
+  if (!tr || tr.length < 2) return null;
+  const [lng1, lat1] = tr[tr.length - 1]!;
+  for (let i = tr.length - 2; i >= 0; i--) {
+    const [lng0, lat0] = tr[i]!;
+    const dx = (lng1 - lng0) * Math.cos((((lat0 + lat1) / 2) * Math.PI) / 180);
+    const dy = lat1 - lat0;
+    if (Math.hypot(dx, dy) * 111.2 < minKm) continue;
+    return ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
+  }
+  return null;
+}
+
+/** A stable angle (degrees) per MMSI for a ship whose direction nothing tells: ships at anchor lie every way, never all north. */
+export function restingAngle(mmsi: number): number {
+  let h = mmsi >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
+  return (h ^ (h >>> 16)) % 360;
+}
+
+/**
+ * Where a ship points when its report has neither heading nor course: the direction of its last movement (trail), else a
+ * stable angle per MMSI. `real` says whether the direction is real (from the trail) or only a placeholder.
+ */
+export function shipDirection(mmsi: number, trail: readonly TrailPoint[] | undefined): { heading: number; real: boolean } {
+  const b = trailBearing(trail);
+  return b !== null ? { heading: b, real: true } : { heading: restingAngle(mmsi), real: false };
 }
 
 /** "11.09., 14:00 UTC" for an AIS ETA (month/day/hour/minute, no year). */
@@ -71,7 +115,11 @@ export class AisBook {
     if (m.kind === 'static') {
       const prev = this.statics.get(m.mmsi);
       const { kind: _k, mmsi: _m, ...rest } = m;
-      this.statics.set(m.mmsi, { ...rest, name: rest.name || prev?.name || '', dest: rest.dest || prev?.dest || '' });
+      // field by field: a class-B part (or a static message with gaps) never erases what is known
+      this.statics.set(m.mmsi, {
+        name: rest.name || prev?.name || '', type: rest.type || prev?.type || 0, dest: rest.dest || prev?.dest || '', call: rest.call || prev?.call || '',
+        imo: rest.imo || prev?.imo || 0, len: rest.len || prev?.len || 0, wid: rest.wid || prev?.wid || 0, draught: rest.draught || prev?.draught || 0, eta: rest.eta ?? prev?.eta ?? null,
+      });
       return;
     }
     if (m.kind !== 'pos') return;
@@ -106,9 +154,10 @@ export class AisBook {
     for (const s of this.ships.values()) {
       const st = this.statics.get(s.mmsi);
       const moving = s.sog >= 0.5;
-      const heading = moving && s.cog >= 0 ? s.cog : s.hdg >= 0 ? s.hdg : s.cog >= 0 ? s.cog : 0;
+      // undefined without heading and course (many class-B boats): the layer fills it in (shipDirection), never a made-up north
+      const heading = moving && s.cog >= 0 ? s.cog : s.hdg >= 0 ? s.hdg : s.cog >= 0 ? s.cog : undefined;
       out.push({
-        id: String(s.mmsi), lng: s.lng, lat: s.lat, heading, speed: moving ? s.sog * KN : 0, t: s.t,
+        id: String(s.mmsi), lng: s.lng, lat: s.lat, heading, speed: moving && heading !== undefined ? s.sog * KN : 0, t: s.t,
         props: { mmsi: s.mmsi, sog: s.sog, cog: s.cog, hdg: s.hdg, nav: s.nav, moving, cls: shipClass(st?.type), name: st?.name || s.name, live: true } satisfies ShipProps & { cls: string; name: string; live: boolean },
       });
     }

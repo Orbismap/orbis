@@ -9,7 +9,7 @@ import type { ExpressionSpecification, FilterSpecification } from 'maplibre-gl';
 import { formatNumber } from '../../core/format';
 import { MINUTE } from '../../core/time';
 import { AisClient } from '../../data/parsers/aisclient';
-import { AisBook, etaText, parseAisMessage, subscriptionBoxes } from '../../data/parsers/aisstream';
+import { AisBook, etaText, parseAisMessage, shipDirection, subscriptionBoxes } from '../../data/parsers/aisstream';
 import { KN, SHIP_CLASSES, shipClass, shipTypeName, type ShipProps, type ShipVessel } from '../../data/parsers/ais';
 import type { NorwayAis } from '../../data/parsers/barentswatch';
 import { greatCircle } from '../../data/parsers/flightinfo';
@@ -174,7 +174,18 @@ export default defineLayer({
       for (const t of b ?? []) m.set(t.id, t);
       for (const t of no ?? []) { const o = m.get(t.id); if (!o || t.t >= o.t) m.set(t.id, t); }
       for (const t of s) { const o = m.get(t.id); if (!o || t.t >= o.t) m.set(t.id, t); }
-      return [...m.values()];
+      const dig = vessels.data.value;
+      const nor = norway.data.value?.vessels;
+      const out: TrackObject[] = [];
+      for (const t of m.values()) {
+        const p = t.props as { cls: string; mmsi: number };
+        // the stream knows the type only after a static message (every 6 min, class B separately): the other sources know it already
+        const type = p.cls === 'other' ? (dig?.[t.id]?.type || nor?.[t.id]?.type) : undefined;
+        // no heading and no course: the direction of the last movement, else a stable angle per ship (never all north)
+        const dir = t.heading === undefined ? shipDirection(p.mmsi, book.trails.get(p.mmsi)) : undefined;
+        out.push(type || dir ? { ...t, ...(dir ? { heading: dir.heading } : {}), props: { ...t.props, ...(type ? { cls: shipClass(type) } : {}) } } : t);
+      }
+      return out;
     });
 
     const filter = computed<FilterSpecification | undefined>(() => {
@@ -280,7 +291,7 @@ export default defineLayer({
         const wid = st?.wid || m?.wid;
         const cls = SHIP_CLASSES.find((c) => c.id === p.cls) ?? SHIP_CLASSES[SHIP_CLASSES.length - 1]!;
         out.push({
-          id: t.id, lng: t.lng, lat: t.lat, course: p.cog >= 0 ? p.cog : undefined, heading: p.hdg >= 0 ? p.hdg : undefined, speedMs: p.moving ? p.sog * KN : 0, moving: p.moving,
+          id: t.id, lng: t.lng, lat: t.lat, course: p.cog >= 0 ? p.cog : undefined, heading: p.hdg >= 0 ? p.hdg : t.heading, speedMs: p.moving ? p.sog * KN : 0, moving: p.moving,
           cls: cls.id, color: cls.color, label: st?.name || m?.name || p.name || `MMSI ${p.mmsi}`, ...(len ? { lenM: len } : {}), ...(wid ? { beamM: wid } : {}), t: t.t,
         });
       }

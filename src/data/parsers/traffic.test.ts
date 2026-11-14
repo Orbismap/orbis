@@ -85,7 +85,7 @@ describe('ships (Digitraffic AIS)', () => {
     expect(l[0]!.speed).toBe(0);
     expect(l[1]!.heading).toBe(90); // moving: course
     expect(l[1]!.speed).toBeCloseTo(6.38, 1);
-    expect(l[2]!.heading).toBe(0); // no course, no heading
+    expect(l[2]!.heading).toBeUndefined(); // no course, no heading: the layer fills it in
     expect(l[1]!.t).toBe(1794342226529);
   });
   it('parses vessel master data', () => {

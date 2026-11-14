@@ -21,7 +21,7 @@ describe('barentswatchLatest', () => {
   it('knows the "not available" values', () => {
     const { tracks, vessels } = barentswatchLatest([rec({ speedOverGround: 102.3, courseOverGround: 360, trueHeading: 511, draught: 255, shipLength: 0, shipWidth: 0, dimensionA: 80, dimensionB: 20, dimensionC: 6, dimensionD: 6 })]);
     expect(tracks[0]!.props).toMatchObject({ sog: 0, cog: -1, hdg: -1, moving: false });
-    expect(tracks[0]!.heading).toBe(0);
+    expect(tracks[0]!.heading).toBeUndefined();
     expect(vessels['257123456']).toMatchObject({ draught: 0, len: 100, wid: 12 });
   });
 
