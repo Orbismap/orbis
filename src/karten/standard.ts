@@ -29,7 +29,7 @@ const THEMES: Record<string, KarteTheme[]> = {
   verkehr: [
     T('strasse', 'Straße', 'car', ['autobahn', 'strassennetz', 'strassenmarkierungen', 'verkehrslage', 'blitzer']),
     T('schiene', 'Schiene', 'train', ['bahnnetz', 'zuege', 'nahverkehr', 'oepnv-linien']),
-    T('luft', 'Luft', 'plane', ['flugzeuge', 'flughaefen', 'flughafen-plan', 'gps-stoerungen', 'wetterballons']),
+    T('luft', 'Luft', 'plane', ['flugzeuge', 'flughafen', 'gps-stoerungen', 'wetterballons']),
     T('see', 'See', 'ship', ['schiffe', 'haefen', 'schiffsrouten']),
     T('raumfahrt', 'Raumfahrt', 'rocket', ['satelliten', 'starlink', 'raketenstarts']),
     T('rad-fuss', 'Rad und Fuß', 'pin', ['leihraeder', 'wegenetze']),
@@ -77,7 +77,7 @@ const DEFS: Karte[] = [
   },
   {
     id: 'verkehr', name: 'Verkehr', icon: 'plane', color: '#F2B45A', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,
-    layers: [on('flugzeuge'), on('satelliten'), off('schiffe'), off('flughaefen'), off('flughafen-plan'), off('gps-stoerungen'), off('haefen'), off('raketenstarts'), off('starlink'), off('blitzer'), off('wetterballons'), off('zuege'), off('nahverkehr'), off('autobahn'), off('strassennetz'), off('bahnnetz'), off('oepnv-linien'), off('wegenetze'), off('leihraeder'), off('verkehrslage'), off('strassenmarkierungen')],
+    layers: [on('flugzeuge'), on('satelliten'), off('schiffe'), off('flughafen'), off('gps-stoerungen'), off('haefen'), off('raketenstarts'), off('starlink'), off('blitzer'), off('wetterballons'), off('zuege'), off('nahverkehr'), off('autobahn'), off('strassennetz'), off('bahnnetz'), off('oepnv-linien'), off('wegenetze'), off('leihraeder'), off('verkehrslage'), off('strassenmarkierungen')],
   },
   {
     id: 'infrastruktur', name: 'Infrastruktur', icon: 'power', color: '#58D0A0', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,

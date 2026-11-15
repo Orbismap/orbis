@@ -33,6 +33,7 @@ import { launchTracker } from './launchtrack';
 import { sondes } from './sondes';
 import { trainLocations } from './trains';
 import { airportsParse } from './airports';
+import { indoorPlanFromOverpass } from './indoor';
 import { portsParse } from './ports';
 import { powerPlants } from './powerplants';
 import { wikiResources } from './resources';
@@ -105,7 +106,7 @@ export const parsers = {
   sondes,
   trainLocations,
   airportsParse,
-  portsParse,
+  indoorPlan: indoorPlanFromOverpass,  portsParse,
   powerPlants,
   wikiResources,
   dataCenters,
