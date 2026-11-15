@@ -129,14 +129,6 @@ describe('runtime', () => {
     stop();
   });
 
-  it('maps the vector basemaps to the theme, imagery stays', async () => {
-    const { basemapForTheme } = await import('./runtime');
-    expect(basemapForTheme('orbis-dark', 'light')).toBe('orbis-light');
-    expect(basemapForTheme('orbis-light', 'dark')).toBe('orbis-dark');
-    expect(basemapForTheme('orbis-dark', 'dark')).toBe('orbis-dark');
-    expect(basemapForTheme('satellite', 'light')).toBe('satellite');
-  });
-
   it('probeAt collects the probes of mounted layers', async () => {
     const store = await import('../karten/store');
     const session = await import('../state/session');

@@ -5,22 +5,15 @@ import { createResource, type Resource } from '../data/resource';
 import { hasKey, keySignal } from '../keys';
 import { settings, warningKey } from '../state/settings';
 import { scopeEngine, type ScopeRecord } from '../map/scope';
-import type { BasemapId, MapEngine, SlotId } from '../map/types';
+import type { MapEngine, SlotId } from '../map/types';
 import { clearLayerSession, activeKarte, setFeed, setLayerStatus, setLegend, activeKarteId } from '../state/session';
 import { inspector, selectCard, selectPlace } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { effectiveTheme } from '../state/settings';
 import { time, timeSources } from '../state/time';
 import { getLayer } from './registry';
 import type { InspectCard, LayerContext, LayerDef, LayerHandle, LayerStatus, OptionSpec, OptionValues } from './types';
 
 const SLOTS: SlotId[] = ['field', 'raster', 'areas', 'lines', 'points', 'labels', 'top'];
-
-/** Chrome and vector basemap must match: orbis-dark/orbis-light swap with the theme; imagery basemaps stay. */
-export function basemapForTheme(id: BasemapId, theme: 'dark' | 'light'): BasemapId {
-  if (id === 'orbis-dark' || id === 'orbis-light') return theme === 'light' ? 'orbis-light' : 'orbis-dark';
-  return id;
-}
 
 export const defaultOptions = (specs: OptionSpec[] = []): OptionValues => Object.fromEntries(specs.map((s) => [s.id, s.default]));
 
@@ -228,9 +221,8 @@ export function startRuntime(engine: MapEngine): () => void {
   stops.push(
     effect(() => {
       const k = activeKarte.value;
-      const theme = effectiveTheme.value;
       void engine.ready.then(() => {
-        engine.setBasemap(basemapForTheme(k.basemap, theme));
+        engine.setBasemap(k.basemap);
         engine.setLabels(k.labels);
         engine.setTerminator(k.terminator ? 'auto' : 'off');
       });
