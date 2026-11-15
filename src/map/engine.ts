@@ -189,8 +189,16 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   /** from here on the globe has turned into the flat map: no terrain on the Orbis colours */
   const TERRAIN_MAX_ZOOM_ORBIS = 12;
   let terrainGoal = -1;
+  let shadeGoal = -1;
   let terrainNow = 0;
   let terrainRaf = 0;
+  /** Relief shading of the flat Orbis colours: full with 3D terrain, weaker (2D) where the terrain is flattened, off with the switch. */
+  let shadeNow = 0;
+  const SHADE_FLAT = 0.45;
+  const shadeTarget = () => {
+    if (!terrainOn || !(basemap === 'orbis-dark' || basemap === 'orbis-light')) return 0;
+    return terrainTarget() > 0 ? 1 : SHADE_FLAT;
+  };
   const terrainTarget = () => {
     const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
     return terrainOn && !(flatOrbis && (projectionSignal.peek() !== 'globe' || ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS)) ? TERRAIN_EXAGGERATION : 0;
@@ -214,21 +222,25 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       (ml as unknown as { _camera?: { applyTerrainChange?: () => void } })._camera?.applyTerrainChange?.();
       ml.triggerRepaint();
     } else ml.setTerrain({ source: TERRAIN_SOURCE, exaggeration: terrainNow });
-    const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
-    setVis(HILLSHADE_LAYER, terrainNow > 0.001 && flatOrbis);
-    if (ml.getLayer(HILLSHADE_LAYER)) ml.setPaintProperty(HILLSHADE_LAYER, 'hillshade-exaggeration', HILLSHADE_STRENGTH * (terrainNow / TERRAIN_EXAGGERATION));
+    setVis(HILLSHADE_LAYER, shadeNow > 0.001);
+    if (ml.getLayer(HILLSHADE_LAYER)) ml.setPaintProperty(HILLSHADE_LAYER, 'hillshade-exaggeration', HILLSHADE_STRENGTH * shadeNow);
   }
   function applyTerrain() {
     const to = terrainTarget();
-    if (to === terrainGoal) return;
+    const shadeTo = shadeTarget();
+    if (to === terrainGoal && shadeTo === shadeGoal) return;
     terrainGoal = to;
+    shadeGoal = shadeTo;
     cancelAnimationFrame(terrainRaf);
     const from = terrainNow;
-    if (from === to) return paintTerrain();
+    const shadeFrom = shadeNow;
+    if (from === to && shadeFrom === shadeTo) return paintTerrain();
     const t0 = performance.now();
     const step = (now: number) => {
       const k = Math.min(1, (now - t0) / TERRAIN_MS);
-      terrainNow = from + (to - from) * (1 - Math.pow(1 - k, 3));
+      const e = 1 - Math.pow(1 - k, 3);
+      terrainNow = from + (to - from) * e;
+      shadeNow = shadeFrom + (shadeTo - shadeFrom) * e;
       paintTerrain();
       if (k < 1) terrainRaf = requestAnimationFrame(step);
     };
