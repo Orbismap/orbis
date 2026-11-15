@@ -111,15 +111,23 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     },
   );
 
+  const resolveReady = () => {
+    loaded = true;
+    if (ml.getProjection()?.type !== projectionSignal.peek()) ml.setProjection({ type: projectionSignal.peek() });
+    applyBasemap();
+    terminator.setMode(terminatorMode);
+    writeCamera();
+  };
   const ready = new Promise<void>((resolve) => {
-    ml.once('style.load', () => {
-      loaded = true;
-      if (ml.getProjection()?.type !== projectionSignal.peek()) ml.setProjection({ type: projectionSignal.peek() });
-      applyBasemap();
-      terminator.setMode(terminatorMode);
-      writeCamera();
-      resolve();
-    });
+    const finish = () => { try { resolveReady(); } catch (e) { console.error('ready resolveReady error', e); } resolve(); };
+    if (ml.isStyleLoaded()) { finish(); return; }
+    let done = false;
+    const wrap = () => { if (done) return; done = true; finish(); };
+    ml.once('style.load', wrap);
+    ml.once('load', wrap);
+    // fallback: poll
+    const iv = setInterval(() => { if (ml.isStyleLoaded()) { clearInterval(iv); wrap(); } }, 100);
+    setTimeout(() => { clearInterval(iv); wrap(); }, 5000);
   });
 
   // ---- camera <-> state/view ------------------------------------------------
