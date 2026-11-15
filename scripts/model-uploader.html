@@ -155,12 +155,47 @@
     </div>
     <div class="row">
       <div>
-        <label>Skalierung (Vorschau)</label>
-        <input id="scaleMul" type="range" min="0.5" max="3" step="0.05" value="1" />
+        <label>Skalierung</label>
+        <input id="scaleMul" type="range" min="0.1" max="5" step="0.01" value="1" />
+        <span id="scaleVal" class="hint">1.00</span>
       </div>
       <div>
         <label>Rotation Y (°)</label>
         <input id="rotY" type="range" min="-180" max="180" step="1" value="0" />
+        <span id="rotYVal" class="hint">0</span>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Rotation X (°)</label>
+        <input id="rotX" type="range" min="-180" max="180" step="1" value="0" />
+      </div>
+      <div>
+        <label>Rotation Z (°)</label>
+        <input id="rotZ" type="range" min="-180" max="180" step="1" value="0" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Verschiebung X</label>
+        <input id="tx" type="range" min="-5" max="5" step="0.01" value="0" />
+      </div>
+      <div>
+        <label>Verschiebung Y</label>
+        <input id="ty" type="range" min="-5" max="5" step="0.01" value="0" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Verschiebung Z</label>
+        <input id="tz" type="range" min="-5" max="5" step="0.01" value="0" />
+      </div>
+      <div>
+        <label>Modus</label>
+        <select id="transformMode">
+          <option value="preview">Vorschau (Origin erhalten)</option>
+          <option value="center">Zentriert (Origin = Mitte)</option>
+        </select>
       </div>
     </div>
     <div class="checks">
@@ -168,6 +203,13 @@
       <input id="grid" type="checkbox" checked /> Boden-Gitter
       <input id="autoRotate" type="checkbox" /> Auto-Rotate
     </div>
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button id="frameBtn" class="secondary">Modell einrahmen</button>
+      <button id="resetTransformBtn" class="secondary">Transformation zurücksetzen</button>
+      <button id="resetViewBtn" class="secondary">Kamera zurücksetzen</button>
+      <button id="exportBtn" class="secondary" disabled>Optimiertes GLB exportieren</button>
+    </div>
+    <div class="hint">Export wendet die Transformation (Skalierung/Rotation/Verschiebung) an und speichert als neues .glb.</div>
     <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
       <button id="resetViewBtn" class="secondary">Ansicht zurücksetzen</button>
       <button id="exportBtn" class="secondary" disabled>Optimiertes GLB exportieren</button>
@@ -270,40 +312,88 @@ fileInput.addEventListener('change', (e)=>{ if(e.target.files.length) setFile(e.
 const bgSelect = document.getElementById('bgColor');
 const lightSlider = document.getElementById('lightIntensity');
 const scaleSlider = document.getElementById('scaleMul');
+const scaleVal = document.getElementById('scaleVal');
+const rotXSlider = document.getElementById('rotX');
 const rotYSlider = document.getElementById('rotY');
+const rotYVal = document.getElementById('rotYVal');
+const rotZSlider = document.getElementById('rotZ');
+const txSlider = document.getElementById('tx');
+const tySlider = document.getElementById('ty');
+const tzSlider = document.getElementById('tz');
+const transformMode = document.getElementById('transformMode');
 const wireframeCb = document.getElementById('wireframe');
 const gridCb = document.getElementById('grid');
 const autoRotateCb = document.getElementById('autoRotate');
 const exportBtn = document.getElementById('exportBtn');
 const resetViewBtn = document.getElementById('resetViewBtn');
+const frameBtn = document.getElementById('frameBtn');
+const resetTransformBtn = document.getElementById('resetTransformBtn');
 const dimsEl = document.getElementById('dims');
 
 let gridHelper = new THREE.GridHelper(4, 20, 0x444466, 0x222244);
 gridHelper.visible = true;
 scene.add(gridHelper);
 
+let baseCenter = new THREE.Vector3();
+let baseMaxDim = 1;
+
 function applySettings() {
   scene.background = new THREE.Color(bgSelect.value);
   light.intensity = parseFloat(lightSlider.value);
   dir.intensity = parseFloat(lightSlider.value) * 0.6;
   if (modelGroup) {
-    modelGroup.scale.setScalar((2 / (modelGroup.userData.baseMaxDim || 1)) * parseFloat(scaleSlider.value));
-    modelGroup.rotation.y = parseFloat(rotYSlider.value) * Math.PI / 180;
+    const s = parseFloat(scaleSlider.value);
+    modelGroup.scale.setScalar(s);
+    modelGroup.rotation.set(
+      parseFloat(rotXSlider.value)*Math.PI/180,
+      parseFloat(rotYSlider.value)*Math.PI/180,
+      parseFloat(rotZSlider.value)*Math.PI/180
+    );
+    modelGroup.position.set(parseFloat(txSlider.value), parseFloat(tySlider.value), parseFloat(tzSlider.value));
+    if (transformMode.value === 'center') {
+      modelGroup.position.sub(baseCenter.clone().multiplyScalar(s));
+    }
     modelGroup.traverse(o => { if (o.isMesh && o.material) { o.material.wireframe = wireframeCb.checked; } });
   }
   gridHelper.visible = gridCb.checked;
   controls.autoRotate = autoRotateCb.checked;
+  scaleVal.textContent = parseFloat(scaleSlider.value).toFixed(2);
+  rotYVal.textContent = rotYSlider.value;
 }
-bgSelect.addEventListener('change', applySettings);
-lightSlider.addEventListener('input', applySettings);
-scaleSlider.addEventListener('input', applySettings);
-rotYSlider.addEventListener('input', applySettings);
-wireframeCb.addEventListener('change', applySettings);
-gridCb.addEventListener('change', applySettings);
-autoRotateCb.addEventListener('change', applySettings);
+['change','input'].forEach(ev => {
+  bgSelect.addEventListener(ev, applySettings);
+  lightSlider.addEventListener(ev, applySettings);
+  scaleSlider.addEventListener(ev, applySettings);
+  rotXSlider.addEventListener(ev, applySettings);
+  rotYSlider.addEventListener(ev, applySettings);
+  rotZSlider.addEventListener(ev, applySettings);
+  txSlider.addEventListener(ev, applySettings);
+  tySlider.addEventListener(ev, applySettings);
+  tzSlider.addEventListener(ev, applySettings);
+  transformMode.addEventListener(ev, applySettings);
+  wireframeCb.addEventListener(ev, applySettings);
+  gridCb.addEventListener(ev, applySettings);
+  autoRotateCb.addEventListener(ev, applySettings);
+});
 resetViewBtn.addEventListener('click', () => {
   camera.position.set(2,2,2); controls.target.set(0,0,0); controls.update();
-  scaleSlider.value = 1; rotYSlider.value = 0; applySettings();
+});
+frameBtn.addEventListener('click', () => {
+  if (!modelGroup) return;
+  const box = new THREE.Box3().setFromObject(modelGroup);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x,size.y,size.z)||1;
+  const dist = maxDim / (2*Math.tan(camera.fov*Math.PI/180/2)) * 1.5;
+  camera.position.copy(center).add(new THREE.Vector3(dist,dist,dist));
+  controls.target.copy(center);
+  controls.update();
+});
+resetTransformBtn.addEventListener('click', () => {
+  scaleSlider.value = 1; rotXSlider.value=0; rotYSlider.value=0; rotZSlider.value=0;
+  txSlider.value=0; tySlider.value=0; tzSlider.value=0;
+  transformMode.value='preview';
+  applySettings();
 });
 
 // patch showPreview to store baseMaxDim
@@ -317,14 +407,13 @@ async function showPreview2(buffer) {
     const box = new THREE.Box3().setFromObject(modelGroup);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    modelGroup.position.sub(center);
-    const maxDim = Math.max(size.x,size.y,size.z)||1;
-    modelGroup.userData.baseMaxDim = maxDim;
-    modelGroup.scale.setScalar((2/maxDim)*parseFloat(scaleSlider.value));
-    modelGroup.rotation.y = parseFloat(rotYSlider.value)*Math.PI/180;
-    modelGroup.traverse(o => { if (o.isMesh && o.material) o.material.wireframe = wireframeCb.checked; });
+    baseCenter.copy(center);
+    baseMaxDim = Math.max(size.x,size.y,size.z)||1;
+    modelGroup.userData.baseMaxDim = baseMaxDim;
+    // do not auto-center; keep original origin; apply user transforms
+    applySettings();
     scene.add(modelGroup);
-    dimsEl.textContent = `Bounding Box: ${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m (Modellraum)`;
+    dimsEl.textContent = `Bounding Box: ${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m | Origin: (${center.x.toFixed(2)}, ${center.y.toFixed(2)}, ${center.z.toFixed(2)})`;
     exportBtn.disabled = false;
   } catch(e){ console.warn('preview failed', e); }
 }
