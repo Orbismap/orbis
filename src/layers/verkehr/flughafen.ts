@@ -248,8 +248,14 @@ export default defineLayer({
     const updateZoom = () => {
       zoomSig.value = ml.getZoom();
       showAirports.value = ml.getZoom() < MIN_PLAN_ZOOM;
-      // hide 3D buildings only when an airport plan is loaded and indoor is shown
-      const hide = plans.value.length > 0 && ml.getZoom() >= MIN_INDOOR_ZOOM;
+      // hide 3D buildings only when indoor is shown AND the view is on an airport with a plan
+      const c0 = ml.getCenter();
+      const onAirport = plans.value.some((p) => {
+        const a = (index.data.value ?? []).find((x) => x.icao === p.icao);
+        if (!a) return false;
+        return c0.lng >= a.bbox[0] && c0.lng <= a.bbox[2] && c0.lat >= a.bbox[1] && c0.lat <= a.bbox[3];
+      });
+      const hide = onAirport && ml.getZoom() >= MIN_INDOOR_ZOOM;
       for (const l of ml.getStyle().layers ?? []) {
         if (l.type === 'fill-extrusion' && l.id.includes('building')) {
           try { ml.setLayoutProperty(l.id, 'visibility', hide ? 'none' : 'visible'); } catch { /* */ }
