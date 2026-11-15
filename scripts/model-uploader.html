@@ -7,139 +7,212 @@
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
 </script>
 <style>
-  :root { --bg:#0f131a; --panel:#171c26; --border:#2a3140; --fg:#e6eaf2; --muted:#8a93a6; --accent:#4f8cff; --ok:#3ddc97; --err:#ff5c5c; --tab:#1f2533; }
+  :root {
+    --bg:#0b0f16; --panel:#151a24; --panel2:#1c2230; --border:#262d3d;
+    --fg:#e6eaf2; --muted:#7a8499; --accent:#4f8cff; --accent2:#7c5cff;
+    --ok:#3ddc97; --err:#ff5c5c; --warn:#ffb347;
+    --radius:10px; --gap:16px;
+  }
   * { box-sizing:border-box; }
-  body { margin:0; font:14px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
-  header { padding:16px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; }
-  header h1 { margin:0; font-size:18px; }
-  main { display:grid; grid-template-columns: 1fr 1fr; gap:16px; padding:16px 24px; max-width:1200px; margin:0 auto; }
-  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
-  .card h2 { margin:0 0 12px; font-size:15px; }
-  #drop { border:2px dashed var(--border); border-radius:10px; padding:24px; text-align:center; color:var(--muted); cursor:pointer; min-height:120px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:6px; }
+  html,body { margin:0; height:100%; }
+  body { font:14px/1.5 system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--fg); display:flex; flex-direction:column; min-height:100vh; }
+  header { padding:14px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; background:linear-gradient(180deg,#121722,#0b0f16); }
+  header h1 { margin:0; font-size:18px; font-weight:600; }
+  header .sub { color:var(--muted); font-size:12px; }
+  header .pill { margin-left:auto; font-size:11px; color:var(--muted); padding:4px 10px; border:1px solid var(--border); border-radius:999px; }
+
+  .cats { display:flex; gap:6px; padding:12px 24px; border-bottom:1px solid var(--border); background:#0d1119; }
+  .cat { padding:8px 16px; background:var(--panel); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13px; color:var(--muted); transition:.15s; user-select:none; }
+  .cat:hover { color:var(--fg); border-color:#3a4255; }
+  .cat.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+  main { flex:1; display:grid; grid-template-columns: 420px 1fr; gap:var(--gap); padding:var(--gap) 24px; min-height:0; }
+  @media (max-width:900px){ main { grid-template-columns:1fr; } }
+
+  .col { display:flex; flex-direction:column; gap:var(--gap); min-height:0; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+  .card h2 { margin:0 0 12px; font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; }
+  .card h3 { margin:14px 0 8px; font-size:13px; color:var(--fg); font-weight:600; }
+
+  label { display:block; margin:10px 0 4px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  input, textarea, select { width:100%; padding:9px 11px; background:#0a0e15; border:1px solid var(--border); border-radius:7px; color:var(--fg); font:inherit; font-size:13px; transition:border-color .15s; }
+  input:focus, textarea:focus, select:focus { outline:none; border-color:var(--accent); }
+  textarea { min-height:56px; resize:vertical; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+
+  button { padding:9px 14px; background:var(--accent); color:#fff; border:none; border-radius:8px; font:inherit; font-size:13px; font-weight:600; cursor:pointer; transition:.15s; }
+  button:hover { filter:brightness(1.1); }
+  button:disabled { opacity:.4; cursor:not-allowed; filter:none; }
+  button.secondary { background:var(--panel2); border:1px solid var(--border); color:var(--fg); }
+  button.secondary:hover { border-color:#3a4255; }
+  button.danger { background:transparent; border:1px solid var(--err); color:var(--err); }
+
+  #drop { border:2px dashed var(--border); border-radius:var(--radius); padding:20px; text-align:center; color:var(--muted); cursor:pointer; min-height:96px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:4px; transition:.15s; }
+  #drop:hover { border-color:#3a4255; }
   #drop.drag { border-color:var(--accent); color:var(--fg); background:rgba(79,140,255,.08); }
-  #drop .name { color:var(--fg); font-weight:600; }
-  label { display:block; margin:8px 0 4px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
-  input, textarea, select { width:100%; padding:8px 10px; background:#0b0f16; border:1px solid var(--border); border-radius:6px; color:var(--fg); font:inherit; }
-  textarea { min-height:60px; resize:vertical; }
-  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  button { padding:10px 16px; background:var(--accent); color:#fff; border:none; border-radius:8px; font:inherit; font-weight:600; cursor:pointer; }
-  button:disabled { opacity:.5; cursor:not-allowed; }
-  button.secondary { background:transparent; border:1px solid var(--border); }
-  #status { margin-top:12px; padding:10px 12px; border-radius:6px; font-size:13px; display:none; }
-  #status.ok { display:block; background:rgba(61,220,151,.12); color:var(--ok); border:1px solid rgba(61,220,151,.3); }
-  #status.err { display:block; background:rgba(255,92,92,.12); color:var(--err); border:1px solid rgba(255,92,92,.3); }
-  #preview { width:100%; height:320px; background:#0b0f16; border-radius:8px; }
-  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
-  .checks { display:flex; gap:8px; align-items:center; margin-top:8px; font-size:12px; color:var(--muted); }
-  .tabs { display:flex; gap:6px; margin-bottom:12px; }
-  .tab { padding:8px 14px; background:var(--tab); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13px; color:var(--muted); }
-  .tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #drop .name { color:var(--fg); font-weight:600; font-size:13px; }
+  #drop .hint { font-size:11px; }
+
+  .preview-wrap { position:relative; background:#0a0e15; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; min-height:420px; display:flex; flex-direction:column; }
+  #preview { flex:1; width:100%; min-height:360px; display:block; }
+  .preview-bar { padding:8px 12px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:11px; color:var(--muted); }
+  .preview-bar label { margin:0; text-transform:none; letter-spacing:0; font-size:11px; }
+  .preview-bar select, .preview-bar input[type=range] { width:auto; padding:4px 6px; font-size:11px; }
+  .preview-bar input[type=range] { width:100px; }
+  .dims { padding:8px 12px; font-size:11px; color:var(--muted); border-top:1px solid var(--border); font-family:monospace; }
+
+  .checks { display:flex; gap:14px; align-items:center; margin-top:8px; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+  .checks label { margin:0; text-transform:none; letter-spacing:0; font-size:12px; display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .checks input { width:auto; }
+
+  .slider-row { display:flex; align-items:center; gap:8px; margin:6px 0; }
+  .slider-row label { margin:0; min-width:90px; text-transform:none; letter-spacing:0; font-size:12px; }
+  .slider-row input[type=range] { flex:1; }
+  .slider-row .val { min-width:44px; text-align:right; font-size:11px; color:var(--muted); font-family:monospace; }
+
+  .transform-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .transform-grid .field { display:flex; flex-direction:column; gap:4px; }
+  .transform-grid label { margin:0; font-size:10px; }
+  .transform-grid input { padding:6px 8px; font-size:12px; }
+
+  #status { margin-top:10px; padding:10px 12px; border-radius:7px; font-size:12px; display:none; line-height:1.4; }
+  #status.ok { display:block; background:rgba(61,220,151,.1); color:var(--ok); border:1px solid rgba(61,220,151,.3); }
+  #status.err { display:block; background:rgba(255,92,92,.1); color:var(--err); border:1px solid rgba(255,92,92,.3); }
+  #status.info { display:block; background:rgba(79,140,255,.1); color:var(--accent); border:1px solid rgba(79,140,255,.3); }
+
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .hint { font-size:11px; color:var(--muted); margin-top:4px; line-height:1.4; }
+
   .field-group { display:none; }
   .field-group.active { display:block; }
+
+  .kv { display:grid; grid-template-columns:90px 1fr; gap:4px 8px; font-size:12px; margin-top:8px; }
+  .kv dt { color:var(--muted); }
+  .kv dd { margin:0; font-family:monospace; }
 </style>
 </head>
 <body>
 <header>
   <h1>Orbis — Model Uploader</h1>
-  <span style="color:var(--muted);font-size:12px;">lokales Tool · drag & drop → models-staging</span>
+  <span class="sub">lokales Tool · drag & drop → models-staging</span>
+  <span class="pill">v2</span>
 </header>
+
+<div class="cats">
+  <div class="cat active" data-cat="aircraft">✈️ Flugzeug</div>
+  <div class="cat" data-cat="ship">🚢 Schiff</div>
+  <div class="cat" data-cat="transit">🚌 ÖPNV</div>
+  <div class="cat" data-cat="other">📦 Sonstiges</div>
+</div>
+
 <main>
-  <section class="card">
-    <h2>Kategorie</h2>
-    <div class="tabs">
-      <div class="tab active" data-cat="aircraft">✈️ Flugzeug</div>
-      <div class="tab" data-cat="ship">🚢 Schiff</div>
-      <div class="tab" data-cat="transit">🚌 ÖPNV</div>
-      <div class="tab" data-cat="other">📦 Sonstiges</div>
+  <!-- LEFT COLUMN: controls -->
+  <div class="col">
+    <div class="card">
+      <h2>1. Datei</h2>
+      <div id="drop">Original-Datei hierher ziehen (.glb / .gltf)<div class="hint">wird optimiert & als Vorschau geladen · oder klicken</div></div>
+      <input id="fileInput" type="file" accept=".glb,.gltf" hidden />
+      <div id="fileInfo" class="hint"></div>
     </div>
 
-    <h2>1. Modell-Datei</h2>
-    <div id="drop">Datei hierher ziehen (.glb / .gltf)<br><span class="hint">oder klicken zum Auswählen</span></div>
-    <input id="fileInput" type="file" accept=".glb,.gltf" hidden />
-    <div id="fileInfo" class="hint"></div>
-
-    <h2 style="margin-top:16px;">2. Metadaten</h2>
-    <label>Modell-ID (Schlüssel)</label>
-    <input id="id" placeholder="b737-800" />
-    <div class="row">
-      <div>
-        <label>Eingebaute Länge (m)</label>
-        <input id="length" type="number" step="0.01" placeholder="39.5" />
+    <div class="card">
+      <h2>2. Metadaten</h2>
+      <label>Modell-ID</label>
+      <input id="id" placeholder="b737-800" />
+      <div class="row">
+        <div>
+          <label>Länge (m)</label>
+          <input id="length" type="number" step="0.01" placeholder="39.5" />
+        </div>
+        <div id="catField"></div>
       </div>
-      <div id="catField"></div>
+
+      <div class="field-group active" data-group="aircraft">
+        <label>ICAO-Typen (Code:Länge)</label>
+        <input id="types" placeholder="B738:39.5, B737:33.6" />
+      </div>
+      <div class="field-group" data-group="ship">
+        <label>Schiffsklasse</label>
+        <select id="shipClass">
+          <option value="cargo">Fracht</option><option value="tanker">Tanker</option>
+          <option value="passenger">Passagier</option><option value="fishing">Fischer</option>
+          <option value="tug">Schlepper/Spezial</option><option value="pleasure">Segel/Pleasure</option>
+          <option value="other">Sonstige</option>
+        </select>
+      </div>
+      <div class="field-group" data-group="transit">
+        <label>Fahrzeugtyp</label>
+        <select id="transitType">
+          <option value="bus">Bus</option><option value="tram">Straßenbahn</option>
+          <option value="subway">U-Bahn</option><option value="train">Zug</option><option value="ferry">Fähre</option>
+        </select>
+      </div>
+      <div class="field-group" data-group="other">
+        <label>Notiz</label>
+        <input id="otherNote" placeholder="z. B. Raumfahrzeug, Gebäude" />
+      </div>
+
+      <label>Titel</label>
+      <input id="title" placeholder="Boeing 737-800" />
+      <div class="row">
+        <div><label>Autor</label><input id="author" placeholder="andriiharbut" /></div>
+        <div><label>Lizenz</label><input id="license" placeholder="CC BY 4.0" /></div>
+      </div>
+      <label>Quelle (URL)</label>
+      <input id="source" placeholder="https://sketchfab.com/..." />
+      <label>Original-Datei (optional, überschreibt das gedroppte)</label>
+      <input id="origInput" type="file" />
+      <div class="checks"><label><input id="keepOrig" type="checkbox" checked /> Original zusätzlich in import/ ablegen</label></div>
     </div>
 
-    <!-- aircraft-specific -->
-    <div class="field-group active" data-group="aircraft">
-      <label>ICAO-Typen (Code:Länge, kommagetrennt)</label>
-      <input id="types" placeholder="B738:39.5, B737:33.6" />
-      <div class="hint">z. B. B738, A320, C172. Leer lassen bei reinem Modell ohne Typ-Mapping.</div>
-    </div>
-    <!-- ship-specific -->
-    <div class="field-group" data-group="ship">
-      <label>Schiffsklasse</label>
-      <select id="shipClass">
-        <option value="cargo">Fracht (cargo)</option>
-        <option value="tanker">Tanker</option>
-        <option value="passenger">Passagier</option>
-        <option value="fishing">Fischer</option>
-        <option value="tug">Schlepper/Spezial</option>
-        <option value="pleasure">Segel/Pleasure</option>
-        <option value="other">Sonstige</option>
+    <div class="card">
+      <h2>3. Transformation</h2>
+      <div class="slider-row">
+        <label>Skalierung</label>
+        <input id="scaleMul" type="range" min="0.1" max="5" step="0.01" value="1" />
+        <span class="val" id="scaleVal">1.00</span>
+      </div>
+      <div class="transform-grid">
+        <div class="field"><label>Rot X°</label><input id="rotX" type="number" step="1" value="0" /></div>
+        <div class="field"><label>Rot Y°</label><input id="rotY" type="number" step="1" value="0" /></div>
+        <div class="field"><label>Rot Z°</label><input id="rotZ" type="number" step="1" value="0" /></div>
+        <div class="field"><label>Pos X</label><input id="tx" type="number" step="0.01" value="0" /></div>
+        <div class="field"><label>Pos Y</label><input id="ty" type="number" step="0.01" value="0" /></div>
+        <div class="field"><label>Pos Z</label><input id="tz" type="number" step="0.01" value="0" /></div>
+      </div>
+      <label style="margin-top:10px;">Modus</label>
+      <select id="transformMode">
+        <option value="preview">Vorschau (Origin erhalten)</option>
+        <option value="center">Zentriert (Origin = Mitte)</option>
       </select>
-    </div>
-    <!-- transit-specific -->
-    <div class="field-group" data-group="transit">
-      <label>Fahrzeugtyp</label>
-      <select id="transitType">
-        <option value="bus">Bus</option>
-        <option value="tram">Straßenbahn</option>
-        <option value="subway">U-Bahn</option>
-        <option value="train">Zug</option>
-        <option value="ferry">Fähre</option>
-      </select>
-    </div>
-    <!-- other-specific -->
-    <div class="field-group" data-group="other">
-      <label>Notiz / Kategorie</label>
-      <input id="otherNote" placeholder="z. B. Raumfahrzeug, Gebäude, ..." />
-    </div>
-
-    <label>Titel</label>
-    <input id="title" placeholder="Boeing 737-800" />
-    <div class="row">
-      <div>
-        <label>Autor</label>
-        <input id="author" placeholder="andriiharbut" />
+      <div class="checks" style="margin-top:10px;">
+        <label><input id="wireframe" type="checkbox" /> Wireframe</label>
+        <label><input id="grid" type="checkbox" checked /> Gitter</label>
+        <label><input id="autoRotate" type="checkbox" /> Auto-Rotate</label>
       </div>
-      <div>
-        <label>Lizenz</label>
-        <input id="license" placeholder="CC BY 4.0" />
+      <div class="actions">
+        <button id="frameBtn" class="secondary">Einrahmen</button>
+        <button id="resetTransformBtn" class="secondary">Reset</button>
       </div>
     </div>
-    <label>Quelle (URL)</label>
-    <input id="source" placeholder="https://sketchfab.com/..." />
-    <label>Original-Datei (optional, für import/)</label>
-    <input id="origInput" type="file" />
-    <div class="checks">
-      <input id="keepOrig" type="checkbox" checked /> Original in import/ ablegen
-    </div>
 
-    <h2 style="margin-top:16px;">3. Speichern</h2>
-    <button id="saveBtn" disabled>Zielordner wählen & speichern</button>
-    <div class="hint">Wählt den <code>models-staging</code>-Ordner (Bucket-Root). Schreibt <code>models/&lt;kategorie&gt;/&lt;id&gt;.glb</code>, aktualisiert <code>registry.json</code> + <code>CREDITS.json</code>.</div>
-    <div id="status"></div>
-  </section>
-  <section class="card">
-    <h2>Vorschau</h2>
-    <canvas id="preview"></canvas>
-    <div class="hint">Drag-orbit mit Maus. Meshopt-komprimierte Modelle werden unterstützt.</div>
-    <div id="dims" class="hint" style="margin-top:8px;"></div>
-  </section>
-  <section class="card" style="grid-column:1/-1;">
-    <h2>4. Optimierung & Einstellungen</h2>
-    <div class="row">
-      <div>
+    <div class="card">
+      <h2>4. Speichern</h2>
+      <button id="saveBtn" disabled style="width:100%;">Zielordner wählen & speichern</button>
+      <div class="hint">Wählt den <code>models-staging</code>-Ordner. Schreibt die <strong>optimierte</strong> Version nach <code>models/&lt;kategorie&gt;/&lt;id&gt;.glb</code> und das Original nach <code>import/</code>. Aktualisiert <code>registry.json</code> + <code>CREDITS.json</code>.</div>
+      <div id="status"></div>
+      <div class="actions" style="margin-top:12px;">
+        <button id="exportBtn" class="secondary" disabled>Optimiertes GLB exportieren</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN: preview -->
+  <div class="col">
+    <div class="preview-wrap">
+      <canvas id="preview"></canvas>
+      <div class="preview-bar">
         <label>Hintergrund</label>
         <select id="bgColor">
           <option value="#0b0f16">Dunkel</option>
@@ -147,75 +220,23 @@
           <option value="#ffffff">Weiß</option>
           <option value="#87ceeb">Himmel</option>
         </select>
-      </div>
-      <div>
-        <label>Lichtstärke</label>
+        <label>Licht</label>
         <input id="lightIntensity" type="range" min="0.2" max="2" step="0.1" value="1.2" />
+        <button id="resetViewBtn" class="secondary" style="padding:4px 10px;font-size:11px;">Kamera Reset</button>
       </div>
+      <div class="dims" id="dims">—</div>
     </div>
-    <div class="row">
-      <div>
-        <label>Skalierung</label>
-        <input id="scaleMul" type="range" min="0.1" max="5" step="0.01" value="1" />
-        <span id="scaleVal" class="hint">1.00</span>
-      </div>
-      <div>
-        <label>Rotation Y (°)</label>
-        <input id="rotY" type="range" min="-180" max="180" step="1" value="0" />
-        <span id="rotYVal" class="hint">0</span>
-      </div>
+
+    <div class="card">
+      <h2>Info</h2>
+      <dl class="kv" id="infoKv">
+        <dt>Datei</dt><dd id="infoFile">—</dd>
+        <dt>Größe</dt><dd id="infoSize">—</dd>
+        <dt>Kategorie</dt><dd id="infoCat">—</dd>
+      </dl>
+      <div class="hint" style="margin-top:10px;">Tipp: Modell so transformieren, dass die Räder auf Y=0 liegen und die Nase in +Z zeigt. Dann exportieren oder direkt speichern.</div>
     </div>
-    <div class="row">
-      <div>
-        <label>Rotation X (°)</label>
-        <input id="rotX" type="range" min="-180" max="180" step="1" value="0" />
-      </div>
-      <div>
-        <label>Rotation Z (°)</label>
-        <input id="rotZ" type="range" min="-180" max="180" step="1" value="0" />
-      </div>
-    </div>
-    <div class="row">
-      <div>
-        <label>Verschiebung X</label>
-        <input id="tx" type="range" min="-5" max="5" step="0.01" value="0" />
-      </div>
-      <div>
-        <label>Verschiebung Y</label>
-        <input id="ty" type="range" min="-5" max="5" step="0.01" value="0" />
-      </div>
-    </div>
-    <div class="row">
-      <div>
-        <label>Verschiebung Z</label>
-        <input id="tz" type="range" min="-5" max="5" step="0.01" value="0" />
-      </div>
-      <div>
-        <label>Modus</label>
-        <select id="transformMode">
-          <option value="preview">Vorschau (Origin erhalten)</option>
-          <option value="center">Zentriert (Origin = Mitte)</option>
-        </select>
-      </div>
-    </div>
-    <div class="checks">
-      <input id="wireframe" type="checkbox" /> Wireframe
-      <input id="grid" type="checkbox" checked /> Boden-Gitter
-      <input id="autoRotate" type="checkbox" /> Auto-Rotate
-    </div>
-    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-      <button id="frameBtn" class="secondary">Modell einrahmen</button>
-      <button id="resetTransformBtn" class="secondary">Transformation zurücksetzen</button>
-      <button id="resetViewBtn" class="secondary">Kamera zurücksetzen</button>
-      <button id="exportBtn" class="secondary" disabled>Optimiertes GLB exportieren</button>
-    </div>
-    <div class="hint">Export wendet die Transformation (Skalierung/Rotation/Verschiebung) an und speichert als neues .glb.</div>
-    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-      <button id="resetViewBtn" class="secondary">Ansicht zurücksetzen</button>
-      <button id="exportBtn" class="secondary" disabled>Optimiertes GLB exportieren</button>
-    </div>
-    <div class="hint">Export wendet die Vorschau-Transformation (Skalierung/Rotation) an und speichert als neues .glb (ohne Meshopt-Kompression).</div>
-  </section>
+  </div>
 </main>
 
 <script type="module">
@@ -225,244 +246,180 @@ import { GLTFExporter } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/example
 import { MeshoptDecoder } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/meshopt_decoder.module.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
-const drop = document.getElementById('drop');
-const fileInput = document.getElementById('fileInput');
-const fileInfo = document.getElementById('fileInfo');
-const saveBtn = document.getElementById('saveBtn');
-const status = document.getElementById('status');
-
+const CAT_DIR = { aircraft:'aircraft', ship:'ships', transit:'transit', other:'other' };
+const CAT_LABEL = { aircraft:'Flugzeug', ship:'Schiff', transit:'ÖPNV', other:'Sonstiges' };
+let currentCategory = 'aircraft';
 let currentFile = null;
 let currentBuffer = null;
-let currentCategory = 'aircraft';
-
-const CAT_DIR = { aircraft:'aircraft', ship:'ships', transit:'transit', other:'other' };
 
 // --- tabs ---
-document.querySelectorAll('.tab').forEach(t => {
+document.querySelectorAll('.cat').forEach(t => {
   t.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.cat').forEach(x => x.classList.remove('active'));
     t.classList.add('active');
     currentCategory = t.dataset.cat;
     document.querySelectorAll('.field-group').forEach(g => {
       g.classList.toggle('active', g.dataset.group === currentCategory);
     });
-    // update id placeholder
     const idInput = document.getElementById('id');
     if (!idInput.value) {
-      const ph = { aircraft:'b737-800', ship:'ever-given', transit:'berlin-bus', other:'item-1' }[currentCategory];
-      idInput.placeholder = ph;
+      idInput.placeholder = { aircraft:'b737-800', ship:'ever-given', transit:'berlin-bus', other:'item-1' }[currentCategory];
     }
+    document.getElementById('infoCat').textContent = CAT_LABEL[currentCategory];
   });
 });
 
 // --- preview ---
 const canvas = document.getElementById('preview');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
-renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b0f16);
-const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth/canvas.clientHeight, 0.01, 1000);
-camera.position.set(2,2,2);
+scene.background = new THREE.Color('#0b0f16');
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10000);
+camera.position.set(3,2,3);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
-scene.add(new THREE.HemisphereLight(0xffffff, 0x222244, 1.2));
-const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(5,10,7); scene.add(dir);
+const hemi = new THREE.HemisphereLight(0xffffff, 0x222244, 1.2);
+scene.add(hemi);
+const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+dir.position.set(5,10,7); scene.add(dir);
 let modelGroup = null;
-function resize(){ const w=canvas.clientWidth,h=canvas.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
-window.addEventListener('resize', resize);
-function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
-animate();
-const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
-async function showPreview(buffer){
-  if (modelGroup){ scene.remove(modelGroup); modelGroup=null; }
-  try {
-    const gltf = await new Promise((resolve,reject)=>loader.parse(buffer,'',resolve,reject));
-    modelGroup = gltf.scene;
-    const box = new THREE.Box3().setFromObject(modelGroup);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    modelGroup.position.sub(center);
-    const maxDim = Math.max(size.x,size.y,size.z)||1;
-    modelGroup.scale.setScalar(2/maxDim);
-    scene.add(modelGroup);
-  } catch(e){ console.warn('preview failed', e); }
-}
-
-// --- drag & drop ---
-function setFile(file){
-  if(!file) return;
-  currentFile = file;
-  const r = new FileReader();
-  r.onload = (e) => {
-    currentBuffer = e.target.result;
-    fileInfo.textContent = `${file.name} — ${(file.size/1024).toFixed(1)} KB`;
-    const idInput = document.getElementById('id');
-    if(!idInput.value) idInput.value = file.name.replace(/\.(glb|gltf)$/i,'').toLowerCase().replace(/[^a-z0-9-]/g,'-');
-    window.__showPreview(currentBuffer);
-  };
-  r.readAsArrayBuffer(file);
-}
-drop.addEventListener('click', ()=>fileInput.click());
-drop.addEventListener('dragover', (e)=>{ e.preventDefault(); drop.classList.add('drag'); });
-drop.addEventListener('dragleave', ()=>drop.classList.remove('drag'));
-drop.addEventListener('drop', (e)=>{ e.preventDefault(); drop.classList.remove('drag'); if(e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]); });
-fileInput.addEventListener('change', (e)=>{ if(e.target.files.length) setFile(e.target.files[0]); });
-
-// --- settings / transform state ---
-const bgSelect = document.getElementById('bgColor');
-const lightSlider = document.getElementById('lightIntensity');
-const scaleSlider = document.getElementById('scaleMul');
-const scaleVal = document.getElementById('scaleVal');
-const rotXSlider = document.getElementById('rotX');
-const rotYSlider = document.getElementById('rotY');
-const rotYVal = document.getElementById('rotYVal');
-const rotZSlider = document.getElementById('rotZ');
-const txSlider = document.getElementById('tx');
-const tySlider = document.getElementById('ty');
-const tzSlider = document.getElementById('tz');
-const transformMode = document.getElementById('transformMode');
-const wireframeCb = document.getElementById('wireframe');
-const gridCb = document.getElementById('grid');
-const autoRotateCb = document.getElementById('autoRotate');
-const exportBtn = document.getElementById('exportBtn');
-const resetViewBtn = document.getElementById('resetViewBtn');
-const frameBtn = document.getElementById('frameBtn');
-const resetTransformBtn = document.getElementById('resetTransformBtn');
-const dimsEl = document.getElementById('dims');
-
+let baseCenter = new THREE.Vector3();
+let baseMaxDim = 1;
 let gridHelper = new THREE.GridHelper(4, 20, 0x444466, 0x222244);
 gridHelper.visible = true;
 scene.add(gridHelper);
 
-let baseCenter = new THREE.Vector3();
-let baseMaxDim = 1;
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (w === 0 || h === 0) return;
+  renderer.setSize(w,h,false);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+// initial size after layout
+setTimeout(resize, 50);
+function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
+animate();
+
+const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
 
 function applySettings() {
-  scene.background = new THREE.Color(bgSelect.value);
-  light.intensity = parseFloat(lightSlider.value);
-  dir.intensity = parseFloat(lightSlider.value) * 0.6;
+  scene.background = new THREE.Color(document.getElementById('bgColor').value);
+  const li = parseFloat(document.getElementById('lightIntensity').value);
+  hemi.intensity = li; dir.intensity = li*0.6;
   if (modelGroup) {
-    const s = parseFloat(scaleSlider.value);
+    const s = parseFloat(document.getElementById('scaleMul').value);
     modelGroup.scale.setScalar(s);
     modelGroup.rotation.set(
-      parseFloat(rotXSlider.value)*Math.PI/180,
-      parseFloat(rotYSlider.value)*Math.PI/180,
-      parseFloat(rotZSlider.value)*Math.PI/180
+      parseFloat(document.getElementById('rotX').value)*Math.PI/180,
+      parseFloat(document.getElementById('rotY').value)*Math.PI/180,
+      parseFloat(document.getElementById('rotZ').value)*Math.PI/180
     );
-    modelGroup.position.set(parseFloat(txSlider.value), parseFloat(tySlider.value), parseFloat(tzSlider.value));
-    if (transformMode.value === 'center') {
+    modelGroup.position.set(
+      parseFloat(document.getElementById('tx').value),
+      parseFloat(document.getElementById('ty').value),
+      parseFloat(document.getElementById('tz').value)
+    );
+    if (document.getElementById('transformMode').value === 'center') {
       modelGroup.position.sub(baseCenter.clone().multiplyScalar(s));
     }
-    modelGroup.traverse(o => { if (o.isMesh && o.material) { o.material.wireframe = wireframeCb.checked; } });
+    modelGroup.traverse(o => { if (o.isMesh && o.material) o.material.wireframe = document.getElementById('wireframe').checked; });
   }
-  gridHelper.visible = gridCb.checked;
-  controls.autoRotate = autoRotateCb.checked;
-  scaleVal.textContent = parseFloat(scaleSlider.value).toFixed(2);
-  rotYVal.textContent = rotYSlider.value;
+  gridHelper.visible = document.getElementById('grid').checked;
+  controls.autoRotate = document.getElementById('autoRotate').checked;
+  document.getElementById('scaleVal').textContent = parseFloat(document.getElementById('scaleMul').value).toFixed(2);
+  document.getElementById('rotYVal').textContent = document.getElementById('rotY').value;
 }
-['change','input'].forEach(ev => {
-  bgSelect.addEventListener(ev, applySettings);
-  lightSlider.addEventListener(ev, applySettings);
-  scaleSlider.addEventListener(ev, applySettings);
-  rotXSlider.addEventListener(ev, applySettings);
-  rotYSlider.addEventListener(ev, applySettings);
-  rotZSlider.addEventListener(ev, applySettings);
-  txSlider.addEventListener(ev, applySettings);
-  tySlider.addEventListener(ev, applySettings);
-  tzSlider.addEventListener(ev, applySettings);
-  transformMode.addEventListener(ev, applySettings);
-  wireframeCb.addEventListener(ev, applySettings);
-  gridCb.addEventListener(ev, applySettings);
-  autoRotateCb.addEventListener(ev, applySettings);
+['input','change'].forEach(ev => {
+  ['bgColor','lightIntensity','scaleMul','rotX','rotY','rotZ','tx','ty','tz','transformMode','wireframe','grid','autoRotate'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(ev, applySettings);
+  });
 });
-resetViewBtn.addEventListener('click', () => {
-  camera.position.set(2,2,2); controls.target.set(0,0,0); controls.update();
+document.getElementById('resetViewBtn').addEventListener('click', () => {
+  camera.position.set(3,2,3); controls.target.set(0,0,0); controls.update();
 });
-frameBtn.addEventListener('click', () => {
+document.getElementById('frameBtn').addEventListener('click', () => {
   if (!modelGroup) return;
   const box = new THREE.Box3().setFromObject(modelGroup);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x,size.y,size.z)||1;
-  const dist = maxDim / (2*Math.tan(camera.fov*Math.PI/180/2)) * 1.5;
+  const dist = maxDim / (2*Math.tan(camera.fov*Math.PI/180/2)) * 1.6;
   camera.position.copy(center).add(new THREE.Vector3(dist,dist,dist));
   controls.target.copy(center);
   controls.update();
 });
-resetTransformBtn.addEventListener('click', () => {
-  scaleSlider.value = 1; rotXSlider.value=0; rotYSlider.value=0; rotZSlider.value=0;
-  txSlider.value=0; tySlider.value=0; tzSlider.value=0;
-  transformMode.value='preview';
+document.getElementById('resetTransformBtn').addEventListener('click', () => {
+  document.getElementById('scaleMul').value = 1;
+  document.getElementById('rotX').value = 0; document.getElementById('rotY').value = 0; document.getElementById('rotZ').value = 0;
+  document.getElementById('tx').value = 0; document.getElementById('ty').value = 0; document.getElementById('tz').value = 0;
+  document.getElementById('transformMode').value = 'preview';
   applySettings();
 });
 
-// patch showPreview to store baseMaxDim
-const _origShowPreview = showPreview;
-// redefine showPreview with baseMaxDim tracking
-async function showPreview2(buffer) {
-  if (modelGroup){ scene.remove(modelGroup); modelGroup=null; }
+async function showPreview(buffer) {
+  if (modelGroup) { scene.remove(modelGroup); modelGroup = null; }
   try {
-    const gltf = await new Promise((resolve,reject)=>loader.parse(buffer,'',resolve,reject));
+    const gltf = await new Promise((resolve,reject) => loader.parse(buffer, '', resolve, reject));
     modelGroup = gltf.scene;
     const box = new THREE.Box3().setFromObject(modelGroup);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     baseCenter.copy(center);
     baseMaxDim = Math.max(size.x,size.y,size.z)||1;
-    modelGroup.userData.baseMaxDim = baseMaxDim;
-    // do not auto-center; keep original origin; apply user transforms
+    document.getElementById('dims').textContent = `Bounding Box: ${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m | Origin: (${center.x.toFixed(2)}, ${center.y.toFixed(2)}, ${center.z.toFixed(2)})`;
+    document.getElementById('exportBtn').disabled = false;
     applySettings();
     scene.add(modelGroup);
-    dimsEl.textContent = `Bounding Box: ${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m | Origin: (${center.x.toFixed(2)}, ${center.y.toFixed(2)}, ${center.z.toFixed(2)})`;
-    exportBtn.disabled = false;
-  } catch(e){ console.warn('preview failed', e); }
+    // auto-frame
+    const maxDim = baseMaxDim;
+    const dist = maxDim / (2*Math.tan(camera.fov*Math.PI/180/2)) * 1.6;
+    camera.position.copy(center).add(new THREE.Vector3(dist,dist,dist));
+    controls.target.copy(center);
+    controls.update();
+  } catch (e) { console.warn('preview failed', e); }
 }
-// replace showPreview reference used in setFile
-// (reassign by overriding the function name via const redeclaration not possible; instead patch call site below)
-window.__showPreview = showPreview2;
 
-// --- export optimized glb ---
-exportBtn.addEventListener('click', async () => {
-  if (!modelGroup) { setStatus('Kein Modell geladen.', false); return; }
-  try {
-    exportBtn.disabled = true;
-    // clone to bake transform
-    const clone = modelGroup.clone(true);
-    // apply current transform to geometry (bake scale/rotation)
-    clone.updateMatrixWorld(true);
-    const exporter = new GLTFExporter();
-    const result = await new Promise((resolve, reject) => {
-      exporter.parse(clone, resolve, reject, { binary: true });
-    });
-    const blob = new Blob([result], { type: 'model/gltf-binary' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = (document.getElementById('id').value.trim() || 'model') + '-optimized.glb';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setStatus('Optimiertes GLB exportiert (Download).', true);
-  } catch (e) {
-    console.error(e);
-    setStatus('Export-Fehler: ' + (e.message || e), false);
-  } finally {
-    exportBtn.disabled = false;
-  }
-});
+// --- drag & drop ---
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const fileInfo = document.getElementById('fileInfo');
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('drag'); if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', (e) => { if (e.target.files.length) setFile(e.target.files[0]); });
 
-function setStatus(msg, ok=true){ status.textContent=msg; status.className=ok?'ok':'err'; status.style.display='block'; }
+function setFile(file) {
+  if (!file) return;
+  currentFile = file;
+  const r = new FileReader();
+  r.onload = (e) => {
+    currentBuffer = e.target.result;
+    fileInfo.innerHTML = `<strong>${file.name}</strong> — ${(file.size/1024).toFixed(1)} KB`;
+    document.getElementById('infoFile').textContent = file.name;
+    document.getElementById('infoSize').textContent = (file.size/1024).toFixed(1) + ' KB';
+    const idInput = document.getElementById('id');
+    if (!idInput.value) idInput.value = file.name.replace(/\.(glb|gltf)$/i,'').toLowerCase().replace(/[^a-z0-9-]/g,'-');
+    showPreview(currentBuffer);
+  };
+  r.readAsArrayBuffer(file);
+}
 
+// --- save ---
+const saveBtn = document.getElementById('saveBtn');
+const status = document.getElementById('status');
 saveBtn.addEventListener('click', async () => {
-  if(!currentBuffer){ setStatus('Keine Datei gewählt.', false); return; }
+  if (!currentBuffer) { setStatus('Keine Datei gewählt.', false); return; }
   const id = document.getElementById('id').value.trim();
   const length = parseFloat(document.getElementById('length').value);
-  if(!id || !Number.isFinite(length)){ setStatus('ID und Länge (m) sind Pflicht.', false); return; }
-  if(!window.showDirectoryPicker){ setStatus('File System Access API nicht verfügbar — nutze Chrome/Edge.', false); return; }
+  if (!id || !Number.isFinite(length)) { setStatus('ID und Länge (m) sind Pflicht.', false); return; }
+  if (!window.showDirectoryPicker) { setStatus('File System Access API nicht verfügbar — nutze Chrome/Edge.', false); return; }
   let root;
   try { root = await window.showDirectoryPicker({ mode:'readwrite' }); }
-  catch(e){ setStatus('Abgebrochen.', false); return; }
+  catch (e) { setStatus('Abgebrochen.', false); return; }
   try {
     saveBtn.disabled = true;
     const title = document.getElementById('title').value.trim() || id;
@@ -470,30 +427,40 @@ saveBtn.addEventListener('click', async () => {
     const license = document.getElementById('license').value.trim() || 'unknown';
     const source = document.getElementById('source').value.trim() || '';
     const subdir = CAT_DIR[currentCategory];
-
     const targetName = id + '.glb';
 
-    // write glb
+    // --- export the (possibly transformed) model as the optimized glb ---
+    let optimizedBuffer = currentBuffer;
+    if (modelGroup) {
+      const clone = modelGroup.clone(true);
+      clone.updateMatrixWorld(true);
+      const exporter = new GLTFExporter();
+      const result = await new Promise((resolve, reject) => {
+        exporter.parse(clone, resolve, reject, { binary: true });
+      });
+      optimizedBuffer = result;
+    }
+
     const modelsDir = await root.getDirectoryHandle('models', { create:true });
     const catDir = await modelsDir.getDirectoryHandle(subdir, { create:true });
     const glbHandle = await catDir.getFileHandle(targetName, { create:true });
     const w = await glbHandle.createWritable();
-    await w.write(currentBuffer);
+    await w.write(optimizedBuffer);
     await w.close();
 
-    // import/ original
-    if(document.getElementById('keepOrig').checked){
-      const origFile = document.getElementById('origInput').files[0];
-      if(origFile){
-        const importDir = await root.getDirectoryHandle('import', { create:true });
+    // original always to import/
+    if (document.getElementById('keepOrig').checked) {
+      const importDir = await root.getDirectoryHandle('import', { create:true });
+      // prefer explicit original file input, else the dropped file
+      const origFile = document.getElementById('origInput').files[0] || currentFile;
+      if (origFile) {
         const h = await importDir.getFileHandle(origFile.name, { create:true });
         const w2 = await h.createWritable();
-        await w2.write(await origFile.arrayBuffer());
+        await w2.write(currentBuffer);
         await w2.close();
       }
     }
 
-    // category-specific extra + registry merge
     let registry = { models:{}, types:{}, classes:{}, vehicleTypes:{} };
     try {
       const rh = await catDir.getFileHandle('registry.json');
@@ -521,11 +488,13 @@ saveBtn.addEventListener('click', async () => {
         }
       }
     } else if (currentCategory === 'ship') {
-      registry.classes[document.getElementById('shipClass').value] = registry.classes[document.getElementById('shipClass').value] || [];
-      if (!registry.classes[document.getElementById('shipClass').value].includes(id)) registry.classes[document.getElementById('shipClass').value].push(id);
+      const sc = document.getElementById('shipClass').value;
+      registry.classes[sc] = registry.classes[sc] || [];
+      if (!registry.classes[sc].includes(id)) registry.classes[sc].push(id);
     } else if (currentCategory === 'transit') {
-      registry.vehicleTypes[document.getElementById('transitType').value] = registry.vehicleTypes[document.getElementById('transitType').value] || [];
-      if (!registry.vehicleTypes[document.getElementById('transitType').value].includes(id)) registry.vehicleTypes[document.getElementById('transitType').value].push(id);
+      const vt = document.getElementById('transitType').value;
+      registry.vehicleTypes[vt] = registry.vehicleTypes[vt] || [];
+      if (!registry.vehicleTypes[vt].includes(id)) registry.vehicleTypes[vt].push(id);
     }
 
     const rHandle = await catDir.getFileHandle('registry.json', { create:true });
@@ -533,7 +502,6 @@ saveBtn.addEventListener('click', async () => {
     await rw.write(JSON.stringify(registry, null, 2) + '\n');
     await rw.close();
 
-    // CREDITS merge
     let credits = [];
     try {
       const ch = await catDir.getFileHandle('CREDITS.json');
@@ -548,7 +516,7 @@ saveBtn.addEventListener('click', async () => {
     await cw.write(JSON.stringify(credits, null, 2) + '\n');
     await cw.close();
 
-    setStatus(`Gespeichert: models/${subdir}/${targetName} (Registry: ${Object.keys(registry.models).length} Modelle)`);
+    setStatus(`Gespeichert: models/${subdir}/${targetName} (optimiert) + Original in import/ (Registry: ${Object.keys(registry.models).length} Modelle)`, true);
   } catch (e) {
     console.error(e);
     setStatus('Fehler: ' + (e.message || e), false);
@@ -556,6 +524,41 @@ saveBtn.addEventListener('click', async () => {
     saveBtn.disabled = false;
   }
 });
+
+// --- export ---
+document.getElementById('exportBtn').addEventListener('click', async () => {
+  if (!modelGroup) { setStatus('Kein Modell geladen.', false); return; }
+  try {
+    document.getElementById('exportBtn').disabled = true;
+    const clone = modelGroup.clone(true);
+    clone.updateMatrixWorld(true);
+    const exporter = new GLTFExporter();
+    const result = await new Promise((resolve, reject) => {
+      exporter.parse(clone, resolve, reject, { binary: true });
+    });
+    const blob = new Blob([result], { type: 'model/gltf-binary' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (document.getElementById('id').value.trim() || 'model') + '-optimized.glb';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setStatus('Optimiertes GLB exportiert (Download).', true);
+  } catch (e) {
+    console.error(e);
+    setStatus('Export-Fehler: ' + (e.message || e), false);
+  } finally {
+    document.getElementById('exportBtn').disabled = false;
+  }
+});
+
+function setStatus(msg, ok=true) {
+  status.textContent = msg;
+  status.className = ok ? 'ok' : 'err';
+  status.style.display = 'block';
+}
 </script>
 </body>
 </html>
