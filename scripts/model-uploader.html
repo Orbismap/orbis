@@ -56,6 +56,11 @@
 
   .preview-wrap { position:relative; background:#0a0e15; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; min-height:420px; display:flex; flex-direction:column; }
   #preview { flex:1; width:100%; min-height:360px; display:block; }
+  .loading-overlay { position:absolute; inset:0; background:rgba(11,15,22,.7); display:none; align-items:center; justify-content:center; color:var(--fg); font-size:13px; gap:8px; }
+  .loading-overlay.active { display:flex; }
+  .spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .field.invalid input, .field.invalid select { border-color:var(--err); }
   .preview-bar { padding:8px 12px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:11px; color:var(--muted); }
   .preview-bar label { margin:0; text-transform:none; letter-spacing:0; font-size:11px; }
   .preview-bar select, .preview-bar input[type=range] { width:auto; padding:4px 6px; font-size:11px; }
@@ -65,6 +70,7 @@
   .checks { display:flex; gap:14px; align-items:center; margin-top:8px; font-size:12px; color:var(--muted); flex-wrap:wrap; }
   .checks label { margin:0; text-transform:none; letter-spacing:0; font-size:12px; display:flex; align-items:center; gap:6px; cursor:pointer; }
   .checks input { width:auto; }
+  .axes { position:absolute; bottom:8px; left:8px; font-size:10px; color:var(--muted); pointer-events:none; }
 
   .slider-row { display:flex; align-items:center; gap:8px; margin:6px 0; }
   .slider-row label { margin:0; min-width:90px; text-transform:none; letter-spacing:0; font-size:12px; }
@@ -189,6 +195,7 @@
       <div class="checks" style="margin-top:10px;">
         <label><input id="wireframe" type="checkbox" /> Wireframe</label>
         <label><input id="grid" type="checkbox" checked /> Gitter</label>
+        <label><input id="axes" type="checkbox" /> Achsen</label>
         <label><input id="autoRotate" type="checkbox" /> Auto-Rotate</label>
       </div>
       <div class="actions">
@@ -204,6 +211,7 @@
       <div id="status"></div>
       <div class="actions" style="margin-top:12px;">
         <button id="exportBtn" class="secondary" disabled>Optimiertes GLB exportieren</button>
+        <button id="resetFormBtn" class="secondary">Formular leeren</button>
       </div>
     </div>
   </div>
@@ -211,6 +219,7 @@
   <!-- RIGHT COLUMN: preview -->
   <div class="col">
     <div class="preview-wrap">
+      <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div> Lade Modell…</div>
       <canvas id="preview"></canvas>
       <div class="preview-bar">
         <label>Hintergrund</label>
@@ -288,6 +297,9 @@ let baseMaxDim = 1;
 let gridHelper = new THREE.GridHelper(4, 20, 0x444466, 0x222244);
 gridHelper.visible = true;
 scene.add(gridHelper);
+let axesHelper = new THREE.AxesHelper(1);
+axesHelper.visible = false;
+scene.add(axesHelper);
 
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -327,12 +339,13 @@ function applySettings() {
     modelGroup.traverse(o => { if (o.isMesh && o.material) o.material.wireframe = document.getElementById('wireframe').checked; });
   }
   gridHelper.visible = document.getElementById('grid').checked;
+  axesHelper.visible = document.getElementById('axes').checked;
   controls.autoRotate = document.getElementById('autoRotate').checked;
   document.getElementById('scaleVal').textContent = parseFloat(document.getElementById('scaleMul').value).toFixed(2);
   document.getElementById('rotYVal').textContent = document.getElementById('rotY').value;
 }
 ['input','change'].forEach(ev => {
-  ['bgColor','lightIntensity','scaleMul','rotX','rotY','rotZ','tx','ty','tz','transformMode','wireframe','grid','autoRotate'].forEach(id => {
+  ['bgColor','lightIntensity','scaleMul','rotX','rotY','rotZ','tx','ty','tz','transformMode','wireframe','grid','axes','autoRotate'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener(ev, applySettings);
   });
@@ -360,6 +373,8 @@ document.getElementById('resetTransformBtn').addEventListener('click', () => {
 });
 
 async function showPreview(buffer) {
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.classList.add('active');
   if (modelGroup) { scene.remove(modelGroup); modelGroup = null; }
   try {
     const gltf = await new Promise((resolve,reject) => loader.parse(buffer, '', resolve, reject));
@@ -379,7 +394,8 @@ async function showPreview(buffer) {
     camera.position.copy(center).add(new THREE.Vector3(dist,dist,dist));
     controls.target.copy(center);
     controls.update();
-  } catch (e) { console.warn('preview failed', e); }
+  } catch (e) { console.warn('preview failed', e); setStatus('Vorschau fehlgeschlagen: ' + (e.message||e), false); }
+  finally { overlay.classList.remove('active'); }
 }
 
 // --- drag & drop ---
@@ -554,10 +570,34 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
   }
 });
 
+document.getElementById('resetFormBtn').addEventListener('click', () => {
+  document.getElementById('id').value = '';
+  document.getElementById('length').value = '';
+  document.getElementById('types').value = '';
+  document.getElementById('title').value = '';
+  document.getElementById('author').value = '';
+  document.getElementById('license').value = '';
+  document.getElementById('source').value = '';
+  document.getElementById('otherNote').value = '';
+  document.getElementById('shipClass').value = 'cargo';
+  document.getElementById('transitType').value = 'bus';
+  document.getElementById('origInput').value = '';
+  document.getElementById('fileInfo').textContent = '';
+  currentFile = null; currentBuffer = null;
+  if (modelGroup) { scene.remove(modelGroup); modelGroup = null; }
+  document.getElementById('dims').textContent = '—';
+  document.getElementById('infoFile').textContent = '—';
+  document.getElementById('infoSize').textContent = '—';
+  document.getElementById('exportBtn').disabled = true;
+  setStatus('Formular zurückgesetzt.', true);
+});
 function setStatus(msg, ok=true) {
   status.textContent = msg;
   status.className = ok ? 'ok' : 'err';
   status.style.display = 'block';
+  // auto-hide after 6s
+  clearTimeout(window.__statusTimer);
+  window.__statusTimer = setTimeout(() => { status.style.display = 'none'; }, 6000);
 }
 </script>
 </body>
