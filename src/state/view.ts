@@ -11,6 +11,11 @@ export const DEFAULT_CAMERA: CameraState = { lng: 10, lat: 30, zoom: 1.6, bearin
 
 export const camera = signal<CameraState>({ ...DEFAULT_CAMERA });
 export const projection = signal<Projection>('globe');
+/** 3D terrain (real elevation model); only lifted while the camera is tilted. Not persisted. */
+export const terrain3d = signal(false);
+export const setTerrain3d = (on: boolean) => {
+  terrain3d.value = on;
+};
 /** Visible bounds and size in px; undefined before the map is ready. */
 export const viewport = signal<Viewport | undefined>(undefined);
 /** Area of the map covered by panels/sheet; the camera keeps targets inside the rest. */

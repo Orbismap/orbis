@@ -4,6 +4,7 @@ import { MARKERS, markerLayerId } from '../slots';
 import type { BasemapId } from '../types';
 import { bluemarble, satellite, terrain } from './raster';
 import type { BasemapDef, LabelVariant } from './types';
+import { DEM_NATIVE_ZOOM, DEM_TILES } from '../dem-protocol';
 import { LABEL_VARIANTS, OFM_GLYPHS, OFM_SOURCE, labelLayers, vectorBasemap } from './vector';
 
 export type { BasemapId } from '../types';
@@ -33,6 +34,12 @@ export function skyFor(theme: 'dark' | 'light'): SkySpecification {
 
 const vis = (on: boolean) => ({ visibility: on ? ('visible' as const) : ('none' as const) });
 
+export const TERRAIN_SOURCE = 'terrain-dem';
+export const HILLSHADE_LAYER = 'terrain-hillshade';
+export const TERRAIN_EXAGGERATION = 1.4;
+export const TERRAIN_ATTRIBUTION = 'Gelände: <a href="https://mapterhorn.com/attribution/" target="_blank" rel="noopener">Mapterhorn</a>, <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles</a>';
+export const TERRAIN_SPEC: SourceSpecification = { type: 'raster-dem', tiles: [DEM_TILES], tileSize: 512, maxzoom: DEM_NATIVE_ZOOM, encoding: 'terrarium', attribution: TERRAIN_ATTRIBUTION };
+
 export interface StyleOptions { basemap: BasemapId; labels: boolean; terminator: boolean; projection: 'globe' | 'mercator' }
 
 /**
@@ -43,6 +50,7 @@ export interface StyleOptions { basemap: BasemapId; labels: boolean; terminator:
 export function composeStyle(o: StyleOptions): StyleSpecification {
   const sources: Record<string, SourceSpecification> = {
     ofm: OFM_SOURCE,
+    [TERRAIN_SOURCE]: TERRAIN_SPEC,
   };
   const layers: LayerSpecification[] = [];
   for (const id of BASEMAP_IDS) {
@@ -50,6 +58,11 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
     Object.assign(sources, b.sources);
     for (const l of b.layers) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(id === o.basemap) } } as LayerSpecification);
   }
+  // relief shading for the flat Orbis colours; only shown while 3D terrain is on (engine.setTerrain)
+  layers.push({
+    id: HILLSHADE_LAYER, type: 'hillshade', source: TERRAIN_SOURCE, layout: { visibility: 'none' },
+    paint: { 'hillshade-exaggeration': 0.35, 'hillshade-shadow-color': 'rgba(8, 12, 22, 0.55)', 'hillshade-highlight-color': 'rgba(255, 255, 255, 0.18)', 'hillshade-accent-color': 'rgba(8, 12, 22, 0.25)' },
+  } as LayerSpecification);
   const active = BASEMAPS[o.basemap].labelVariant;
   const marker = (m: (typeof MARKERS)[number]) => ({ id: markerLayerId(m), type: 'background', layout: { visibility: 'none' } }) as LayerSpecification;
   for (const m of ['field', 'raster'] as const) layers.push(marker(m));

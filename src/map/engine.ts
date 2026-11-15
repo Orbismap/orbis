@@ -8,8 +8,9 @@ import { collapseKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
-import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, composeStyle, skyFor } from './basemaps';
+import { camera, padding, projection as projectionSignal, terrain3d, viewport, type CameraState, type Padding } from '../state/view';
+import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, HILLSHADE_LAYER, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, skyFor } from './basemaps';
+import { registerDemTiles } from './dem-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
 import { clampCamera, ENGINE_MAX_PITCH, flyToTarget, locate as locateImpl } from './camera';
 import { attachCameraLimits } from './limits';
@@ -63,6 +64,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   let labels = init.labels ?? true;
   let terminatorMode: 'off' | 'auto' = init.terminator === false ? 'off' : 'auto';
   let loaded = false;
+  let terrainOn = false;
+  registerDemTiles();
 
   // a URL/state asking for more tilt than the zoom allows is clamped on load
   const cam = clampCamera(camera.peek());
@@ -154,6 +157,9 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       ml.setPadding(p);
     }),
     effect(() => {
+      engine.setTerrain(terrain3d.value);
+    }),
+    effect(() => {
       const p = projectionSignal.value;
       if (loaded && ml.getProjection()?.type !== p) ml.setProjection({ type: p });
     }),
@@ -173,7 +179,15 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     const theme = BASEMAPS[basemap].theme;
     ml.setSky(skyFor(theme));
     terminator.setLook(theme);
+    applyTerrain();
   }
+  // Terrain only while tilted: top-down it stays flat (and cheap). Hillshade only on the flat Orbis colours.
+  function applyTerrain() {
+    const lift = terrainOn && ml.getPitch() > 10;
+    if (lift !== !!ml.getTerrain()) ml.setTerrain(lift ? { source: TERRAIN_SOURCE, exaggeration: TERRAIN_EXAGGERATION } : null);
+    setVis(HILLSHADE_LAYER, terrainOn && BASEMAPS[basemap].id.startsWith('orbis'));
+  }
+  ml.on('pitch', () => loaded && applyTerrain());
 
   // ---- slots ----------------------------------------------------------------
   const place = (spec: LayerSpecification | CustomLayerInterface, slot: SlotId) => {
@@ -188,6 +202,10 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       if (id === basemap) return;
       basemap = id;
       if (loaded) applyBasemap();
+    },
+    setTerrain(on) {
+      terrainOn = on;
+      if (loaded) applyTerrain();
     },
     setProjection(p) {
       projectionSignal.value = p;
