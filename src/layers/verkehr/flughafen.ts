@@ -114,7 +114,7 @@ export default defineLayer({
       let p = planCache.get(a.icao);
       if (!p) {
         p = a.prebuilt
-          ? fetchJson<unknown>(assetsUrl(a.icao), { timeout: 30_000, signal }).then((r) => planFromStatic(r.data))
+          ? fetchJson<unknown>(assetsUrl(a.icao), { timeout: 30_000, signal, revalidate: true }).then((r) => planFromStatic(r.data))
           : (async () => {
               const q = overpassQuery({ west: a.lng - 0.035, south: a.lat - 0.025, east: a.lng + 0.035, north: a.lat + 0.025 });
               let last: unknown;
@@ -190,7 +190,7 @@ export default defineLayer({
             return;
           }
           try {
-            const r = await fetchJson<unknown>(assetsUrl(best.icao), { timeout: 20_000, signal: indoorCtl.signal });
+            const r = await fetchJson<unknown>(assetsUrl(best.icao), { timeout: 20_000, signal: indoorCtl.signal, revalidate: true });
             const indoor = (r.data as { indoor?: IndoorFeature[] } | null)?.indoor;
             if (Array.isArray(indoor)) {
               indoorCache.set(cacheKey, indoor);
