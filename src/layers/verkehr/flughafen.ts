@@ -260,7 +260,8 @@ export default defineLayer({
     const taxiLines = computed(() => lines.value.filter((l) => l.properties.kind !== 'runway'));
     const runways = computed(() => fc(runwayLines.value));
     const taxis = computed(() => fc(taxiLines.value));
-    const planPoints = computed(() => fc(plans.value.flatMap((p) => p.points)));
+    const standPoints = computed(() => fc(plans.value.flatMap((p) => p.points.filter((pt) => pt.properties.kind !== 'light'))));
+    const lightPoints = computed(() => fc(plans.value.flatMap((p) => p.points.filter((pt) => pt.properties.kind === 'light'))));
 
     const widthExpr = computed(() => {
       const k10 = pxPerMetre(10, planLat.value);
@@ -329,19 +330,23 @@ export default defineLayer({
     const lsrc = `${ctx.id}.labels-src`;
     const psrc = `${ctx.id}.stands-src`;
     const tsrc = `${ctx.id}.taxi-src`;
+    const rsrc = `${ctx.id}.lights-src`;
     ctx.map.addSource(lsrc, { type: 'geojson', data: fc([]) } as any);
     ctx.map.addSource(psrc, { type: 'geojson', data: fc([]) } as any);
     ctx.map.addSource(tsrc, { type: 'geojson', data: fc([]) } as any);
+    ctx.map.addSource(rsrc, { type: 'geojson', data: fc([]) } as any);
     const halo = { 'text-halo-color': 'rgba(10, 15, 24, 0.9)', 'text-halo-width': 1.4 };
     ctx.map.addLayer({ id: `${ctx.id}.stands`, type: 'circle', source: psrc, minzoom: 15.5, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 15.5, 1.5, 19, 4], 'circle-color': ['case', ['==', ['get', 'kind'], 'gate'], '#ffd166', '#8ea3c4'], 'circle-stroke-color': 'rgba(10,15,24,0.8)', 'circle-stroke-width': 0.8 } } as any, 'points');
+    ctx.map.addLayer({ id: `${ctx.id}.lights`, type: 'circle', source: rsrc, minzoom: 11, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 1, 16, 2.5, 19, 4], 'circle-color': ['match', ['get', 'col'], 'blue', '#4a78ff', 'green', '#2bd47d', 'red', '#ff4b4b', 'yellow', '#ffd23f', '#f4f6f8'] as unknown as ExpressionSpecification, 'circle-opacity': ['match', ['get', 'lt'], 'txc', 0.75, 0.95], 'circle-stroke-width': 0 } } as any, 'points');
     ctx.map.addLayer({ id: `${ctx.id}.stand-labels`, type: 'symbol', source: psrc, minzoom: 17, filter: ['!=', ['get', 'ref'], ''], layout: { 'text-field': ['get', 'ref'], 'text-font': ['Noto Sans Regular'], 'text-size': ['interpolate', ['linear'], ['zoom'], 17, 9, 20, 12], 'text-offset': [0, 0.9], 'text-anchor': 'top', 'text-optional': true }, paint: { 'text-color': '#ffe9b0', ...halo } } as any, 'labels');
     ctx.map.addLayer({ id: `${ctx.id}.taxi-labels`, type: 'symbol', source: tsrc, minzoom: 14.5, filter: ['!=', ['get', 'ref'], ''], layout: { 'symbol-placement': 'line', 'text-field': ['get', 'ref'], 'text-font': ['Noto Sans Regular'], 'text-size': 10.5, 'symbol-spacing': 280, 'text-max-angle': 30 }, paint: { 'text-color': '#f4d35e', ...halo } } as any, 'labels');
     ctx.map.addLayer({ id: `${ctx.id}.runway-numbers`, type: 'symbol', source: lsrc, minzoom: 12, layout: { 'text-field': ['get', 'text'], 'text-font': ['Noto Sans Regular'], 'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 18, 19, 26], 'text-rotate': ['get', 'rot'], 'text-rotation-alignment': 'map', 'text-pitch-alignment': 'map', 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': '#ffffff', ...halo } } as any, 'labels');
     const stopPlanLabels = effect(() => {
       const set = (id: string, d: FeatureCollection) => (ml.getSource(id) as { setData(d: unknown): void } | undefined)?.setData(d);
       set(lsrc, fc(runwayEnds(runwayLines.value)));
-      set(psrc, planPoints.value);
+      set(psrc, standPoints.value);
       set(tsrc, fc(taxiLines.value.filter((f) => f.properties.ref)));
+      set(rsrc, lightPoints.value);
     });
 
     // ---------- render: indoor ----------
@@ -463,7 +468,7 @@ export default defineLayer({
         stopStatus();
         try { container.removeChild(overlay); } catch { /* */ }
         // remove plan labels
-        try { ctx.map.remove({ layers: [`${ctx.id}.runway-numbers`, `${ctx.id}.taxi-labels`, `${ctx.id}.stand-labels`, `${ctx.id}.stands`], sources: [lsrc, psrc, tsrc] }); } catch { /* */ }
+        try { ctx.map.remove({ layers: [`${ctx.id}.runway-numbers`, `${ctx.id}.taxi-labels`, `${ctx.id}.stand-labels`, `${ctx.id}.stands`, `${ctx.id}.lights`], sources: [lsrc, psrc, tsrc, rsrc] }); } catch { /* */ }
         // remove indoor labels
         try { ctx.map.remove({ layers: [`${ctx.id}.room-labels`], sources: [indoorLsrc] }); } catch { /* */ }
         // remove airport labels
