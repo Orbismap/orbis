@@ -291,6 +291,31 @@ export default defineLayer({
     const extraLines = computed(() => fc(selected.value.filter((f) => f.geometry.type === 'LineString' && f.properties.kind !== 'wall')));
     const indoorPoints = computed(() => fc(selected.value.filter((f) => f.geometry.type === 'Point')));
 
+    // derived walls: extract edges from room/corridor polygons so walls are shown
+    // even when OSM has no explicit indoor=wall tags. Shared edges between two
+    // rooms are deduplicated so a wall is drawn only once.
+    const derivedWalls = computed(() => {
+      const segs = new Set<string>();
+      const out: Feature<LineString>[] = [];
+      for (const f of selected.value) {
+        if (f.geometry.type !== 'Polygon') continue;
+        const ring = (f.geometry as Polygon).coordinates?.[0];
+        if (!ring || ring.length < 2) continue;
+        for (let i = 0; i < ring.length - 1; i++) {
+          const a = ring[i] as [number, number];
+          const b = ring[i + 1] as [number, number];
+          // canonical key: sorted endpoints
+          const key = a[0] < b[0] || (a[0] === b[0] && a[1] < b[1])
+            ? `${a[0]},${a[1]}|${b[0]},${b[1]}`
+            : `${b[0]},${b[1]}|${a[0]},${a[1]}`;
+          if (segs.has(key)) continue;
+          segs.add(key);
+          out.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [a, b] }, properties: { kind: 'wall' } } as Feature<LineString>);
+        }
+      }
+      return fc(out);
+    });
+
     // ---------- render: airports ----------
     const label = (name: string, src: string, minzoom: number): any => ({
       id: `${ctx.id}.${name}-labels`, type: 'symbol', source: src, minzoom, maxzoom: 10.9,
@@ -403,14 +428,15 @@ export default defineLayer({
         name: 'rooms',
         minZoom: MIN_INDOOR_ZOOM,
         fill: ['match', ['get', 'kind'], 'corridor', '#2a3446', 'shop', '#3b2f4a', 'amenity', '#2f3f3a', 'poi', '#3a3a3a', 'stairs', '#3a3320', 'elevator', '#2a3a3a', '#1f2a3a'] as unknown as ExpressionSpecification,
-        fillOpacity: 0.78,
-        outline: { color: '#7d8da6', width: 0.5 },
+        fillOpacity: 0.6,
+        outline: { color: 'rgba(0,0,0,0)', width: 0 },
         describe: (f: AnyFeature) => {
           const p = f.properties as IndoorFeature['properties'];
           return { title: p.name || p.kind, subtitle: `Ebene ${p.level || '?'}`, color: PLAN_COLOR, icon: 'map', facts: [...(p.ref ? [{ label: 'Kennung', value: p.ref }] : []), { label: 'Art', value: p.kind }, ...(p.category ? [{ label: 'Kategorie', value: p.category }] : [])] };
         },
       }),
-      lineLayer(kitCtx, { data: walls, name: 'walls', minZoom: MIN_INDOOR_ZOOM, color: '#c9d6ea', width: 1.4, casing: false, opacity: 0.95 }),
+      lineLayer(kitCtx, { data: derivedWalls, name: 'walls', minZoom: MIN_INDOOR_ZOOM, color: '#c9d6ea', width: 1.6, casing: false, opacity: 0.95 }),
+      lineLayer(kitCtx, { data: walls, name: 'explicit-walls', minZoom: MIN_INDOOR_ZOOM, color: '#e8f0fa', width: 2, casing: false, opacity: 1 }),
       lineLayer(kitCtx, { data: extraLines, name: 'paths', minZoom: MIN_INDOOR_ZOOM, color: '#7d8da6', width: 1, casing: false, opacity: 0.7 }),
       pointLayer(kitCtx, {
         data: indoorPoints,
