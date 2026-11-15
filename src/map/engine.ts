@@ -5,7 +5,8 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { effect } from '@preact/signals';
 import { throttle } from '../core/scheduler';
 import { collapseKarteDetail } from '../state/hud';
-import { clearSelection, setProbe } from '../state/selection';
+import { routePick } from '../state/routes';
+import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
 import { camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, composeStyle, skyFor } from './basemaps';
@@ -21,6 +22,26 @@ import type { BasemapId, CameraTarget, MapEngine, PickHandler, SlotId } from './
 
 // MapLibre 6 ships its worker as a separate module; let Vite bundle it (with its shared chunk) and point MapLibre at it.
 maplibregl.setWorkerUrl(workerUrl);
+
+const LABEL_KIND: Record<string, { text: string; zoom: number }> = {
+  water: { text: 'Gewässer', zoom: 5 }, town: { text: 'Ort', zoom: 12 }, suburb: { text: 'Stadtteil', zoom: 14 }, road: { text: 'Straße', zoom: 15 },
+  city: { text: 'Stadt', zoom: 11 }, state: { text: 'Region', zoom: 7 }, country: { text: 'Land', zoom: 5 },
+};
+
+/** The basemap label (city, country, water ...) under a pixel, if any. */
+function labelAt(ml: maplibregl.Map, at: { lng: number; lat: number }): { title: string; lng: number; lat: number; category: string; zoom: number } | undefined {
+  const layers = (ml.getStyle()?.layers ?? []).filter((l) => l.type === 'symbol' && l.id.startsWith('lbl-')).map((l) => l.id);
+  if (!layers.length) return undefined;
+  const p = ml.project([at.lng, at.lat]);
+  const f = ml.queryRenderedFeatures([[p.x - 10, p.y - 8], [p.x + 10, p.y + 8]], { layers })[0];
+  if (!f) return undefined;
+  const pr = f.properties as Record<string, unknown>;
+  const title = [pr['name:de'], pr.name_de, pr['name:latin'], pr.name].find((v): v is string => typeof v === 'string' && v.length > 0);
+  if (!title) return undefined;
+  const kind = LABEL_KIND[/^lbl-[a-z]+-(country|[a-z]+)/.exec(f.layer.id)?.[1] ?? ''] ?? { text: '', zoom: 10 };
+  const [lng, lat] = f.geometry.type === 'Point' ? (f.geometry.coordinates as [number, number]) : [at.lng, at.lat];
+  return { title, lng, lat, category: kind.text, zoom: kind.zoom };
+}
 
 export interface EngineInit {
   basemap?: BasemapId;
@@ -72,6 +93,13 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     ml,
     (at) => {
       if (isMobile.peek()) return setProbe(at);
+      const lbl = at && !isMobile.peek() ? labelAt(ml, at) : undefined;
+      if (at && routePick(lbl ?? at, lbl?.title)) return;
+      if (lbl) {
+        selectPlace({ id: `lbl:${lbl.lng.toFixed(4)},${lbl.lat.toFixed(4)}`, title: lbl.title, subtitle: '', lng: lbl.lng, lat: lbl.lat, category: lbl.category || undefined });
+        engine.flyTo({ center: [lbl.lng, lbl.lat], zoom: Math.max(ml.getZoom(), lbl.zoom) });
+        return;
+      }
       if (at) (clearSelection(), collapseKarteDetail());
       else setProbe(null);
     },

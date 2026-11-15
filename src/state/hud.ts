@@ -4,7 +4,7 @@ import { computed, effect, signal } from '@preact/signals';
 import { getJSON, setJSON } from '../core/storage';
 import { karten, setLayerVisible } from '../karten/store';
 import type { Karte } from '../karten/types';
-import { inspector, probe } from './selection';
+import { inspector, place, probe } from './selection';
 import { activeKarte, setActiveKarte } from './session';
 import { isMobile, leftPanelOpen } from './ui';
 
@@ -63,8 +63,16 @@ export function dismissKarte(id: string): void {
   collapsedIds.value = collapsedIds.peek().filter((x) => x !== id);
 }
 
-/** The detail menu shows: a map selection, the catalog/settings view, or the active Karte while it is open. */
-export const detailVisible = computed(() => !isMobile.value && (!!inspector.value || !!probe.value || detailOpen.value));
+/** "Orte" pages of the main menu shown in the detail menu: saved places or the route planner. */
+export type OrteView = 'places' | 'routes';
+export const orteView = signal<OrteView | null>(null);
+// picking an object or a place on the map replaces the Orte page (route and saved places stay in their state)
+effect(() => {
+  if ((inspector.value || probe.value || place.value) && orteView.peek()) orteView.value = null;
+});
+
+/** The detail menu shows: a map selection, an Orte page, or the active Karte while it is open. */
+export const detailVisible = computed(() => !isMobile.value && (!!inspector.value || !!probe.value || !!orteView.value || detailOpen.value));
 
 /** Right edge of the menu stack plus one gap: where map overlays may start. */
 export const hudMapLeft = computed(() => {
