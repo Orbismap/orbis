@@ -95,7 +95,7 @@ export default defineLayer({
   options: [
     { id: 'milOnly', label: 'Nur Militär', type: 'toggle', default: false },
     { id: 'minAlt', label: 'Mindesthöhe', type: 'range', min: 0, max: 12000, step: 500, default: 0, unit: 'm' },
-    { id: 'kind', label: 'Anzeigen', type: 'select', choices: [{ value: 'all', label: 'Alle Luftfahrzeuge' }, { value: 'heli', label: 'Nur Hubschrauber' }, { value: 'drone', label: 'Nur Drohnen' }, { value: 'vehicle', label: 'Nur Flughafenfahrzeuge' }], default: 'all' },
+    { id: 'kind', label: 'Anzeigen', type: 'select', choices: [{ value: 'all', label: 'Alle' }, { value: 'heli', label: 'Hubschrauber' }, { value: 'drone', label: 'Drohnen' }, { value: 'vehicle', label: 'Flughafenfahrzeuge' }], default: 'all' },
     { id: 'ground', label: 'Flugzeuge am Boden', type: 'toggle', default: false },
     { id: 'vehicles', label: 'Flughafenfahrzeuge', type: 'toggle', default: true },
   ],

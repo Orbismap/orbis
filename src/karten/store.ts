@@ -67,6 +67,16 @@ const validatePersisted = (raw: unknown): Persisted | undefined => {
 };
 
 const loaded = getJSON<Persisted>('karten', VERSION, validatePersisted, { custom: [], drafts: {} });
+// One-time migration: layers that moved to another standard Karte are dropped from the remembered state of the old
+// one (otherwise they would stay there as a foreign layer). Done once, so adding them back by hand sticks.
+const MOVED: { id: string; from: string; layers: string[] }[] = [{ id: 'geld-zu-zeitzeugen', from: 'gesellschaft', layers: ['geldfluesse', 'ukraine-hilfe'] }];
+for (const m of MOVED) {
+  const done = getJSON<boolean>(`karten-moved-${m.id}`, 1, (r) => (r === true ? true : undefined), false);
+  if (done) continue;
+  const d = loaded.drafts[m.from];
+  if (d) loaded.drafts[m.from] = { ...d, layers: d.layers.filter((l) => !m.layers.includes(l.id)) };
+  setJSON(`karten-moved-${m.id}`, 1, true);
+}
 export const customKarten = signal<Karte[]>(loaded.custom);
 export const drafts = signal<Record<string, Karte>>(loaded.drafts);
 const builtins = computed(() => builtinKarten());

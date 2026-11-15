@@ -201,6 +201,7 @@ class ParticleCustomLayer implements CustomLayerInterface {
   private densityCap = 3000;
   private view = { x0: 0, x1: 1, y0: 0, y1: 1 };
   private copies = 1;
+  private lastZoom = NaN;
   private lastT = 0;
   private sinceSample = 0;
   private perf = { frames: 0, cpu: 0, interval: 0, logged: false };
@@ -311,6 +312,22 @@ class ParticleCustomLayer implements CustomLayerInterface {
     const area = w * h;
     const wanted = Math.round(area / (this.o.areaPerParticle ?? 160));
     this.densityCap = Math.min(this.maxCount, Math.max(800, wanted));
+
+    // zooming out: the old particles still sit in the small former section (they only die after their life of a few
+    // seconds), so the rest of the screen stays empty. Thin them out at random: a share equal to the area growth fades
+    // out quickly and is respawned over the whole new section from the fresh pool.
+    const z = map.getZoom();
+    const dz = this.lastZoom - z;
+    this.lastZoom = z;
+    if (dz > 0.05 && this.poolN > 0) {
+      const share = 1 - 2 ** (-2 * Math.min(dz, 4));
+      for (let i = 0; i < this.count; i++) {
+        if (Math.random() >= share) continue;
+        const left = this.life[i]! - this.age[i]!;
+        const fade = 0.15 + Math.random() * 0.45;
+        if (left > fade) this.life[i] = this.age[i]! + fade;
+      }
+    }
   }
 
   private respawn(i: number, startAged: boolean): void {

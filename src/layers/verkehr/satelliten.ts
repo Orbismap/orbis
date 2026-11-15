@@ -18,6 +18,7 @@ import type { InspectCard } from '../types';
 
 const COLOR = '#ffd166';
 const GROUPS = [
+  { value: 'all', label: 'Alle', file: '' },
   { value: 'stations', label: 'Raumstationen (ISS, Tiangong)', file: 'stations' },
   { value: 'visual', label: 'Mit bloßem Auge sichtbar', file: 'visual' },
   { value: 'weather', label: 'Wettersatelliten', file: 'weather' },
@@ -59,7 +60,8 @@ export default defineLayer({
   async mount(ctx) {
     const lib: SatLib = await import('satellite.js');
     const resources: Resource<unknown>[] = [];
-    let res: Resource<TleRec[]> | undefined;
+    let active: Resource<TleRec[]>[] = [];
+    const stationIds = new Set<string>();
     const sats = signal<Sat[] | undefined>(undefined);
     const tracks = signal<TrackObject[] | undefined>(undefined);
     const byId = new Map<string, Sat>();
@@ -71,29 +73,52 @@ export default defineLayer({
     // one resource per chosen group; the previous one is released
     const stopGroup = effect(() => {
       const g = GROUPS.find((x) => x.value === group()) ?? GROUPS[0]!;
-      res?.dispose();
+      for (const r of active) r.dispose();
+      active = [];
       resources.length = 0;
       sats.value = undefined;
       tracks.value = undefined;
-      const r = ctx.resource<TleRec[]>({
-        key: `live:tle-${g.file}`,
-        url: bucketUrl('live', `space/tle/${g.file}.txt`),
-        format: 'text',
-        parse: 'tleParse',
-        parseArgs: g.value === 'stations' ? { dedupe: true, only: '^(ISS \\(ZARYA\\)|CSS \\(TIANHE\\))' } : undefined,
-        refresh: 6 * HOUR,
-      });
-      res = r;
-      resources.push(r);
-      const stop = effect(() => {
-        const recs = r.data.value;
-        if (!recs) return;
+      // "Alle" loads every group and merges them (an object in several groups appears once)
+      const parts = g.value === 'all' ? GROUPS.filter((x) => x.value !== 'all') : [g];
+      const lists = new Map<string, TleRec[]>();
+      const stops: (() => void)[] = [];
+      const merge = () => {
+        const seen = new Set<string>();
+        const recs: TleRec[] = [];
+        stationIds.clear();
+        for (const p of parts) {
+          for (const rec of lists.get(p.value) ?? []) {
+            const id = String(rec.id);
+            if (p.value === 'stations') stationIds.add(id);
+            if (seen.has(id)) continue;
+            seen.add(id);
+            recs.push(rec);
+          }
+        }
         const list = initSats(lib, recs);
         byId.clear();
-        for (const s of list) byId.set(String(s.rec.id), s);
+        for (const x of list) byId.set(String(x.rec.id), x);
         sats.value = list;
-      });
-      return () => stop();
+      };
+      for (const p of parts) {
+        const r = ctx.resource<TleRec[]>({
+          key: `live:tle-${p.file}`,
+          url: bucketUrl('live', `space/tle/${p.file}.txt`),
+          format: 'text',
+          parse: 'tleParse',
+          parseArgs: p.value === 'stations' ? { dedupe: true, only: '^(ISS \\(ZARYA\\)|CSS \\(TIANHE\\))' } : undefined,
+          refresh: 6 * HOUR,
+        });
+        active.push(r);
+        resources.push(r);
+        stops.push(effect(() => {
+          const recs = r.data.value;
+          if (!recs) return;
+          lists.set(p.value, recs);
+          merge();
+        }));
+      }
+      return () => stops.forEach((f) => f());
     });
 
     const at = () => (isLive(ctx.time.peek()) ? Date.now() : ctx.time.peek());
@@ -103,7 +128,7 @@ export default defineLayer({
       const t = at();
       const live = isLive(ctx.time.peek());
       const now = Date.now();
-      const big = group() === 'stations';
+      const all = group() === 'all';
       const out: TrackObject[] = [];
       const date = new Date(t);
       const gmst = lib.gstime(date);
@@ -117,7 +142,7 @@ export default defineLayer({
         out.push({
           id: String(s.rec.id), lng: p.lng, lat: p.lat,
           heading: m?.heading, speed: live ? m?.speed : 0, t: now,
-          props: { alt: Math.round(p.alt), big },
+          props: { alt: Math.round(p.alt), big: all ? stationIds.has(String(s.rec.id)) : group() === 'stations' },
         });
       }
       tracks.value = out;

@@ -88,6 +88,13 @@ export const effectiveTheme = computed<'dark' | 'light'>(() => {
 });
 
 /** Marks a content warning ('layer:<id>' / 'karte:<id>') as confirmed. */
+/** Key of a content warning by its text: one confirmation covers every Karte and layer that shows the same warning. */
+export function warningKey(w: { title: string; text: string }): string {
+  let h = 0;
+  for (const c of w.title + w.text) h = (Math.imul(h, 31) + c.charCodeAt(0)) | 0;
+  return `w:${(h >>> 0).toString(36)}`;
+}
+
 export function confirmWarning(key: string): void {
   const cur = settings.peek().confirmedWarnings;
   if (!cur.includes(key)) updateSettings({ confirmedWarnings: [...cur, key] });

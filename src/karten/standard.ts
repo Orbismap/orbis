@@ -51,20 +51,21 @@ const THEMES: Record<string, KarteTheme[]> = {
     T('orte', 'Orte und Läden', 'pin', ['orte']),
     T('wahlen', 'Wahlen und Politik', 'vote', ['wahlen', 'wahlen-usa', 'us-kongress-geld']),
     T('proteste', 'Proteste', 'people', ['demos', 'us-proteste']),
-    T('geld', 'Geld und Hilfe', 'globe', ['geldfluesse', 'ukraine-hilfe']),
+    T('kameras', 'Kameras', 'camera', ['ueberwachung', 'webcams', 'kennzeichen']),
     T('medien', 'Medien', 'radio', ['radio']),
   ],
   zeitzeugen: [
     T('archiv', 'Archiv', 'camera', ['kriegsarchiv']),
     T('gaza', 'Gaza', 'people', ['gaza-lage', 'gaza-hunger', 'gaza-vertreibung', 'gaza-gesundheit']),
     T('ukraine', 'Ukraine', 'warning', ['ukraine-lage', 'ukraine-schaeden']),
+    T('geld', 'Geld und Hilfe', 'globe', ['geldfluesse', 'ukraine-hilfe']),
   ],
 };
 
 const DEFS: Karte[] = [
   {
     id: 'wetter', name: 'Wetter', icon: 'cloud', color: '#72C8F0', builtin: true, basemap: 'orbis-dark', labels: true, terminator: true,
-    layers: [on('radar'), off('wind', 0.85), off('temperatur', 0.8), off('gefuehlt', 0.8), off('staedte'), off('luftqualitaet', 0.85), off('niederschlag'), off('bewoelkung'), off('luftdruck'), off('satellit'), off('stroemung'), off('blitze')],
+    layers: [on('radar'), off('wind', 0.85), off('temperatur', 0.8), off('gefuehlt', 0.8), off('staedte'), off('luftqualitaet', 0.85), off('niederschlag'), off('bewoelkung'), off('luftdruck'), off('satellit'), on('stroemung'), off('blitze')],
   },
   {
     id: 'gefahren', name: 'Gefahren', icon: 'warning', color: '#FF6B5E', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,
@@ -87,13 +88,13 @@ const DEFS: Karte[] = [
   },
   {
     id: 'gesellschaft', name: 'Gesellschaft', icon: 'vote', color: '#C0A0FF', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,
-    layers: [on('wahlen', 0.9), off('wahlen-usa', 0.9), on('demos'), off('us-proteste'), off('us-kongress-geld'), off('geldfluesse')],
+    layers: [on('wahlen', 0.9), off('wahlen-usa', 0.9), on('demos'), off('us-proteste'), off('us-kongress-geld'), off('ueberwachung'), off('webcams'), off('kennzeichen')],
   },
   {
     id: 'zeitzeugen', name: 'Zeitzeugen', icon: 'camera', color: '#C0392B', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,
     view: { center: [34.47, 31.5], zoom: 10.6 },
     sensitive: ZEUGEN_WARNUNG,
-    layers: [on('kriegsarchiv'), off('gaza-lage'), off('gaza-hunger', 0.8), off('gaza-vertreibung'), off('gaza-gesundheit'), off('ukraine-schaeden'), off('ukraine-lage', 0.8)],
+    layers: [on('kriegsarchiv'), off('gaza-lage'), off('gaza-hunger', 0.8), off('gaza-vertreibung'), off('gaza-gesundheit'), off('ukraine-schaeden'), off('ukraine-lage', 0.8), off('geldfluesse'), off('ukraine-hilfe')],
   },
 ];
 

@@ -581,8 +581,7 @@
 @layer features {
   /* vertical three dots; on hover devices only shown while the row is hovered or focused (no space otherwise) */
   .lrow-set .icon {
-    transform: rotate(90deg);
-    stroke-width: 2.5;
+    stroke-width: 1.5;
   }
   @media (hover: hover) {
     /* collapsed to zero width (not display: none) so the neighbours slide when it appears */
@@ -597,8 +596,8 @@
     }
     .lrow:not(.lfield):hover .lrow-set,
     .lrow:not(.lfield):has(:focus-visible) .lrow-set {
-      width: 22px;
-      margin-right: -2px;
+      width: 26px;
+      margin-right: 0;
       opacity: 1;
       pointer-events: auto;
     }
@@ -766,4 +765,92 @@
   @media (prefers-reduced-motion: reduce) {
     .lrow-grip, .lgrp-head .lgrp-grip + .lgrp-title { animation: none; }
   }
+}
+
+@layer features {
+  /* options summary in the free space of the row (small, cut off with an ellipsis when it does not fit) */
+  .lrow-fill {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    overflow: hidden;
+  }
+  .lrow-opts {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 4px;
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .lrow-opts:empty {
+    display: none;
+  }
+  .lrow-filter {
+    flex: none;
+    align-self: center;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    color: var(--text-2);
+    transition: background 120ms ease-out, color 120ms ease-out;
+  }
+  .lrow-filter.is-open {
+    background: color-mix(in srgb, var(--text-1) 14%, transparent);
+    color: var(--text-1);
+  }
+  @media (hover: hover) {
+    .lrow-filter:hover {
+      background: color-mix(in srgb, var(--text-1) 14%, transparent);
+      color: var(--text-1);
+    }
+  }
+}
+.lrow-pop {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  transform-origin: top right;
+}
+
+.lrow-pop-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -4px -4px;
+  padding: 8px 8px 4px;
+  border-top: 1px solid color-mix(in srgb, var(--text-1) 10%, transparent);
+  font-size: 13px;
+  color: var(--text-2);
+  text-align: left;
+}
+@media (hover: hover) {
+  .lrow-pop-foot:hover {
+    color: var(--text-1);
+  }
+}
+
+@layer features {
+  /* gear and filter share one 26 px box at the same distance from the right edge */
+  .lrow-main {
+    padding-right: 8px;
+  }
+  .lrow-set {
+    width: 26px;
+    min-width: 26px;
+  }
+}
+.lrow-pop .slider {
+  padding: 0 8px;
+}
+.lrow-pop .ld-line {
+  margin-bottom: 6px;
+}
+.lrow-pop .slider {
+  margin-top: 4px;
 }

@@ -25,7 +25,7 @@ const pollen = (label: string): AqSpec => ({ label, unit: 'Körner/m³', limits:
 
 /** Class limits of the European Air Quality Index (EEA) per pollutant, as used by Open-Meteo. */
 export const AQ_SPECS: Record<AqVar, AqSpec> = {
-  european_aqi: { label: 'Europäischer Luftqualitätsindex', unit: '', limits: [20, 40, 60, 80, 100], classes: EAQI_CLASSES },
+  european_aqi: { label: 'EU-Luftindex', unit: '', limits: [20, 40, 60, 80, 100], classes: EAQI_CLASSES },
   pm2_5: { label: 'Feinstaub PM2,5', unit: 'µg/m³', limits: [10, 20, 25, 50, 75], classes: EAQI_CLASSES },
   pm10: { label: 'Feinstaub PM10', unit: 'µg/m³', limits: [20, 40, 50, 100, 150], classes: EAQI_CLASSES },
   nitrogen_dioxide: { label: 'Stickstoffdioxid NO₂', unit: 'µg/m³', limits: [40, 90, 120, 230, 340], classes: EAQI_CLASSES },

@@ -3,7 +3,7 @@
 import { computed, effect, untracked } from '@preact/signals';
 import { createResource, type Resource } from '../data/resource';
 import { hasKey, keySignal } from '../keys';
-import { settings } from '../state/settings';
+import { settings, warningKey } from '../state/settings';
 import { scopeEngine, type ScopeRecord } from '../map/scope';
 import type { BasemapId, MapEngine, SlotId } from '../map/types';
 import { clearLayerSession, activeKarte, setFeed, setLayerStatus, setLegend, activeKarteId } from '../state/session';
@@ -190,7 +190,7 @@ export function startRuntime(engine: MapEngine): () => void {
       const wanted: string[] = [];
       const exclusive = new Set<string>();
       const confirmed = settings.value.confirmedWarnings;
-      const karteBlocked = !!k.sensitive && !confirmed.includes(`karte:${k.id}`);
+      const karteBlocked = !!k.sensitive && !confirmed.includes(warningKey(k.sensitive)) && !confirmed.includes(`karte:${k.id}`);
       gated.clear();
       for (const l of k.layers) {
         const def = l.visible ? getLayer(l.id) : undefined;
@@ -204,7 +204,7 @@ export function startRuntime(engine: MapEngine): () => void {
           gated.set(def.id, { state: 'empty', note: 'Schlüssel nötig', needsKey: missing.id });
           continue;
         }
-        if (def.sensitive && !confirmed.includes(`layer:${def.id}`)) {
+        if (def.sensitive && !confirmed.includes(warningKey(def.sensitive)) && !confirmed.includes(`layer:${def.id}`)) {
           gated.set(def.id, { state: 'empty', note: 'Bestätigung nötig', needsConfirm: true });
           continue;
         }

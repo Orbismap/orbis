@@ -114,7 +114,22 @@ export class OceanStore {
 
   private globalPoints(): [number, number][] {
     const m = this.mask.value!;
-    return oceanPoints((lon, lat) => isOcean(m, lon, lat), { lat0: -75, lat1: 80, lon0: -180, lon1: 175 }, GLOBAL_STEP);
+    const pts = oceanPoints((lon, lat) => isOcean(m, lon, lat), { lat0: -75, lat1: 80, lon0: -180, lon1: 175 }, GLOBAL_STEP);
+    // The load takes minutes (paced), the map fills with every chunk. In row order it would fill from the south pole
+    // northwards, so the points are shuffled (fixed seed): every chunk spreads over the whole globe and the picture
+    // gets denser everywhere at once (gaps are bridged by the interpolation of the lattice).
+    let seed = 20240607;
+    const rnd = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    for (let i = pts.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [pts[i], pts[j]] = [pts[j]!, pts[i]!];
+    }
+    return pts;
   }
 
   private async loadGlobal(force = false) {
@@ -128,16 +143,27 @@ export class OceanStore {
         time = hit.d.time;
         at = hit.t;
       } else {
-        this.global = [];
-        let first = true;
-        const r = await fetchMarine(this.globalPoints(), this.ctl.signal, (part) => {
+        // an interrupted load (layer switched off, tab closed) continues where it stopped
+        const partial = force ? undefined : cacheGet<{ time: number; rows: Row[] }>('global5-part', GLOBAL_TTL);
+        const done = partial ? unpack(partial.d.rows) : [];
+        // the API snaps coordinates to its own grid, so compare by lattice cell
+        const cell = (la: number, lo: number) => `${Math.round(la / GLOBAL_STEP)}:${Math.round(lo / GLOBAL_STEP)}`;
+        const have = new Set(done.map((x) => cell(x.lat, x.lon)));
+        const todo = this.globalPoints().filter(([la, lo]) => !have.has(cell(la, lo)));
+        this.global = [...done];
+        if (done.length) { this.rebuild(); this.state.value = { ...this.state.value, state: 'ready', note: 'Raster wird aufgebaut' }; }
+        let first = !done.length;
+        const r = await fetchMarine(todo, this.ctl.signal, (part) => {
           if (this.disposed) return;
           this.global.push(...part);
           this.rebuild();
+          cachePut('global5-part', { time: partial?.d.time ?? Date.now(), rows: pack(this.global) });
           if (first) { first = false; this.state.value = { ...this.state.value, state: 'ready', note: 'Raster wird aufgebaut' }; }
         });
         if (this.disposed) return;
-        this.global = r.samples;
+        this.global = [...done, ...r.samples];
+        if (!Number.isFinite(r.time) || !r.samples.length) r.time = partial?.d.time ?? r.time;
+        r.samples = this.global;
         time = r.time;
         at = Date.now();
         if (!r.complete) {
@@ -285,7 +311,8 @@ export class OceanStore {
   }
 }
 
-let shared: { store: OceanStore; refs: number } | undefined;
+const KEEP_ALIVE = 15 * MINUTE;
+let shared: { store: OceanStore; refs: number; idle?: ReturnType<typeof setTimeout> } | undefined;
 export interface OceanHandle {
   store: OceanStore;
   state: ReadonlySignal<StoreState>;
@@ -295,6 +322,7 @@ export interface OceanHandle {
 export function acquireOceanStore(): OceanHandle {
   if (!shared) shared = { store: new OceanStore(), refs: 0 };
   const s = shared;
+  if (s.idle) { clearTimeout(s.idle); s.idle = undefined; }
   s.refs++;
   let released = false;
   return {
@@ -303,9 +331,14 @@ export function acquireOceanStore(): OceanHandle {
     release() {
       if (released) return;
       released = true;
+      // The store lives on for a while: switching the layer off and on again (or hopping between Seegang and
+      // Meeresströmung) must neither abort a running load nor start over.
       if (--s.refs === 0) {
-        s.store.dispose();
-        if (shared === s) shared = undefined;
+        s.idle = setTimeout(() => {
+          if (s.refs > 0) return;
+          s.store.dispose();
+          if (shared === s) shared = undefined;
+        }, KEEP_ALIVE);
       }
     },
   };

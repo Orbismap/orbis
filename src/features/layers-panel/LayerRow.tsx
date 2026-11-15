@@ -1,6 +1,7 @@
 import { isMobile } from '../../state/ui';
 import { computed } from '@preact/signals';
-import { useMemo, useRef } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { KarteLayer } from '../../karten/types';
 import type { LayerDef } from '../../layers/types';
 import { layerStatus } from '../../state/session';
@@ -8,6 +9,8 @@ import { now } from '../../state/time';
 import { camera } from '../../state/view';
 import { hasKey } from '../../keys';
 import { setLayerVisible } from '../../karten/store';
+import { useEscape } from '../../ui/hooks';
+import { OptionFields } from './LayerDetails';
 import { Icon } from '../../ui/icons/Icon';
 import { cx } from '../../ui/hooks';
 import { openKeySettings } from '../boost/open';
@@ -68,7 +71,7 @@ export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGr
   const toggle = () => !editing && setLayerVisible(karteId, def.id, !layer.visible);
 
   return (
-    <li class={cx('lrow', layer.visible && 'is-on', st.state === 'error' && 'has-error')} data-key={def.id} onKeyDown={onKey}>
+    <li class={cx('lrow', layer.visible && 'is-on', editing && 'is-editing', st.state === 'error' && 'has-error')} data-key={def.id} onKeyDown={onKey}>
       <div class="lrow-main">
         {onGrip && (
           <button type="button" class="lrow-grip" aria-label={`${def.title} verschieben. Position ${index + 1} von ${count}. Alt plus Pfeiltasten verschiebt.`} onPointerDown={onGrip} disabled={count < 2}>
@@ -104,8 +107,11 @@ export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGr
             <span class="lrow-keybtn-text">Eintragen</span>
           </button>
         )}
-        <span class="lrow-fill" aria-hidden="true" onPointerDown={onGrip} onClick={toggle} />
-        <SettingsButton def={def} onClick={openPage} />
+        <span class="lrow-fill" aria-hidden="true" onPointerDown={onGrip} onClick={toggle}>
+          {!editing && <span class="lrow-opts">{optionSummary(def, layer)}</span>}
+        </span>
+        {/* one button per row: the filter (its popup ends in "Einstellungen") or, without options, the gear */}
+        {!editing && hasChoices(def) ? <FilterButton def={def} layer={layer} karteId={karteId} onSettings={openPage} /> : <SettingsButton def={def} onClick={openPage} />}
       </div>
       {st.state === 'loading' && <span class="lrow-strip" role="progressbar" aria-label={`${def.title} lädt`} />}
     </li>
@@ -115,8 +121,8 @@ export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGr
 /** Three-dots settings button that pushes the detail page of the layer. */
 function SettingsButton({ def, onClick }: { def: LayerDef; onClick(): void }) {
   return (
-    <button type="button" class="lrow-set" data-nav aria-haspopup="true" aria-label={`Einstellungen ${def.title}`} onClick={onClick}>
-      <Icon name="more" size={16} />
+    <button type="button" class="lrow-set" data-nav aria-haspopup="true" aria-label={`Einstellungen ${def.title}`} style={{ ['--c' as string]: def.color }} onClick={onClick}>
+      <Icon name="gear" size={16} />
     </button>
   );
 }
@@ -143,8 +149,82 @@ export function FieldRow({ layer, def, karteId, from, tabbable, onSelect }: { la
             {selected && <Icon name="check" size={16} />}
           </span>
         </button>
-        {selected && <SettingsButton def={def} onClick={() => openDetail(karteId, def.id, from)} />}
+        {selected && (hasChoices(def) ? <FilterButton def={def} layer={layer} karteId={karteId} onSettings={() => openDetail(karteId, def.id, from)} /> : <SettingsButton def={def} onClick={() => openDetail(karteId, def.id, from)} />)}
       </div>
     </div>
+  );
+}
+
+/** Layers with a select or a toggle option get the filter button. */
+const hasChoices = (def: LayerDef) => !!def.options?.some((o) => o.type === 'select' || o.type === 'toggle');
+
+/** Short text of the chosen options: the labels of the select choices (toggle labels are too long for a row). */
+function optionSummary(def: LayerDef, layer: KarteLayer): string {
+  const parts: string[] = [];
+  for (const o of def.options ?? []) {
+    const v = layer.options?.[o.id] ?? o.default;
+    if (o.type === 'select') parts.push(o.choices.find((c) => c.value === v)?.label ?? String(v));
+  }
+  return parts.join(' · ').replace(/OpenStreetMap/g, 'OSM');
+}
+
+/** Filter button: opens a small popup with the options of the layer, right at the row. */
+function FilterButton({ def, layer, karteId, onSettings }: { def: LayerDef; layer: KarteLayer; karteId: string; onSettings(): void }) {
+  const [pos, setPos] = useState<{ top: number; right: number; up?: number } | null>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  const open = pos !== null;
+  const close = () => setPos(null);
+  useEscape(open, close);
+  // not enough room below the row: open upwards instead (anchored at the bottom edge, so the height does not matter)
+  useLayoutEffect(() => {
+    if (!pos || pos.up !== undefined || !pop.current || !btn.current) return;
+    const h = pop.current.getBoundingClientRect().height;
+    const r = btn.current.getBoundingClientRect();
+    if (pos.top + h > window.innerHeight - 8 && r.top > window.innerHeight - r.bottom) setPos({ ...pos, up: window.innerHeight - r.top + 6 });
+  }, [pos]);
+  useEffect(() => {
+    if (!open) return;
+    const on = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!pop.current?.contains(t) && !btn.current?.contains(t)) close();
+    };
+    document.addEventListener('pointerdown', on, true);
+    window.addEventListener('resize', close);
+    // scrolling the list (or anything else) moves the row away from the popup: close it
+    const onScroll = (e: Event) => {
+      if (!pop.current?.contains(e.target as Node)) close();
+    };
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('wheel', onScroll as EventListener, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('wheel', onScroll as EventListener, true);
+      document.removeEventListener('pointerdown', on, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+  const toggle = () => {
+    if (open) return close();
+    const r = btn.current!.getBoundingClientRect();
+    setPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right - 4) });
+  };
+  return (
+    <>
+      <button ref={btn} type="button" class={cx('lrow-filter', open && 'is-open')} data-nav aria-haspopup="dialog" aria-expanded={open} aria-label={`Optionen ${def.title}`} title="Optionen" onClick={toggle}>
+        <Icon name="filter" size={16} />
+      </button>
+      {open &&
+        createPortal(
+          <div ref={pop} class="popover lrow-pop" role="dialog" aria-label={`Optionen ${def.title}`} style={pos.up !== undefined ? { position: 'fixed', bottom: `${pos.up}px`, top: 'auto', right: `${pos.right}px`, left: 'auto', transformOrigin: 'bottom right' } : { position: 'fixed', top: `${pos.top}px`, right: `${pos.right}px`, left: 'auto' }}>
+            <OptionFields layer={layer} def={def} karteId={karteId} />
+            <button type="button" class="lrow-pop-foot" onClick={() => { close(); onSettings(); }}>
+              <Icon name="gear" size={16} />
+              Einstellungen
+            </button>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
