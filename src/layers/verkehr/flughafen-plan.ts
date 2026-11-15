@@ -3,7 +3,7 @@
 // for every other airport in view (zoom 13+) Overpass answers through the proxy, once per airport (cached).
 // The parsed plan keeps heights (`h`, `minh`), widths (`w`) and surfaces, so the later 3D view can extrude it.
 import { computed, effect, signal } from '@preact/signals';
-import type { ExpressionSpecification } from 'maplibre-gl';
+import { Marker, type ExpressionSpecification } from 'maplibre-gl';
 import type { Feature, FeatureCollection, LineString, Point, Polygon } from 'geojson';
 import { bucketUrl, proxied } from '../../data/endpoints';
 import { fetchJson } from '../../data/http';
@@ -58,7 +58,7 @@ export default defineLayer({
     { name: 'OpenStreetMap (aeroway=*)', url: 'https://www.openstreetmap.org/copyright', license: 'ODbL 1.0' },
     { name: 'Vorab erzeugte Flughafendateien (443 Flughäfen)', url: 'https://orbis-assets.maltee.dev/data/airports/index.json', license: 'ODbL 1.0 (OpenStreetMap)' },
   ],
-  legend: { type: 'classes', items: [{ color: '#d5dbe6', label: 'Piste', shape: 'line' }, { color: '#7d8da6', label: 'Rollweg', shape: 'line' }, { color: '#3b4960', label: 'Vorfeld', shape: 'square' }, { color: '#6f86b0', label: 'Terminal, Hangar', shape: 'square' }, { color: '#ffd166', label: 'Gate, Stellplatz', shape: 'dot' }] },
+  legend: { type: 'classes', items: [{ color: '#2b313b', label: 'Piste', shape: 'line' }, { color: '#4b5360', label: 'Rollweg', shape: 'line' }, { color: '#3b4960', label: 'Vorfeld', shape: 'square' }, { color: '#6f86b0', label: 'Terminal, Hangar', shape: 'square' }, { color: '#ffd166', label: 'Gate, Stellplatz', shape: 'dot' }] },
   keywords: ['flughafen', 'airport', 'piste', 'runway', 'rollweg', 'taxiway', 'gate', 'vorfeld', 'apron', 'terminal'],
 
   mount(ctx) {
@@ -107,7 +107,9 @@ export default defineLayer({
     const taxiLines = computed(() => lines.value.filter((l) => l.properties.kind !== 'runway'));
     const runways = computed(() => fc(runwayLines.value));
     const taxis = computed(() => fc(taxiLines.value));
-    const points = computed(() => fc(plans.value.flatMap((p) => p.points)));
+    const allPoints = computed(() => plans.value.flatMap((p) => p.points));
+    const standPoints = computed(() => fc(allPoints.value.filter((p) => p.properties.kind !== 'light')));
+    const lightPoints = computed(() => fc(allPoints.value.filter((p) => p.properties.kind === 'light')));
 
     // widths in metres -> px at the current latitude (exact for the zoom range 10..21)
     const widthExpr = computed(() => {
@@ -126,17 +128,17 @@ export default defineLayer({
     const handles = [
       areaLayer(ctx, {
         data: polys, name: 'areas', minZoom: MIN_ZOOM,
-        fill: ['match', ['get', 'kind'], 'apron', '#3b4960', 'terminal', '#6f86b0', 'hangar', '#5d7092', 'helipad', '#4a5a74', '#3b4960'] as unknown as ExpressionSpecification,
+        fill: ['match', ['get', 'kind'], 'apron', '#3b4960', 'terminal', '#6f86b0', 'hangar', '#5d7092', 'building', '#6b7280', 'helipad', '#4a5a74', '#3b4960'] as unknown as ExpressionSpecification,
         fillOpacity: 0.85, outline: { color: '#7d8da6', width: 0.6 },
         describe: (f: AnyFeature) => {
           const p = f.properties as PlanPolygon['properties'];
-          const name = { apron: 'Vorfeld', terminal: 'Terminal', hangar: 'Hangar', helipad: 'Hubschrauberlandeplatz' }[p.kind as string] ?? 'Fläche';
+          const name = { apron: 'Vorfeld', terminal: 'Terminal', hangar: 'Hangar', building: 'Gebäude', helipad: 'Hubschrauberlandeplatz' }[p.kind as string] ?? 'Fläche';
           return { title: p.name || name, subtitle: p.name ? name : undefined, color: COLOR, icon: 'plane', facts: [...(p.ref ? [{ label: 'Kennung', value: p.ref }] : []), ...(p.h > 0 ? [{ label: 'Höhe', value: `${Math.round(p.h)} m` }] : [])] };
         },
       }),
-      lineLayer(ctx, { data: taxis, name: 'taxiways', minZoom: MIN_ZOOM, color: '#7d8da6', width: widthExpr, casing: false, opacity: 0.95 }),
+      lineLayer(ctx, { data: taxis, name: 'taxiways', minZoom: MIN_ZOOM, color: '#4b5360', width: widthExpr, casing: false, opacity: 1 }),
       lineLayer(ctx, {
-        data: runways, name: 'runways', minZoom: MIN_ZOOM, color: '#d5dbe6', width: widthExpr, casing: { color: '#1b2433', extra: 1 },
+        data: runways, name: 'runways', minZoom: MIN_ZOOM, color: '#2b313b', width: widthExpr, casing: { color: '#1b2433', extra: 1 },
         describe: (f: AnyFeature) => {
           const p = f.properties as PlanLine['properties'];
           return { title: `Piste ${p.ref || ''}`.trim(), color: COLOR, icon: 'plane', facts: [{ label: 'Breite', value: `${Math.round(p.w)} m` }, ...(p.surface ? [{ label: 'Belag', value: SURFACE[p.surface] ?? p.surface }] : [])] };
@@ -148,19 +150,31 @@ export default defineLayer({
     const lsrc = `${ctx.id}.labels-src`;
     const psrc = `${ctx.id}.stands-src`;
     const tsrc = `${ctx.id}.taxi-src`;
+    const rsrc = `${ctx.id}.lights-src`;
     ctx.map.addSource(lsrc, { type: 'geojson', data: fc([]) });
     ctx.map.addSource(psrc, { type: 'geojson', data: fc([]) });
     ctx.map.addSource(tsrc, { type: 'geojson', data: fc([]) });
+    ctx.map.addSource(rsrc, { type: 'geojson', data: fc([]) });
     const halo = { 'text-halo-color': 'rgba(10, 15, 24, 0.9)', 'text-halo-width': 1.4 };
     ctx.map.addLayer({
-      id: `${ctx.id}.stands`, type: 'circle', source: psrc, minzoom: 15.5,
-      paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 15.5, 1.5, 19, 4], 'circle-color': ['case', ['==', ['get', 'kind'], 'gate'], '#ffd166', '#8ea3c4'], 'circle-stroke-color': 'rgba(10,15,24,0.8)', 'circle-stroke-width': 0.8 },
+      id: `${ctx.id}.stands`, type: 'circle', source: psrc, minzoom: 15.5, filter: ['!=', ['get', 'kind'], 'gate'],
+      paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 15.5, 1.5, 19, 4], 'circle-color': '#8ea3c4', 'circle-stroke-color': 'rgba(10,15,24,0.8)', 'circle-stroke-width': 0.8 },
     } as never, 'points');
+    // gate badges are rendered as HTML markers (fixed border-radius) below
     ctx.map.addLayer({
-      id: `${ctx.id}.stand-labels`, type: 'symbol', source: psrc, minzoom: 17, filter: ['!=', ['get', 'ref'], ''],
-      layout: { 'text-field': ['get', 'ref'], 'text-font': ['Noto Sans Regular'], 'text-size': ['interpolate', ['linear'], ['zoom'], 17, 9, 20, 12], 'text-offset': [0, 0.9], 'text-anchor': 'top', 'text-optional': true },
-      paint: { 'text-color': '#ffe9b0', ...halo },
+      id: `${ctx.id}.parking-labels`, type: 'symbol', source: psrc, minzoom: 16, filter: ['all', ['!=', ['get', 'kind'], 'gate'], ['!=', ['get', 'ref'], '']],
+      layout: { 'text-field': ['get', 'ref'], 'text-font': ['Noto Sans Regular'], 'text-size': ['interpolate', ['linear'], ['zoom'], 16, 8, 20, 11], 'text-offset': [0, 0], 'text-anchor': 'center', 'text-optional': true },
+      paint: { 'text-color': '#cfd6e3', ...halo },
     } as never, 'labels');
+    ctx.map.addLayer({
+      id: `${ctx.id}.lights`, type: 'circle', source: rsrc, minzoom: 11,
+      paint: {
+        'circle-color': ['match', ['get', 'col'], 'blue', '#4a78ff', 'green', '#2bd47d', 'red', '#ff4b4b', 'yellow', '#ffd23f', '#f4f6f8'] as unknown as ExpressionSpecification,
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 16, 1.6, 19, 3.2],
+        'circle-opacity': ['match', ['get', 'lt'], 'txc', 0.75, 0.95],
+        'circle-blur': 0.15,
+      },
+    } as never, 'points');
     ctx.map.addLayer({
       id: `${ctx.id}.taxi-labels`, type: 'symbol', source: tsrc, minzoom: 14.5, filter: ['!=', ['get', 'ref'], ''],
       layout: { 'symbol-placement': 'line', 'text-field': ['get', 'ref'], 'text-font': ['Noto Sans Regular'], 'text-size': 10.5, 'symbol-spacing': 280, 'text-max-angle': 30 },
@@ -174,9 +188,54 @@ export default defineLayer({
     const stopLabels = effect(() => {
       const set = (id: string, d: FeatureCollection) => (ml.getSource(id) as { setData(d: unknown): void } | undefined)?.setData(d);
       set(lsrc, fc(runwayEnds(runwayLines.value)));
-      set(psrc, points.value);
+      set(psrc, standPoints.value);
       set(tsrc, fc(taxiLines.value.filter((f) => f.properties.ref)));
+      set(rsrc, lightPoints.value);
     });
+
+    // gate badges as HTML markers (fixed border-radius) with simple collision hiding
+    type GateMarker = { marker: Marker; el: HTMLDivElement; coord: [number, number] };
+    const gateMarkers: GateMarker[] = [];
+    const layoutGateMarkers = () => {
+      const kept: { x: number; y: number; w: number; h: number }[] = [];
+      for (const g of gateMarkers) {
+        if (ml.getZoom() < 15.5) { g.el.style.display = 'none'; continue; }
+        const pos = ml.project(g.coord);
+        const w = g.el.offsetWidth || 24;
+        const h = g.el.offsetHeight || 14;
+        const box = { x: pos.x - w / 2, y: pos.y - h / 2, w, h };
+        let collide = false;
+        for (const k of kept) {
+          if (box.x < k.x + k.w && box.x + box.w > k.x && box.y < k.y + k.h && box.y + box.h > k.y) { collide = true; break; }
+        }
+        if (collide) {
+          g.el.style.display = 'none';
+        } else {
+          g.el.style.display = '';
+          kept.push(box);
+        }
+      }
+    };
+    const syncGateMarkers = () => {
+      for (const g of gateMarkers) g.marker.remove();
+      gateMarkers.length = 0;
+      if (ml.getZoom() < 15.5) return;
+      for (const p of allPoints.value) {
+        if (p.properties.kind !== 'gate' || !p.properties.ref) continue;
+        const el = document.createElement('div');
+        el.textContent = String(p.properties.ref);
+        el.style.cssText = 'background:#e0aa4d;color:#1b2433;font:700 10px/1 system-ui,sans-serif;padding:2px 5px;border-radius:6px;border:2px solid #fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.4);opacity:0;transition:opacity 0.35s ease;display:none;';
+        const m = new Marker({ element: el, anchor: 'center' }).setLngLat(p.geometry.coordinates as [number, number]).addTo(ml);
+        requestAnimationFrame(() => { el.style.opacity = '1'; });
+        gateMarkers.push({ marker: m, el, coord: p.geometry.coordinates as [number, number] });
+      }
+      layoutGateMarkers();
+    };
+    const stopMarkers = effect(() => { allPoints.value; syncGateMarkers(); });
+    const onMoveZoom = () => layoutGateMarkers();
+    ml.on('moveend', onMoveZoom);
+    const onZoom2 = () => syncGateMarkers();
+    ml.on('zoomend', onZoom2);
 
     return {
       destroy() {
@@ -184,8 +243,12 @@ export default defineLayer({
         ctl.abort();
         ctl = new AbortController();
         ml.off('moveend', onMove);
-        stopIdx(); stopStatus(); stopLabels();
-        ctx.map.remove({ layers: [`${ctx.id}.runway-numbers`, `${ctx.id}.taxi-labels`, `${ctx.id}.stand-labels`, `${ctx.id}.stands`], sources: [lsrc, psrc, tsrc] });
+        ml.off('moveend', onMoveZoom);
+        ml.off('zoomend', onZoom2);
+        stopIdx(); stopStatus(); stopLabels(); stopMarkers();
+        for (const g of gateMarkers) g.marker.remove();
+        gateMarkers.length = 0;
+        ctx.map.remove({ layers: [`${ctx.id}.runway-numbers`, `${ctx.id}.taxi-labels`, `${ctx.id}.stand-labels`, `${ctx.id}.parking-labels`, `${ctx.id}.stands`, `${ctx.id}.lights`], sources: [lsrc, psrc, tsrc, rsrc] });
         for (const h of handles.reverse()) h.destroy();
       },
     };
