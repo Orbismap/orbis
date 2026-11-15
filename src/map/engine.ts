@@ -186,11 +186,14 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   // 3D terrain scales smoothly up and down (exaggeration tween). On the flat Orbis colours it exists only on the globe:
   // switching to the 2D map flattens it, and from there on the map stays without terrain.
   const TERRAIN_MS = 700;
+  /** from here on the globe has turned into the flat map: no terrain on the Orbis colours */
+  const TERRAIN_MAX_ZOOM_ORBIS = 12;
+  let terrainGoal = -1;
   let terrainNow = 0;
   let terrainRaf = 0;
   const terrainTarget = () => {
     const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
-    return terrainOn && !(flatOrbis && projectionSignal.peek() !== 'globe') ? TERRAIN_EXAGGERATION : 0;
+    return terrainOn && !(flatOrbis && (projectionSignal.peek() !== 'globe' || ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS)) ? TERRAIN_EXAGGERATION : 0;
   };
   function paintTerrain() {
     if (terrainNow > 0.001) {
@@ -201,8 +204,10 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     if (ml.getLayer(HILLSHADE_LAYER)) ml.setPaintProperty(HILLSHADE_LAYER, 'hillshade-exaggeration', HILLSHADE_STRENGTH * (terrainNow / TERRAIN_EXAGGERATION));
   }
   function applyTerrain() {
-    cancelAnimationFrame(terrainRaf);
     const to = terrainTarget();
+    if (to === terrainGoal) return;
+    terrainGoal = to;
+    cancelAnimationFrame(terrainRaf);
     const from = terrainNow;
     if (from === to) return paintTerrain();
     const t0 = performance.now();
@@ -214,6 +219,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     };
     terrainRaf = requestAnimationFrame(step);
   }
+  ml.on('zoom', () => loaded && applyTerrain());
 
   // ---- slots ----------------------------------------------------------------
   const place = (spec: LayerSpecification | CustomLayerInterface, slot: SlotId) => {
