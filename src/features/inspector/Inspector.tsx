@@ -19,6 +19,7 @@ export function InspectorCard({ card, layerId }: { card: InspectCard; layerId: s
       <header class="insp-head">
         <span class="insp-icon" style={{ ['--c' as string]: card.color ?? 'var(--limb)' }}>
           <Icon name={card.icon ?? 'pin'} size={18} />
+          {card.logo && <img class="insp-logo" src={card.logo} alt="" loading="lazy" referrerpolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
         </span>
         <div class="insp-titles">
           <h2 class="insp-title">{card.title}</h2>

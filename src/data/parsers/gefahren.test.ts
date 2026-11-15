@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { gvpVolcanoes } from './gvp';
+import { gvpVolcanoes, summaryExcerpt } from './gvp';
+import { gvpEruptions, eruptionYears } from './eruptions';
 import { fireConfidence, firmsFires } from './firms';
 import { gdacsEvents } from './gdacs';
 import { eonetEvents } from './eonet';
@@ -8,7 +9,7 @@ import { tsunamiBulletins } from './tsunami';
 import { nwsAlerts } from './nws';
 import { dwdWarnings } from './dwd';
 import { AURORA_H, AURORA_W, auroraGrid, latestKp } from './aurora';
-import { bfsDose, hcDose, safecastDose, stukDose } from './radiation';
+import { bfsDose, bfsVoronoi, hcDose, safecastAir, safecastDose, safecastTrack, stukDose } from './radiation';
 import { lzwDecode, parseStrike } from './blitzortung';
 import { runParser } from '../worker/pool';
 
@@ -17,14 +18,53 @@ const json = (n: string) => JSON.parse(fx(n));
 const NOW = Date.parse('2026-11-10T20:00:00Z');
 
 describe('gvpVolcanoes', () => {
-  it('classifies by last eruption and drops long text', () => {
+  it('classifies by last eruption and carries the inspector facts', () => {
     const fc = gvpVolcanoes(json('gvp.json'), { now: NOW });
     const by = Object.fromEntries(fc.features.map((f) => [f.properties.name, f.properties]));
     expect(by['Stromboli']).toMatchObject({ state: 'active', rank: 2, last: 2026 });
     expect(by['Campi Flegrei']).toMatchObject({ state: 'dormant', rank: 0, last: 1538 });
     expect(by['West Eifel Volcanic Field']!.last).toBe(-8300);
-    expect(JSON.stringify(fc)).not.toContain('Geological');
+    expect(by['Stromboli']).toMatchObject({
+      landform: 'Composite',
+      setting: 'Subduction zone / Continental crust (> 25 km)',
+      rock: 'Trachyandesite / Basaltic Trachyandesite',
+      epoch: 'Holocene',
+      evidence: 'Eruption Observed',
+      photo: 'https://volcano.si.edu/gallery/photos/GVP-09131.jpg',
+    });
+    expect(by['Stromboli']!.photoCredit).toContain('Smithsonian');
+    expect(by['Stromboli']!.summary!.length).toBeLessThanOrEqual(321);
+    expect(by['Stromboli']!.summary!.endsWith('.') || by['Stromboli']!.summary!.endsWith('…')).toBe(true);
     expect(gvpVolcanoes(null).features).toEqual([]);
+  });
+  it('shortens the summary without cutting words', () => {
+    expect(summaryExcerpt('Kurzer Text.')).toBe('Kurzer Text.');
+    const long = `${'Ein Satz mit Inhalt. '.repeat(30)}Ende.`;
+    const s = summaryExcerpt(long)!;
+    expect(s.length).toBeLessThanOrEqual(321);
+    expect(s.endsWith('.') || s.endsWith('…')).toBe(true);
+    expect(summaryExcerpt(undefined)).toBeUndefined();
+  });
+});
+
+describe('gvpEruptions', () => {
+  const raw = {
+    u: '2026-11-15T00:00:00Z',
+    v: [
+      [38.789, 15.213, 211040, 'Stromboli', [[2026, 1, 15, 2, 1], [-4250, 0, 0, 5, 0]]],
+      [64.416, -17.316, 373010, 'Bárðarbunga', [[2014, 8, 29, 0, 1]]],
+      [0, 0, 1, 'Kaputt', [[NaN, 0, 0, 0, 1]]],
+    ],
+  };
+  it('turns grouped years into eruption points', () => {
+    const fc = gvpEruptions(raw);
+    expect(fc.features).toHaveLength(3);
+    expect(fc.features[0]!.properties).toMatchObject({ vnum: 211040, name: 'Stromboli', year: 2026, month: 1, day: 15, vei: 2, conf: 1 });
+    expect(fc.features[1]!.properties).toMatchObject({ year: -4250, vei: 5, conf: 0 });
+    expect(fc.features[2]!.properties).toMatchObject({ name: 'Bárðarbunga', year: 2014, month: 8, day: 29, vei: 0 });
+    expect(new Set(fc.features.map((f) => f.id)).size).toBe(3);
+    expect(eruptionYears(fc)).toEqual({ from: -4250, to: 2026 });
+    expect(gvpEruptions(null).features).toEqual([]);
   });
 });
 
@@ -144,6 +184,8 @@ describe('radiation parsers', () => {
     expect(p.v).toBeGreaterThan(0.01);
     expect(p.v).toBeLessThan(1);
     expect(p.t).toBeGreaterThan(0);
+    expect(p.status).toBe('in Betrieb');
+    expect(p.kenn).toBe('083170571');
   });
   it('STUK and Health Canada rows', () => {
     const s = stukDose(json('stuk.json')).features[0]!.properties;
@@ -157,6 +199,51 @@ describe('radiation parsers', () => {
     expect(fc.features).toHaveLength(3);
     expect(fc.features[0]!.properties.v).toBeCloseTo(87.9375 / 334, 3);
     expect(safecastDose(raw, { now: Date.parse('2026-11-10T00:00:00Z'), maxAgeDays: 3 }).features).toHaveLength(0);
+  });
+  it('Safecast bGeigie: imports become tracks with stats', () => {
+    const fc = safecastTrack(json('safecast-tracks.json'));
+    expect(fc.features).toHaveLength(1);
+    const f = fc.features[0]!;
+    expect(f.geometry.type).toBe('LineString');
+    expect(f.properties).toMatchObject({ source: 'a.log', credits: 'tester', min: 0.03, max: 0.06, avg: 0.045, count: 2 });
+    expect(f.properties.t).toBe(Date.parse('2026-11-10T00:00:00Z'));
+    // raw import with points is converted too
+    const raw = safecastTrack([
+      { id: 7, credits: 'x', source: { url: 'https://example.org/b.log' }, created_at: '2026-11-10T00:00:00Z', points: [[37.0, 140.0, 12], [37.1, 140.1, 20]] },
+    ]);
+    expect(raw.features).toHaveLength(1);
+    expect(raw.features[0]!.properties.source).toBe('b.log');
+    expect(raw.features[0]!.properties.avg).toBeCloseTo((12 / 334 + 20 / 334) / 2, 5);
+    expect(safecastTrack(null).features).toEqual([]);
+  });
+  it('Safecast AirNote: PM values, skips radiation devices, stale and glitchy sensors', () => {
+    const air = [
+      { device_urn: 'note:dev:1', device_class: 'product:org.airnote.solar.air.v1', when_captured: '2026-11-09T20:00:00Z', loc_lat: 41.42, loc_lon: 2.17, loc_name: 'Horta-Guinardó', loc_country: 'ES', pms_pm01_0: 2.04, pms_pm02_5: 12.46, pms_pm10_0: 19.8, env_temp: 22.1, env_humid: 48.8, env_press: 99945.2, bat_voltage: 2.72, dev_dashboard: 'http://qrgo.org/ID/1' },
+      { device_urn: 'note:dev:2', device_class: 'product:org.airnote.solar.air.v1', when_captured: '2026-09-01T00:00:00Z', loc_lat: 1, loc_lon: 2, pms_pm02_5: 5 },
+      { device_urn: 'note:dev:3', device_class: 'product:org.airnote.solar.air.v1', when_captured: '2026-11-09T20:00:00Z', loc_lat: 3, loc_lon: 4, pms_pm02_5: 5000 },
+      { device_urn: 'rad:1', device_class: 'product:com.blues.radnote', when_captured: '2026-11-09T20:00:00Z', loc_lat: 5, loc_lon: 6, lnd_7318c: 30 },
+    ];
+    const now = Date.parse('2026-11-10T00:00:00Z');
+    const fc = safecastAir(air, { now });
+    expect(fc.features).toHaveLength(1);
+    const p = fc.features[0]!.properties;
+    expect(p).toMatchObject({ name: 'Horta-Guinardó', pm25: 12.5, pm1: 2, pm10: 19.8, country: 'ES', bat: 2.72, dash: 'http://qrgo.org/ID/1' });
+    expect(p.t).toBe(Date.parse('2026-11-09T20:00:00Z'));
+    expect(safecastAir(air, { now, maxAgeDays: 0.1 }).features).toHaveLength(0);
+  });
+  it('BfS Voronoi: keeps valued polygons of the requested hour', () => {
+    const raw = {
+      features: [
+        { geometry: { type: 'Polygon', coordinates: [[[13, 48], [14, 48], [14, 49], [13, 48]]] }, properties: { id: 7, value_interp: 0.156, time_measurement_end: '2026-11-15T08:00:00Z' } },
+        { geometry: { type: 'Polygon', coordinates: [[[13, 48], [14, 48], [14, 49], [13, 48]]] }, properties: { id: 8, value_interp: null, time_measurement_end: '2026-11-15T08:00:00Z' } },
+        { geometry: { type: 'Point', coordinates: [1, 2] }, properties: { id: 9, value_interp: 0.2, time_measurement_end: '2026-11-15T08:00:00Z' } },
+      ],
+    };
+    const fc = bfsVoronoi(raw);
+    expect(fc.features).toHaveLength(1);
+    expect(fc.features[0]!.properties).toMatchObject({ id: 'bfs-voronoi:7', v: 0.156, t: Date.parse('2026-11-15T08:00:00Z') });
+    expect(fc.features[0]!.geometry.type).toBe('Polygon');
+    expect(bfsVoronoi(null).features).toEqual([]);
   });
 });
 

@@ -83,8 +83,8 @@ describe('webcams', () => {
 
 describe('radioStations', () => {
   const rb = [
-    { stationuuid: 'a', name: 'Classic Vinyl HD ', url_resolved: 'https://icecast.walmradio.com:8443/classic', homepage: 'https://walmradio.com/classic', tags: '1930,1940,1950,1960,1970', country: 'USA', codec: 'MP3', bitrate: 320, geo_lat: 40.7517, geo_long: -73.9754, clickcount: 1411, hls: 0 },
-    { stationuuid: 'b', name: 'Insecure', url_resolved: 'http://s/x', geo_lat: 1, geo_long: 2, hls: 1 },
+    { stationuuid: 'a', name: 'Classic Vinyl HD ', url_resolved: 'https://icecast.walmradio.com:8443/classic', homepage: 'https://walmradio.com/classic', tags: '1930,1940,1950,1960,1970', country: 'USA', codec: 'MP3', bitrate: 320, geo_lat: 40.7517, geo_long: -73.9754, clickcount: 1411, hls: 0, favicon: 'https://walmradio.com/logo.png' },
+    { stationuuid: 'b', name: 'Insecure', url_resolved: 'http://s/x', geo_lat: 1, geo_long: 2, hls: 1, favicon: 'http://insecure.example/logo.png' },
     { stationuuid: 'a', name: 'dup', geo_lat: 1, geo_long: 2 },
     { stationuuid: 'c', name: 'broken', geo_lat: 1, geo_long: 2, lastcheckok: 0 },
     { stationuuid: 'd', name: 'nogeo', geo_lat: null, geo_long: null },
@@ -92,8 +92,8 @@ describe('radioStations', () => {
   it('splits secure and insecure streams, dedupes, drops broken', () => {
     const fc = radioStations(rb);
     expect(fc.features).toHaveLength(2);
-    expect(fc.features[0]!.properties).toMatchObject({ name: 'Classic Vinyl HD', stream: 'https://icecast.walmradio.com:8443/classic', tags: '1930, 1940, 1950, 1960', bitrate: 320, clicks: 1411 });
-    expect(fc.features[1]!.properties).toMatchObject({ stream: '', streamHttp: 'http://s/x', hls: true });
+    expect(fc.features[0]!.properties).toMatchObject({ name: 'Classic Vinyl HD', stream: 'https://icecast.walmradio.com:8443/classic', tags: '1930, 1940, 1950, 1960', bitrate: 320, clicks: 1411, favicon: 'https://walmradio.com/logo.png' });
+    expect(fc.features[1]!.properties).toMatchObject({ stream: '', streamHttp: 'http://s/x', hls: true, favicon: '' });
   });
 });
 
