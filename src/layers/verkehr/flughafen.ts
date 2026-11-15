@@ -458,35 +458,80 @@ export default defineLayer({
       }),
     ];
 
-    // indoor level switcher overlay
+    // indoor level switcher overlay: compact circle button (same size as compass) showing current level,
+    // expands to vertical list on click. Positioned top-right under the compass.
     const container = ml.getContainer();
     const overlay = document.createElement('div');
     overlay.style.position = 'absolute';
     overlay.style.right = '12px';
-    overlay.style.bottom = '90px';
+    overlay.style.top = '50px';
     overlay.style.zIndex = '10';
     overlay.style.display = 'none';
     overlay.style.flexDirection = 'column';
+    overlay.style.alignItems = 'center';
     overlay.style.gap = '4px';
     container.appendChild(overlay);
+
+    let expanded = false;
+    const mainBtn = document.createElement('button');
+    mainBtn.style.width = '32px';
+    mainBtn.style.height = '32px';
+    mainBtn.style.borderRadius = '50%';
+    mainBtn.style.border = '1px solid rgba(255,255,255,0.25)';
+    mainBtn.style.background = 'rgba(0,0,29,0.85)';
+    mainBtn.style.color = '#fff';
+    mainBtn.style.cursor = 'pointer';
+    mainBtn.style.font = '700 0.85rem/1 Roboto, sans-serif';
+    mainBtn.style.display = 'flex';
+    mainBtn.style.alignItems = 'center';
+    mainBtn.style.justifyContent = 'center';
+    mainBtn.style.padding = '0';
+    mainBtn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+    overlay.appendChild(mainBtn);
+
+    const listContainer = document.createElement('div');
+    listContainer.style.display = 'none';
+    listContainer.style.flexDirection = 'column';
+    listContainer.style.gap = '4px';
+    listContainer.style.alignItems = 'center';
+    overlay.appendChild(listContainer);
+
+    mainBtn.onclick = () => {
+      expanded = !expanded;
+      listContainer.style.display = expanded ? 'flex' : 'none';
+    };
+
     const stopOverlay = effect(() => {
-      overlay.innerHTML = '';
       const ls = levels.value;
       if (ls.length <= 1) { overlay.style.display = 'none'; return; }
       overlay.style.display = 'flex';
+      mainBtn.textContent = String(indoorLevel.value || ls[0] || '');
+      mainBtn.style.background = '#4DA3FF';
+      listContainer.innerHTML = '';
       for (const l of ls) {
         const btn = document.createElement('button');
-        btn.textContent = `Ebene ${l}`;
-        btn.style.padding = '6px 10px';
-        btn.style.borderRadius = '8px';
+        btn.textContent = String(l);
+        btn.style.width = '32px';
+        btn.style.height = '32px';
+        btn.style.borderRadius = '50%';
         btn.style.border = '1px solid rgba(255,255,255,0.25)';
         btn.style.background = l === indoorLevel.value ? '#4DA3FF' : 'rgba(0,0,29,0.85)';
         btn.style.color = '#fff';
         btn.style.cursor = 'pointer';
-        btn.style.font = '600 0.75rem/1 Roboto, sans-serif';
-        btn.onclick = () => { indoorLevel.value = l; };
-        overlay.appendChild(btn);
+        btn.style.font = '700 0.85rem/1 Roboto, sans-serif';
+        btn.style.display = 'flex';
+        btn.style.alignItems = 'center';
+        btn.style.justifyContent = 'center';
+        btn.style.padding = '0';
+        btn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+        btn.onclick = () => { indoorLevel.value = l; expanded = false; listContainer.style.display = 'none'; };
+        listContainer.appendChild(btn);
       }
+    });
+
+    // sync main button text when level changes
+    effect(() => {
+      if (levels.value.length > 1) mainBtn.textContent = String(indoorLevel.value || levels.value[0] || '');
     });
 
     // indoor labels
