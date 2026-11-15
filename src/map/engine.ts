@@ -157,7 +157,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       ml.setPadding(p);
     }),
     effect(() => {
-      engine.setTerrain(terrain3d.value);
+      terrainOn = terrain3d.value;
+      if (loaded) applyTerrain();
     }),
     effect(() => {
       const p = projectionSignal.value;
