@@ -9,7 +9,7 @@ import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
 import { camera, padding, projection as projectionSignal, terrain3d, viewport, type CameraState, type Padding } from '../state/view';
-import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, HILLSHADE_LAYER, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, skyFor } from './basemaps';
+import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
 import { clampCamera, ENGINE_MAX_PITCH, flyToTarget, locate as locateImpl } from './camera';
@@ -64,7 +64,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   let labels = init.labels ?? true;
   let terminatorMode: 'off' | 'auto' = init.terminator === false ? 'off' : 'auto';
   let loaded = false;
-  let terrainOn = false;
+  let terrainOn = true;
   registerDemTiles();
 
   // a URL/state asking for more tilt than the zoom allows is clamped on load
@@ -163,6 +163,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     effect(() => {
       const p = projectionSignal.value;
       if (loaded && ml.getProjection()?.type !== p) ml.setProjection({ type: p });
+      if (loaded) applyTerrain();
     }),
   ];
 
@@ -182,13 +183,37 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     terminator.setLook(theme);
     applyTerrain();
   }
-  // Terrain only while tilted: top-down it stays flat (and cheap). Hillshade only on the flat Orbis colours.
-  function applyTerrain() {
-    const lift = terrainOn && ml.getPitch() > 10;
-    if (lift !== !!ml.getTerrain()) ml.setTerrain(lift ? { source: TERRAIN_SOURCE, exaggeration: TERRAIN_EXAGGERATION } : null);
-    setVis(HILLSHADE_LAYER, terrainOn && BASEMAPS[basemap].id.startsWith('orbis'));
+  // 3D terrain scales smoothly up and down (exaggeration tween). On the flat Orbis colours it exists only on the globe:
+  // switching to the 2D map flattens it, and from there on the map stays without terrain.
+  const TERRAIN_MS = 700;
+  let terrainNow = 0;
+  let terrainRaf = 0;
+  const terrainTarget = () => {
+    const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
+    return terrainOn && !(flatOrbis && projectionSignal.peek() !== 'globe') ? TERRAIN_EXAGGERATION : 0;
+  };
+  function paintTerrain() {
+    if (terrainNow > 0.001) {
+      ml.setTerrain({ source: TERRAIN_SOURCE, exaggeration: terrainNow });
+    } else if (ml.getTerrain()) ml.setTerrain(null);
+    const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
+    setVis(HILLSHADE_LAYER, terrainNow > 0.001 && flatOrbis);
+    if (ml.getLayer(HILLSHADE_LAYER)) ml.setPaintProperty(HILLSHADE_LAYER, 'hillshade-exaggeration', HILLSHADE_STRENGTH * (terrainNow / TERRAIN_EXAGGERATION));
   }
-  ml.on('pitch', () => loaded && applyTerrain());
+  function applyTerrain() {
+    cancelAnimationFrame(terrainRaf);
+    const to = terrainTarget();
+    const from = terrainNow;
+    if (from === to) return paintTerrain();
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / TERRAIN_MS);
+      terrainNow = from + (to - from) * (1 - Math.pow(1 - k, 3));
+      paintTerrain();
+      if (k < 1) terrainRaf = requestAnimationFrame(step);
+    };
+    terrainRaf = requestAnimationFrame(step);
+  }
 
   // ---- slots ----------------------------------------------------------------
   const place = (spec: LayerSpecification | CustomLayerInterface, slot: SlotId) => {
@@ -267,6 +292,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       terminator.destroy();
       picking.destroy();
       disposeBuildingsTilt();
+      cancelAnimationFrame(terrainRaf);
       ml.remove();
       if (current === engine) current = undefined;
     },
