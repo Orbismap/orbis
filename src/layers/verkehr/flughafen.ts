@@ -6,7 +6,7 @@ import type { Feature, FeatureCollection, LineString, Point, Polygon } from 'geo
 import { bucketUrl } from '../../data/endpoints';
 import { fetchJson } from '../../data/http';
 import { airportIndex, airportsInView, overpassQuery, planFromOverpass, planFromStatic, pxPerMetre, runwayEnds, type AirportIndexEntry, type AirportPlan, type PlanLine, type PlanPolygon } from '../../data/parsers/airportplan';
-import { indoorLevels, indoorOverpassQuery, indoorPlanFromOverpass, type IndoorFeature } from '../../data/parsers/indoor';
+import { indoorLevels, indoorOverpassQuery, indoorPlanFromOverpass, normalizeIndoorLevels, type IndoorFeature } from '../../data/parsers/indoor';
 import type { AirportProps } from '../../data/parsers/airports';
 import { M_PER_FT } from '../../data/parsers/traffic';
 import { formatNumber } from '../../core/format';
@@ -167,7 +167,7 @@ export default defineLayer({
     async function loadIndoor(bbox: [number, number, number, number]) {
       const key = bbox.map((n) => n.toFixed(4)).join(',');
       const cached = indoorCache.get(key);
-      if (cached) { indoorFeatures.value = cached; return; }
+      if (cached) { indoorFeatures.value = normalizeIndoorLevels(cached); return; }
 
       // nearest airport within 2.5 km (from airport index, small + fast)
       const c = ml.getCenter();
@@ -186,7 +186,7 @@ export default defineLayer({
           const cacheKey = `icao:${best.icao}`;
           const cachedStatic = indoorCache.get(cacheKey);
           if (cachedStatic) {
-            indoorFeatures.value = cachedStatic;
+            indoorFeatures.value = normalizeIndoorLevels(cachedStatic);
             indoorFailed.value = undefined;
             indoorLoading.value--;
             return;
@@ -195,9 +195,10 @@ export default defineLayer({
             const r = await fetchJson<unknown>(assetsUrl(best.icao), { timeout: 20_000, signal: indoorCtl.signal, revalidate: true });
             const indoor = (r.data as { indoor?: IndoorFeature[] } | null)?.indoor;
             if (Array.isArray(indoor)) {
-              indoorCache.set(cacheKey, indoor);
-              indoorCache.set(key, indoor);
-              indoorFeatures.value = indoor;
+              const normalized = normalizeIndoorLevels(indoor);
+              indoorCache.set(cacheKey, normalized);
+              indoorCache.set(key, normalized);
+              indoorFeatures.value = normalized;
               indoorFailed.value = undefined;
               indoorLoading.value--;
               return;
@@ -214,7 +215,7 @@ export default defineLayer({
         for (const host of OVERPASS) {
           try {
             const res = await fetchJson<unknown>(`${host}?data=${encodeURIComponent(q)}`, { timeout: 45_000, signal: indoorCtl.signal });
-            const parsed = indoorPlanFromOverpass(res.data);
+            const parsed = normalizeIndoorLevels(indoorPlanFromOverpass(res.data));
             indoorCache.set(key, parsed);
             indoorFeatures.value = parsed;
             indoorFailed.value = undefined;

@@ -138,6 +138,19 @@ export function indoorPlanFromOverpass(raw: unknown): IndoorFeature[] {
   return out;
 }
 
+/** Round fractional OSM levels (e.g. 0.7, 1.3, -1.5) to integers for a clean level list. */
+export function normalizeIndoorLevels(features: IndoorFeature[]): IndoorFeature[] {
+  return features.map((f) => {
+    const lv = f.properties.level;
+    if (lv === undefined || lv === null || lv === '') return f;
+    const n = Number(lv);
+    if (!Number.isFinite(n)) return f;
+    const rounded = String(Math.round(n));
+    if (rounded === lv) return f;
+    return { ...f, properties: { ...f.properties, level: rounded } };
+  });
+}
+
 export function indoorLevels(features: IndoorFeature[]): string[] {
   const s = new Set<string>();
   for (const f of features) if (f.properties.level) s.add(f.properties.level);
