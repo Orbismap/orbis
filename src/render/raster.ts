@@ -24,6 +24,8 @@ export interface RasterLayerOptions {
   tileSize?: number;
   minzoom?: number;
   maxzoom?: number;
+  layerMinzoom?: number;
+  layerMaxzoom?: number;
   bounds?: [w: number, s: number, e: number, n: number];
   /** HTML attribution (shown in the map's attribution control). */
   attribution: string;
@@ -31,6 +33,8 @@ export interface RasterLayerOptions {
   slot?: SlotId;
   name?: string;
   paint?: { brightness?: [number, number]; contrast?: number; saturation?: number; hueRotate?: number; resampling?: 'linear' | 'nearest' };
+  /** Base multiplier for the layer opacity (may be a zoom expression). Defaults to 1. */
+  opacityBase?: number | unknown[];
   /** Reported with the status (e.g. when the image date is known). */
   updatedAt?: number;
 }
@@ -66,6 +70,8 @@ export function rasterLayer(ctx: LayerContext, o: RasterLayerOptions): LayerHand
   engine.addLayer(
     {
       id: layerId, type: 'raster', source: src,
+      ...(o.layerMinzoom !== undefined || o.minzoom !== undefined ? { minzoom: o.layerMinzoom ?? o.minzoom } : {}),
+      ...(o.layerMaxzoom !== undefined || o.maxzoom !== undefined ? { maxzoom: o.layerMaxzoom ?? o.maxzoom } : {}),
       paint: {
         'raster-opacity': 1,
         ...(p.brightness ? { 'raster-brightness-min': p.brightness[0], 'raster-brightness-max': p.brightness[1] } : {}),
@@ -78,7 +84,7 @@ export function rasterLayer(ctx: LayerContext, o: RasterLayerOptions): LayerHand
     } as LayerSpecification,
     o.slot ?? 'raster',
   );
-  clean.add(bindOpacity(ctx, ml, [{ layer: layerId, prop: 'raster-opacity', base: 1 }]));
+  clean.add(bindOpacity(ctx, ml, [{ layer: layerId, prop: 'raster-opacity', base: (o.opacityBase ?? 1) as never }]));
   if (reactive) {
     let first = true;
     clean.add(effect(() => {
