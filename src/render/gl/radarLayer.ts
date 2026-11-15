@@ -293,10 +293,24 @@ class RadarCustomLayer implements CustomLayerInterface {
   }
 
   private async fetchTile(url: string): Promise<{ bytes: Uint8Array; size: number } | null> {
+    // Cache API: RainViewer-Tiles sind pro URL unveränderlich (Frame-Pfad enthält die Frame-ID). Aggressives
+    // Cachen reduziert die Last auf den Free-Tier (100 req/IP/min) und vermeidet 429/CORS-Floods.
+    const cache = typeof caches !== 'undefined' ? await caches.open('rainviewer-tiles').catch(() => null) : null;
+    if (cache) {
+      const hit = await cache.match(url).catch(() => undefined);
+      if (hit) {
+        const buf = await hit.arrayBuffer();
+        return runParser('radarTile', buf, { format: 'arraybuffer', signal: this.ctx.signal });
+      }
+    }
     const res = await fetch(url, { signal: this.ctx.signal });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`HTTP ${res.status}`); // 429 / 5xx: asked again later
-    return runParser('radarTile', await res.arrayBuffer(), { format: 'arraybuffer', signal: this.ctx.signal });
+    const buf = await res.arrayBuffer();
+    if (cache) {
+      cache.put(url, new Response(buf.slice(0), { headers: { 'Content-Type': 'image/png' } })).catch(() => {});
+    }
+    return runParser('radarTile', buf, { format: 'arraybuffer', signal: this.ctx.signal });
   }
 
   /** Starts the motion estimate of a tile pair in the worker; the picture follows with the next repaint. */
