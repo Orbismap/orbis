@@ -1,0 +1,15 @@
+@layer features {
+  .oim {
+    position: relative;
+  }
+  .oim-pop {
+    /* open to the left of the rail so it cannot run off the right edge */
+    width: min(230px, calc(100vw - var(--rail-w) - var(--rail-inset) - 16px));
+    top: 0;
+    right: calc(100% + 8px);
+  }
+  .oim-pop.oim-up {
+    top: auto;
+    bottom: 0;
+  }
+}

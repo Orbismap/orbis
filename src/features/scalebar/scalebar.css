@@ -39,7 +39,14 @@
   .sb-bar .dk {
     background: rgb(40, 44, 48);
   }
-  /* just under the top edge; never takes clicks */
+  .sb-zoom {
+    margin-top: 2px;
+    text-align: center;
+    font: 500 9px/1 var(--font-ui);
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  }
+  /* top centre of the whole window, just under the top edge; never takes clicks */
   .scalebar-pos {
     position: absolute;
     z-index: 1;

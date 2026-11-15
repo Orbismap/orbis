@@ -2,6 +2,8 @@ import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { unitPrefs } from '../../core/units';
 import { useCameraFrame } from '../../map/useCameraFrame';
 import { mapEngine } from '../../state/ui';
+import { camera } from '../../state/view';
+import { settings } from '../../state/settings';
 import { haversine, MAX_PX, scaleModel, SCALE_UNITS, type ScaleModel } from './scale';
 import './scalebar.css';
 
@@ -69,6 +71,9 @@ export function Scalebar() {
           <i key={i} class={i % 2 ? 'dk' : 'lt'} />
         ))}
       </div>
+      {settings.value.debug && (
+        <div class="sb-zoom num" aria-hidden="true">Zoom {camera.value.zoom.toFixed(2)}</div>
+      )}
     </div>
   );
 }
