@@ -260,6 +260,12 @@ const CAT_LABEL = { aircraft:'Flugzeug', ship:'Schiff', transit:'ÖPNV', other:'
 let currentCategory = 'aircraft';
 let currentFile = null;
 let currentBuffer = null;
+window.__loadTest = async (url) => {
+  const r = await fetch(url);
+  const b = await r.arrayBuffer();
+  const f = new File([b], url.split('/').pop(), { type: 'model/gltf-binary' });
+  setFile(f);
+};
 
 // --- tabs ---
 document.querySelectorAll('.cat').forEach(t => {
@@ -293,6 +299,7 @@ const dir = new THREE.DirectionalLight(0xffffff, 0.8);
 dir.position.set(5,10,7); scene.add(dir);
 let modelGroup = null;
 let baseCenter = new THREE.Vector3();
+window.__dbg = () => ({ hasModel: !!modelGroup, children: modelGroup ? modelGroup.children.length : 0, canvas: canvas.clientWidth+'x'+canvas.clientHeight, dims: document.getElementById('dims').textContent });
 let baseMaxDim = 1;
 let gridHelper = new THREE.GridHelper(4, 20, 0x444466, 0x222244);
 gridHelper.visible = true;
