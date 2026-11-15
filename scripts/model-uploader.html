@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Orbis — Model Uploader</title>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<style>
+  :root { --bg:#0f131a; --panel:#171c26; --border:#2a3140; --fg:#e6eaf2; --muted:#8a93a6; --accent:#4f8cff; --ok:#3ddc97; --err:#ff5c5c; --tab:#1f2533; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:16px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; }
+  header h1 { margin:0; font-size:18px; }
+  main { display:grid; grid-template-columns: 1fr 1fr; gap:16px; padding:16px 24px; max-width:1200px; margin:0 auto; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
+  .card h2 { margin:0 0 12px; font-size:15px; }
+  #drop { border:2px dashed var(--border); border-radius:10px; padding:24px; text-align:center; color:var(--muted); cursor:pointer; min-height:120px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:6px; }
+  #drop.drag { border-color:var(--accent); color:var(--fg); background:rgba(79,140,255,.08); }
+  #drop .name { color:var(--fg); font-weight:600; }
+  label { display:block; margin:8px 0 4px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  input, textarea, select { width:100%; padding:8px 10px; background:#0b0f16; border:1px solid var(--border); border-radius:6px; color:var(--fg); font:inherit; }
+  textarea { min-height:60px; resize:vertical; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  button { padding:10px 16px; background:var(--accent); color:#fff; border:none; border-radius:8px; font:inherit; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  button.secondary { background:transparent; border:1px solid var(--border); }
+  #status { margin-top:12px; padding:10px 12px; border-radius:6px; font-size:13px; display:none; }
+  #status.ok { display:block; background:rgba(61,220,151,.12); color:var(--ok); border:1px solid rgba(61,220,151,.3); }
+  #status.err { display:block; background:rgba(255,92,92,.12); color:var(--err); border:1px solid rgba(255,92,92,.3); }
+  #preview { width:100%; height:320px; background:#0b0f16; border-radius:8px; }
+  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+  .checks { display:flex; gap:8px; align-items:center; margin-top:8px; font-size:12px; color:var(--muted); }
+  .tabs { display:flex; gap:6px; margin-bottom:12px; }
+  .tab { padding:8px 14px; background:var(--tab); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13px; color:var(--muted); }
+  .tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .field-group { display:none; }
+  .field-group.active { display:block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Orbis — Model Uploader</h1>
+  <span style="color:var(--muted);font-size:12px;">lokales Tool · drag & drop → models-staging</span>
+</header>
+<main>
+  <section class="card">
+    <h2>Kategorie</h2>
+    <div class="tabs">
+      <div class="tab active" data-cat="aircraft">✈️ Flugzeug</div>
+      <div class="tab" data-cat="ship">🚢 Schiff</div>
+      <div class="tab" data-cat="transit">🚌 ÖPNV</div>
+      <div class="tab" data-cat="other">📦 Sonstiges</div>
+    </div>
+
+    <h2>1. Modell-Datei</h2>
+    <div id="drop">Datei hierher ziehen (.glb / .gltf)<br><span class="hint">oder klicken zum Auswählen</span></div>
+    <input id="fileInput" type="file" accept=".glb,.gltf" hidden />
+    <div id="fileInfo" class="hint"></div>
+
+    <h2 style="margin-top:16px;">2. Metadaten</h2>
+    <label>Modell-ID (Schlüssel)</label>
+    <input id="id" placeholder="b737-800" />
+    <div class="row">
+      <div>
+        <label>Eingebaute Länge (m)</label>
+        <input id="length" type="number" step="0.01" placeholder="39.5" />
+      </div>
+      <div id="catField"></div>
+    </div>
+
+    <!-- aircraft-specific -->
+    <div class="field-group active" data-group="aircraft">
+      <label>ICAO-Typen (Code:Länge, kommagetrennt)</label>
+      <input id="types" placeholder="B738:39.5, B737:33.6" />
+      <div class="hint">z. B. B738, A320, C172. Leer lassen bei reinem Modell ohne Typ-Mapping.</div>
+    </div>
+    <!-- ship-specific -->
+    <div class="field-group" data-group="ship">
+      <label>Schiffsklasse</label>
+      <select id="shipClass">
+        <option value="cargo">Fracht (cargo)</option>
+        <option value="tanker">Tanker</option>
+        <option value="passenger">Passagier</option>
+        <option value="fishing">Fischer</option>
+        <option value="tug">Schlepper/Spezial</option>
+        <option value="pleasure">Segel/Pleasure</option>
+        <option value="other">Sonstige</option>
+      </select>
+    </div>
+    <!-- transit-specific -->
+    <div class="field-group" data-group="transit">
+      <label>Fahrzeugtyp</label>
+      <select id="transitType">
+        <option value="bus">Bus</option>
+        <option value="tram">Straßenbahn</option>
+        <option value="subway">U-Bahn</option>
+        <option value="train">Zug</option>
+        <option value="ferry">Fähre</option>
+      </select>
+    </div>
+    <!-- other-specific -->
+    <div class="field-group" data-group="other">
+      <label>Notiz / Kategorie</label>
+      <input id="otherNote" placeholder="z. B. Raumfahrzeug, Gebäude, ..." />
+    </div>
+
+    <label>Titel</label>
+    <input id="title" placeholder="Boeing 737-800" />
+    <div class="row">
+      <div>
+        <label>Autor</label>
+        <input id="author" placeholder="andriiharbut" />
+      </div>
+      <div>
+        <label>Lizenz</label>
+        <input id="license" placeholder="CC BY 4.0" />
+      </div>
+    </div>
+    <label>Quelle (URL)</label>
+    <input id="source" placeholder="https://sketchfab.com/..." />
+    <label>Original-Datei (optional, für import/)</label>
+    <input id="origInput" type="file" />
+    <div class="checks">
+      <input id="keepOrig" type="checkbox" checked /> Original in import/ ablegen
+    </div>
+
+    <h2 style="margin-top:16px;">3. Speichern</h2>
+    <button id="saveBtn" disabled>Zielordner wählen & speichern</button>
+    <div class="hint">Wählt den <code>models-staging</code>-Ordner (Bucket-Root). Schreibt <code>models/&lt;kategorie&gt;/&lt;id&gt;.glb</code>, aktualisiert <code>registry.json</code> + <code>CREDITS.json</code>.</div>
+    <div id="status"></div>
+  </section>
+  <section class="card">
+    <h2>Vorschau</h2>
+    <canvas id="preview"></canvas>
+    <div class="hint">Drag-orbit mit Maus. Meshopt-komprimierte Modelle werden unterstützt.</div>
+  </section>
+</main>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/meshopt_decoder.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const fileInfo = document.getElementById('fileInfo');
+const saveBtn = document.getElementById('saveBtn');
+const status = document.getElementById('status');
+
+let currentFile = null;
+let currentBuffer = null;
+let currentCategory = 'aircraft';
+
+const CAT_DIR = { aircraft:'aircraft', ship:'ships', transit:'transit', other:'other' };
+
+// --- tabs ---
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    currentCategory = t.dataset.cat;
+    document.querySelectorAll('.field-group').forEach(g => {
+      g.classList.toggle('active', g.dataset.group === currentCategory);
+    });
+    // update id placeholder
+    const idInput = document.getElementById('id');
+    if (!idInput.value) {
+      const ph = { aircraft:'b737-800', ship:'ever-given', transit:'berlin-bus', other:'item-1' }[currentCategory];
+      idInput.placeholder = ph;
+    }
+  });
+});
+
+// --- preview ---
+const canvas = document.getElementById('preview');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0f16);
+const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth/canvas.clientHeight, 0.01, 1000);
+camera.position.set(2,2,2);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x222244, 1.2));
+const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(5,10,7); scene.add(dir);
+let modelGroup = null;
+function resize(){ const w=canvas.clientWidth,h=canvas.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+window.addEventListener('resize', resize);
+function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
+animate();
+const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
+async function showPreview(buffer){
+  if (modelGroup){ scene.remove(modelGroup); modelGroup=null; }
+  try {
+    const gltf = await new Promise((resolve,reject)=>loader.parse(buffer,'',resolve,reject));
+    modelGroup = gltf.scene;
+    const box = new THREE.Box3().setFromObject(modelGroup);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    modelGroup.position.sub(center);
+    const maxDim = Math.max(size.x,size.y,size.z)||1;
+    modelGroup.scale.setScalar(2/maxDim);
+    scene.add(modelGroup);
+  } catch(e){ console.warn('preview failed', e); }
+}
+
+// --- drag & drop ---
+function setFile(file){
+  if(!file) return;
+  currentFile = file;
+  const r = new FileReader();
+  r.onload = (e) => {
+    currentBuffer = e.target.result;
+    fileInfo.textContent = `${file.name} — ${(file.size/1024).toFixed(1)} KB`;
+    const idInput = document.getElementById('id');
+    if(!idInput.value) idInput.value = file.name.replace(/\.(glb|gltf)$/i,'').toLowerCase().replace(/[^a-z0-9-]/g,'-');
+    showPreview(currentBuffer);
+  };
+  r.readAsArrayBuffer(file);
+}
+drop.addEventListener('click', ()=>fileInput.click());
+drop.addEventListener('dragover', (e)=>{ e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', ()=>drop.classList.remove('drag'));
+drop.addEventListener('drop', (e)=>{ e.preventDefault(); drop.classList.remove('drag'); if(e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', (e)=>{ if(e.target.files.length) setFile(e.target.files[0]); });
+
+function setStatus(msg, ok=true){ status.textContent=msg; status.className=ok?'ok':'err'; status.style.display='block'; }
+
+saveBtn.addEventListener('click', async () => {
+  if(!currentBuffer){ setStatus('Keine Datei gewählt.', false); return; }
+  const id = document.getElementById('id').value.trim();
+  const length = parseFloat(document.getElementById('length').value);
+  if(!id || !Number.isFinite(length)){ setStatus('ID und Länge (m) sind Pflicht.', false); return; }
+  if(!window.showDirectoryPicker){ setStatus('File System Access API nicht verfügbar — nutze Chrome/Edge.', false); return; }
+  let root;
+  try { root = await window.showDirectoryPicker({ mode:'readwrite' }); }
+  catch(e){ setStatus('Abgebrochen.', false); return; }
+  try {
+    saveBtn.disabled = true;
+    const title = document.getElementById('title').value.trim() || id;
+    const author = document.getElementById('author').value.trim() || 'unknown';
+    const license = document.getElementById('license').value.trim() || 'unknown';
+    const source = document.getElementById('source').value.trim() || '';
+    const subdir = CAT_DIR[currentCategory];
+
+    const targetName = id + '.glb';
+
+    // write glb
+    const modelsDir = await root.getDirectoryHandle('models', { create:true });
+    const catDir = await modelsDir.getDirectoryHandle(subdir, { create:true });
+    const glbHandle = await catDir.getFileHandle(targetName, { create:true });
+    const w = await glbHandle.createWritable();
+    await w.write(currentBuffer);
+    await w.close();
+
+    // import/ original
+    if(document.getElementById('keepOrig').checked){
+      const origFile = document.getElementById('origInput').files[0];
+      if(origFile){
+        const importDir = await root.getDirectoryHandle('import', { create:true });
+        const h = await importDir.getFileHandle(origFile.name, { create:true });
+        const w2 = await h.createWritable();
+        await w2.write(await origFile.arrayBuffer());
+        await w2.close();
+      }
+    }
+
+    // category-specific extra + registry merge
+    let registry = { models:{}, types:{}, classes:{}, vehicleTypes:{} };
+    try {
+      const rh = await catDir.getFileHandle('registry.json');
+      const f = await rh.getFile();
+      registry = JSON.parse(await f.text());
+    } catch {}
+    registry.models = registry.models || {};
+    registry.types = registry.types || {};
+    registry.classes = registry.classes || {};
+    registry.vehicleTypes = registry.vehicleTypes || {};
+
+    const entry = { file: targetName, length };
+    if (currentCategory === 'ship') entry.shipClass = document.getElementById('shipClass').value;
+    if (currentCategory === 'transit') entry.vehicleType = document.getElementById('transitType').value;
+    if (currentCategory === 'other') entry.note = document.getElementById('otherNote').value.trim();
+    registry.models[id] = entry;
+
+    if (currentCategory === 'aircraft') {
+      const typesRaw = document.getElementById('types').value.trim();
+      if (typesRaw) {
+        for (const part of typesRaw.split(',')) {
+          const [code, len] = part.trim().split(':');
+          if (!code) continue;
+          registry.types[code.trim().toUpperCase()] = [id, len ? parseFloat(len) : length];
+        }
+      }
+    } else if (currentCategory === 'ship') {
+      registry.classes[document.getElementById('shipClass').value] = registry.classes[document.getElementById('shipClass').value] || [];
+      if (!registry.classes[document.getElementById('shipClass').value].includes(id)) registry.classes[document.getElementById('shipClass').value].push(id);
+    } else if (currentCategory === 'transit') {
+      registry.vehicleTypes[document.getElementById('transitType').value] = registry.vehicleTypes[document.getElementById('transitType').value] || [];
+      if (!registry.vehicleTypes[document.getElementById('transitType').value].includes(id)) registry.vehicleTypes[document.getElementById('transitType').value].push(id);
+    }
+
+    const rHandle = await catDir.getFileHandle('registry.json', { create:true });
+    const rw = await rHandle.createWritable();
+    await rw.write(JSON.stringify(registry, null, 2) + '\n');
+    await rw.close();
+
+    // CREDITS merge
+    let credits = [];
+    try {
+      const ch = await catDir.getFileHandle('CREDITS.json');
+      const f = await ch.getFile();
+      credits = JSON.parse(await f.text());
+    } catch {}
+    if (!credits.some(c => c.file === targetName)) {
+      credits.push({ file: targetName, title, author, license, source });
+    }
+    const cHandle = await catDir.getFileHandle('CREDITS.json', { create:true });
+    const cw = await cHandle.createWritable();
+    await cw.write(JSON.stringify(credits, null, 2) + '\n');
+    await cw.close();
+
+    setStatus(`Gespeichert: models/${subdir}/${targetName} (Registry: ${Object.keys(registry.models).length} Modelle)`);
+  } catch (e) {
+    console.error(e);
+    setStatus('Fehler: ' + (e.message || e), false);
+  } finally {
+    saveBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
+EOF
+echo written
