@@ -183,23 +183,25 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     terminator.setLook(theme);
     applyTerrain();
   }
-  // 3D terrain. On the flat Orbis colours it flattens while you zoom in (scroll-driven, ZOOM_FLAT_FROM..ZOOM_FLAT_TO) and
-  // is gone on the 2D map; the relief shading stays. Switch and projection changes ease over time (the `gate`).
+  // 3D terrain scales smoothly up and down (exaggeration tween). On the flat Orbis colours it exists only on the globe:
+  // switching to the 2D map flattens it, and from there on the map stays without terrain.
   const TERRAIN_MS = 700;
-  const ZOOM_FLAT_FROM = 10;
-  const ZOOM_FLAT_TO = 12;
-  const isFlatOrbis = () => basemap === 'orbis-dark' || basemap === 'orbis-light';
-  let gate = 0; // 0..1, eased in time: switch and 2D projection
-  let gateGoal = -1;
+  /** from here on the globe has turned into the flat map: no terrain on the Orbis colours */
+  const TERRAIN_MAX_ZOOM_ORBIS = 12;
+  let terrainGoal = -1;
   let shadeGoal = -1;
-  let gateRaf = 0;
-  let shadeNow = 0; // relief shading of the flat Orbis colours: on with the switch, stays when the terrain is flattened
-  const gateTarget = () => (terrainOn && !(isFlatOrbis() && projectionSignal.peek() !== 'globe') ? 1 : 0);
-  /** 1 = full terrain, 0 = flat; follows the zoom directly (no timer) on the flat Orbis colours */
-  const zoomFactor = () => {
-    if (!isFlatOrbis()) return 1;
-    const t = Math.min(1, Math.max(0, (ml.getZoom() - ZOOM_FLAT_FROM) / (ZOOM_FLAT_TO - ZOOM_FLAT_FROM)));
-    return 1 - t * t * (3 - 2 * t);
+  let terrainNow = 0;
+  let terrainRaf = 0;
+  /** Relief shading of the flat Orbis colours: the same with 3D terrain and where the terrain is flattened (2D), off with the switch. */
+  let shadeNow = 0;
+  const SHADE_FLAT = 1;
+  const shadeTarget = () => {
+    if (!terrainOn || !(basemap === 'orbis-dark' || basemap === 'orbis-light')) return 0;
+    return terrainTarget() > 0 ? 1 : SHADE_FLAT;
+  };
+  const terrainTarget = () => {
+    const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
+    return terrainOn && !(flatOrbis && (projectionSignal.peek() !== 'globe' || ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS)) ? TERRAIN_EXAGGERATION : 0;
   };
   /**
    * Changes the exaggeration of the running terrain in place. `map.setTerrain` would rebuild the whole terrain every
@@ -208,42 +210,41 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
    */
   type TerrainInternals = { exaggeration: number; options: { exaggeration?: number }; coverage: { exaggeration: number } };
   function paintTerrain() {
-    const ex = TERRAIN_EXAGGERATION * gate * zoomFactor();
     const t = (ml as unknown as { terrain: TerrainInternals | null }).terrain;
-    if (ex <= 0.001) {
+    if (terrainNow <= 0.001) {
       if (t) ml.setTerrain(null);
     } else if (!t) {
-      ml.setTerrain({ source: TERRAIN_SOURCE, exaggeration: ex });
+      ml.setTerrain({ source: TERRAIN_SOURCE, exaggeration: terrainNow });
     } else if (t.coverage) {
-      t.exaggeration = ex;
-      t.options.exaggeration = ex;
-      t.coverage.exaggeration = ex;
+      t.exaggeration = terrainNow;
+      t.options.exaggeration = terrainNow;
+      t.coverage.exaggeration = terrainNow;
       (ml as unknown as { _camera?: { applyTerrainChange?: () => void } })._camera?.applyTerrainChange?.();
       ml.triggerRepaint();
-    } else ml.setTerrain({ source: TERRAIN_SOURCE, exaggeration: ex });
+    } else ml.setTerrain({ source: TERRAIN_SOURCE, exaggeration: terrainNow });
     setVis(HILLSHADE_LAYER, shadeNow > 0.001);
     if (ml.getLayer(HILLSHADE_LAYER)) ml.setPaintProperty(HILLSHADE_LAYER, 'hillshade-exaggeration', HILLSHADE_STRENGTH * shadeNow);
   }
   function applyTerrain() {
-    const to = gateTarget();
-    const shadeTo = terrainOn && isFlatOrbis() ? 1 : 0;
-    if (to === gateGoal && shadeTo === shadeGoal) return paintTerrain();
-    gateGoal = to;
+    const to = terrainTarget();
+    const shadeTo = shadeTarget();
+    if (to === terrainGoal && shadeTo === shadeGoal) return;
+    terrainGoal = to;
     shadeGoal = shadeTo;
-    cancelAnimationFrame(gateRaf);
-    const from = gate;
+    cancelAnimationFrame(terrainRaf);
+    const from = terrainNow;
     const shadeFrom = shadeNow;
     if (from === to && shadeFrom === shadeTo) return paintTerrain();
     const t0 = performance.now();
     const step = (now: number) => {
       const k = Math.min(1, (now - t0) / TERRAIN_MS);
       const e = 1 - Math.pow(1 - k, 3);
-      gate = from + (to - from) * e;
+      terrainNow = from + (to - from) * e;
       shadeNow = shadeFrom + (shadeTo - shadeFrom) * e;
       paintTerrain();
-      if (k < 1) gateRaf = requestAnimationFrame(step);
+      if (k < 1) terrainRaf = requestAnimationFrame(step);
     };
-    gateRaf = requestAnimationFrame(step);
+    terrainRaf = requestAnimationFrame(step);
   }
   ml.on('zoom', () => loaded && applyTerrain());
 
@@ -324,7 +325,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       terminator.destroy();
       picking.destroy();
       disposeBuildingsTilt();
-      cancelAnimationFrame(gateRaf);
+      cancelAnimationFrame(terrainRaf);
       ml.remove();
       if (current === engine) current = undefined;
     },
