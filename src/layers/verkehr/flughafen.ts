@@ -169,14 +169,13 @@ export default defineLayer({
       const cached = indoorCache.get(key);
       if (cached) { indoorFeatures.value = cached; return; }
 
-      // nearest airport within 2.5 km (from airport index, small + fast)
+      // nearest airport within 2.5 km (OurAirports), like the plan part
       const c = ml.getCenter();
       let best: { icao: string; lng: number; lat: number; d: number } | undefined;
-      for (const a of index.data.value ?? []) {
-        const lng = (a.bbox[0] + a.bbox[2]) / 2;
-        const lat = (a.bbox[1] + a.bbox[3]) / 2;
-        const d = Math.hypot((lng - c.lng) * Math.cos((c.lat * Math.PI) / 180), lat - c.lat) * 111.2;
-        if (d < 2.5 && (!best || d < best.d)) best = { icao: a.icao, lng, lat, d };
+      for (const f of ourAirports.data.value?.features ?? []) {
+        const [x, y] = f.geometry.coordinates as [number, number];
+        const d = Math.hypot((x - c.lng) * Math.cos((c.lat * Math.PI) / 180), y - c.lat) * 111.2;
+        if (d < 2.5 && (!best || d < best.d)) best = { icao: f.properties.icao, lng: x, lat: y, d };
       }
 
       indoorLoading.value++;
