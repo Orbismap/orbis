@@ -72,7 +72,17 @@ export function bindOpacity(ctx: LayerContext, ml: MlMap, targets: { layer: stri
     const o = ctx.opacity.value;
     for (const t of targets) {
       if (!ml.getLayer(t.layer)) continue;
-      ml.setPaintProperty(t.layer, t.prop as 'circle-opacity', typeof t.base === 'number' ? t.base * o : (['*', t.base, o] as Expr));
+      const base = t.base;
+      // If base is a zoom curve, scale its output values by o (can't wrap in '*' — MapLibre forbids zoom nested in '*').
+      let value: NumOrExpr;
+      if (Array.isArray(base) && (base[0] === 'interpolate' || base[0] === 'step') && Array.isArray(base[2]) && base[2][0] === 'zoom') {
+        value = mapOutputs(base as NumOrExpr, (v) => (typeof v === 'number' ? v * o : v));
+      } else if (typeof base === 'number') {
+        value = base * o;
+      } else {
+        value = (['*', base, o] as unknown) as NumOrExpr;
+      }
+      ml.setPaintProperty(t.layer, t.prop as 'circle-opacity', value as any);
     }
   });
 }
