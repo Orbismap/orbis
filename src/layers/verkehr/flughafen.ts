@@ -23,7 +23,6 @@ const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.p
 const env = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
 const AIRPORTS_URL = `${env.BASE_URL ?? './'}data/airports.json`;
 const assetsUrl = (icao: string) => bucketUrl('assets', `data/airports/${icao}.json`);
-const indoorAssetsUrl = (icao: string) => bucketUrl('assets', `data/indoor/${icao}.json`);
 
 // ---------- airport point styling ----------
 const large = ['interpolate', ['linear'], ['zoom'], 1, 2.5, 5, 4.5, 9, 7, 13, 10] as unknown as ExpressionSpecification;
@@ -190,12 +189,12 @@ export default defineLayer({
             return;
           }
           try {
-            const r = await fetchJson<unknown>(indoorAssetsUrl(best.icao), { timeout: 20_000, signal: indoorCtl.signal });
-            if (Array.isArray(r.data)) {
-              const parsed = r.data as IndoorFeature[];
-              indoorCache.set(cacheKey, parsed);
-              indoorCache.set(key, parsed);
-              indoorFeatures.value = parsed;
+            const r = await fetchJson<unknown>(assetsUrl(best.icao), { timeout: 20_000, signal: indoorCtl.signal });
+            const indoor = (r.data as { indoor?: IndoorFeature[] } | null)?.indoor;
+            if (Array.isArray(indoor)) {
+              indoorCache.set(cacheKey, indoor);
+              indoorCache.set(key, indoor);
+              indoorFeatures.value = indoor;
               indoorFailed.value = undefined;
               indoorLoading.value--;
               return;
