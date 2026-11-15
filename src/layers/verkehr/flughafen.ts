@@ -176,8 +176,9 @@ export default defineLayer({
         const lng = (a.bbox[0] + a.bbox[2]) / 2;
         const lat = (a.bbox[1] + a.bbox[3]) / 2;
         const d = Math.hypot((lng - c.lng) * Math.cos((c.lat * Math.PI) / 180), lat - c.lat) * 111.2;
-        if (d < 2.5 && (!best || d < best.d)) best = { icao: a.icao, lng, lat, d };
+        if (d < 10 && (!best || d < best.d)) best = { icao: a.icao, lng, lat, d };
       }
+
 
       indoorLoading.value++;
       try {
