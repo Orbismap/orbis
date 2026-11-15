@@ -68,8 +68,8 @@ export default defineLayer({
     { name: 'OpenStreetMap (Simple Indoor Tagging)', url: 'https://www.openstreetmap.org/copyright', license: 'ODbL 1.0' },
   ],
   legend: { type: 'classes', items: [
-    { color: '#d5dbe6', label: 'Piste', shape: 'line' },
-    { color: '#7d8da6', label: 'Rollweg', shape: 'line' },
+    { color: '#2b313b', label: 'Piste', shape: 'line' },
+    { color: '#4b5360', label: 'Rollweg', shape: 'line' },
     { color: '#3b4960', label: 'Vorfeld', shape: 'square' },
     { color: '#6f86b0', label: 'Terminal, Hangar', shape: 'square' },
     { color: '#ffd166', label: 'Gate, Stellplatz', shape: 'dot' },
@@ -309,7 +309,7 @@ export default defineLayer({
     const planHandles = [
       areaLayer(kitCtx, {
         data: polys, name: 'areas', minZoom: MIN_PLAN_ZOOM,
-        fill: ['match', ['get', 'kind'], 'apron', '#3b4960', 'terminal', '#6f86b0', 'hangar', '#5d7092', 'helipad', '#4a5a74', '#3b4960'] as unknown as ExpressionSpecification,
+        fill: ['match', ['get', 'kind'], 'apron', '#3b4960', 'terminal', '#6f86b0', 'hangar', '#5d7092', 'building', '#6b7280', 'helipad', '#4a5a74', '#3b4960'] as unknown as ExpressionSpecification,
         fillOpacity: 0.85, outline: { color: '#7d8da6', width: 0.6 },
         describe: (f: AnyFeature) => {
           const p = f.properties as PlanPolygon['properties'];
@@ -317,9 +317,9 @@ export default defineLayer({
           return { title: p.name || name, subtitle: p.name ? name : undefined, color: PLAN_COLOR, icon: 'plane', facts: [...(p.ref ? [{ label: 'Kennung', value: p.ref }] : []), ...(p.h > 0 ? [{ label: 'Höhe', value: `${Math.round(p.h)} m` }] : [])] };
         },
       }),
-      lineLayer(kitCtx, { data: taxis, name: 'taxiways', minZoom: MIN_PLAN_ZOOM, color: '#7d8da6', width: widthExpr, casing: false, opacity: 0.95 }),
+      lineLayer(kitCtx, { data: taxis, name: 'taxiways', minZoom: MIN_PLAN_ZOOM, color: '#4b5360', width: widthExpr, casing: false, opacity: 1 }),
       lineLayer(kitCtx, {
-        data: runways, name: 'runways', minZoom: MIN_PLAN_ZOOM, color: '#d5dbe6', width: widthExpr, casing: { color: '#1b2433', extra: 1 },
+        data: runways, name: 'runways', minZoom: MIN_PLAN_ZOOM, color: '#2b313b', width: widthExpr, casing: { color: '#1b2433', extra: 1 },
         describe: (f: AnyFeature) => {
           const p = f.properties as PlanLine['properties'];
           return { title: `Piste ${p.ref || ''}`.trim(), color: PLAN_COLOR, icon: 'plane', facts: [{ label: 'Breite', value: `${Math.round(p.w)} m` }, ...(p.surface ? [{ label: 'Belag', value: SURFACE[p.surface] ?? p.surface }] : [])] };
