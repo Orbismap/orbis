@@ -26,3 +26,4 @@ Dokumentation:
 - [docs/DESIGN.md](docs/DESIGN.md): Gestaltung
 - [docs/LAYERS.md](docs/LAYERS.md): Ebene anlegen, Render-Bausteine
 - [docs/DATA.md](docs/DATA.md): Buckets, Manifest, Resource, Parser, OWX
+- [docs/research/README.md](docs/research/README.md): Recherche zu neuen Datenquellen (offene Lizenzen)
