@@ -6,9 +6,11 @@ dist
 *.log
 .DS_Store
 .vite
+.obsidian
 # generated indoor plans (hosted in the assets bucket, not committed)
 public/data/indoor/
 
 test/out
 dist-smoke
 dist-thumbs
+models-staging/

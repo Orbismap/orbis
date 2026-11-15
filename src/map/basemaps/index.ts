@@ -37,6 +37,7 @@ const vis = (on: boolean) => ({ visibility: on ? ('visible' as const) : ('none' 
 export const TERRAIN_SOURCE = 'terrain-dem';
 export const HILLSHADE_LAYER = 'terrain-hillshade';
 export const TERRAIN_EXAGGERATION = 1.4;
+export const HILLSHADE_STRENGTH = 0.35;
 export const TERRAIN_ATTRIBUTION = 'Gelände: <a href="https://mapterhorn.com/attribution/" target="_blank" rel="noopener">Mapterhorn</a>, <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles</a>';
 export const TERRAIN_SPEC: SourceSpecification = { type: 'raster-dem', tiles: [DEM_TILES], tileSize: 512, maxzoom: DEM_NATIVE_ZOOM, encoding: 'terrarium', attribution: TERRAIN_ATTRIBUTION };
 
@@ -61,7 +62,7 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
   // relief shading for the flat Orbis colours; only shown while 3D terrain is on (engine.setTerrain)
   layers.push({
     id: HILLSHADE_LAYER, type: 'hillshade', source: TERRAIN_SOURCE, layout: { visibility: 'none' },
-    paint: { 'hillshade-exaggeration': 0.35, 'hillshade-shadow-color': 'rgba(8, 12, 22, 0.55)', 'hillshade-highlight-color': 'rgba(255, 255, 255, 0.18)', 'hillshade-accent-color': 'rgba(8, 12, 22, 0.25)' },
+    paint: { 'hillshade-exaggeration': 0, 'hillshade-shadow-color': 'rgba(8, 12, 22, 0.55)', 'hillshade-highlight-color': 'rgba(255, 255, 255, 0.18)', 'hillshade-accent-color': 'rgba(8, 12, 22, 0.25)' },
   } as LayerSpecification);
   const active = BASEMAPS[o.basemap].labelVariant;
   const marker = (m: (typeof MARKERS)[number]) => ({ id: markerLayerId(m), type: 'background', layout: { visibility: 'none' } }) as LayerSpecification;
