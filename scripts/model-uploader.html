@@ -1,337 +1,1560 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="utf-8" />
-<title>Orbis — Model Uploader</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Orbis Model Prep</title>
 <script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+    "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js",
+    "meshopt-simplifier": "https://cdn.jsdelivr.net/npm/meshoptimizer@0.20.0/meshopt_simplifier.module.js"
+  }
+}
 </script>
 <style>
-  :root { --bg:#0f131a; --panel:#171c26; --border:#2a3140; --fg:#e6eaf2; --muted:#8a93a6; --accent:#4f8cff; --ok:#3ddc97; --err:#ff5c5c; --tab:#1f2533; }
-  * { box-sizing:border-box; }
-  body { margin:0; font:14px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
-  header { padding:16px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; }
-  header h1 { margin:0; font-size:18px; }
-  main { display:grid; grid-template-columns: 1fr 1fr; gap:16px; padding:16px 24px; max-width:1200px; margin:0 auto; }
-  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
-  .card h2 { margin:0 0 12px; font-size:15px; }
-  #drop { border:2px dashed var(--border); border-radius:10px; padding:24px; text-align:center; color:var(--muted); cursor:pointer; min-height:120px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:6px; }
-  #drop.drag { border-color:var(--accent); color:var(--fg); background:rgba(79,140,255,.08); }
-  #drop .name { color:var(--fg); font-weight:600; }
-  label { display:block; margin:8px 0 4px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
-  input, textarea, select { width:100%; padding:8px 10px; background:#0b0f16; border:1px solid var(--border); border-radius:6px; color:var(--fg); font:inherit; }
-  textarea { min-height:60px; resize:vertical; }
-  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  button { padding:10px 16px; background:var(--accent); color:#fff; border:none; border-radius:8px; font:inherit; font-weight:600; cursor:pointer; }
-  button:disabled { opacity:.5; cursor:not-allowed; }
-  button.secondary { background:transparent; border:1px solid var(--border); }
-  #status { margin-top:12px; padding:10px 12px; border-radius:6px; font-size:13px; display:none; }
-  #status.ok { display:block; background:rgba(61,220,151,.12); color:var(--ok); border:1px solid rgba(61,220,151,.3); }
-  #status.err { display:block; background:rgba(255,92,92,.12); color:var(--err); border:1px solid rgba(255,92,92,.3); }
-  #preview { width:100%; height:320px; background:#0b0f16; border-radius:8px; }
-  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
-  .checks { display:flex; gap:8px; align-items:center; margin-top:8px; font-size:12px; color:var(--muted); }
-  .tabs { display:flex; gap:6px; margin-bottom:12px; }
-  .tab { padding:8px 14px; background:var(--tab); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13px; color:var(--muted); }
-  .tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
-  .field-group { display:none; }
-  .field-group.active { display:block; }
+  :root{
+    --bg:#0b0f16; --bg2:#0d1220; --panel:#141926; --panel2:#1b2233;
+    --border:#262e40; --border2:#38415a;
+    --fg:#e7ebf3; --muted:#8b94a8; --dim:#606a80;
+    --accent:#4f8cff; --accent2:#7c5cff;
+    --ok:#3ddc97; --err:#ff5c5c; --warn:#ffb347;
+    --radius:12px;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--fg);
+    display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100vh;overflow:hidden;
+  }
+
+  /* ---------- Kopfzeile ---------- */
+  header{display:flex;align-items:center;gap:14px;height:50px;padding:0 16px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#131927,#0b0f16);overflow-x:auto}
+  header h1{margin:0;font-size:15px;font-weight:700;white-space:nowrap}
+  header h1 .thin{font-weight:300;color:var(--muted)}
+  .cats{display:flex;gap:4px}
+  .cat{padding:5px 12px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;user-select:none;white-space:nowrap;transition:.15s}
+  .cat:hover{color:var(--fg);background:var(--panel2)}
+  .cat.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  #headerRight{margin-left:auto;display:flex;gap:8px;align-items:center;white-space:nowrap}
+  #saveBtnTop{padding:6px 16px;font-size:12px}
+  .pill{font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted);white-space:nowrap;max-width:230px;overflow:hidden;text-overflow:ellipsis}
+  .pill.ok{color:var(--ok);border-color:rgba(61,220,151,.4);background:rgba(61,220,151,.07)}
+  .pill.warn{color:var(--warn);border-color:rgba(255,179,71,.45);background:rgba(255,179,71,.07)}
+  .pill.click{cursor:pointer}
+
+  /* ---------- Hauptbereich: Dock links + Bühne rechts ---------- */
+  main{display:grid;grid-template-columns:344px minmax(0,1fr);min-height:0}
+  .dock{border-right:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;min-height:0}
+  .stepTabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:8px;border-bottom:1px solid var(--border)}
+  .stepTab{padding:7px 2px;text-align:center;font-size:10.5px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;user-select:none;transition:.15s;line-height:1.2}
+  .stepTab:hover{color:var(--fg);border-color:var(--border2)}
+  .stepTab .num{width:16px;height:16px;border-radius:5px;background:var(--panel2);border:1px solid var(--border);color:var(--accent);font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:700}
+  .stepTab.active{color:var(--fg);border-color:var(--accent);background:rgba(79,140,255,.1)}
+  .stepTab.active .num{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .stepTab.done .num{background:rgba(61,220,151,.15);color:var(--ok);border-color:rgba(61,220,151,.4)}
+
+  .stepContent{flex:1;overflow-y:auto;padding:12px;min-height:0}
+  .stepPane{display:none;flex-direction:column;gap:12px}
+  .stepPane.active{display:flex}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px}
+  .panel h3{margin:0 0 8px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:650}
+
+  label{display:block;margin:8px 0 3px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  input,select{width:100%;padding:8px 10px;background:#0a0e15;border:1px solid var(--border);border-radius:7px;color:var(--fg);font:inherit;font-size:13px;transition:border-color .15s}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+  button{padding:8px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+  button:hover{filter:brightness(1.12)}
+  button:disabled{opacity:.35;cursor:not-allowed;filter:none}
+  button.secondary{background:var(--panel2);border:1px solid var(--border);color:var(--fg);font-weight:500}
+  button.secondary:hover{border-color:var(--border2)}
+  button.small{padding:3px 9px;font-size:11px}
+  button.danger{background:transparent;border:1px solid var(--err);color:var(--err);padding:3px 9px;font-size:11px}
+
+  #drop{border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;transition:.15s;font-size:13px}
+  #drop:hover{border-color:var(--border2)}
+  #drop.drag{border-color:var(--accent);color:var(--fg);background:rgba(79,140,255,.08)}
+  #drop .hint{font-size:11px}
+
+  .hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.45}
+  .hint.ok{color:var(--ok)} .hint.err{color:var(--err)} .hint.info{color:var(--accent)}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:11px;font-family:var(--mono)}
+
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .checks{display:flex;gap:14px;align-items:center;margin-top:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .checks label{margin:0;text-transform:none;letter-spacing:0;font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer}
+  .checks input{width:auto}
+
+  .slider-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+  .slider-row label{margin:0;min-width:88px;text-transform:none;letter-spacing:0;font-size:12px}
+  .slider-row input[type=range]{flex:1}
+  .slider-row .val{min-width:40px;text-align:right;font-size:11px;color:var(--muted);font-family:var(--mono)}
+
+  .transform-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .transform-grid .field{display:flex;flex-direction:column;gap:3px}
+  .transform-grid label{margin:0;font-size:10px}
+  .transform-grid input{padding:5px 8px;font-size:12px}
+
+  .field-group{display:none}
+  .field-group.active{display:block}
+
+  /* ---------- Bühne (Vorschau) ---------- */
+  .stage{position:relative;min-height:0;display:flex;flex-direction:column;padding:12px}
+  .viewport{position:relative;flex:1;min-height:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:#0a0e15}
+  #preview{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .chip{position:absolute;background:rgba(13,18,32,.84);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:11px;color:var(--muted);pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #statsBar{top:10px;left:10px;max-width:calc(100% - 240px)}
+  #statsBar b{color:var(--fg);font-family:var(--mono)}
+  #dims{position:absolute;bottom:10px;left:10px;max-width:calc(100% - 190px);font-family:var(--mono)}
+  #dims.ok{color:var(--ok);border-color:rgba(61,220,151,.4)}
+  .corner{position:absolute;bottom:12px;right:12px;font-size:10px;color:var(--dim);pointer-events:none;text-align:right}
+  .stageTools{position:absolute;top:10px;right:10px;display:flex;gap:7px;align-items:center;flex-wrap:wrap;background:rgba(13,18,32,.84);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:8px;padding:6px 9px}
+  .stageTools label{margin:0;text-transform:none;letter-spacing:0;font-size:11px;color:var(--muted)}
+  .stageTools select{width:auto;padding:3px 6px;font-size:11px}
+  .stageTools input[type=range]{width:80px}
+  .loading-overlay{position:absolute;inset:0;background:rgba(11,15,22,.72);display:none;align-items:center;justify-content:center;color:var(--fg);font-size:13px;gap:10px;z-index:7}
+  .loading-overlay.active{display:flex}
+  .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .viewport.drag::after{content:'Modell hier ablegen …';position:absolute;inset:10px;border:2px dashed var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--fg);background:rgba(79,140,255,.08);font-size:15px;z-index:6;pointer-events:none}
+
+  /* ---------- untere Leiste ---------- */
+  .bottomDock{border-top:1px solid var(--border);background:var(--bg2)}
+  .dockHead{display:flex;align-items:center;gap:12px;padding:7px 14px;min-height:36px}
+  #status{flex:1;font-size:12px;line-height:1.4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #status.ok{color:var(--ok)} #status.err{color:var(--err)} #status.info{color:var(--accent)} #status.warn{color:var(--warn)}
+  .dockBody{height:168px;display:grid;grid-template-columns:1.25fr 1fr;border-top:1px solid var(--border)}
+  .bottomDock.collapsed .dockBody{display:none}
+  .dockCol{padding:8px 14px;overflow:auto;min-height:0}
+  .dockCol+.dockCol{border-left:1px solid var(--border)}
+  .dockColTitle{display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:650}
+  .dockColTitle button{margin-left:auto}
+
+  .pipelog{font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.55}
+  table.stats{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+  table.stats td{padding:3px 6px;border-bottom:1px solid var(--border)}
+  table.stats td:first-child{color:var(--muted)}
+  table.stats td.mono{font-family:var(--mono);text-align:right}
+  table.stats td.ok{color:var(--ok)}
+  table.stats td.bad{color:var(--err)}
+
+  table.lib{width:100%;border-collapse:collapse;font-size:12px}
+  .lib th{text-align:left;color:var(--dim);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:4px 6px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2)}
+  .lib td{padding:5px 6px;border-bottom:1px solid var(--border)}
+  .lib td.mono{font-family:var(--mono)}
+  .lib .actions{display:flex;gap:4px;justify-content:flex-end;margin:0}
+  .lib .empty{text-align:center;color:var(--dim);padding:14px}
+  .qitem{display:flex;justify-content:space-between;gap:10px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;margin-top:6px;cursor:pointer;font-size:12px}
+  .qitem:hover{border-color:var(--accent)}
+  .qitem.active{border-color:var(--accent);color:var(--fg)}
+  .qsize{color:var(--dim);font-family:var(--mono)}
+
+  .modal-back{position:fixed;inset:0;background:rgba(5,8,14,.72);display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal{background:var(--panel);border:1px solid var(--border2);border-radius:var(--radius);max-width:680px;width:92%;max-height:84vh;overflow:auto;padding:22px 26px}
+  .modal h2{margin:0 0 10px;font-size:16px}
+  .modal h3{margin:14px 0 6px;font-size:13px;color:var(--accent)}
+  .modal p,.modal li{font-size:13px;color:var(--fg);line-height:1.55}
+  .modal ul,.modal ol{margin:6px 0;padding-left:20px}
+
+  /* ---------- kleine Bildschirme ---------- */
+  @media(max-width:900px){
+    body{height:auto;overflow:auto;grid-template-rows:auto auto auto}
+    main{display:flex;flex-direction:column}
+    .stage{order:0;padding:12px}
+    .viewport{min-height:380px}
+    .dock{order:1;border-right:none;border-top:1px solid var(--border)}
+    .stepTabs{display:none}
+    .stepPane{display:flex !important}
+    .dockBody{grid-template-columns:1fr;height:auto}
+    .dockCol+.dockCol{border-left:none;border-top:1px solid var(--border)}
+    .dockCol{max-height:280px}
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>Orbis — Model Uploader</h1>
-  <span style="color:var(--muted);font-size:12px;">lokales Tool · drag & drop → models-staging</span>
+  <h1>Orbis <span class="thin">Model Prep</span></h1>
+  <div class="cats">
+    <div class="cat active" data-cat="aircraft">✈ Flugzeug</div>
+    <div class="cat" data-cat="ship">🚢 Schiff</div>
+    <div class="cat" data-cat="transit">🚌 ÖPNV</div>
+    <div class="cat" data-cat="other">📦 Sonstiges</div>
+  </div>
+  <div id="headerRight">
+    <span class="pill warn" id="folderPill">📁 kein Ordner verbunden</span>
+    <button id="changeFolderBtn" class="secondary small">Ordner verbinden</button>
+    <button id="saveBtnTop" disabled>Speichern</button>
+    <button id="helpBtn" class="secondary small">?</button>
+  </div>
 </header>
+
 <main>
-  <section class="card">
-    <h2>Kategorie</h2>
-    <div class="tabs">
-      <div class="tab active" data-cat="aircraft">✈️ Flugzeug</div>
-      <div class="tab" data-cat="ship">🚢 Schiff</div>
-      <div class="tab" data-cat="transit">🚌 ÖPNV</div>
-      <div class="tab" data-cat="other">📦 Sonstiges</div>
+  <!-- LINKS: Schritt-Tabs -->
+  <aside class="dock">
+    <div class="stepTabs">
+      <div class="stepTab active" data-step="import"><span class="num">1</span>Import</div>
+      <div class="stepTab" data-step="opt"><span class="num">2</span>Optimieren</div>
+      <div class="stepTab" data-step="transform"><span class="num">3</span>Ausrichten</div>
+      <div class="stepTab" data-step="save"><span class="num">4</span>Speichern</div>
     </div>
 
-    <h2>1. Modell-Datei</h2>
-    <div id="drop">Datei hierher ziehen (.glb / .gltf)<br><span class="hint">oder klicken zum Auswählen</span></div>
-    <input id="fileInput" type="file" accept=".glb,.gltf" hidden />
-    <div id="fileInfo" class="hint"></div>
+    <div class="stepContent">
+      <!-- Schritt 1: Import -->
+      <div class="stepPane active" data-pane="import">
+        <div class="panel">
+          <h3>Modell importieren</h3>
+          <div id="drop">Modell hierher ziehen — <b>.glb</b>, <b>.gltf</b> oder <b>.zip</b>
+            <div class="hint">ZIP-Pakete (Sketchfab) und gltf+bin+Texturen werden automatisch zugeordnet · oder klicken zum Auswählen · Ablegen direkt in der 3D-Vorschau funktioniert auch</div>
+          </div>
+          <input id="fileInput" type="file" accept=".glb,.gltf,.zip,.bin,.png,.jpg,.jpeg,.webp" hidden multiple/>
+          <div id="fileInfo" class="hint"></div>
+        </div>
 
-    <h2 style="margin-top:16px;">2. Metadaten</h2>
-    <label>Modell-ID (Schlüssel)</label>
-    <input id="id" placeholder="b737-800" />
-    <div class="row">
-      <div>
-        <label>Eingebaute Länge (m)</label>
-        <input id="length" type="number" step="0.01" placeholder="39.5" />
+        <div class="panel" id="queueCard" style="display:none">
+          <h3>Weitere Dateien — klicken zum Laden</h3>
+          <div id="queueList"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Identität &amp; Credits</h3>
+          <div class="row">
+            <div><label>Modell-ID</label><input id="id" placeholder="b737-800"/></div>
+            <div><label>Reale Länge (m)</label><input id="length" type="number" step="0.01" min="0" placeholder="39.5"/></div>
+          </div>
+          <div class="field-group active" data-group="aircraft">
+            <label>ICAO-Typcodes (CODE:länge_m, kommasepariert)</label>
+            <input id="types" placeholder="B738:39.5, B737:33.6"/>
+          </div>
+          <div class="field-group" data-group="ship">
+            <label>Schiffsklasse</label>
+            <select id="shipClass">
+              <option value="cargo">Frachtschiff</option><option value="tanker">Tanker</option>
+              <option value="passenger">Passagierschiff</option><option value="fishing">Fischerei</option>
+              <option value="tug">Schlepper/Spezial</option><option value="pleasure">Segel/Freizeit</option>
+              <option value="other">Sonstige</option>
+            </select>
+          </div>
+          <div class="field-group" data-group="transit">
+            <label>Fahrzeugtyp</label>
+            <select id="transitType">
+              <option value="bus">Bus</option><option value="tram">Tram</option>
+              <option value="subway">U-Bahn</option><option value="train">Zug</option>
+              <option value="ferry">Fähre</option>
+            </select>
+          </div>
+          <div class="field-group" data-group="other">
+            <label>Notiz</label>
+            <input id="otherNote" placeholder="z. B. Raumfahrtzeug, Gebäude"/>
+          </div>
+          <label>Titel</label><input id="title" placeholder="Boeing 737-800"/>
+          <div class="row">
+            <div><label>Autor</label><input id="author" placeholder="sketchfab-nutzer"/></div>
+            <div><label>Lizenz</label><input id="license" placeholder="CC BY 4.0"/></div>
+          </div>
+          <label>Quelle (URL)</label><input id="source" placeholder="https://sketchfab.com/3d-models/..."/>
+        </div>
       </div>
-      <div id="catField"></div>
-    </div>
 
-    <!-- aircraft-specific -->
-    <div class="field-group active" data-group="aircraft">
-      <label>ICAO-Typen (Code:Länge, kommagetrennt)</label>
-      <input id="types" placeholder="B738:39.5, B737:33.6" />
-      <div class="hint">z. B. B738, A320, C172. Leer lassen bei reinem Modell ohne Typ-Mapping.</div>
-    </div>
-    <!-- ship-specific -->
-    <div class="field-group" data-group="ship">
-      <label>Schiffsklasse</label>
-      <select id="shipClass">
-        <option value="cargo">Fracht (cargo)</option>
-        <option value="tanker">Tanker</option>
-        <option value="passenger">Passagier</option>
-        <option value="fishing">Fischer</option>
-        <option value="tug">Schlepper/Spezial</option>
-        <option value="pleasure">Segel/Pleasure</option>
-        <option value="other">Sonstige</option>
-      </select>
-    </div>
-    <!-- transit-specific -->
-    <div class="field-group" data-group="transit">
-      <label>Fahrzeugtyp</label>
-      <select id="transitType">
-        <option value="bus">Bus</option>
-        <option value="tram">Straßenbahn</option>
-        <option value="subway">U-Bahn</option>
-        <option value="train">Zug</option>
-        <option value="ferry">Fähre</option>
-      </select>
-    </div>
-    <!-- other-specific -->
-    <div class="field-group" data-group="other">
-      <label>Notiz / Kategorie</label>
-      <input id="otherNote" placeholder="z. B. Raumfahrzeug, Gebäude, ..." />
-    </div>
+      <!-- Schritt 2: Optimieren -->
+      <div class="stepPane" data-pane="opt">
+        <div class="panel">
+          <h3>Einstellungen</h3>
+          <div class="row">
+            <div><label>Preset</label>
+              <select id="preset">
+                <option value="balanced" selected>Ausgewogen</option>
+                <option value="quality">Qualität</option>
+                <option value="tiny">Klein</option>
+                <option value="custom">Eigene</option>
+              </select>
+            </div>
+            <div><label>Max. Texturgröße</label>
+              <select id="texMax">
+                <option value="512">512 px</option>
+                <option value="1024" selected>1024 px</option>
+                <option value="2048">2048 px</option>
+                <option value="4096">4096 px</option>
+                <option value="0">Original belassen</option>
+              </select>
+            </div>
+          </div>
+          <div class="checks">
+            <label><input id="weld" type="checkbox" checked/> Vertices vereinen</label>
+            <label><input id="simplifyChk" type="checkbox"/> Dezimieren</label>
+            <label><input id="mergeChk" type="checkbox"/> Meshes zusammenführen</label>
+          </div>
+          <div class="slider-row" id="simplifyRow" style="display:none">
+            <label>Ziel-Tris</label>
+            <input id="simplifyRatio" type="range" min="10" max="100" step="5" value="50"/>
+            <span class="val" id="simplifyRatioVal">50%</span>
+          </div>
+          <div class="hint">Farb-Texturen werden auf die Maximalgröße verkleinert und als JPEG kodiert, Daten-Maps (Normal/Roughness) bleiben PNG. Vorher/Nachher siehe unten.</div>
+        </div>
 
-    <label>Titel</label>
-    <input id="title" placeholder="Boeing 737-800" />
-    <div class="row">
-      <div>
-        <label>Autor</label>
-        <input id="author" placeholder="andriiharbut" />
+        <div class="panel">
+          <h3>Ergebnis</h3>
+          <div id="optStats"></div>
+          <div id="optStatus" class="hint">Wird nach dem Import und bei Änderungen automatisch neu aufgebaut.</div>
+          <div class="actions"><button id="rebuildBtn" class="secondary">Jetzt neu aufbauen</button></div>
+        </div>
       </div>
-      <div>
-        <label>Lizenz</label>
-        <input id="license" placeholder="CC BY 4.0" />
+
+      <!-- Schritt 3: Ausrichten -->
+      <div class="stepPane" data-pane="transform">
+        <div class="panel">
+          <h3>Skalierung &amp; Ausrichtung</h3>
+          <div class="slider-row">
+            <label>Skalierung ×</label>
+            <input id="scaleSlider" type="range" min="0" max="1000" step="1" value="500"/>
+            <input id="scale" type="number" step="0.001" min="0.0001" value="1" style="width:92px"/>
+          </div>
+          <div class="hint">Slider ist logarithmisch (0,01× – 100×) — wichtig für cm-skalierte Sketchfab-Modelle. <b>Länge anpassen</b> skaliert automatisch auf die reale Länge aus Schritt 1.</div>
+          <div class="transform-grid" style="margin-top:8px">
+            <div class="field"><label>Rot X°</label><input id="rotX" type="number" step="1" value="0"/></div>
+            <div class="field"><label>Rot Y°</label><input id="rotY" type="number" step="1" value="0"/></div>
+            <div class="field"><label>Rot Z°</label><input id="rotZ" type="number" step="1" value="0"/></div>
+            <div class="field"><label>Pos X</label><input id="tx" type="number" step="0.01" value="0"/></div>
+            <div class="field"><label>Pos Y</label><input id="ty" type="number" step="0.01" value="0"/></div>
+            <div class="field"><label>Pos Z</label><input id="tz" type="number" step="0.01" value="0"/></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Helfer &amp; Ansicht</h3>
+          <div class="actions">
+            <button id="fitLenBtn" class="secondary">Länge anpassen</button>
+            <button id="snapGroundBtn" class="secondary">Boden Y=0</button>
+            <button id="centerXZBtn" class="secondary">Zentrieren XZ</button>
+            <button id="flipBtn" class="secondary">180° drehen</button>
+            <button id="resetTransformBtn" class="secondary">Zurücksetzen</button>
+          </div>
+          <div class="checks">
+            <label><input id="wireframe" type="checkbox"/> Drahtgitter</label>
+            <label><input id="grid" type="checkbox" checked/> Gitter</label>
+            <label><input id="axes" type="checkbox" checked/> Achsen</label>
+            <label><input id="autoRotate" type="checkbox"/> Auto-Rotation</label>
+          </div>
+          <div class="hint">Konvention: <b>Y oben · Nase +Z · Räder auf Y=0</b>. Die Vorschau zeigt exakt das Ergebnis, das gespeichert wird.</div>
+        </div>
+      </div>
+
+      <!-- Schritt 4: Speichern -->
+      <div class="stepPane" data-pane="save">
+        <div class="panel">
+          <h3>In models-staging speichern</h3>
+          <button id="saveBtn" style="width:100%">Speichern — optimiertes GLB + Registry + Credits</button>
+          <div class="hint">Schreibt <code>models/&lt;kategorie&gt;/&lt;id&gt;.glb</code> (optimiert), das Original nach <code>import/</code> und aktualisiert <code>registry.json</code> + <code>CREDITS.json</code> in der Kategorie-Ablage. Der Ordner bleibt über Sitzungen verbunden — einmal „Ordner verbinden“ oben rechts genügt.</div>
+          <div class="actions">
+            <button id="exportBtn" class="secondary" disabled>Optimiertes GLB herunterladen</button>
+            <button id="resetFormBtn" class="secondary">Metadaten leeren</button>
+          </div>
+          <div class="hint">Der <b>Speichern</b>-Button oben rechts tut dasselbe und ist immer erreichbar. In Firefox/Safari (ohne Ordnerzugriff) bitte herunterladen und manuell ablegen.</div>
+        </div>
       </div>
     </div>
-    <label>Quelle (URL)</label>
-    <input id="source" placeholder="https://sketchfab.com/..." />
-    <label>Original-Datei (optional, für import/)</label>
-    <input id="origInput" type="file" />
-    <div class="checks">
-      <input id="keepOrig" type="checkbox" checked /> Original in import/ ablegen
-    </div>
+  </aside>
 
-    <h2 style="margin-top:16px;">3. Speichern</h2>
-    <button id="saveBtn" disabled>Zielordner wählen & speichern</button>
-    <div class="hint">Wählt den <code>models-staging</code>-Ordner (Bucket-Root). Schreibt <code>models/&lt;kategorie&gt;/&lt;id&gt;.glb</code>, aktualisiert <code>registry.json</code> + <code>CREDITS.json</code>.</div>
-    <div id="status"></div>
-  </section>
-  <section class="card">
-    <h2>Vorschau</h2>
-    <canvas id="preview"></canvas>
-    <div class="hint">Drag-orbit mit Maus. Meshopt-komprimierte Modelle werden unterstützt.</div>
+  <!-- RECHTS: 3D-Bühne -->
+  <section class="stage">
+    <div class="viewport" id="viewport">
+      <canvas id="preview"></canvas>
+      <div id="statsBar" class="chip">—</div>
+      <div class="stageTools">
+        <label>Hintergrund</label>
+        <select id="bgColor">
+          <option value="#0b0f16">Dunkel</option>
+          <option value="#1a1f2b">Grau</option>
+          <option value="#ffffff">Weiß</option>
+          <option value="#87ceeb">Himmel</option>
+        </select>
+        <label>Licht</label><input id="lightIntensity" type="range" min="0.2" max="2" step="0.1" value="1.2"/>
+        <button id="frameBtn" class="secondary small">Einpassen</button>
+        <button id="resetViewBtn" class="secondary small">Kamera</button>
+      </div>
+      <div id="dims" class="chip">—</div>
+      <div class="corner">Y oben · Nase +Z · Räder auf Y=0<br/>Gitter = Boden</div>
+      <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div><span id="loadingText">Lade…</span></div>
+    </div>
   </section>
 </main>
 
+<!-- UNTEN: Ablage + Protokoll -->
+<div class="bottomDock" id="bottomDock">
+  <div class="dockHead">
+    <span id="status"></span>
+    <button id="dockToggle" class="secondary small" title="Leiste ein-/ausklappen">▼</button>
+  </div>
+  <div class="dockBody">
+    <div class="dockCol">
+      <div class="dockColTitle">Ablage — models-staging <button id="libRefresh" class="secondary small">Aktualisieren</button></div>
+      <div id="libHint" class="hint"></div>
+      <table class="lib">
+        <thead><tr><th>ID</th><th>Kategorie</th><th>Größe</th><th>Titel</th><th>Autor</th><th></th></tr></thead>
+        <tbody id="libBody"></tbody>
+      </table>
+    </div>
+    <div class="dockCol">
+      <div class="dockColTitle">Protokoll</div>
+      <div id="pipeLog" class="pipelog"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="helpModal" style="display:none">
+  <div class="modal">
+    <h2>Orbis Model Prep — Kurzanleitung</h2>
+    <ol>
+      <li><b>Import</b> — .glb, .gltf oder Sketchfab-.zip ablegen (direkt in der Vorschau oder in Schritt 1). ZIPs und gltf+bin+Textur-Sätze werden automatisch zugeordnet; Draco/meshopt-komprimierte Quellen werden dekodiert.</li>
+      <li><b>Identität</b> — Kategorie in der Kopfzeile wählen, Modell-ID und reale Länge (m) setzen, Credits von der Sketchfab-Seite eintragen.</li>
+      <li><b>Optimieren</b> — Texturen werden verkleinert und rekodiert (Farb-Maps → JPEG, Daten-Maps → PNG), Vertices vereint, optional dezimiert. Die Tabelle zeigt echte Vorher/Nachher-Zahlen.</li>
+      <li><b>Ausrichten</b> — Nase nach <b>+Z</b>, <b>Boden Y=0</b> (Räder berühren den Boden), <b>Länge anpassen</b> für die reale Größe. Was die Vorschau zeigt, wird gespeichert.</li>
+      <li><b>Speichern</b> — den <code>models-staging</code>-Ordner einmal verbinden; die Verbindung bleibt erhalten. Gespeichert wird nach <code>models/&lt;kategorie&gt;/&lt;id&gt;.glb</code>, Original nach <code>import/</code>, plus <code>registry.json</code> und <code>CREDITS.json</code> — genau das Format, das Orbis liest.</li>
+    </ol>
+    <h3>Optimierung</h3>
+    <p>Farb-Texturen werden als JPEG kodiert, Normal-/Roughness-/Metallic-Maps bleiben PNG, um Artefakte zu vermeiden. <b>Vertices vereinen</b> verschmilzt doppelte Vertices; <b>Dezimieren</b> (meshopt) reduziert Dreiecke — Vorschau auf Schäden prüfen; <b>Meshes zusammenführen</b> fasst statische Meshes mit gleichem Material zu einem Draw Call zusammen. Buffer-Kompression (Draco/meshopt) wird nicht angewendet — falls eine Datei jemals kleiner sein muss, anschließend <code>gltf-transform</code> auf die gespeicherte Datei anwenden.</p>
+    <h3>Browser</h3>
+    <p>Ordner-Speichern benötigt Chrome/Edge (File System Access API). In Firefox/Safari „Optimiertes GLB herunterladen“ nutzen und die Dateien manuell ablegen.</p>
+    <div class="actions"><button id="helpClose">Verstanden</button></div>
+  </div>
+</div>
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/meshopt_decoder.module.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { MeshoptSimplifier } from 'meshopt-simplifier';
+import { unzipSync } from 'fflate';
 
-const drop = document.getElementById('drop');
-const fileInput = document.getElementById('fileInput');
-const fileInfo = document.getElementById('fileInfo');
-const saveBtn = document.getElementById('saveBtn');
-const status = document.getElementById('status');
-
-let currentFile = null;
-let currentBuffer = null;
-let currentCategory = 'aircraft';
-
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const num = id => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : 0; };
 const CAT_DIR = { aircraft:'aircraft', ship:'ships', transit:'transit', other:'other' };
+const CAT_LABEL = { aircraft:'Flugzeug', ship:'Schiff', transit:'ÖPNV', other:'Sonstiges' };
+const TEX_KEYS = ['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap','specularMap'];
+const COLOR_KEYS = new Set(['map','emissiveMap']);
 
-// --- tabs ---
-document.querySelectorAll('.tab').forEach(t => {
-  t.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-    t.classList.add('active');
-    currentCategory = t.dataset.cat;
-    document.querySelectorAll('.field-group').forEach(g => {
-      g.classList.toggle('active', g.dataset.group === currentCategory);
-    });
-    // update id placeholder
-    const idInput = document.getElementById('id');
-    if (!idInput.value) {
-      const ph = { aircraft:'b737-800', ship:'ever-given', transit:'berlin-bus', other:'item-1' }[currentCategory];
-      idInput.placeholder = ph;
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtBytes(n){ if(n==null || !Number.isFinite(n)) return '—'; if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(2)+' MB'; }
+function fmtNum(n){ return (n==null||!Number.isFinite(n)) ? '—' : n.toLocaleString('en-US'); }
+function slugify(s){ return ((s||'').toLowerCase().replace(/\.(glb|gltf|zip)$/i,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60)) || 'model'; }
+function titleCase(s){ return (s||'').split(/[-_\s]+/).filter(Boolean).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '); }
+function pct(a,b){ if(!b) return '—'; const d=(a-b)/b*100; return (d>0?'+':'')+d.toFixed(0)+'%'; }
+function clamp(v,lo,hi){ return Math.min(hi, Math.max(lo, v)); }
+function showLoading(on, msg){ const el=$('loadingOverlay'); el.classList.toggle('active', !!on); if(msg) $('loadingText').textContent = msg; }
+
+let statusTimer = null;
+function setStatus(msg, kind='ok'){
+  const el = $('status');
+  el.textContent = msg; el.className = kind; el.style.display = 'block';
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(()=>{ el.style.display='none'; }, 9000);
+}
+function setOptStatus(msg, kind){ const el=$('optStatus'); el.textContent = msg; el.className = 'hint' + (kind ? ' '+kind : ''); }
+function logLine(msg){
+  const el = $('pipeLog');
+  const t = new Date();
+  const ts = t.toTimeString().slice(0,8);
+  const div = document.createElement('div');
+  div.textContent = `[${ts}] ${msg}`;
+  el.prepend(div);
+  while(el.children.length > 40) el.removeChild(el.lastChild);
+}
+function mkBtn(label, cls, fn){ const b=document.createElement('button'); b.className=cls; b.textContent=label; b.addEventListener('click', fn); return b; }
+function twoClickConfirm(btn, fn){
+  if(btn.dataset.confirm === '1'){ btn.dataset.confirm=''; btn.textContent='✕'; fn(); return; }
+  btn.dataset.confirm='1'; btn.textContent='Sicher?';
+  setTimeout(()=>{ if(btn.dataset.confirm==='1'){ btn.dataset.confirm=''; btn.textContent='✕'; } }, 2500);
+}
+
+/* ---------- state ---------- */
+const state = {
+  category:'aircraft', root:null,
+  model:null, animations:[],
+  baseSize:null, baseCenter:null,
+  srcStats:null, postStats:null, texStats:null,
+  originalBlob:null, mainName:'', fileBytes:0,
+  exportBuffer:null, exportBytes:0,
+  dirty:true, optimizing:false, loading:false,
+  autoTitle:false
+};
+
+/* resource package (zip / multi-file) → blob URLs */
+const pkg = { map:new Map(), urls:[] };
+function addResource(name, bytes){
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const url = URL.createObjectURL(new Blob([u8]));
+  pkg.map.set(name, url); pkg.urls.push(url);
+}
+function clearPackage(){ for(const u of pkg.urls) URL.revokeObjectURL(u); pkg.map.clear(); pkg.urls.length = 0; }
+function urlModifier(url){
+  if(/^(blob:|data:|https?:)/.test(url)) return url;
+  let clean; try{ clean = decodeURIComponent(url); }catch(e){ clean = url; }
+  clean = clean.replace(/^\.\//,'').replace(/^\//,'');
+  if(pkg.map.has(clean)) return pkg.map.get(clean);
+  const base = clean.split('/').pop();
+  if(pkg.map.has(base)) return pkg.map.get(base);
+  for(const [k,v] of pkg.map){ if(k.endsWith('/'+clean) || k.endsWith('/'+base)) return v; }
+  return url;
+}
+
+/* ---------- IndexedDB (persisted folder handle) ---------- */
+function idbOpen(){
+  return new Promise((res, rej)=>{
+    const rq = indexedDB.open('orbis-model-prep', 1);
+    rq.onupgradeneeded = ()=> rq.result.createObjectStore('kv');
+    rq.onsuccess = ()=> res(rq.result);
+    rq.onerror = ()=> rej(rq.error);
+  });
+}
+async function idbGet(k){
+  const db = await idbOpen();
+  return new Promise((res, rej)=>{
+    const rq = db.transaction('kv').objectStore('kv').get(k);
+    rq.onsuccess = ()=> res(rq.result); rq.onerror = ()=> rej(rq.error);
+  });
+}
+async function idbSet(k, v){
+  const db = await idbOpen();
+  return new Promise((res, rej)=>{
+    const rq = db.transaction('kv','readwrite').objectStore('kv').put(v, k);
+    rq.onsuccess = ()=> res(); rq.onerror = ()=> rej(rq.error);
+  });
+}
+
+/* ---------- three.js viewport ---------- */
+const canvas = $('preview');
+let renderer = null;
+try{
+  renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+}catch(e){
+  console.warn('WebGL unavailable', e);
+}
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0b0f16');
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10000);
+camera.position.set(6, 4, 8);
+let controls = null;
+if(renderer){
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.autoRotateSpeed = 2.0;
+}
+const hemi = new THREE.HemisphereLight(0xffffff, 0x223044, 1.2);
+scene.add(hemi);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(5, 10, 7);
+scene.add(dirLight);
+const gridHelper = new THREE.GridHelper(20, 20, 0x3a4255, 0x1f2735);
+scene.add(gridHelper);
+const axesHelper = new THREE.AxesHelper(3);
+scene.add(axesHelper);
+
+function resize(){
+  if(!renderer) return;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if(!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+}
+if(renderer){
+  if(typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(canvas.parentElement || canvas);
+  window.addEventListener('resize', resize);
+  setTimeout(resize, 50); setTimeout(resize, 300);
+  (function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); })();
+}
+
+/* ---------- loaders ---------- */
+const manager = new THREE.LoadingManager();
+manager.setURLModifier(urlModifier);
+const loader = new GLTFLoader(manager);
+try{
+  const draco = new DRACOLoader();
+  draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
+  loader.setDRACOLoader(draco);
+}catch(e){ console.warn('DRACOLoader setup failed', e); }
+loader.setMeshoptDecoder(MeshoptDecoder);
+
+/* ---------- analysis ---------- */
+function analyzeModel(root){
+  let tris=0, verts=0, meshes=0;
+  const mats = new Set(), texs = new Set();
+  let texMaxDim = 0;
+  root.traverse(o=>{
+    if(o.isMesh && o.geometry){
+      meshes++;
+      const g = o.geometry, pos = g.attributes.position;
+      if(pos){ verts += pos.count; tris += g.index ? g.index.count/3 : pos.count/3; }
+      const list = Array.isArray(o.material) ? o.material : [o.material];
+      for(const m of list){
+        if(!m) continue;
+        mats.add(m);
+        for(const k of TEX_KEYS){
+          const t = m[k];
+          if(t && t.isTexture && t.image && t.image.width){
+            texs.add(t);
+            texMaxDim = Math.max(texMaxDim, t.image.width, t.image.height);
+          }
+        }
+      }
     }
+  });
+  return { tris:Math.round(tris), verts, meshes, materials:mats.size, textures:texs.size, texMaxDim };
+}
+function disposeModel(root){
+  root.traverse(o=>{
+    if(o.geometry) o.geometry.dispose();
+    const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+    for(const m of mats){
+      for(const k of TEX_KEYS) if(m[k] && m[k].isTexture) m[k].dispose();
+      m.dispose();
+    }
+  });
+}
+
+/* ---------- loading pipeline ---------- */
+function resetFileState(){
+  if(state.model){ scene.remove(state.model); disposeModel(state.model); state.model = null; }
+  clearPackage();
+  state.animations = [];
+  state.exportBuffer = null; state.exportBytes = 0;
+  state.postStats = null; state.texStats = null;
+  state.dirty = true; state.autoTitle = false;
+  $('scale').value = 1; syncScaleSlider();
+  for(const id of ['rotX','rotY','rotZ','tx','ty','tz']) $(id).value = 0;
+  $('optStats').innerHTML = '';
+  setOptStatus('');
+  updateDims();
+}
+
+async function loadFromBlob(mainFile, siblings=[]){
+  if(state.loading) return;
+  state.loading = true;
+  showLoading(true, 'Modell wird geladen…');
+  const t0 = performance.now();
+  try{
+    resetFileState();
+    let mainName = mainFile.name, mainAB = null;
+    if(/\.zip$/i.test(mainFile.name)){
+      showLoading(true, 'ZIP wird entpackt…');
+      const entries = unzipSync(new Uint8Array(await mainFile.arrayBuffer()));
+      const names = Object.keys(entries).filter(n => /\.(glb|gltf)$/i.test(n) && !n.split('/').pop().startsWith('.'));
+      if(!names.length) throw new Error('ZIP contains no .glb/.gltf file');
+      names.sort((a,b)=> (a.split('/').length - b.split('/').length) || (/\.glb$/i.test(a) ? -1 : (/\.glb$/i.test(b) ? 1 : 0)));
+      mainName = names[0];
+      const u8 = entries[mainName];
+      mainAB = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+      for(const [n, d] of Object.entries(entries)){
+        if(n.endsWith('/') || !d.length) continue;
+        addResource(n.split('/').pop(), d);
+      }
+    }else{
+      for(const f of siblings){
+        if(f === mainFile) continue;
+        addResource(f.name, new Uint8Array(await f.arrayBuffer()));
+      }
+      mainAB = await mainFile.arrayBuffer();
+    }
+    state.originalBlob = mainFile;
+    state.mainName = mainName;
+    state.fileBytes = mainAB.byteLength;
+    const isGltf = /\.gltf$/i.test(mainName);
+    showLoading(true, 'glTF wird analysiert…');
+    const data = isGltf ? new TextDecoder().decode(mainAB) : mainAB;
+    const gltf = await new Promise((res, rej)=> loader.parse(data, '', res, rej));
+    onModelLoaded(gltf, performance.now() - t0);
+  }catch(e){
+    console.error(e);
+    setStatus('Laden fehlgeschlagen: ' + (e && e.message || e), 'err');
+    logLine('FEHLER beim Laden — ' + (e && e.message || e));
+  }finally{
+    state.loading = false;
+    showLoading(false);
+  }
+}
+
+async function intake(fileList){
+  const files = [...fileList];
+  const mains = files.filter(f => /\.(glb|gltf|zip)$/i.test(f.name));
+  if(!mains.length){ setStatus('Keine .glb-, .gltf- oder .zip-Datei gefunden.', 'warn'); return; }
+  if(mains.length > 1) setQueue(mains);
+  await loadFromBlob(mains[0], files.filter(f => f !== mains[0]));
+}
+
+function onModelLoaded(gltf, ms){
+  state.model = gltf.scene || gltf.scenes[0];
+  state.animations = gltf.animations || [];
+  scene.add(state.model);
+  const box = new THREE.Box3().setFromObject(state.model);
+  state.baseSize = box.getSize(new THREE.Vector3());
+  state.baseCenter = box.getCenter(new THREE.Vector3());
+  state.srcStats = analyzeModel(state.model);
+  const maxDim = Math.max(state.baseSize.x, state.baseSize.y, state.baseSize.z) || 1;
+  gridHelper.scale.setScalar(maxDim/10);
+  axesHelper.scale.setScalar(maxDim/3);
+  camera.near = maxDim/1000;
+  camera.far = maxDim*100;
+  camera.updateProjectionMatrix();
+  const slug = slugify(state.mainName);
+  $('id').value = slug;
+  if(!$('title').value || state.autoTitle){ $('title').value = titleCase(slug); state.autoTitle = true; }
+  const rel = state.originalBlob && state.originalBlob.name !== state.mainName;
+  $('fileInfo').innerHTML = `<strong>${esc(state.mainName)}</strong> — ${fmtBytes(state.fileBytes)}${rel ? ` (aus ${esc(state.originalBlob.name)})` : ''}`;
+  frame();
+  applySettings();
+  updateDims();
+  updateStatsUI();
+  $('exportBtn').disabled = false;
+  $('saveBtn').disabled = false;
+  $('saveBtnTop').disabled = false;
+  const stTab = document.querySelector('.stepTab[data-step="import"]');
+  if(stTab) stTab.classList.add('done');
+  showLoading(false);
+  logLine(`geladen ${state.mainName} (${fmtBytes(state.fileBytes)}) in ${Math.round(ms)} ms — ${fmtNum(state.srcStats.tris)} Tris, ${state.srcStats.meshes} Meshes, ${state.srcStats.textures} Tex`);
+  state.dirty = true;
+  scheduleRebuild(150);
+}
+
+/* ---------- stats / dims UI ---------- */
+function updateStatsUI(){
+  const s = state.srcStats;
+  if(!s || !state.baseSize){ $('statsBar').textContent = '—'; return; }
+  const sz = state.baseSize;
+  $('statsBar').innerHTML =
+    `<b>${fmtBytes(state.fileBytes)}</b> · ${fmtNum(s.tris)} Tris · ${fmtNum(s.verts)} Verts · ${s.meshes} Meshes · ` +
+    `${s.materials} Mats · ${s.textures} Tex (max ${s.texMaxDim || '—'}px) · BBox ${sz.x.toFixed(2)} × ${sz.y.toFixed(2)} × ${sz.z.toFixed(2)} m`;
+}
+function updateDims(){
+  if(!state.model){ $('dims').textContent = '—'; return; }
+  const box = new THREE.Box3().setFromObject(state.model);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const horiz = Math.max(size.x, size.z);
+  const target = parseFloat($('length').value);
+  let tail = '';
+  if(Number.isFinite(target) && target > 0){
+    const ok = Math.abs(horiz - target)/target <= 0.02;
+    tail = ok ? ` · Ziel ${target} m ✓` : ` · Ziel ${target} m ✗ (Skalierung ×${(target/Math.max(1e-9, horiz)).toFixed(3)})`;
+  }
+  $('dims').textContent = `Längste Seite ${horiz.toFixed(2)} m (${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)}) · Zentrum (${center.x.toFixed(2)}, ${center.y.toFixed(2)}, ${center.z.toFixed(2)})${tail}`;
+}
+
+/* ---------- transform ---------- */
+function getScale(){ const v = parseFloat($('scale').value); return (Number.isFinite(v) && v > 0) ? v : 1; }
+function applyUserTransform(root){
+  const d = Math.PI/180;
+  root.scale.setScalar(getScale());
+  root.rotation.set(num('rotX')*d, num('rotY')*d, num('rotZ')*d);
+  root.position.set(num('tx'), num('ty'), num('tz'));
+}
+function applyTransform(){
+  if(state.model) applyUserTransform(state.model);
+  updateDims();
+}
+function syncScaleSlider(){
+  const s = clamp(getScale(), 1e-4, 1e4);
+  $('scaleSlider').value = String(Math.round((Math.log10(s) + 2)/4*1000));
+}
+function frame(){
+  if(!state.model) return;
+  const box = new THREE.Box3().setFromObject(state.model);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const dist = maxDim/(2*Math.tan(camera.fov*Math.PI/180/2)) * 1.7;
+  camera.position.set(center.x + dist*0.8, center.y + dist*0.5, center.z + dist*0.9);
+  if(controls){ controls.target.copy(center); controls.update(); } else camera.lookAt(center);
+}
+
+/* ---------- display settings ---------- */
+function applySettings(){
+  scene.background = new THREE.Color($('bgColor').value);
+  const li = parseFloat($('lightIntensity').value) || 1;
+  hemi.intensity = li;
+  dirLight.intensity = li*0.7;
+  if(state.model){
+    state.model.traverse(o=>{
+      if(o.isMesh && o.material){
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for(const m of mats) m.wireframe = $('wireframe').checked;
+      }
+    });
+  }
+  gridHelper.visible = $('grid').checked;
+  axesHelper.visible = $('axes').checked;
+  if(controls) controls.autoRotate = $('autoRotate').checked;
+}
+
+
+/* ---------- optimization pipeline ---------- */
+function currentOpts(){
+  return {
+    texMax: parseInt($('texMax').value, 10) || 0,
+    weld: $('weld').checked,
+    simplify: $('simplifyChk').checked ? (parseInt($('simplifyRatio').value, 10)/100) : 1,
+    merge: $('mergeChk').checked
+  };
+}
+
+function cloneTexture(t, texMap, key, mat, opts, stats){
+  if(texMap.has(t)) return texMap.get(t);
+  const c = t.clone();
+  texMap.set(t, c);
+  const im = t.image;
+  if(!im || !im.width){ return c; }
+  const w = im.width, h = im.height;
+  const isColor = COLOR_KEYS.has(key);
+  const alphaRisk = !isColor || (mat.alphaMode && mat.alphaMode !== 'OPAQUE');
+  stats.pxBefore += w*h;
+  stats.pxAfter += w*h;
+  const over = opts.texMax > 0 && Math.max(w, h) > opts.texMax;
+  if(over){
+    const k = opts.texMax/Math.max(w, h);
+    const nw = Math.max(1, Math.round(w*k)), nh = Math.max(1, Math.round(h*k));
+    const canvas = document.createElement('canvas');
+    canvas.width = nw; canvas.height = nh;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(im, 0, 0, nw, nh);
+    c.image = canvas;
+    c.userData.mimeType = alphaRisk ? 'image/png' : 'image/jpeg';
+    stats.resized++; stats.pxAfter -= (w*h - nw*nh);
+  }else{
+    c.userData.mimeType = alphaRisk ? 'image/png' : 'image/jpeg';
+    if(isColor) stats.colorJpeg++; else stats.dataPng++;
+  }
+  return c;
+}
+
+function processTextures(root, opts){
+  const matMap = new Map(), texMap = new Map();
+  const stats = { resized:0, colorJpeg:0, dataPng:0, pxBefore:0, pxAfter:0 };
+  root.traverse(o=>{
+    if(!o.isMesh) return;
+    const isArr = Array.isArray(o.material);
+    const mats = isArr ? o.material : [o.material];
+    const cloned = mats.map(m=>{
+      if(matMap.has(m)) return matMap.get(m);
+      const c = m.clone(); matMap.set(m, c); return c;
+    });
+    o.material = isArr ? cloned : cloned[0];
+    for(const m of cloned){
+      for(const key of TEX_KEYS){
+        const t = m[key];
+        if(t && t.isTexture) m[key] = cloneTexture(t, texMap, key, m, opts, stats);
+      }
+    }
+  });
+  return stats;
+}
+
+function weldAll(root){
+  const seen = new Map();
+  let welded=0, skipped=0;
+  root.traverse(o=>{
+    if(!o.isMesh || !o.geometry) return;
+    const g = o.geometry;
+    if(seen.has(g)){ o.geometry = seen.get(g); return; }
+    let res = g;
+    const hasMorph = g.morphAttributes && Object.keys(g.morphAttributes).length > 0;
+    const multiGroup = g.groups && g.groups.length > 1;
+    if(!hasMorph && !multiGroup){
+      try{ res = BufferGeometryUtils.mergeVertices(g, 1e-4); welded++; }catch(e){ res = g; skipped++; }
+    }else skipped++;
+    o.geometry = res;
+    seen.set(g, res);
+  });
+  return { welded, skipped };
+}
+
+async function simplifyAll(root, ratio){
+  if(!MeshoptSimplifier || typeof MeshoptSimplifier.simplify !== 'function') throw new Error('meshopt simplifier unavailable');
+  try{ MeshoptSimplifier.useExperimentalSimplification = true; }catch(e){}
+  await MeshoptSimplifier.ready;
+  const seen = new Map();
+  let simplified=0, skipped=0;
+  root.traverse(o=>{
+    if(!o.isMesh || !o.geometry) return;
+    const g0 = o.geometry;
+    if(seen.has(g0)){ o.geometry = seen.get(g0); return; }
+    let res = g0, ok = false;
+    try{
+      let g = g0;
+      if(g.morphAttributes && Object.keys(g.morphAttributes).length) throw new Error('morphs');
+      if(g.groups && g.groups.length > 1) throw new Error('groups');
+      if(!g.index) g = BufferGeometryUtils.mergeVertices(g, 1e-6);
+      const posAttr = g.attributes.position;
+      if(!g.index || !(posAttr.array instanceof Float32Array) || posAttr.count < 3) throw new Error('layout');
+      let idx = g.index.array;
+      if(!(idx instanceof Uint32Array)){
+        const u32 = new Uint32Array(g.index.count);
+        for(let i=0;i<g.index.count;i++) u32[i] = g.index.getX(i);
+        idx = u32;
+      }
+      const triCount = idx.length/3;
+      const target = Math.max(3, Math.floor(triCount*ratio/3)*3);
+      if(target >= triCount) throw new Error('no-op');
+      const out = MeshoptSimplifier.simplify(idx, posAttr.array, 3, target, 0.01, []);
+      const newIdx = Array.isArray(out) ? out[0] : (out && out.indices);
+      if(!newIdx || newIdx.length < 3) throw new Error('empty');
+      // remap to used vertices only
+      const vertCount = posAttr.count;
+      const remap = new Int32Array(vertCount).fill(-1);
+      let next = 0;
+      const outIdx = new Uint32Array(newIdx.length);
+      for(let i=0;i<newIdx.length;i++){
+        const v = newIdx[i];
+        let m = remap[v];
+        if(m === -1){ m = next++; remap[v] = m; }
+        outIdx[i] = m;
+      }
+      const ng = new THREE.BufferGeometry();
+      for(const name of Object.keys(g.attributes)){
+        const attr = g.attributes[name];
+        if(attr.isInterleavedBufferAttribute) continue;
+        const item = attr.itemSize;
+        const Arr = attr.array.constructor;
+        const dst = new Arr(next*item);
+        for(let v=0; v<vertCount; v++){
+          const m = remap[v];
+          if(m === -1) continue;
+          for(let k=0;k<item;k++) dst[m*item+k] = attr.array[v*item+k];
+        }
+        ng.setAttribute(name, new THREE.BufferAttribute(dst, item, attr.normalized));
+      }
+      ng.setIndex(new THREE.BufferAttribute(outIdx, 1));
+      res = ng; ok = true; simplified++;
+    }catch(e){ ok = false; skipped++; }
+    o.geometry = res;
+    seen.set(g0, res);
+  });
+  return { simplified, skipped };
+}
+
+function mergeStatic(root){
+  root.updateMatrixWorld(true);
+  const groups = new Map();
+  const leftovers = [];
+  root.traverse(o=>{
+    if(o === root || !o.isMesh || !o.geometry) return;
+    const g = o.geometry.clone();
+    g.applyMatrix4(o.matrixWorld);
+    const isArr = Array.isArray(o.material);
+    if(isArr || !o.material){ leftovers.push({ geo:g, mat:isArr ? o.material : null }); return; }
+    const k = o.material.uuid;
+    if(!groups.has(k)) groups.set(k, []);
+    groups.get(k).push({ geo:g, mat:o.material });
+  });
+  const out = new THREE.Group();
+  out.name = 'orbis-merged';
+  for(const [, list] of groups){
+    let done = false;
+    if(list.length > 1){
+      try{
+        const merged = BufferGeometryUtils.mergeGeometries(list.map(x=>x.geo), false);
+        if(merged){
+          const mesh = new THREE.Mesh(merged, list[0].mat);
+          mesh.name = 'merged';
+          out.add(mesh);
+          done = true;
+        }
+      }catch(e){ /* fall through */ }
+    }
+    if(!done) for(const x of list){ const mesh = new THREE.Mesh(x.geo, x.mat); mesh.name = 'baked'; out.add(mesh); }
+  }
+  for(const x of leftovers){ const mesh = new THREE.Mesh(x.geo, x.mat); mesh.name = 'baked'; out.add(mesh); }
+  return out;
+}
+
+function renderOptStats(weldInfo, simplifyInfo, texStats){
+  const pre = state.srcStats, post = state.postStats;
+  if(!pre || !post || state.exportBytes == null){ $('optStats').innerHTML = ''; return; }
+  const rows = [
+    ['Dateigröße', fmtBytes(state.fileBytes), fmtBytes(state.exportBytes), pct(state.exportBytes, state.fileBytes)],
+    ['Dreiecke', fmtNum(pre.tris), fmtNum(post.tris), pct(post.tris, pre.tris)],
+    ['Vertices', fmtNum(pre.verts), fmtNum(post.verts), pct(post.verts, pre.verts)],
+    ['Draw Calls (Meshes)', String(pre.meshes), String(post.meshes), pct(post.meshes, pre.meshes)],
+    ['Texturen', String(pre.textures), String(post.textures), `max ${pre.texMaxDim || '—'} → ${post.texMaxDim || '—'} px`],
+  ];
+  const cls = v => (typeof v === 'string' && v.startsWith('-')) ? 'ok' : ((typeof v === 'string' && v.startsWith('+')) ? 'bad' : '');
+  let html = '<table class="stats"><tbody>' + rows.map(r=>
+    `<tr><td>${r[0]}</td><td class="mono">${r[1]}</td><td class="mono">→</td><td class="mono">${r[2]}</td><td class="mono ${cls(r[3])}">${r[3]}</td></tr>`
+  ).join('') + '</tbody></table>';
+  const notes = [];
+  if(texStats){
+    notes.push(`Texturen: ${texStats.resized} verkleinert` +
+      (texStats.colorJpeg ? `, ${texStats.colorJpeg} → JPEG` : '') +
+      (texStats.dataPng ? `, ${texStats.dataPng} als PNG` : ''));
+  }
+  if(weldInfo) notes.push(`Weld: ${weldInfo.welded} Meshes vereint, ${weldInfo.skipped} übersprungen`);
+  if(simplifyInfo) notes.push(`Dezimieren: ${simplifyInfo.simplified} vereinfacht, ${simplifyInfo.skipped} übersprungen`);
+  html += `<div class="hint">${notes.join(' · ') || 'keine Zusatzpässe aktiv'}</div>`;
+  $('optStats').innerHTML = html;
+}
+
+let rebuildTimer = null;
+function scheduleRebuild(ms=700){
+  state.dirty = true;
+  if(rebuildTimer) clearTimeout(rebuildTimer);
+  rebuildTimer = setTimeout(()=>{ rebuildTimer = null; rebuildExport(); }, ms);
+}
+
+async function rebuildExport(){
+  if(!state.model) return;
+  if(state.optimizing){ state.dirty = true; return; }
+  state.optimizing = true;
+  state.dirty = false;
+  setOptStatus('Optimiertes GLB wird erstellt…', 'info');
+  const t0 = performance.now();
+  let weldInfo = null, simplifyInfo = null, texStats = null;
+  try{
+    const opts = currentOpts();
+    let root = state.model.clone(true);
+    root.position.set(0,0,0); root.rotation.set(0,0,0); root.scale.set(1,1,1);
+    root.updateMatrixWorld(true);
+    if(opts.merge) root = mergeStatic(root);
+    if(opts.weld) weldInfo = weldAll(root);
+    if(opts.simplify < 1) simplifyInfo = await simplifyAll(root, opts.simplify);
+    texStats = processTextures(root, opts);
+    applyUserTransform(root);
+    root.updateMatrixWorld(true);
+    state.postStats = analyzeModel(root);
+    const exporter = new GLTFExporter();
+    const result = await new Promise((res, rej)=> exporter.parse(root, res, rej, { binary:true, animations: state.animations }));
+    state.exportBuffer = result;
+    state.exportBytes = result.byteLength;
+    state.texStats = texStats;
+    renderOptStats(weldInfo, simplifyInfo, texStats);
+    const ms = Math.round(performance.now() - t0);
+    setOptStatus(`Optimiertes GLB: ${fmtBytes(state.exportBytes)} (Quelle ${fmtBytes(state.fileBytes)}) · ${ms} ms`, 'ok');
+    logLine(`Optimierung → ${fmtBytes(state.exportBytes)} aus ${fmtBytes(state.fileBytes)} in ${ms} ms`);
+    const optTab = document.querySelector('.stepTab[data-step="opt"]');
+    if(optTab) optTab.classList.add('done');
+  }catch(e){
+    console.error(e);
+    state.exportBuffer = null;
+    setOptStatus('Optimieren fehlgeschlagen: ' + (e && e.message || e), 'err');
+    logLine('FEHLER bei Optimierung — ' + (e && e.message || e));
+  }finally{
+    state.optimizing = false;
+    if(state.dirty) scheduleRebuild(200);
+  }
+}
+
+/* ---------- file IO helpers ---------- */
+async function writeFile(dirHandle, name, data){
+  const fh = await dirHandle.getFileHandle(name, { create:true });
+  const w = await fh.createWritable();
+  await w.write(data);
+  await w.close();
+}
+async function readText(dirHandle, name){
+  const fh = await dirHandle.getFileHandle(name);
+  return await (await fh.getFile()).text();
+}
+
+/* ---------- save (works with any directory handle, incl. OPFS for tests) ---------- */
+async function saveToRoot(rootDir){
+  const id = $('id').value.trim();
+  if(!/^[a-z0-9][a-z0-9_-]*$/i.test(id)) throw new Error('Ungültige Modell-ID — erlaubt: Buchstaben, Ziffern, "-", "_"');
+  const length = parseFloat($('length').value);
+  if(!Number.isFinite(length) || length <= 0) throw new Error('Reale Länge (m) muss angegeben werden');
+  if(!state.exportBuffer){
+    if(state.model) await rebuildExport();
+    if(!state.exportBuffer) throw new Error('Kein optimiertes GLB vorhanden — siehe Schritt Optimieren');
+  }
+  const subdir = CAT_DIR[state.category];
+  const modelsDir = await rootDir.getDirectoryHandle('models', { create:true });
+  const catDir = await modelsDir.getDirectoryHandle(subdir, { create:true });
+  const targetName = id + '.glb';
+
+  await writeFile(catDir, targetName, state.exportBuffer);
+
+  if(state.originalBlob){
+    const importDir = await rootDir.getDirectoryHandle('import', { create:true });
+    await writeFile(importDir, state.originalBlob.name || targetName, state.originalBlob);
+  }
+
+  let registry = { models:{}, types:{}, classes:{}, vehicleTypes:{} };
+  try{ registry = JSON.parse(await readText(catDir, 'registry.json')); }catch(e){}
+  registry.models = registry.models || {};
+  registry.types = registry.types || {};
+  registry.classes = registry.classes || {};
+  registry.vehicleTypes = registry.vehicleTypes || {};
+  const existed = !!registry.models[id];
+
+  const entry = { file: targetName, length };
+  if(state.category === 'ship') entry.shipClass = $('shipClass').value;
+  if(state.category === 'transit') entry.vehicleType = $('transitType').value;
+  if(state.category === 'other') entry.note = $('otherNote').value.trim();
+  registry.models[id] = entry;
+
+  if(state.category === 'aircraft'){
+    const raw = $('types').value.trim();
+    for(const part of raw.split(',')){
+      if(!part.trim()) continue;
+      const [code, len] = part.trim().split(':');
+      if(!code) continue;
+      registry.types[code.trim().toUpperCase()] = [id, len ? parseFloat(len) : length];
+    }
+  }else if(state.category === 'ship'){
+    const sc = $('shipClass').value;
+    registry.classes[sc] = registry.classes[sc] || [];
+    if(!registry.classes[sc].includes(id)) registry.classes[sc].push(id);
+  }else if(state.category === 'transit'){
+    const vt = $('transitType').value;
+    registry.vehicleTypes[vt] = registry.vehicleTypes[vt] || [];
+    if(!registry.vehicleTypes[vt].includes(id)) registry.vehicleTypes[vt].push(id);
+  }
+  await writeFile(catDir, 'registry.json', new TextEncoder().encode(JSON.stringify(registry, null, 2) + '\n'));
+
+  let credits = [];
+  try{ credits = JSON.parse(await readText(catDir, 'CREDITS.json')); }catch(e){}
+  credits = credits.filter(c => c.file !== targetName);
+  credits.push({
+    file: targetName,
+    title: $('title').value.trim() || id,
+    author: $('author').value.trim() || 'unknown',
+    license: $('license').value.trim() || 'unknown',
+    source: $('source').value.trim() || ''
+  });
+  await writeFile(catDir, 'CREDITS.json', new TextEncoder().encode(JSON.stringify(credits, null, 2) + '\n'));
+
+  return { id, subdir, targetName, existed, registryCount: Object.keys(registry.models).length, bytes: state.exportBytes, srcBytes: state.fileBytes };
+}
+
+async function doSave(){
+  try{
+    let rootDir = state.root;
+    if(!rootDir){
+      if(!window.showDirectoryPicker){ setStatus('Ordner-Speichern benötigt Chrome/Edge — stattdessen „Optimiertes GLB herunterladen“ verwenden.', 'err'); return; }
+      rootDir = await window.showDirectoryPicker({ mode:'readwrite' });
+      await idbSet('stagingRoot', rootDir);
+      setRoot(rootDir);
+    }
+    $('saveBtn').disabled = true;
+    $('saveBtnTop').disabled = true;
+    const res = await saveToRoot(rootDir);
+    setStatus(`Gespeichert: models/${res.subdir}/${res.targetName} — ${fmtBytes(res.bytes)} (Quelle ${fmtBytes(res.srcBytes)}) · Original → import/ · Registry: ${res.registryCount} Modelle${res.existed ? ' (Eintrag aktualisiert)' : ''}`, 'ok');
+    logLine(`gespeichert ${res.subdir}/${res.targetName} (${fmtBytes(res.bytes)})`);
+    refreshLibrary();
+  }catch(e){
+    if(e && e.name === 'AbortError'){ setStatus('Abgebrochen.', 'warn'); }
+    else{ console.error(e); setStatus('Speichern fehlgeschlagen: ' + (e && e.message || e), 'err'); }
+  }finally{
+    $('saveBtn').disabled = false;
+    $('saveBtnTop').disabled = false;
+  }
+}
+$('saveBtn').addEventListener('click', doSave);
+$('saveBtnTop').addEventListener('click', ()=>{ doSave(); gotoStep('save'); });
+
+$('exportBtn').addEventListener('click', async ()=>{
+  try{
+    if(!state.exportBuffer){ await rebuildExport(); }
+    if(!state.exportBuffer) return;
+    const blob = new Blob([state.exportBuffer], { type:'model/gltf-binary' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = ($('id').value.trim() || 'model') + '-optimized.glb';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 5000);
+    setStatus('Optimiertes GLB heruntergeladen.', 'ok');
+  }catch(e){ setStatus('Export fehlgeschlagen: ' + (e && e.message || e), 'err'); }
+});
+
+$('resetFormBtn').addEventListener('click', ()=>{
+  for(const id of ['id','length','types','title','author','license','source','otherNote']) $(id).value = '';
+  $('shipClass').value = 'cargo';
+  $('transitType').value = 'bus';
+  setStatus('Metadaten geleert (Modell bleibt geladen).', 'info');
+});
+
+/* ---------- staged folder persistence ---------- */
+function setRoot(h){
+  state.root = h;
+  const pill = $('folderPill');
+  pill.classList.remove('click');
+  pill.onclick = null;
+  if(h){
+    pill.textContent = '📁 ' + h.name;
+    pill.classList.add('ok'); pill.classList.remove('warn');
+    $('changeFolderBtn').textContent = 'Change';
+    refreshLibrary();
+  }else{
+    pill.textContent = '📁 no folder connected';
+    pill.classList.add('warn'); pill.classList.remove('ok');
+    $('changeFolderBtn').textContent = 'Connect folder';
+  }
+}
+async function initFolder(){
+  try{
+    const h = await idbGet('stagingRoot');
+    if(!h) return;
+    if(typeof h.queryPermission !== 'function'){ setRoot(h); return; }
+    const perm = await h.queryPermission({ mode:'readwrite' });
+    if(perm === 'granted'){ setRoot(h); }
+    else{
+      const pill = $('folderPill');
+      pill.textContent = '📁 ' + h.name + ' — click to reconnect';
+      pill.classList.add('warn', 'click');
+      pill.onclick = async ()=>{
+        try{
+          const p = await h.requestPermission({ mode:'readwrite' });
+          if(p === 'granted') setRoot(h);
+        }catch(e){ /* user ignored */ }
+      };
+    }
+  }catch(e){ console.warn('folder restore failed', e); }
+}
+$('changeFolderBtn').addEventListener('click', async ()=>{
+  if(!window.showDirectoryPicker){ setStatus('Ordnerzugriff benötigt Chrome/Edge.', 'err'); return; }
+  try{
+    const h = await window.showDirectoryPicker({ mode:'readwrite' });
+    await idbSet('stagingRoot', h);
+    setRoot(h);
+    setStatus(`Ordner verbunden: ${h.name}`, 'ok');
+  }catch(e){ /* cancelled */ }
+});
+
+/* ---------- library ---------- */
+async function refreshLibrary(){
+  const tbody = $('libBody');
+  tbody.innerHTML = '';
+  if(!state.root){
+    $('libHint').textContent = 'Ordner verbinden, um gespeicherte Fahrzeuge zu verwalten.';
+    return;
+  }
+  $('libHint').textContent = '';
+  const rows = [];
+  try{
+    const modelsDir = await state.root.getDirectoryHandle('models');
+    for(const subdir of Object.values(CAT_DIR)){
+      let catDir;
+      try{ catDir = await modelsDir.getDirectoryHandle(subdir); }catch(e){ continue; }
+      let registry = null, credits = null;
+      try{ registry = JSON.parse(await readText(catDir, 'registry.json')); }catch(e){}
+      try{ credits = JSON.parse(await readText(catDir, 'CREDITS.json')); }catch(e){}
+      const creditMap = {};
+      if(Array.isArray(credits)) for(const c of credits) creditMap[c.file] = c;
+      const ids = registry && registry.models ? Object.keys(registry.models) : [];
+      const listed = new Set();
+      for(const id of ids){
+        const entry = registry.models[id];
+        let size = null;
+        try{
+          const fh = await catDir.getFileHandle(entry.file);
+          size = (await fh.getFile()).size;
+        }catch(e){}
+        listed.add(entry.file);
+        rows.push({ id, subdir, entry, size, credit: creditMap[entry.file] || {} });
+      }
+      for await (const [name, handle] of catDir.entries()){
+        if(!name.toLowerCase().endsWith('.glb') || listed.has(name)) continue;
+        try{
+          const f = await handle.getFile();
+          rows.push({ id: name.replace(/\.glb$/i,''), subdir, entry:{ file:name, length:null }, size:f.size, credit: creditMap[name] || {}, orphan:true });
+        }catch(e){}
+      }
+    }
+  }catch(e){
+    $('libHint').textContent = 'Ordner nicht lesbar: ' + (e && e.message || e);
+    return;
+  }
+  if(!rows.length){ tbody.innerHTML = '<tr><td colspan="6" class="empty">Noch keine Modelle gespeichert.</td></tr>'; return; }
+  rows.sort((a,b)=> a.subdir.localeCompare(b.subdir) || a.id.localeCompare(b.id));
+  for(const r of rows){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="mono">${esc(r.id)}${r.orphan ? ' <span style="color:var(--warn)">·ohne Eintrag</span>' : ''}</td>` +
+      `<td>${esc(CAT_LABEL[Object.keys(CAT_DIR).find(k=>CAT_DIR[k]===r.subdir)] || r.subdir)}</td>` +
+      `<td class="mono">${r.size != null ? fmtBytes(r.size) : '—'}</td>` +
+      `<td>${esc(r.credit.title || '')}</td><td>${esc(r.credit.author || '')}</td>` +
+      `<td class="actions"></td>`;
+    const actions = tr.querySelector('.actions');
+    actions.append(
+      mkBtn('Laden', 'secondary', ()=>loadFromLibrary(r)),
+      mkBtn('✕', 'danger', function(){ twoClickConfirm(this, ()=>deleteFromLibrary(r)); })
+    );
+    tbody.appendChild(tr);
+  }
+}
+
+async function loadFromLibrary(r){
+  try{
+    const modelsDir = await state.root.getDirectoryHandle('models');
+    const catDir = await modelsDir.getDirectoryHandle(r.subdir);
+    const fh = await catDir.getFileHandle(r.entry.file);
+    const f = await fh.getFile();
+    await loadFromBlob(new File([f], r.entry.file, { type:'model/gltf-binary' }));
+    setStatus(`${r.entry.file} aus der Ablage geladen (zur Ansicht). Speichern mit gleicher ID überschreibt den Eintrag.`, 'info');
+  }catch(e){ setStatus('Laden fehlgeschlagen: ' + (e && e.message || e), 'err'); }
+}
+
+async function deleteFromLibrary(r){
+  try{
+    const modelsDir = await state.root.getDirectoryHandle('models');
+    const catDir = await modelsDir.getDirectoryHandle(r.subdir);
+    await catDir.removeEntry(r.entry.file);
+    let registry = null;
+    try{ registry = JSON.parse(await readText(catDir, 'registry.json')); }catch(e){}
+    if(registry){
+      if(registry.models) delete registry.models[r.id];
+      if(registry.types) for(const k of Object.keys(registry.types)){
+        if(Array.isArray(registry.types[k]) && registry.types[k][0] === r.id) delete registry.types[k];
+      }
+      for(const key of ['classes','vehicleTypes']){
+        if(registry[key]) for(const k of Object.keys(registry[key])){
+          registry[key][k] = (registry[key][k] || []).filter(x => x !== r.id);
+        }
+      }
+      await writeFile(catDir, 'registry.json', new TextEncoder().encode(JSON.stringify(registry, null, 2) + '\n'));
+    }
+    let credits = null;
+    try{ credits = JSON.parse(await readText(catDir, 'CREDITS.json')); }catch(e){}
+    if(Array.isArray(credits)){
+      credits = credits.filter(c => c.file !== r.entry.file);
+      await writeFile(catDir, 'CREDITS.json', new TextEncoder().encode(JSON.stringify(credits, null, 2) + '\n'));
+    }
+    setStatus(`${r.subdir}/${r.entry.file} gelöscht (Registry + Credits aktualisiert).`, 'ok');
+    logLine(`Ablage: ${r.subdir}/${r.entry.file} gelöscht`);
+    refreshLibrary();
+  }catch(e){ console.error(e); setStatus('Löschen fehlgeschlagen: ' + (e && e.message || e), 'err'); }
+}
+$('libRefresh').addEventListener('click', refreshLibrary);
+
+/* ---------- queue ---------- */
+function setQueue(files){
+  const q = $('queueList');
+  q.innerHTML = '';
+  $('queueCard').style.display = files.length > 1 ? '' : 'none';
+  for(const f of files){
+    const row = document.createElement('div');
+    row.className = 'qitem';
+    row.innerHTML = `<span class="qname">${esc(f.name)}</span><span class="qsize">${fmtBytes(f.size)}</span>`;
+    row.addEventListener('click', ()=> loadFromBlob(f));
+    q.appendChild(row);
+  }
+}
+function clearQueue(){ $('queueList').innerHTML = ''; $('queueCard').style.display = 'none'; }
+
+/* ---------- category tabs ---------- */
+document.querySelectorAll('.cat').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.cat').forEach(x=> x.classList.remove('active'));
+    t.classList.add('active');
+    state.category = t.dataset.cat;
+    document.querySelectorAll('.field-group').forEach(g=>{
+      g.classList.toggle('active', g.dataset.group === state.category);
+    });
+    if(!$('id').value) $('id').placeholder = { aircraft:'b737-800', ship:'ever-given', transit:'berlin-bus', other:'item-1' }[state.category];
   });
 });
 
-// --- preview ---
-const canvas = document.getElementById('preview');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
-renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b0f16);
-const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth/canvas.clientHeight, 0.01, 1000);
-camera.position.set(2,2,2);
-const controls = new OrbitControls(camera, canvas);
-controls.enableDamping = true;
-scene.add(new THREE.HemisphereLight(0xffffff, 0x222244, 1.2));
-const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(5,10,7); scene.add(dir);
-let modelGroup = null;
-function resize(){ const w=canvas.clientWidth,h=canvas.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
-window.addEventListener('resize', resize);
-function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
-animate();
-const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
-async function showPreview(buffer){
-  if (modelGroup){ scene.remove(modelGroup); modelGroup=null; }
-  try {
-    const gltf = await new Promise((resolve,reject)=>loader.parse(buffer,'',resolve,reject));
-    modelGroup = gltf.scene;
-    const box = new THREE.Box3().setFromObject(modelGroup);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    modelGroup.position.sub(center);
-    const maxDim = Math.max(size.x,size.y,size.z)||1;
-    modelGroup.scale.setScalar(2/maxDim);
-    scene.add(modelGroup);
-  } catch(e){ console.warn('preview failed', e); }
+/* ---------- step tabs (links) + untere Leiste + Drop auf der Bühne ---------- */
+function gotoStep(name){
+  const t = document.querySelector(`.stepTab[data-step="${name}"]`);
+  if(t) t.click();
 }
-
-// --- drag & drop ---
-function setFile(file){
-  if(!file) return;
-  currentFile = file;
-  const r = new FileReader();
-  r.onload = (e) => {
-    currentBuffer = e.target.result;
-    fileInfo.textContent = `${file.name} — ${(file.size/1024).toFixed(1)} KB`;
-    const idInput = document.getElementById('id');
-    if(!idInput.value) idInput.value = file.name.replace(/\.(glb|gltf)$/i,'').toLowerCase().replace(/[^a-z0-9-]/g,'-');
-    showPreview(currentBuffer);
-  };
-  r.readAsArrayBuffer(file);
-}
-drop.addEventListener('click', ()=>fileInput.click());
-drop.addEventListener('dragover', (e)=>{ e.preventDefault(); drop.classList.add('drag'); });
-drop.addEventListener('dragleave', ()=>drop.classList.remove('drag'));
-drop.addEventListener('drop', (e)=>{ e.preventDefault(); drop.classList.remove('drag'); if(e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]); });
-fileInput.addEventListener('change', (e)=>{ if(e.target.files.length) setFile(e.target.files[0]); });
-
-function setStatus(msg, ok=true){ status.textContent=msg; status.className=ok?'ok':'err'; status.style.display='block'; }
-
-saveBtn.addEventListener('click', async () => {
-  if(!currentBuffer){ setStatus('Keine Datei gewählt.', false); return; }
-  const id = document.getElementById('id').value.trim();
-  const length = parseFloat(document.getElementById('length').value);
-  if(!id || !Number.isFinite(length)){ setStatus('ID und Länge (m) sind Pflicht.', false); return; }
-  if(!window.showDirectoryPicker){ setStatus('File System Access API nicht verfügbar — nutze Chrome/Edge.', false); return; }
-  let root;
-  try { root = await window.showDirectoryPicker({ mode:'readwrite' }); }
-  catch(e){ setStatus('Abgebrochen.', false); return; }
-  try {
-    saveBtn.disabled = true;
-    const title = document.getElementById('title').value.trim() || id;
-    const author = document.getElementById('author').value.trim() || 'unknown';
-    const license = document.getElementById('license').value.trim() || 'unknown';
-    const source = document.getElementById('source').value.trim() || '';
-    const subdir = CAT_DIR[currentCategory];
-
-    const targetName = id + '.glb';
-
-    // write glb
-    const modelsDir = await root.getDirectoryHandle('models', { create:true });
-    const catDir = await modelsDir.getDirectoryHandle(subdir, { create:true });
-    const glbHandle = await catDir.getFileHandle(targetName, { create:true });
-    const w = await glbHandle.createWritable();
-    await w.write(currentBuffer);
-    await w.close();
-
-    // import/ original
-    if(document.getElementById('keepOrig').checked){
-      const origFile = document.getElementById('origInput').files[0];
-      if(origFile){
-        const importDir = await root.getDirectoryHandle('import', { create:true });
-        const h = await importDir.getFileHandle(origFile.name, { create:true });
-        const w2 = await h.createWritable();
-        await w2.write(await origFile.arrayBuffer());
-        await w2.close();
-      }
-    }
-
-    // category-specific extra + registry merge
-    let registry = { models:{}, types:{}, classes:{}, vehicleTypes:{} };
-    try {
-      const rh = await catDir.getFileHandle('registry.json');
-      const f = await rh.getFile();
-      registry = JSON.parse(await f.text());
-    } catch {}
-    registry.models = registry.models || {};
-    registry.types = registry.types || {};
-    registry.classes = registry.classes || {};
-    registry.vehicleTypes = registry.vehicleTypes || {};
-
-    const entry = { file: targetName, length };
-    if (currentCategory === 'ship') entry.shipClass = document.getElementById('shipClass').value;
-    if (currentCategory === 'transit') entry.vehicleType = document.getElementById('transitType').value;
-    if (currentCategory === 'other') entry.note = document.getElementById('otherNote').value.trim();
-    registry.models[id] = entry;
-
-    if (currentCategory === 'aircraft') {
-      const typesRaw = document.getElementById('types').value.trim();
-      if (typesRaw) {
-        for (const part of typesRaw.split(',')) {
-          const [code, len] = part.trim().split(':');
-          if (!code) continue;
-          registry.types[code.trim().toUpperCase()] = [id, len ? parseFloat(len) : length];
-        }
-      }
-    } else if (currentCategory === 'ship') {
-      registry.classes[document.getElementById('shipClass').value] = registry.classes[document.getElementById('shipClass').value] || [];
-      if (!registry.classes[document.getElementById('shipClass').value].includes(id)) registry.classes[document.getElementById('shipClass').value].push(id);
-    } else if (currentCategory === 'transit') {
-      registry.vehicleTypes[document.getElementById('transitType').value] = registry.vehicleTypes[document.getElementById('transitType').value] || [];
-      if (!registry.vehicleTypes[document.getElementById('transitType').value].includes(id)) registry.vehicleTypes[document.getElementById('transitType').value].push(id);
-    }
-
-    const rHandle = await catDir.getFileHandle('registry.json', { create:true });
-    const rw = await rHandle.createWritable();
-    await rw.write(JSON.stringify(registry, null, 2) + '\n');
-    await rw.close();
-
-    // CREDITS merge
-    let credits = [];
-    try {
-      const ch = await catDir.getFileHandle('CREDITS.json');
-      const f = await ch.getFile();
-      credits = JSON.parse(await f.text());
-    } catch {}
-    if (!credits.some(c => c.file === targetName)) {
-      credits.push({ file: targetName, title, author, license, source });
-    }
-    const cHandle = await catDir.getFileHandle('CREDITS.json', { create:true });
-    const cw = await cHandle.createWritable();
-    await cw.write(JSON.stringify(credits, null, 2) + '\n');
-    await cw.close();
-
-    setStatus(`Gespeichert: models/${subdir}/${targetName} (Registry: ${Object.keys(registry.models).length} Modelle)`);
-  } catch (e) {
-    console.error(e);
-    setStatus('Fehler: ' + (e.message || e), false);
-  } finally {
-    saveBtn.disabled = false;
-  }
+document.querySelectorAll('.stepTab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.stepTab').forEach(x=> x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelectorAll('.stepPane').forEach(p=> p.classList.toggle('active', p.dataset.pane === t.dataset.step));
+  });
 });
+$('dockToggle').addEventListener('click', ()=>{
+  const d = $('bottomDock');
+  d.classList.toggle('collapsed');
+  $('dockToggle').textContent = d.classList.contains('collapsed') ? '▲' : '▼';
+});
+const viewport = $('viewport');
+viewport.addEventListener('dragover', e=>{ e.preventDefault(); viewport.classList.add('drag'); });
+viewport.addEventListener('dragleave', ()=> viewport.classList.remove('drag'));
+viewport.addEventListener('drop', e=>{
+  e.preventDefault();
+  viewport.classList.remove('drag');
+  if(e.dataTransfer.files.length){ intake(e.dataTransfer.files); gotoStep('import'); }
+});
+
+/* ---------- UI wiring ---------- */
+const drop = $('drop'), fileInput = $('fileInput');
+drop.addEventListener('click', ()=> fileInput.click());
+drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', ()=> drop.classList.remove('drag'));
+drop.addEventListener('drop', e=>{
+  e.preventDefault();
+  drop.classList.remove('drag');
+  if(e.dataTransfer.files.length) intake(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', ()=>{
+  if(fileInput.files.length) intake(fileInput.files);
+  fileInput.value = '';
+});
+
+$('frameBtn').addEventListener('click', frame);
+$('resetViewBtn').addEventListener('click', ()=>{
+  if(!state.model) return;
+  frame();
+});
+
+$('fitLenBtn').addEventListener('click', ()=>{
+  if(!state.model){ setStatus('Zuerst ein Modell laden.', 'warn'); return; }
+  const target = parseFloat($('length').value);
+  if(!Number.isFinite(target) || target <= 0){ setStatus('Zuerst die reale Länge (m) in Schritt 1 angeben.', 'warn'); return; }
+  const horiz = Math.max(state.baseSize.x, state.baseSize.z) || 1;
+  const s = clamp(target/horiz, 0.0001, 10000);
+  $('scale').value = s < 1 ? s.toPrecision(3) : parseFloat(s.toFixed(4));
+  syncScaleSlider();
+  applyTransform();
+  frame();
+  setStatus(`Skalierung ×${getScale()} gesetzt — längste Seite ist jetzt ${target} m. Danach Boden Y=0 prüfen.`, 'ok');
+});
+$('snapGroundBtn').addEventListener('click', ()=>{
+  if(!state.model) return;
+  const box = new THREE.Box3().setFromObject(state.model);
+  $('ty').value = parseFloat((num('ty') - box.min.y).toFixed(4));
+  applyTransform();
+});
+$('centerXZBtn').addEventListener('click', ()=>{
+  if(!state.model) return;
+  const box = new THREE.Box3().setFromObject(state.model);
+  const c = box.getCenter(new THREE.Vector3());
+  $('tx').value = parseFloat((num('tx') - c.x).toFixed(4));
+  $('tz').value = parseFloat((num('tz') - c.z).toFixed(4));
+  applyTransform();
+});
+$('flipBtn').addEventListener('click', ()=>{
+  $('rotY').value = num('rotY') + 180;
+  applyTransform();
+});
+$('resetTransformBtn').addEventListener('click', ()=>{
+  $('scale').value = 1; syncScaleSlider();
+  for(const id of ['rotX','rotY','rotZ','tx','ty','tz']) $(id).value = 0;
+  applyTransform();
+});
+
+$('scaleSlider').addEventListener('input', ()=>{
+  const logv = (parseFloat($('scaleSlider').value)/1000)*4 - 2;
+  const s = Math.pow(10, logv);
+  $('scale').value = s < 1 ? s.toPrecision(3) : parseFloat(s.toFixed(3));
+  applyTransform();
+});
+$('scale').addEventListener('input', ()=>{ syncScaleSlider(); applyTransform(); });
+
+for(const id of ['rotX','rotY','rotZ','tx','ty','tz']) $(id).addEventListener('input', applyTransform);
+$('length').addEventListener('input', updateDims);
+$('title').addEventListener('input', ()=>{ state.autoTitle = false; });
+
+/* presets */
+const PRESETS = {
+  quality: { texMax:'2048', weld:true,  simplify:false, ratio:100, merge:false },
+  balanced:{ texMax:'1024', weld:true,  simplify:false, ratio:50,  merge:false },
+  tiny:    { texMax:'512',  weld:true,  simplify:true,  ratio:50,  merge:false }
+};
+function applyPreset(name){
+  const p = PRESETS[name];
+  if(!p) return;
+  $('texMax').value = p.texMax;
+  $('weld').checked = p.weld;
+  $('simplifyChk').checked = p.simplify;
+  $('simplifyRatio').value = String(p.ratio);
+  $('simplifyRatioVal').textContent = p.ratio + '%';
+  $('mergeChk').checked = p.merge;
+  $('simplifyRow').style.display = p.simplify ? '' : 'none';
+}
+function optChanged(markCustom=true){
+  if(markCustom) $('preset').value = 'custom';
+  scheduleRebuild();
+}
+$('preset').addEventListener('change', ()=>{
+  const v = $('preset').value;
+  if(v !== 'custom') applyPreset(v);
+  scheduleRebuild();
+});
+for(const id of ['texMax','weld','mergeChk']) $(id).addEventListener('change', ()=>optChanged());
+$('simplifyChk').addEventListener('change', ()=>{
+  $('simplifyRow').style.display = $('simplifyChk').checked ? '' : 'none';
+  optChanged();
+});
+$('simplifyRatio').addEventListener('input', ()=>{
+  $('simplifyRatioVal').textContent = $('simplifyRatio').value + '%';
+  optChanged();
+});
+$('rebuildBtn').addEventListener('click', ()=> rebuildExport());
+
+/* display settings */
+for(const id of ['bgColor','lightIntensity','wireframe','grid','axes','autoRotate']){
+  $(id).addEventListener('input', applySettings);
+  $(id).addEventListener('change', applySettings);
+}
+
+/* help modal */
+$('helpBtn').addEventListener('click', ()=>{ $('helpModal').style.display = 'flex'; });
+$('helpClose').addEventListener('click', ()=>{ $('helpModal').style.display = 'none'; });
+$('helpModal').addEventListener('click', e=>{ if(e.target === $('helpModal')) $('helpModal').style.display = 'none'; });
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape') $('helpModal').style.display = 'none'; });
+
+/* ---------- test hooks (harmless in production) ---------- */
+window.__test = {
+  loadFromUrl: async (url)=>{
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('fetch ' + r.status);
+    const b = await r.arrayBuffer();
+    return await intake([new File([b], url.split('/').pop())]);
+  },
+  state: ()=>({
+    hasModel: !!state.model,
+    category: state.category,
+    id: $('id').value,
+    fileBytes: state.fileBytes,
+    exportBytes: state.exportBytes,
+    srcStats: state.srcStats,
+    postStats: state.postStats,
+    dims: $('dims').textContent,
+    dirty: state.dirty,
+    optimizing: state.optimizing,
+    hasRenderer: !!renderer,
+    hasRoot: !!state.root
+  }),
+  set: (id, v)=>{ $(id).value = v; $(id).dispatchEvent(new Event('input', { bubbles:true })); },
+  setCheck: (id, v)=>{ $(id).checked = v; $(id).dispatchEvent(new Event('change', { bubbles:true })); },
+  click: (id)=> $(id).click(),
+  optimize: ()=> rebuildExport(),
+  saveToOPFS: async ()=>{
+    const root = await navigator.storage.getDirectory();
+    return await saveToRoot(root);
+  },
+  opfsRead: async (path)=>{
+    const parts = path.split('/').filter(Boolean);
+    let dir = await navigator.storage.getDirectory();
+    for(let i=0;i<parts.length-1;i++) dir = await dir.getDirectoryHandle(parts[i]);
+    const fh = await dir.getFileHandle(parts[parts.length-1]);
+    return await (await fh.getFile()).text();
+  },
+  refreshLibrary: ()=> refreshLibrary(),
+  setOPFSRoot: async ()=>{
+    const root = await navigator.storage.getDirectory();
+    setRoot(root);
+    return root.name || 'opfs';
+  },
+  log: ()=> $('pipeLog').innerText
+};
+
+/* ---------- init ---------- */
+initFolder();
+refreshLibrary();
+setStatus('Bereit — Modell (.glb/.gltf/.zip) ablegen. Für direktes Speichern oben rechts den models-staging-Ordner verbinden.', 'info');
+logLine('Orbis Model Prep v4 — neues Layout bereit');
 </script>
 </body>
 </html>
-EOF
-echo written
