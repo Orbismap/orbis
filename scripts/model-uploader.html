@@ -134,12 +134,52 @@
     <h2>Vorschau</h2>
     <canvas id="preview"></canvas>
     <div class="hint">Drag-orbit mit Maus. Meshopt-komprimierte Modelle werden unterstützt.</div>
+    <div id="dims" class="hint" style="margin-top:8px;"></div>
+  </section>
+  <section class="card" style="grid-column:1/-1;">
+    <h2>4. Optimierung & Einstellungen</h2>
+    <div class="row">
+      <div>
+        <label>Hintergrund</label>
+        <select id="bgColor">
+          <option value="#0b0f16">Dunkel</option>
+          <option value="#1a1f2b">Grau</option>
+          <option value="#ffffff">Weiß</option>
+          <option value="#87ceeb">Himmel</option>
+        </select>
+      </div>
+      <div>
+        <label>Lichtstärke</label>
+        <input id="lightIntensity" type="range" min="0.2" max="2" step="0.1" value="1.2" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Skalierung (Vorschau)</label>
+        <input id="scaleMul" type="range" min="0.5" max="3" step="0.05" value="1" />
+      </div>
+      <div>
+        <label>Rotation Y (°)</label>
+        <input id="rotY" type="range" min="-180" max="180" step="1" value="0" />
+      </div>
+    </div>
+    <div class="checks">
+      <input id="wireframe" type="checkbox" /> Wireframe
+      <input id="grid" type="checkbox" checked /> Boden-Gitter
+      <input id="autoRotate" type="checkbox" /> Auto-Rotate
+    </div>
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button id="resetViewBtn" class="secondary">Ansicht zurücksetzen</button>
+      <button id="exportBtn" class="secondary" disabled>Optimiertes GLB exportieren</button>
+    </div>
+    <div class="hint">Export wendet die Vorschau-Transformation (Skalierung/Rotation) an und speichert als neues .glb (ohne Meshopt-Kompression).</div>
   </section>
 </main>
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFExporter } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/GLTFExporter.js';
 import { MeshoptDecoder } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/meshopt_decoder.module.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
@@ -216,7 +256,7 @@ function setFile(file){
     fileInfo.textContent = `${file.name} — ${(file.size/1024).toFixed(1)} KB`;
     const idInput = document.getElementById('id');
     if(!idInput.value) idInput.value = file.name.replace(/\.(glb|gltf)$/i,'').toLowerCase().replace(/[^a-z0-9-]/g,'-');
-    showPreview(currentBuffer);
+    window.__showPreview(currentBuffer);
   };
   r.readAsArrayBuffer(file);
 }
@@ -225,6 +265,103 @@ drop.addEventListener('dragover', (e)=>{ e.preventDefault(); drop.classList.add(
 drop.addEventListener('dragleave', ()=>drop.classList.remove('drag'));
 drop.addEventListener('drop', (e)=>{ e.preventDefault(); drop.classList.remove('drag'); if(e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]); });
 fileInput.addEventListener('change', (e)=>{ if(e.target.files.length) setFile(e.target.files[0]); });
+
+// --- settings / transform state ---
+const bgSelect = document.getElementById('bgColor');
+const lightSlider = document.getElementById('lightIntensity');
+const scaleSlider = document.getElementById('scaleMul');
+const rotYSlider = document.getElementById('rotY');
+const wireframeCb = document.getElementById('wireframe');
+const gridCb = document.getElementById('grid');
+const autoRotateCb = document.getElementById('autoRotate');
+const exportBtn = document.getElementById('exportBtn');
+const resetViewBtn = document.getElementById('resetViewBtn');
+const dimsEl = document.getElementById('dims');
+
+let gridHelper = new THREE.GridHelper(4, 20, 0x444466, 0x222244);
+gridHelper.visible = true;
+scene.add(gridHelper);
+
+function applySettings() {
+  scene.background = new THREE.Color(bgSelect.value);
+  light.intensity = parseFloat(lightSlider.value);
+  dir.intensity = parseFloat(lightSlider.value) * 0.6;
+  if (modelGroup) {
+    modelGroup.scale.setScalar((2 / (modelGroup.userData.baseMaxDim || 1)) * parseFloat(scaleSlider.value));
+    modelGroup.rotation.y = parseFloat(rotYSlider.value) * Math.PI / 180;
+    modelGroup.traverse(o => { if (o.isMesh && o.material) { o.material.wireframe = wireframeCb.checked; } });
+  }
+  gridHelper.visible = gridCb.checked;
+  controls.autoRotate = autoRotateCb.checked;
+}
+bgSelect.addEventListener('change', applySettings);
+lightSlider.addEventListener('input', applySettings);
+scaleSlider.addEventListener('input', applySettings);
+rotYSlider.addEventListener('input', applySettings);
+wireframeCb.addEventListener('change', applySettings);
+gridCb.addEventListener('change', applySettings);
+autoRotateCb.addEventListener('change', applySettings);
+resetViewBtn.addEventListener('click', () => {
+  camera.position.set(2,2,2); controls.target.set(0,0,0); controls.update();
+  scaleSlider.value = 1; rotYSlider.value = 0; applySettings();
+});
+
+// patch showPreview to store baseMaxDim
+const _origShowPreview = showPreview;
+// redefine showPreview with baseMaxDim tracking
+async function showPreview2(buffer) {
+  if (modelGroup){ scene.remove(modelGroup); modelGroup=null; }
+  try {
+    const gltf = await new Promise((resolve,reject)=>loader.parse(buffer,'',resolve,reject));
+    modelGroup = gltf.scene;
+    const box = new THREE.Box3().setFromObject(modelGroup);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    modelGroup.position.sub(center);
+    const maxDim = Math.max(size.x,size.y,size.z)||1;
+    modelGroup.userData.baseMaxDim = maxDim;
+    modelGroup.scale.setScalar((2/maxDim)*parseFloat(scaleSlider.value));
+    modelGroup.rotation.y = parseFloat(rotYSlider.value)*Math.PI/180;
+    modelGroup.traverse(o => { if (o.isMesh && o.material) o.material.wireframe = wireframeCb.checked; });
+    scene.add(modelGroup);
+    dimsEl.textContent = `Bounding Box: ${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m (Modellraum)`;
+    exportBtn.disabled = false;
+  } catch(e){ console.warn('preview failed', e); }
+}
+// replace showPreview reference used in setFile
+// (reassign by overriding the function name via const redeclaration not possible; instead patch call site below)
+window.__showPreview = showPreview2;
+
+// --- export optimized glb ---
+exportBtn.addEventListener('click', async () => {
+  if (!modelGroup) { setStatus('Kein Modell geladen.', false); return; }
+  try {
+    exportBtn.disabled = true;
+    // clone to bake transform
+    const clone = modelGroup.clone(true);
+    // apply current transform to geometry (bake scale/rotation)
+    clone.updateMatrixWorld(true);
+    const exporter = new GLTFExporter();
+    const result = await new Promise((resolve, reject) => {
+      exporter.parse(clone, resolve, reject, { binary: true });
+    });
+    const blob = new Blob([result], { type: 'model/gltf-binary' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (document.getElementById('id').value.trim() || 'model') + '-optimized.glb';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setStatus('Optimiertes GLB exportiert (Download).', true);
+  } catch (e) {
+    console.error(e);
+    setStatus('Export-Fehler: ' + (e.message || e), false);
+  } finally {
+    exportBtn.disabled = false;
+  }
+});
 
 function setStatus(msg, ok=true){ status.textContent=msg; status.className=ok?'ok':'err'; status.style.display='block'; }
 
