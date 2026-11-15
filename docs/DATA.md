@@ -120,7 +120,7 @@ Orte/min, ein Tageszähler in `localStorage` stoppt bei 8 000, bei 429 gibt es 1
 - **Gefühlte Temperatur**: aus T, Taupunkt, u, v im Shader (zwei gepackte Texturfelder), Formel Steadman wie im alten Orbis (`t + 0,33·e − 0,7·v − 4`).
 - **Städtewetter** (`staedte`): liest die bereits geladenen ICON-Übersichten (T, Wolken, Niederschlag, u, v) an den Stadtkoordinaten (`parsers/cities.ts`),
   keine zusätzliche API. 3-Tage-Ausblick je Stadt aus denselben Feldern.
-- **Luftqualität & Pollen** (`luftqualitaet`): Open-Meteo Air Quality (Copernicus CAMS), `current` mit 11 Variablen auf einem 3°-Gitter über Europa
+- **Luftqualität** (`luftqualitaet`): Open-Meteo Air Quality (Copernicus CAMS), `current` mit 11 Variablen auf einem 3°-Gitter über Europa
   (24 × 14 = 336 Orte, 4 Abrufe à 100 Orte), direkt aus dem Browser (CORS offen), 3 h Zwischenspeicher in `localStorage`, gemeinsamer Tageszähler und
   Pacing mit den Ozean-Ebenen (`render/ocean/budget.ts`). Pflichtsatz: „Generated using Copernicus Atmosphere Monitoring Service information 2026“ steht in
   der Lizenzangabe der Ebene. Klassen: EEA-Grenzwerte wie bei Open-Meteo; Pollen in Körnern/m³ (nur Europa, saisonabhängig, außerhalb der Saison 0).

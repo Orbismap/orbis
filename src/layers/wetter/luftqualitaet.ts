@@ -49,7 +49,7 @@ const legendOf = (v: AqVar): LegendSpec => {
 export default defineLayer({
   id: 'luftqualitaet',
   category: 'wetter',
-  title: 'Luftqualität & Pollen',
+  title: 'Luftqualität',
   summary: 'Luftqualität und Pollenflug über Europa als Feld, Modellrechnung von Copernicus CAMS',
   icon: 'leaf',
   color: '#50C878',
