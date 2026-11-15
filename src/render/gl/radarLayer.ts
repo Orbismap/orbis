@@ -292,11 +292,19 @@ class RadarCustomLayer implements CustomLayerInterface {
     return entry;
   }
 
+  /** Zeitstempel des letzten Cache-Aufräumens (ms). */
+  private lastCacheCleanup = 0;
+
   private async fetchTile(url: string): Promise<{ bytes: Uint8Array; size: number } | null> {
     // Cache API: RainViewer-Tiles sind pro URL unveränderlich (Frame-Pfad enthält die Frame-ID). Aggressives
     // Cachen reduziert die Last auf den Free-Tier (100 req/IP/min) und vermeidet 429/CORS-Floods.
     const cache = typeof caches !== 'undefined' ? await caches.open('rainviewer-tiles').catch(() => null) : null;
     if (cache) {
+      // Aufräumen: RainViewer liefert nur ~2 h Historie, ältere Tiles brauchen wir nicht mehr cachen.
+      if (Date.now() - this.lastCacheCleanup > 10 * 60_000) {
+        this.lastCacheCleanup = Date.now();
+        this.cleanupCache(cache).catch(() => {});
+      }
       const hit = await cache.match(url).catch(() => undefined);
       if (hit) {
         const buf = await hit.arrayBuffer();
@@ -308,9 +316,21 @@ class RadarCustomLayer implements CustomLayerInterface {
     if (!res.ok) throw new Error(`HTTP ${res.status}`); // 429 / 5xx: asked again later
     const buf = await res.arrayBuffer();
     if (cache) {
-      cache.put(url, new Response(buf.slice(0), { headers: { 'Content-Type': 'image/png' } })).catch(() => {});
+      cache.put(url, new Response(buf.slice(0), { headers: { 'Content-Type': 'image/png', 'X-Orbis-Cached-At': String(Date.now()) } })).catch(() => {});
     }
     return runParser('radarTile', buf, { format: 'arraybuffer', signal: this.ctx.signal });
+  }
+
+  /** Entfernt Cache-Einträge älter als 3 h (2 h Timeline + Puffer). */
+  private async cleanupCache(cache: Cache): Promise<void> {
+    const keys = await cache.keys();
+    const cutoff = Date.now() - 3 * 60 * 60_000;
+    await Promise.all(keys.map(async (req) => {
+      const res = await cache.match(req).catch(() => undefined);
+      const ts = Number(res?.headers.get('X-Orbis-Cached-At') ?? 0);
+      // Einträge ohne Zeitstempel (alt) ebenfalls entfernen, damit der Cache nicht ewig wächst.
+      if (!ts || ts < cutoff) await cache.delete(req).catch(() => {});
+    }));
   }
 
   /** Starts the motion estimate of a tile pair in the worker; the picture follows with the next repaint. */
