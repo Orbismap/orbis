@@ -5,7 +5,7 @@ import type { Resource } from '../data/resource';
 import type { FeedItem, InspectCard, LayerContext, LayerHandle } from '../layers/types';
 import type { SlotId } from '../map/types';
 import {
-  Cleanup, EMPTY_FC, HOVER, LIMB, bindOpacity, bindProp, createLookup, dataSignal, ensureIds, idBase, peek, resourcesOf, trackStatus,
+  Cleanup, EMPTY_FC, HOVER, LIMB, bindOpacity, bindProp, createLookup, dataSignal, ensureIds, idBase, isSignal, peek, resourcesOf, trackStatus, unwrap,
   type AnyFeature, type Dyn, type Expr, type FeatureData, type NumOrExpr,
   withCards, featureFinder,
 } from './common';
@@ -20,14 +20,18 @@ export interface AreaLayerOptions {
   idKey?: string;
   fill: Dyn<string | Expr>;
   /** 0..1, default 0.35 */
-  fillOpacity?: NumOrExpr;
+  fillOpacity?: Dyn<NumOrExpr>;
   /** Outline; false = none. Default: same colour as the fill, 1 px. */
-  outline?: false | { color?: string | Expr; width?: number };
+  outline?: false | { color?: string | Expr; width?: number; opacity?: Dyn<NumOrExpr> };
   filter?: ReadonlySignal<FilterSpecification | undefined>;
   describe?(feature: AnyFeature): InspectCard;
+  /** Optional guard: clicks on features for which this returns false are ignored. */
+  clickable?(feature: AnyFeature): boolean;
   feed?(features: AnyFeature[]): FeedItem[];
   minZoom?: number;
   count?: ReadonlySignal<number | undefined>;
+  /** false: do not report loading/ready (when another kit of the same layer already reports it). */
+  status?: boolean;
 }
 
 export function areaLayer(ctx: LayerContext, o: AreaLayerOptions): LayerHandle {
@@ -39,7 +43,9 @@ export function areaLayer(ctx: LayerContext, o: AreaLayerOptions): LayerHandle {
   const clean = new Cleanup();
   const data = dataSignal(o.data);
   const slot = o.slot ?? 'areas';
-  const fillOpacity = o.fillOpacity ?? 0.35;
+  const fillOpacityDyn = o.fillOpacity ?? 0.35;
+  const fillOpacityIsSignal = isSignal<NumOrExpr>(fillOpacityDyn);
+  const fillOpacityInitial = unwrap<NumOrExpr>(fillOpacityDyn);
   const zoom = o.minZoom !== undefined ? { minzoom: o.minZoom } : {};
   const filter = o.filter?.peek();
   const f = filter ? { filter } : {};
@@ -47,7 +53,10 @@ export function areaLayer(ctx: LayerContext, o: AreaLayerOptions): LayerHandle {
   const lineId = `${base}-outline`;
   const selId = `${base}-selected`;
   const outline = o.outline === undefined ? { width: 1 } : o.outline;
-  const hoverBoost = ['min', 1, ['+', fillOpacity, ['case', HOVER, 0.15, 0]]] as unknown as ExpressionSpecification;
+  const outlineOpacityDyn = (outline && outline.opacity) ? outline.opacity : 0.85;
+  const outlineOpacityIsSignal = isSignal<NumOrExpr>(outlineOpacityDyn);
+  const outlineOpacityInitial = unwrap<NumOrExpr>(outlineOpacityDyn);
+  const hoverBoost = ['min', 1, ['+', fillOpacityInitial, ['case', HOVER, 0.15, 0]]] as unknown as ExpressionSpecification;
 
   engine.addSource(src, { type: 'geojson', data: EMPTY_FC, promoteId: idKey } as GeoJSONSourceSpecification);
   const layers: LayerSpecification[] = [
@@ -56,7 +65,7 @@ export function areaLayer(ctx: LayerContext, o: AreaLayerOptions): LayerHandle {
   if (outline) {
     layers.push({
       id: lineId, type: 'line', source: src, ...zoom, ...f, layout: { 'line-join': 'round' },
-      paint: { 'line-color': outline.color ?? peek(o.fill), 'line-width': outline.width ?? 1, 'line-opacity': 0.85 },
+      paint: { 'line-color': outline.color ?? peek(o.fill), 'line-width': outline.width ?? 1, 'line-opacity': outlineOpacityInitial },
     } as LayerSpecification);
   }
   layers.push({
@@ -67,16 +76,32 @@ export function areaLayer(ctx: LayerContext, o: AreaLayerOptions): LayerHandle {
 
   clean.add(effect(() => { (ml.getSource(src) as { setData(d: unknown): void } | undefined)?.setData(data.value ? ensureIds(data.value, idKey) : EMPTY_FC); }));
   if (o.feed) clean.add(effect(() => { const fc = data.value; if (fc) { const feats = fc.features as AnyFeature[]; const items = o.feed!(feats); ctx.feed(o.describe ? withCards(items, featureFinder(feats, idKey), o.describe) : items); }; }));
-  clean.add(trackStatus(ctx, data, resourcesOf(o.data, o.resources), o.count));
+  if (o.status !== false) clean.add(trackStatus(ctx, data, resourcesOf(o.data, o.resources), o.count));
   clean.add(bindProp(ml, fillId, 'paint', 'fill-color', o.fill));
   if (outline && !outline.color) clean.add(bindProp(ml, lineId, 'paint', 'line-color', o.fill));
   if (o.filter) {
     const flt = o.filter;
     clean.add(effect(() => { for (const id of [fillId, lineId]) if (ml.getLayer(id)) ml.setFilter(id, flt.value ?? null); }));
   }
-  const targets: { layer: string; prop: string; base: NumOrExpr }[] = [{ layer: fillId, prop: 'fill-opacity', base: hoverBoost }];
-  if (outline) targets.push({ layer: lineId, prop: 'line-opacity', base: 0.85 });
+  const targets: { layer: string; prop: string; base: NumOrExpr }[] = [];
+  if (!fillOpacityIsSignal) targets.push({ layer: fillId, prop: 'fill-opacity', base: hoverBoost });
+  if (outline && !outlineOpacityIsSignal) targets.push({ layer: lineId, prop: 'line-opacity', base: outlineOpacityInitial });
   clean.add(bindOpacity(ctx, ml, targets));
+  if (fillOpacityIsSignal) {
+    clean.add(effect(() => {
+      const fo = (fillOpacityDyn as ReadonlySignal<NumOrExpr>).value;
+      const hb = ['min', 1, ['+', fo, ['case', HOVER, 0.15, 0]]] as unknown as ExpressionSpecification;
+      const opacity = ctx.opacity.value;
+      if (ml.getLayer(fillId)) ml.setPaintProperty(fillId, 'fill-opacity', ['*', hb, opacity] as unknown as ExpressionSpecification);
+    }));
+  }
+  if (outline && outlineOpacityIsSignal) {
+    clean.add(effect(() => {
+      const oo = (outlineOpacityDyn as ReadonlySignal<NumOrExpr>).value;
+      const opacity = ctx.opacity.value;
+      if (ml.getLayer(lineId)) ml.setPaintProperty(lineId, 'line-opacity', ['*', oo, opacity] as unknown as ExpressionSpecification);
+    }));
+  }
 
   const selectedId = signal<unknown>(null);
   let lastCard: InspectCard | null = null;
@@ -89,6 +114,8 @@ export function areaLayer(ctx: LayerContext, o: AreaLayerOptions): LayerHandle {
       engine.onPick([fillId], {
         click(feat, ll) {
           const id = (feat.properties as Record<string, unknown> | null)?.[idKey] ?? feat.id;
+          const full = (lookup(data.peek(), id) ?? feat) as AnyFeature;
+          if (o.clickable && !o.clickable(full)) return;
           const card = o.describe!((lookup(data.peek(), id) ?? feat) as AnyFeature);
           card.location ??= ll;
           lastCard = card;

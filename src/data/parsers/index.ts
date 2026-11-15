@@ -13,6 +13,7 @@ import { coopsStations } from './tides';
 import { mergeQuakes } from './quakes';
 import { usgsQuakes } from './usgs';
 import { gvpVolcanoes } from './gvp';
+import { gvpEruptions } from './eruptions';
 import { firmsFires } from './firms';
 import { gdacsEvents } from './gdacs';
 import { eonetEvents } from './eonet';
@@ -21,7 +22,7 @@ import { nwsAlerts } from './nws';
 import { dwdWarnings } from './dwd';
 import { ninaList } from './nina';
 import { auroraGrid } from './aurora';
-import { bfsDose, stukDose, hcDose, safecastDose } from './radiation';
+import { bfsDose, stukDose, hcDose, safecastDose, safecastAir, bfsVoronoi, safecastTrack } from './radiation';
 import { aircraftReadsb } from './readsb';
 import { openskyStates } from './opensky';
 import { aisLocations, aisVessels } from './ais';
@@ -77,6 +78,7 @@ export const parsers = {
   shippingLanes,
   owxDecode: decodeOwx,
   gvpVolcanoes,
+  gvpEruptions,
   firmsFires,
   gdacsEvents,
   eonetEvents,
@@ -89,6 +91,9 @@ export const parsers = {
   stukDose,
   hcDose,
   safecastDose,
+  safecastAir,
+  safecastTrack,
+  bfsVoronoi,
   aircraftReadsb,
   openskyStates,
   aisLocations,

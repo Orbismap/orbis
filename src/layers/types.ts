@@ -43,6 +43,8 @@ export interface LayerKeyRef { id: string; /** true: the layer does nothing with
 
 export interface InspectCard {
   title: string; subtitle?: string; time?: number; color?: string; icon?: IconName;
+  /** Small logo shown in place of the icon, e.g. a radio station's favicon. */
+  logo?: string;
   facts: { label: string; value: string; emphasis?: boolean }[];
   text?: string;
   media?: { type: 'image' | 'video' | 'audio' | 'hls'; url: string; poster?: string; refresh?: number };

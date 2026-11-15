@@ -17,13 +17,13 @@ const THEMES: Record<string, KarteTheme[]> = {
   wetter: [
     T('niederschlag', 'Niederschlag und Radar', 'rain', ['radar', 'niederschlag']),
     T('felder', 'Felder', 'thermometer', ['wind', 'temperatur', 'gefuehlt', 'taupunkt', 'feuchte', 'luftdruck', 'bewoelkung', 'boeen', 'cape', 'schnee']),
-    T('zusaetze', 'Zusätze', 'layers', ['satellit', 'staedte', 'luftqualitaet', 'stroemung', 'blitze']),
+    T('zusaetze', 'Zusätze', 'layers', ['satellit', 'staedte', 'luftqualitaet', 'feinstaub', 'stroemung', 'blitze']),
   ],
   gefahren: [
     T('unwetter', 'Unwetter', 'storm', ['stuerme', 'unwetter-usa', 'unwetter-de', 'blitze']),
     T('erde', 'Erde', 'quake', ['erdbeben', 'vulkane', 'tsunami']),
     T('feuer', 'Feuer', 'flame', ['feuer']),
-    T('strahlung', 'Strahlung und Weltraum', 'radiation', ['radioaktivitaet', 'polarlicht']),
+    T('strahlung', 'Strahlung und Weltraum', 'radiation', ['radioaktivitaet', 'safecast-tracks', 'polarlicht']),
     T('ereignisse', 'Ereignisse', 'warning', ['katastrophen', 'naturereignisse', 'rekonstruktionen']),
   ],
   verkehr: [
@@ -40,6 +40,7 @@ const THEMES: Record<string, KarteTheme[]> = {
     T('rohstoffe', 'Rohstoffe', 'mine', ['rohstoffe', 'oelgasleitungen']),
     T('wasser', 'Wasser', 'drop', ['wasserleitungen', 'wasserwerke', 'stauseen']),
     T('kameras', 'Kameras', 'camera', ['webcams', 'ueberwachung', 'kennzeichen']),
+    T('medien', 'Medien', 'radio', ['radio']),
   ],
   erde: [
     T('oberflaeche', 'Oberfläche', 'leaf', ['satellitenbild', 'vegetation', 'landbedeckung', 'schneedecke', 'bodentemperatur', 'aerosole', 'nachtlichter']),
@@ -65,13 +66,13 @@ const THEMES: Record<string, KarteTheme[]> = {
 const DEFS: Karte[] = [
   {
     id: 'wetter', name: 'Wetter', icon: 'cloud', color: '#72C8F0', builtin: true, basemap: 'orbis-dark', labels: true, terminator: true,
-    layers: [on('radar'), off('wind', 0.85), off('temperatur', 0.8), off('gefuehlt', 0.8), off('staedte'), off('luftqualitaet', 0.85), off('niederschlag'), off('bewoelkung'), off('luftdruck'), off('satellit'), on('stroemung'), off('blitze')],
+    layers: [on('radar'), off('wind', 0.85), off('temperatur', 0.8), off('gefuehlt', 0.8), off('staedte'), off('luftqualitaet', 0.85), off('niederschlag'), off('bewoelkung'), off('luftdruck'), off('satellit'), on('stroemung'), off('blitze'), off('feinstaub')],
   },
   {
     id: 'gefahren', name: 'Gefahren', icon: 'warning', color: '#FF6B5E', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,
     layers: [
       on('stuerme'), on('katastrophen'), { ...on('vulkane'), options: { onlyActive: true } }, on('erdbeben'), on('feuer'),
-      off('unwetter-usa'), off('unwetter-de'), off('naturereignisse'), off('tsunami'), off('blitze'), off('polarlicht'), off('rekonstruktionen'), off('radioaktivitaet'), off('plastik'),
+      off('unwetter-usa'), off('unwetter-de'), off('naturereignisse'), off('tsunami'), off('blitze'), off('polarlicht'), off('rekonstruktionen'), off('radioaktivitaet'), off('safecast-tracks'), off('plastik'),
     ],
   },
   {

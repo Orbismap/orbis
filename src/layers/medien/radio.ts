@@ -83,6 +83,7 @@ export default defineLayer({
           subtitle: [p.state, p.country].filter(Boolean).join(', ') || 'Radiosender',
           color: p.stream ? COLOR : DIM,
           icon: 'radio',
+          logo: p.favicon || undefined,
           facts: [
             ...(p.tags ? [{ label: 'Genre', value: p.tags }] : []),
             ...(p.country ? [{ label: 'Land', value: p.country }] : []),

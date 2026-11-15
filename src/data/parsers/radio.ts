@@ -4,12 +4,14 @@ import type { Feature, FeatureCollection, Point } from 'geojson';
 export type StationProps = {
   id: string; name: string; /** https stream URL, '' when the station only has an insecure (http) one */ stream: string; streamHttp: string;
   homepage: string; tags: string; country: string; state: string; language: string; codec: string; bitrate: number; hls: boolean; clicks: number;
+  /** station logo, '' when none is given or it is only served over http */
+  favicon: string;
 };
 export type StationCollection = FeatureCollection<Point, StationProps>;
 
 interface Rb {
   stationuuid?: string; name?: string; url_resolved?: string; homepage?: string; tags?: string; country?: string; state?: string; language?: string;
-  codec?: string; bitrate?: number; hls?: number; geo_lat?: number | null; geo_long?: number | null; clickcount?: number; lastcheckok?: number;
+  codec?: string; bitrate?: number; hls?: number; geo_lat?: number | null; geo_long?: number | null; clickcount?: number; lastcheckok?: number; favicon?: string;
 }
 
 export function radioStations(raw: unknown): StationCollection {
@@ -38,6 +40,7 @@ export function radioStations(raw: unknown): StationCollection {
           bitrate: s.bitrate ?? 0,
           hls: s.hls === 1,
           clicks: s.clickcount ?? 0,
+          favicon: /^https:\/\//.test(s.favicon ?? '') ? s.favicon! : '',
         },
       });
     }
