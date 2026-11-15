@@ -10,3 +10,4 @@ dist
 test/out
 dist-smoke
 dist-thumbs
+models-staging/

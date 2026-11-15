@@ -1,14 +1,21 @@
-// Detailed 3D models (glTF, public/models/aircraft/, credits in CREDITS.json) for the most common aircraft types. One
-// model serves a whole family and is scaled to the real length of each type; types without a model keep the simple
-// procedural one (models.ts). The files are normalised: y up, nose towards +z, x centred, wheels at y = 0, in metres.
-
+// Detailed 3D models (glTF) for the most common aircraft types. One model serves a whole family and is scaled to the real
+// length of each type; types without a model keep the simple procedural one (models.ts). The files live in the assets
+// bucket (`models/aircraft/*.glb`) and are normalised: y up, nose towards +z, x centred, wheels at y = 0, in metres.
+// The seed below keeps the app working offline / before the bucket registry loads; new models can be added by dropping
+// them into the bucket and extending `models/aircraft/registry.json` (no code change, no redeploy).
 export interface GlbSpec {
   file: string;
   /** length of the model in metres (as built into the file) */
   length: number;
 }
 
-export const GLB_MODELS: Record<string, GlbSpec> = {
+interface RegistryFile {
+  models: Record<string, GlbSpec>;
+  types: Record<string, [string, number]>;
+}
+
+// ---- seed (also serves as the offline fallback) ----
+const SEED_MODELS: Record<string, GlbSpec> = {
   'b737-800': { file: 'b737-800.glb', length: 39.5 },
   a320neo: { file: 'a320neo.glb', length: 37.57 },
   a220: { file: 'a220.glb', length: 38.7 },
@@ -29,8 +36,7 @@ export const GLB_MODELS: Record<string, GlbSpec> = {
   pc12: { file: 'pc12.glb', length: 14.4 },
 };
 
-/** ICAO type designator → [model, real length of the type in metres] */
-export const TYPE_MODEL: Record<string, [string, number]> = {
+const SEED_TYPES: Record<string, [string, number]> = {
   B736: ['b737-800', 31.2], B737: ['b737-800', 33.6], B738: ['b737-800', 39.5], B739: ['b737-800', 42.1],
   B37M: ['b737-800', 35.6], B38M: ['b737-800', 39.5], B39M: ['b737-800', 42.2],
   A318: ['a320neo', 31.4], A319: ['a320neo', 33.8], A19N: ['a320neo', 33.8], A320: ['a320neo', 37.57], A20N: ['a320neo', 37.57], A321: ['a320neo', 44.5], A21N: ['a320neo', 44.5],
@@ -52,9 +58,43 @@ export const TYPE_MODEL: Record<string, [string, number]> = {
   PC12: ['pc12', 14.4],
 };
 
+// ---- mutable registries (seeded, augmented by the bucket registry) ----
+export const GLB_MODELS: Record<string, GlbSpec> = { ...SEED_MODELS };
+export const TYPE_MODEL: Record<string, [string, number]> = { ...SEED_TYPES };
+
+let loaded = false;
+let inflight: Promise<void> | undefined;
+
+export function loadAircraftRegistry(): Promise<void> {
+  if (loaded) return Promise.resolve();
+  if (inflight) return inflight;
+  inflight = (async () => {
+    try {
+      const base = (import.meta.env?.VITE_ASSETS_BASE && String(import.meta.env.VITE_ASSETS_BASE).trim()) || 'https://orbis-assets.maltee.dev/';
+      const root = base.endsWith('/') ? base : base + '/';
+      const res = await fetch(root + 'models/aircraft/registry.json');
+      if (!res.ok) return;
+      const data = (await res.json()) as RegistryFile;
+      if (data?.models) Object.assign(GLB_MODELS, data.models);
+      if (data?.types) Object.assign(TYPE_MODEL, data.types);
+      loaded = true;
+    } catch {
+      // offline / not uploaded yet: keep seed
+    } finally {
+      inflight = undefined;
+    }
+  })();
+  return inflight;
+}
+
+// kick off loading as soon as the module is imported (browser only)
+if (typeof window !== 'undefined') void loadAircraftRegistry();
+
 /** The model for an ICAO type and how much to stretch it (real length / built length); undefined: no detailed model. */
 export function glbFor(type: string | undefined): { id: string; factor: number } | undefined {
   const t = type && TYPE_MODEL[type];
   if (!t) return undefined;
-  return { id: t[0], factor: t[1] / GLB_MODELS[t[0]]!.length };
+  const spec = GLB_MODELS[t[0]];
+  if (!spec) return undefined;
+  return { id: t[0], factor: t[1] / spec.length };
 }

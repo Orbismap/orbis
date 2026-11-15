@@ -31,7 +31,9 @@ function floats(a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): TH
 export async function loadGlb(id: string): Promise<GlbPart[]> {
   const spec = GLB_MODELS[id];
   if (!spec) throw new Error(`unknown aircraft model ${id}`);
-  const gltf = await loader.loadAsync(`${import.meta.env.BASE_URL}models/aircraft/${spec.file}`);
+  const base = (import.meta.env?.VITE_ASSETS_BASE && String(import.meta.env.VITE_ASSETS_BASE).trim()) || 'https://orbis-assets.maltee.dev/';
+  const root = base.endsWith('/') ? base : base + '/';
+  const gltf = await loader.loadAsync(root + `models/aircraft/${spec.file}`);
   gltf.scene.updateMatrixWorld(true);
   const parts: GlbPart[] = [];
   gltf.scene.traverse((o) => {
