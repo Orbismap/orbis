@@ -1,5 +1,6 @@
 // Combined airport layer: airports as points at low zoom, airport ground plan from zoom 11, indoor plan from zoom 16.
 import { computed, effect, signal } from '@preact/signals';
+import { Marker } from 'maplibre-gl';
 import type { ExpressionSpecification, FilterSpecification } from 'maplibre-gl';
 import type { Feature, FeatureCollection, LineString, Point, Polygon } from 'geojson';
 import { bucketUrl } from '../../data/endpoints';
@@ -260,7 +261,7 @@ export default defineLayer({
     const taxiLines = computed(() => lines.value.filter((l) => l.properties.kind !== 'runway'));
     const runways = computed(() => fc(runwayLines.value));
     const taxis = computed(() => fc(taxiLines.value));
-    const standPoints = computed(() => fc(plans.value.flatMap((p) => p.points.filter((pt) => pt.properties.kind !== 'light'))));
+    const standPoints = computed(() => fc(plans.value.flatMap((p) => p.points.filter((pt) => pt.properties.kind !== 'light' && pt.properties.kind !== 'gate'))));
     const lightPoints = computed(() => fc(plans.value.flatMap((p) => p.points.filter((pt) => pt.properties.kind === 'light'))));
 
     const widthExpr = computed(() => {
@@ -348,6 +349,50 @@ export default defineLayer({
       set(tsrc, fc(taxiLines.value.filter((f) => f.properties.ref)));
       set(rsrc, lightPoints.value);
     });
+
+    // gate badges as HTML markers (fixed border-radius) with simple collision hiding
+    type GateMarker = { marker: Marker; el: HTMLDivElement; coord: [number, number] };
+    const gateMarkers: GateMarker[] = [];
+    const layoutGateMarkers = () => {
+      const kept: { x: number; y: number; w: number; h: number }[] = [];
+      for (const g of gateMarkers) {
+        if (ml.getZoom() < 15.5) { g.el.style.display = 'none'; continue; }
+        const pos = ml.project(g.coord);
+        const w = g.el.offsetWidth || 24;
+        const h = g.el.offsetHeight || 14;
+        const box = { x: pos.x - w / 2, y: pos.y - h / 2, w, h };
+        let collide = false;
+        for (const k of kept) {
+          if (box.x < k.x + k.w && box.x + box.w > k.x && box.y < k.y + k.h && box.y + box.h > k.y) { collide = true; break; }
+        }
+        if (collide) {
+          g.el.style.display = 'none';
+        } else {
+          g.el.style.display = '';
+          kept.push(box);
+        }
+      }
+    };
+    const syncGateMarkers = () => {
+      for (const g of gateMarkers) g.marker.remove();
+      gateMarkers.length = 0;
+      if (ml.getZoom() < 15.5) return;
+      for (const p of plans.value.flatMap((pl) => pl.points)) {
+        if (p.properties.kind !== 'gate' || !p.properties.ref) continue;
+        const el = document.createElement('div');
+        el.textContent = String(p.properties.ref);
+        el.style.cssText = 'background:#e0aa4d;color:#1b2433;font:700 10px/1 system-ui,sans-serif;padding:2px 5px;border-radius:6px;border:2px solid #fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.4);opacity:0;transition:opacity 0.35s ease;display:none;';
+        const m = new Marker({ element: el, anchor: 'center' }).setLngLat(p.geometry.coordinates as [number, number]).addTo(ml);
+        requestAnimationFrame(() => { el.style.opacity = '1'; });
+        gateMarkers.push({ marker: m, el, coord: p.geometry.coordinates as [number, number] });
+      }
+      layoutGateMarkers();
+    };
+    const stopGateMarkers = effect(() => { plans.value; syncGateMarkers(); });
+    const onGateMove = () => layoutGateMarkers();
+    ml.on('moveend', onGateMove);
+    const onGateZoom = () => syncGateMarkers();
+    ml.on('zoomend', onGateZoom);
 
     // ---------- render: indoor ----------
     const indoorHandles = [
@@ -464,6 +509,11 @@ export default defineLayer({
         stopLevelSync();
         stopOverlay();
         stopPlanLabels();
+        stopGateMarkers();
+        for (const g of gateMarkers) g.marker.remove();
+        gateMarkers.length = 0;
+        ml.off('moveend', onGateMove);
+        ml.off('zoomend', onGateZoom);
         stopIndoorLabels();
         stopStatus();
         try { container.removeChild(overlay); } catch { /* */ }
