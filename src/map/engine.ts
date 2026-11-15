@@ -192,9 +192,9 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   let shadeGoal = -1;
   let terrainNow = 0;
   let terrainRaf = 0;
-  /** Relief shading of the flat Orbis colours: full with 3D terrain, weaker (2D) where the terrain is flattened, off with the switch. */
+  /** Relief shading of the flat Orbis colours: the same with 3D terrain and where the terrain is flattened (2D), off with the switch. */
   let shadeNow = 0;
-  const SHADE_FLAT = 0.45;
+  const SHADE_FLAT = 1;
   const shadeTarget = () => {
     if (!terrainOn || !(basemap === 'orbis-dark' || basemap === 'orbis-light')) return 0;
     return terrainTarget() > 0 ? 1 : SHADE_FLAT;
