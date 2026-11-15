@@ -8,6 +8,7 @@ import { Icon } from '../../ui/icons/Icon';
 import { tipProps } from '../../ui/tip-state';
 import { TiltGroup } from './Tilt';
 import { BasemapPicker } from '../basemap/BasemapPicker';
+import { OpenInMaps } from './OpenInMaps';
 import './tools.css';
 
 const zoomBy = (d: number) => mapEngine.peek()?.flyTo({ zoom: camera.peek().zoom + d, duration: 260 });
@@ -80,6 +81,7 @@ export function ToolRail({ popoverUp }: { popoverUp?: boolean }) {
       </div>
       <TiltGroup />
       <Compass />
+      <OpenInMaps popoverUp={popoverUp} />
     </div>
   );
 }

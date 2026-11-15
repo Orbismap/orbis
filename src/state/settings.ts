@@ -16,10 +16,12 @@ export interface Settings {
   confirmedWarnings: string[];
   /** Orbis Pro (3D extension) switched on. Local switch for now; the licence check lives in ext/licence.ts. */
   pro: boolean;
+  /** Show debug information (extra links, zoom level, …). */
+  debug: boolean;
 }
 
 const VERSION = 1;
-export const DEFAULT_SETTINGS: Settings = { units: { ...DEFAULT_UNITS }, theme: 'dark', motion: 'auto', keys: {}, confirmedWarnings: [], pro: false };
+export const DEFAULT_SETTINGS: Settings = { units: { ...DEFAULT_UNITS }, theme: 'dark', motion: 'auto', keys: {}, confirmedWarnings: [], pro: false, debug: false };
 
 const pick = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(v as T) ? (v as T) : fallback);
 
@@ -42,6 +44,7 @@ export function validateSettings(raw: unknown): Settings | undefined {
     keys,
     confirmedWarnings: Array.isArray(r.confirmedWarnings) ? r.confirmedWarnings.filter((x): x is string => typeof x === 'string') : [],
     pro: r.pro === true,
+    debug: r.debug === true,
   };
 }
 

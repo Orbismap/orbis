@@ -3,6 +3,7 @@ import { settings, updateSettings } from '../../state/settings';
 import { leftView, shortcutsOpen } from '../../state/ui';
 import { Button, IconButton } from '../../ui/Button';
 import { Segmented } from '../../ui/Segmented';
+import { Switch } from '../../ui/Switch';
 import { BoostSection } from '../boost/BoostSection';
 import { ProSection } from './ProSection';
 import { allSources } from '../attribution/credits';
@@ -68,6 +69,15 @@ export function SettingsView({ modal }: { modal?: boolean } = {}) {
             Übersicht
           </Button>
         </div>
+        </div>
+      </section>
+      <section class="set-sec" aria-labelledby="set-debug">
+        <h3 id="set-debug">Debug</h3>
+        <div class="setgroup">
+          <div class="set-row">
+            <span class="set-label">Debug-Infos</span>
+            <Switch checked={s.debug} onChange={(v) => updateSettings({ debug: v })} />
+          </div>
         </div>
       </section>
       <BoostSection />
