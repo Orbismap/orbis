@@ -195,10 +195,25 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
     return terrainOn && !(flatOrbis && (projectionSignal.peek() !== 'globe' || ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS)) ? TERRAIN_EXAGGERATION : 0;
   };
+  /**
+   * Changes the exaggeration of the running terrain in place. `map.setTerrain` would rebuild the whole terrain every
+   * frame (tiles reload, the camera re-solves its centre against a half-loaded terrain), which makes the view jump up
+   * and down. Here only the number changes, the camera follows the ground under the centre smoothly.
+   */
+  type TerrainInternals = { exaggeration: number; options: { exaggeration?: number }; coverage: { exaggeration: number } };
   function paintTerrain() {
-    if (terrainNow > 0.001) {
+    const t = (ml as unknown as { terrain: TerrainInternals | null }).terrain;
+    if (terrainNow <= 0.001) {
+      if (t) ml.setTerrain(null);
+    } else if (!t) {
       ml.setTerrain({ source: TERRAIN_SOURCE, exaggeration: terrainNow });
-    } else if (ml.getTerrain()) ml.setTerrain(null);
+    } else if (t.coverage) {
+      t.exaggeration = terrainNow;
+      t.options.exaggeration = terrainNow;
+      t.coverage.exaggeration = terrainNow;
+      (ml as unknown as { _camera?: { applyTerrainChange?: () => void } })._camera?.applyTerrainChange?.();
+      ml.triggerRepaint();
+    } else ml.setTerrain({ source: TERRAIN_SOURCE, exaggeration: terrainNow });
     const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
     setVis(HILLSHADE_LAYER, terrainNow > 0.001 && flatOrbis);
     if (ml.getLayer(HILLSHADE_LAYER)) ml.setPaintProperty(HILLSHADE_LAYER, 'hillshade-exaggeration', HILLSHADE_STRENGTH * (terrainNow / TERRAIN_EXAGGERATION));
