@@ -11,8 +11,8 @@ export const DEFAULT_CAMERA: CameraState = { lng: 10, lat: 30, zoom: 1.6, bearin
 
 export const camera = signal<CameraState>({ ...DEFAULT_CAMERA });
 export const projection = signal<Projection>('globe');
-/** 3D terrain (real elevation model); only lifted while the camera is tilted. Not persisted. */
-export const terrain3d = signal(false);
+/** 3D terrain (real elevation model); on by default. Not persisted. */
+export const terrain3d = signal(true);
 export const setTerrain3d = (on: boolean) => {
   terrain3d.value = on;
 };
