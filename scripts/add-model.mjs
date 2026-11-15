@@ -24,6 +24,7 @@ const staging = resolve(get('--staging') || './models-staging');
 const group = get('--group') || 'aircraft';
 const modelsDir = get('--models-dir') || 'models';
 const glbPath = get('--glb');
+const originalPath = get('--original');
 const id = get('--id') || (glbPath ? basename(glbPath, '.glb') : undefined);
 const name = get('--name') || (glbPath ? basename(glbPath) : undefined);
 const length = parseFloat(get('--length'));
@@ -42,6 +43,10 @@ if (!glbPath || !id || !Number.isFinite(length)) {
 mkdirSync(dir, { recursive: true });
 const targetFile = name || basename(glbPath);
 copyFileSync(glbPath, join(dir, targetFile));
+if (originalPath) {
+  mkdirSync(join(staging, 'import'), { recursive: true });
+  copyFileSync(originalPath, join(staging, 'import', basename(originalPath)));
+}
 
 const regPath = join(dir, 'registry.json');
 const reg = existsSync(regPath) ? JSON.parse(readFileSync(regPath, 'utf8')) : { models: {}, types: {} };
