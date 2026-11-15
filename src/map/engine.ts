@@ -9,7 +9,7 @@ import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
 import { camera, padding, projection as projectionSignal, terrain3d, viewport, type CameraState, type Padding } from '../state/view';
-import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, HILLSHADE_LAYER, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, skyFor } from './basemaps';
+import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
 import { clampCamera, ENGINE_MAX_PITCH, flyToTarget, locate as locateImpl } from './camera';
@@ -64,7 +64,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   let labels = init.labels ?? true;
   let terminatorMode: 'off' | 'auto' = init.terminator === false ? 'off' : 'auto';
   let loaded = false;
-  let terrainOn = false;
+  let terrainOn = true;
   registerDemTiles();
 
   // a URL/state asking for more tilt than the zoom allows is clamped on load
@@ -163,6 +163,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     effect(() => {
       const p = projectionSignal.value;
       if (loaded && ml.getProjection()?.type !== p) ml.setProjection({ type: p });
+      if (loaded) applyTerrain();
     }),
   ];
 
@@ -182,13 +183,70 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     terminator.setLook(theme);
     applyTerrain();
   }
-  // Terrain only while tilted: top-down it stays flat (and cheap). Hillshade only on the flat Orbis colours.
-  function applyTerrain() {
-    const lift = terrainOn && ml.getPitch() > 10;
-    if (lift !== !!ml.getTerrain()) ml.setTerrain(lift ? { source: TERRAIN_SOURCE, exaggeration: TERRAIN_EXAGGERATION } : null);
-    setVis(HILLSHADE_LAYER, terrainOn && BASEMAPS[basemap].id.startsWith('orbis'));
+  // 3D terrain scales smoothly up and down (exaggeration tween). On the flat Orbis colours it exists only on the globe:
+  // switching to the 2D map flattens it, and from there on the map stays without terrain.
+  const TERRAIN_MS = 700;
+  /** from here on the globe has turned into the flat map: no terrain on the Orbis colours */
+  const TERRAIN_MAX_ZOOM_ORBIS = 12;
+  let terrainGoal = -1;
+  let shadeGoal = -1;
+  let terrainNow = 0;
+  let terrainRaf = 0;
+  /** Relief shading of the flat Orbis colours: the same with 3D terrain and where the terrain is flattened (2D), off with the switch. */
+  let shadeNow = 0;
+  const SHADE_FLAT = 1;
+  const shadeTarget = () => {
+    if (!terrainOn || !(basemap === 'orbis-dark' || basemap === 'orbis-light')) return 0;
+    return terrainTarget() > 0 ? 1 : SHADE_FLAT;
+  };
+  const terrainTarget = () => {
+    const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
+    return terrainOn && !(flatOrbis && (projectionSignal.peek() !== 'globe' || ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS)) ? TERRAIN_EXAGGERATION : 0;
+  };
+  /**
+   * Changes the exaggeration of the running terrain in place. `map.setTerrain` would rebuild the whole terrain every
+   * frame (tiles reload, the camera re-solves its centre against a half-loaded terrain), which makes the view jump up
+   * and down. Here only the number changes, the camera follows the ground under the centre smoothly.
+   */
+  type TerrainInternals = { exaggeration: number; options: { exaggeration?: number }; coverage: { exaggeration: number } };
+  function paintTerrain() {
+    const t = (ml as unknown as { terrain: TerrainInternals | null }).terrain;
+    if (terrainNow <= 0.001) {
+      if (t) ml.setTerrain(null);
+    } else if (!t) {
+      ml.setTerrain({ source: TERRAIN_SOURCE, exaggeration: terrainNow });
+    } else if (t.coverage) {
+      t.exaggeration = terrainNow;
+      t.options.exaggeration = terrainNow;
+      t.coverage.exaggeration = terrainNow;
+      (ml as unknown as { _camera?: { applyTerrainChange?: () => void } })._camera?.applyTerrainChange?.();
+      ml.triggerRepaint();
+    } else ml.setTerrain({ source: TERRAIN_SOURCE, exaggeration: terrainNow });
+    setVis(HILLSHADE_LAYER, shadeNow > 0.001);
+    if (ml.getLayer(HILLSHADE_LAYER)) ml.setPaintProperty(HILLSHADE_LAYER, 'hillshade-exaggeration', HILLSHADE_STRENGTH * shadeNow);
   }
-  ml.on('pitch', () => loaded && applyTerrain());
+  function applyTerrain() {
+    const to = terrainTarget();
+    const shadeTo = shadeTarget();
+    if (to === terrainGoal && shadeTo === shadeGoal) return;
+    terrainGoal = to;
+    shadeGoal = shadeTo;
+    cancelAnimationFrame(terrainRaf);
+    const from = terrainNow;
+    const shadeFrom = shadeNow;
+    if (from === to && shadeFrom === shadeTo) return paintTerrain();
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / TERRAIN_MS);
+      const e = 1 - Math.pow(1 - k, 3);
+      terrainNow = from + (to - from) * e;
+      shadeNow = shadeFrom + (shadeTo - shadeFrom) * e;
+      paintTerrain();
+      if (k < 1) terrainRaf = requestAnimationFrame(step);
+    };
+    terrainRaf = requestAnimationFrame(step);
+  }
+  ml.on('zoom', () => loaded && applyTerrain());
 
   // ---- slots ----------------------------------------------------------------
   const place = (spec: LayerSpecification | CustomLayerInterface, slot: SlotId) => {
@@ -267,6 +325,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       terminator.destroy();
       picking.destroy();
       disposeBuildingsTilt();
+      cancelAnimationFrame(terrainRaf);
       ml.remove();
       if (current === engine) current = undefined;
     },
