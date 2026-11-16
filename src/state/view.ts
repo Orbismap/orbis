@@ -16,6 +16,11 @@ export const terrain3d = signal(true);
 export const setTerrain3d = (on: boolean) => {
   terrain3d.value = on;
 };
+/** 3D buildings (extruded OpenStreetMap buildings, 2.5D) on every basemap. Follows the basemap (on for Orbis dark/light, off otherwise) when that changes; not persisted. */
+export const buildings3d = signal(true);
+export const setBuildings3d = (on: boolean) => {
+  buildings3d.value = on;
+};
 /** Visible bounds and size in px; undefined before the map is ready. */
 export const viewport = signal<Viewport | undefined>(undefined);
 /** Area of the map covered by panels/sheet; the camera keeps targets inside the rest. */

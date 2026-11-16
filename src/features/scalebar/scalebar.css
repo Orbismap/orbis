@@ -56,6 +56,10 @@
     justify-content: center;
     pointer-events: none;
   }
+  /* `.hud > *` gives every HUD child clicks; the scale bar spans the window and must not take the buttons' */
+  .hud > .scalebar-pos {
+    pointer-events: none;
+  }
   /* desktop: centred between the right edge of the left menus and the right edge of the window */
   .hud-desktop .scalebar-pos {
     top: calc(env(safe-area-inset-top, 0px) + 7px);

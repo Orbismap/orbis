@@ -9,7 +9,7 @@ import { mapEngine } from '../state/ui';
 import { projection } from '../state/view';
 import { reducedMotion } from '../state/settings';
 import type { MapEngine } from '../map/types';
-import { followCurrent, followWanted, powerChannel, shipsChannel, tracksChannel } from './channels';
+import { followCurrent, followWanted, powerChannel, shipsChannel, tilesetsChannel, tilesetsState, tracksChannel } from './channels';
 import { proEnabled } from './licence';
 import type { ExtensionHost, OrbisExtension } from './types';
 
@@ -32,6 +32,8 @@ function makeHost(engine: MapEngine): ExtensionHost {
     tracks: tracksChannel,
     ships: shipsChannel,
     power: powerChannel,
+    tilesets: tilesetsChannel,
+    reportTilesets: (state) => { tilesetsState.value = state; },
     holdCamera: () => engine.holdCamera(),
     reducedMotion,
     follow: { wanted: followWanted, report: (ref) => { followCurrent.value = ref; } },
@@ -51,6 +53,7 @@ export function startExtensions(): () => void {
     token++;
     stop?.();
     followCurrent.value = null;
+    tilesetsState.value = { loading: false };
     stop = undefined;
     status = status && { ...status, running: false };
   };

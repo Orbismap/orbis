@@ -8,8 +8,9 @@ import { collapseKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { camera, padding, projection as projectionSignal, terrain3d, viewport, type CameraState, type Padding } from '../state/view';
-import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, skyFor } from './basemaps';
+import { tilesetsChannel } from '../ext/channels';
+import { buildings3d, camera, padding, projection as projectionSignal, terrain3d, viewport, type CameraState, type Padding } from '../state/view';
+import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
 import { activeMembers, loadRegional, memberIds, membersOf, regionalDef, regionalEntry, regionalReady, type Bounds } from './basemaps/regional';
@@ -68,11 +69,13 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   let terrainOn = true;
   registerDemTiles();
 
+  buildings3d.value = hasOwnBuildings(basemap);
+
   // a URL/state asking for more tilt than the zoom allows is clamped on load
   const cam = clampCamera(camera.peek());
   const ml = new maplibregl.Map({
     container,
-    style: composeStyle({ basemap, labels, terminator: terminatorMode === 'auto', projection: projectionSignal.peek() }),
+    style: composeStyle({ basemap, labels, terminator: terminatorMode === 'auto', projection: projectionSignal.peek(), buildings: buildings3d.peek() }),
     center: [cam.lng, cam.lat],
     zoom: cam.zoom,
     bearing: cam.bearing,
@@ -166,6 +169,11 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       ml.setPadding(p);
     }),
     effect(() => {
+      buildings3d.value;
+      tilesetsChannel.presented.value;
+      if (loaded) applyBuildings();
+    }),
+    effect(() => {
       terrainOn = terrain3d.value;
       if (loaded) applyTerrain();
     }),
@@ -229,13 +237,21 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   ml.on('moveend', () => {
     if (loaded && dynamic && membersOf(regionalEntry(dynamic.id)!).length > 1) syncDynamic(dynamic.id);
   });
+  /** 2.5D buildings: the Orbis basemaps' own, or the generic ones elsewhere; off with the switch, and off where Orbis Pro draws the real city models instead. */
+  function applyBuildings() {
+    const shown = isStaticBasemap(basemap) ? basemap : undefined;
+    const on = buildings3d.peek();
+    for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) setVis(l.id, on && id === shown);
+    setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !tilesetsChannel.presented.peek());
+  }
   function applyBasemap() {
     const regional = isStaticBasemap(basemap) ? undefined : regionalDef(basemap);
     // regional data not loaded yet: show the default meanwhile and apply again when it is there
     if (!isStaticBasemap(basemap) && !regional && !regionalReady.peek()) void loadRegional().then(() => loaded && applyBasemap(), () => {});
     syncDynamic(regional?.id);
     const shown = isStaticBasemap(basemap) ? basemap : regional ? undefined : DEFAULT_BASEMAP;
-    for (const id of BASEMAP_IDS) for (const l of [...BASEMAPS[id].layers, ...(BASEMAPS[id].topLayers ?? [])]) setVis(l.id, id === shown);
+    for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].layers) setVis(l.id, id === shown);
+    applyBuildings();
     const look = regional ?? BASEMAPS[shown ?? DEFAULT_BASEMAP];
     for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) setVis(l.id, labels && v === look.labelVariant);
     container.style.background = look.background;
@@ -322,6 +338,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     setBasemap(id) {
       if (id === basemap) return;
       basemap = id;
+      // the switch follows the basemap: on for the Orbis ones (their own buildings), off for aerial images and the like; free to change after that
+      buildings3d.value = hasOwnBuildings(id);
       if (loaded) applyBasemap();
     },
     setTerrain(on) {

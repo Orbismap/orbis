@@ -95,6 +95,32 @@ export interface PowerLineSample {
 /** What the power grid channel carries: towers and overhead lines, to be connected by the extension. */
 export type PowerGridSample = PowerTowerSample | PowerLineSample;
 
+/** One streamed 3D tileset (a city model) the base layer offers; the extension loads and draws it. */
+export interface TilesetSample {
+  /** unique within the layer */
+  id: string;
+  name: string;
+  /** URL of the root `tileset.json` */
+  url: string;
+  /** [west, south, east, north] in degrees */
+  bbox: [number, number, number, number];
+  /** [lng, lat] the tileset is anchored at (middle of the bbox) */
+  center: [number, number];
+  /** source line to show while the tileset is visible */
+  attribution: string;
+  license: string;
+  /** shift in metres added to the tileset's heights (ellipsoid vs. sea level), 0 when none */
+  heightOffsetM?: number;
+}
+
+/** What the extension reports about the streamed tilesets (for the status of the layer). */
+export interface TilesetsState {
+  /** tiles are on their way */
+  loading: boolean;
+  /** set when nothing could be loaded (host down, blocked, 404) */
+  error?: string;
+}
+
 /** A button an extension adds to the inspector card of a selected object. */
 export interface CardAction {
   id: string;
@@ -147,6 +173,10 @@ export interface ExtensionHost {
   readonly ships: TracksChannel<ShipSample>;
   /** Channel for power towers and overhead lines (layer `stromnetz`). */
   readonly power: TracksChannel<PowerGridSample>;
+  /** Channel for streamed 3D city models (layer `stadtmodelle3d`). */
+  readonly tilesets: TracksChannel<TilesetSample>;
+  /** Tells the base what the tilesets do: loading, errors. */
+  reportTilesets(state: TilesetsState): void;
   /**
    * The extension steers the camera's tilt and bearing itself (a follow camera): the base's tilt and north limits stand
    * back until the returned function is called. Called with `ease`, the camera eases once back onto the limits (and to

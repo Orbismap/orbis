@@ -5,6 +5,7 @@ import type { BasemapId, StaticBasemapId } from '../types';
 import { canonicalRegionalId, isRegionalId, regionalDef } from './regional';
 import { blank, bluemarble, esriClarity, imagicoAlps, osm, satellite, swissalti3d, swissimage, swisssurface3d, terrain } from './raster';
 import type { BasemapDef, LabelVariant } from './types';
+import { BUILDING_BASE, BUILDING_HEIGHT } from '../buildings-tilt';
 import { DEM_NATIVE_ZOOM, DEM_TILES } from '../dem-protocol';
 import { LABEL_VARIANTS, OFM_GLYPHS, OFM_SOURCE, labelLayers, vectorBasemap } from './vector';
 
@@ -65,7 +66,24 @@ export const HILLSHADE_STRENGTH = 0.35;
 export const TERRAIN_ATTRIBUTION = 'Gelände: <a href="https://mapterhorn.com/attribution/" target="_blank" rel="noopener">Mapterhorn</a>, <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles</a>';
 export const TERRAIN_SPEC: SourceSpecification = { type: 'raster-dem', tiles: [DEM_TILES], tileSize: 512, maxzoom: DEM_NATIVE_ZOOM, encoding: 'terrarium', attribution: TERRAIN_ATTRIBUTION };
 
-export interface StyleOptions { basemap: BasemapId; labels: boolean; terminator: boolean; projection: 'globe' | 'mercator' }
+export interface StyleOptions { basemap: BasemapId; labels: boolean; terminator: boolean; projection: 'globe' | 'mercator'; /** 2.5D buildings, default true */ buildings?: boolean }
+
+/** The 2.5D buildings for every basemap that has none of its own (aerial images, OSM, terrain, regional); the Orbis ones bring theirs. */
+export const GENERIC_BUILDINGS_ID = 'bm-buildings';
+const GENERIC_BUILDINGS_COLOR = '#d6dae3';
+const genericBuildings = (visible: boolean): LayerSpecification => ({
+  id: GENERIC_BUILDINGS_ID, type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5,
+  layout: { visibility: visible ? 'visible' : 'none', 'fill-extrusion-rounded-corner-distance': 1.5 },
+  paint: {
+    'fill-extrusion-color': GENERIC_BUILDINGS_COLOR,
+    'fill-extrusion-height': BUILDING_HEIGHT,
+    'fill-extrusion-base': BUILDING_BASE,
+    'fill-extrusion-opacity': 0.85,
+    'fill-extrusion-vertical-gradient': true,
+  },
+} as LayerSpecification);
+/** Does this basemap draw 2.5D buildings of its own? */
+export const hasOwnBuildings = (id: string | undefined): boolean => !!id && id.startsWith('orbis-');
 
 /**
  * Complete style: every basemap and label variant is part of it (hidden), slot markers and the terminator
@@ -93,7 +111,9 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
   const marker = (m: (typeof MARKERS)[number]) => ({ id: markerLayerId(m), type: 'background', layout: { visibility: 'none' } }) as LayerSpecification;
   for (const m of ['field', 'raster'] as const) layers.push(marker(m));
   for (const m of ['terminator', 'areas', 'lines'] as const) layers.push(marker(m));
-  for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(id === shown) } } as LayerSpecification);
+  const buildings = o.buildings !== false;
+  for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(buildings && id === shown) } } as LayerSpecification);
+  layers.push(genericBuildings(buildings && !hasOwnBuildings(shown)));
   for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(o.labels && v === active) } } as LayerSpecification);
   for (const m of ['basemap-labels', 'points', 'labels', 'top'] as const) layers.push(marker(m));
   return {

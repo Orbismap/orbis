@@ -5,7 +5,7 @@ import { activeKarte } from '../../state/session';
 import { Icon } from '../../ui/icons/Icon';
 import { Segmented } from '../../ui/Segmented';
 import { tipProps } from '../../ui/tip-state';
-import { projection, setProjection, setTerrain3d, terrain3d } from '../../state/view';
+import { buildings3d, projection, setBuildings3d, setProjection, setTerrain3d, terrain3d } from '../../state/view';
 import { cx } from '../../ui/hooks';
 import { Popover } from '../../ui/Popover';
 import { Switch } from '../../ui/Switch';
@@ -85,6 +85,7 @@ function PickerBody() {
       <RegionalSelect r={regional} />
       <div class="bm-switches">
         <Switch label="Beschriftung" checked={k.labels} onChange={(v) => setLabels(k.id, v)} />
+        <Switch label="3D-Gebäude" checked={buildings3d.value} onChange={setBuildings3d} />
         <Switch label="3D-Gelände" checked={terrain3d.value} onChange={setTerrain3d} />
         <Switch label="Tag und Nacht" checked={k.terminator} onChange={(v) => setTerminator(k.id, v)} />
       </div>
