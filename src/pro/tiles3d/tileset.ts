@@ -18,6 +18,9 @@ const MIN_ZOOM = 10;
 /** a tileset counts as in view when its box is this much (degrees) around the visible area */
 const MARGIN_DEG = 0.01;
 const EARTH_R = 6371008.8;
+/** Limits per device: tilesets drawn at once (the nearest to the centre of the map) and tilesets kept ready (their tiles are cached). */
+const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+export const LIMITS = touch ? { drawn: 4, kept: 8 } : { drawn: 12, kept: 32 };
 
 interface Entry {
   sample: TilesetSample;
@@ -27,6 +30,8 @@ interface Entry {
   /** a tile of this tileset has loaded */
   loadedAny: boolean;
   failed: number;
+  /** the frame it was last drawn in */
+  seen: number;
 }
 
 /** Curvature correction: the Earth bends away from the flat tangent frame, the flat map does not (see mapping.curvatureLift). */
@@ -107,7 +112,7 @@ export class TilesetPart implements StagePart {
     tiles.group.matrix.copy(toEnu);
     root.add(tiles.group);
     this.object.add(root);
-    const entry: Entry = { sample, tiles, root, loadedAny: false, failed: 0 };
+    const entry: Entry = { sample, tiles, root, loadedAny: false, failed: 0, seen: 0 };
     const rootInverse = () => root.matrixWorld.clone().invert();
     tiles.addEventListener('load-model', (e) => {
       entry.loadedAny = true;
@@ -134,6 +139,7 @@ export class TilesetPart implements StagePart {
     let failed: string | undefined;
     let busy = false;
     let tileCount = 0;
+    this.frameNo++;
     for (const s of this.samples) {
       let e = this.entries.get(s.id);
       const on = wanted.includes(s.id);
@@ -141,6 +147,7 @@ export class TilesetPart implements StagePart {
       e ??= this.create(s);
       e.root.visible = on;
       if (!on) continue;
+      e.seen = this.frameNo;
       names.add(s.name);
       const [lng, lat] = s.center;
       frame.place(this.model, lng, lat, s.heightOffsetM ?? 0);
@@ -155,6 +162,7 @@ export class TilesetPart implements StagePart {
       if (e.failed > 0 && !e.loadedAny) failed = `${s.name}: Kacheln nicht ladbar (Server antwortet nicht oder blockiert)`;
       if (e.tiles.loadProgress < 1) busy = true;
     }
+    this.trim();
     SAG.value = 1 - frame.t;
     this.object.visible = names.size > 0;
     this.visibleTiles = tileCount;
@@ -167,7 +175,21 @@ export class TilesetPart implements StagePart {
   private inView(): string[] {
     const b = this.map.getBounds();
     const [w, s, e, n] = [b.getWest() - MARGIN_DEG, b.getSouth() - MARGIN_DEG, b.getEast() + MARGIN_DEG, b.getNorth() + MARGIN_DEG];
-    return this.samples.filter((t) => t.bbox[0] <= e && t.bbox[2] >= w && t.bbox[1] <= n && t.bbox[3] >= s).map((t) => t.id);
+    const c = this.map.getCenter();
+    const dist = (t: TilesetSample) => (t.center[0] - c.lng) ** 2 + (t.center[1] - c.lat) ** 2;
+    return this.samples
+      .filter((t) => t.bbox[0] <= e && t.bbox[2] >= w && t.bbox[1] <= n && t.bbox[3] >= s)
+      .sort((a, b) => dist(a) - dist(b))
+      .slice(0, LIMITS.drawn)
+      .map((t) => t.id);
+  }
+
+  private frameNo = 0;
+  /** Lets go of the tilesets that were not drawn for longest, so flying across Japan does not pile up memory. */
+  private trim() {
+    if (this.entries.size <= LIMITS.kept) return;
+    const idle = [...this.entries].filter(([, e]) => e.seen !== this.frameNo).sort((a, b) => a[1].seen - b[1].seen);
+    for (const [id, e] of idle.slice(0, this.entries.size - LIMITS.kept)) this.drop(id, e);
   }
 
   stats() {

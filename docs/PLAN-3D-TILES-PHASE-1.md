@@ -111,7 +111,7 @@ Neuer Ordner `src/pro/tiles3d/`:
 **Phase 1 abgenommen am 16.11.2026.** Typecheck, 559 Tests und Build grün. Vom Nutzer bestätigt: Gebäude stehen mit und ohne 3D-Gelände auf dem Boden, Pro aus räumt alles auf, großer Abstand und Wechsel zum Globus sauber. LOD wirkt richtig, ist wegen des langsamen Hosts aber nicht eindeutig prüfbar.
 
 - `src/ext/`: `TilesetSample`, `tilesetsChannel`, `host.tilesets`, `host.reportTilesets(state)` (`TilesetsState`: bedeckte Kacheln als Boxen, Laden, Fehler).
-- `src/data/plateau-tokyo.ts` (+ Test): 23 Bezirke, LOD2 texturiert, `composite_url`, bbox, `heightOffsetM = -37`.
+- `src/data/plateau-tokyo.ts` (in Phase 2 durch `plateau.ts` ersetzt): 23 Bezirke, LOD2 texturiert, `composite_url`, bbox, `heightOffsetM = -37`.
 - `src/layers/infrastruktur/stadtmodelle3d.ts`: Umrisse ohne Pro (weg, solange ein Modell im Bild ist); Ladestatus/Fehler über `ctx.status`; Quellenzeile (Attribution) in der Kartenecke über eine Hilfsquelle; in `src/karten/standard.ts` (Thema „Gebäude“).
 - `src/pro/tiles3d/mapping.ts` (+ Test): WGS84→ECEF→ENU, Krümmungsmaß, Proxy-Kamera aus `frame.proj` (spiegelsicher, Mercator ist gespiegelt).
 - `src/pro/tiles3d/tileset.ts`: `TilesetPart`, ein `TilesRenderer` pro Bezirk, ab Zoom 11 und nur im Ausschnitt; Draco aus `public/draco/`; `DoubleSide` (gespiegelter Raum dreht die Dreiecke); Krümmungskorrektur im Vertex-Shader; `errorTarget = 24`.

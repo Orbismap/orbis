@@ -89,6 +89,8 @@ Abhängigkeit: `pnpm add 3d-tiles-renderer` (Lizenz und Bundlegröße beim Hinzu
 
 ### Phase 2: Katalog und Qualität (ca. 1–2 Wochen)
 
+Stand: Katalog (446 Plateau-Modelle, `scripts/build-plateau-catalog.mjs`), Karte mit „Hinfliegen“, Limits für Mobil und Geoid-Näherung umgesetzt, noch nicht abgenommen. Die Geoid-Näherung (±3 m) ist zu prüfen, etwa in Osaka und Sapporo. Kein eigener URL-Parameter: Position und Ebene genügen.
+
 - Mehrere Tilesets (weitere Plateau-Städte, weitere offene Photomeshes), Flug zum Tileset, Auswahl in der Ebene.
 - Terrain-Abgleich: MapLibre-Terrain unter aktivem Mesh auf 0 oder absetzen, Plateau-DEM-Tileset nutzen.
 - Attribution pro Tileset, Ladeanzeige, Fehlerbehandlung, Limits für Mobil.
