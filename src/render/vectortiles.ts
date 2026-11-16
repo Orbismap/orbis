@@ -38,6 +38,8 @@ export interface VectorTileOptions {
   /** Feature property with a unique id per source layer (promoted for hover). Default 'osm_id'. */
   idKey?: string;
   name?: string;
+  /** While `when` is true, these parts (with casing and selection) are hidden: an extension draws their objects in 3D. The data stays; what is hidden cannot be picked. */
+  hideWhenPresented?: { when: ReadonlySignal<boolean>; parts: string[] };
   describe(feature: AnyFeature, part: VtPart): InspectCard;
 }
 
@@ -119,6 +121,16 @@ export function vectorTileLayer(ctx: LayerContext, o: VectorTileOptions): LayerH
     if (p.pick !== false) { pickIds.push(main); partOf.set(main, p); }
   }
   clean.add(bindOpacity(ctx, ml, targets));
+
+  // An extension presents some parts in 3D (e.g. the power towers): hide only those parts, the rest of the layer stays.
+  const hide = o.hideWhenPresented;
+  if (hide) {
+    const ids = hide.parts.flatMap((p) => [`${base}.${p}`, `${base}.${p}-casing`, `${base}.${p}-sel`]).filter((id) => ml.getLayer(id));
+    clean.add(effect(() => {
+      const visibility = hide.when.value ? 'none' : 'visible';
+      for (const id of ids) if (ml.getLayer(id)) ml.setLayoutProperty(id, 'visibility', visibility);
+    }));
+  }
 
   // loading / ready / error: a vector source has no feature count; ready once the first tiles arrived
   let loaded = false;

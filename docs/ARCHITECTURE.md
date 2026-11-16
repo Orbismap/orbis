@@ -428,6 +428,7 @@ interface ExtensionHost {
   projection: ReadonlySignal<'globe' | 'mercator'>;
   tracks: TracksChannel;                        // Kanal für bewegte Objekte: Flugzeuge (TrackSample)
   ships: TracksChannel<ShipSample>;             // dasselbe für Schiffe
+  power: TracksChannel<PowerGridSample>;        // dasselbe für Strommasten und Freileitungen (Stromnetz)
   reducedMotion(): boolean;
 }
 ```
@@ -453,6 +454,8 @@ Beim Abschalten der Ebene sendet `reset()` eine leere Liste und vergisst die Aus
 
 `ShipSample` (Ebene `schiffe`): MMSI als `id`, Position, Kurs über Grund und wahre Peilung (je `undefined`, wenn AIS „nicht verfügbar“ meldet), Geschwindigkeit m/s, `moving` (ab 0,5 kn), Klasse (`cls`) samt Klassenfarbe (`SHIP_CLASSES`, eine Quelle für Symbol, Legende und 3D), Name oder `MMSI …`, Länge und Breite aus den AIS-Stammdaten (wenn bekannt) und Zeit der Meldung. Gefiltert wie die 2D-Symbole (Optionen „Nur fahrende Schiffe“ und „Schiffstyp“); Digitraffic, BarentsWatch (Norwegen) und Stream sind schon zu einer Liste zusammengeführt.
 
+`PowerGridSample` (Ebene `stromnetz`): die Masten (`kind: 'tower'`, OSM-Tags unverändert) und Freileitungen (`kind: 'line'`, Polylinie, Spannung in kV, Stromkreise) der geladenen Kacheln, nur bereinigt (außer Betrieb, Erdkabel, Doppelte aus überlappenden Kacheln; `data/parsers/powergrid.ts`). Veröffentlicht ab Zoom 14 (dem Ende der Kacheln), nur solange jemand zuhört (`onListener` weckt die Ebene). Welches Modell ein Mast bekommt und wie die Leitungen verbunden sind, entscheidet die Erweiterung. `present()` blendet die 2D-Mastenpunkte und die 2D-Freileitungen aus (Erdkabel und Umspannwerke bleiben).
+
 ### Pro-Paket (`src/pro/`)
 
 ```
@@ -474,6 +477,13 @@ ships/              Teil „Schiffe“
   smoothing.ts      Zustand zwischen Meldungen (Koppelnavigation nur bei Fahrt, bis 10 min), rein und getestet
   models.ts         prozedurale Modelle je Klasse: cargo, tanker, passenger, fishing, tug, pleasure, other; Hilfsattribut `aLight`
   ships.ts          der StagePart: Modelle auf der Wasserlinie, Kontur der Auswahl, Beschriftung, Picking
+stromnetz/          Teil „Stromnetz“
+  designs.ts        die neun Mastentwürfe als Daten (Maße, Traversen, Befestigungspunkte der Drähte), rein
+  models.ts         Geometrie je Entwurf aus diesen Daten (Gitterwerk, Rohre, Isolatoren), Vertexfarben
+  network.ts        Masten und Leitungen verbinden, Entwurf und Ausrichtung wählen, Drähte zwischen Isolatoren (rein, getestet)
+  sag.ts            Durchhang (rein, getestet)
+  wires.ts          alle Drähte in einer Mesh
+  stromnetz.ts      der StagePart: Masten auf dem Gelände, Drähte, Blickfeldauswahl, Statistik
 ```
 
 **Bühne.** Auf der flachen Karte zeichnet die Bühne direkt in die Karte (Tiefentest gegen die 2,5D-Gebäude). Auf dem
@@ -504,6 +514,8 @@ Tipp auf Modell, Schatten, Fallinie, Spur oder Wand → `tracks.select(id)` → 
 Flugzeug ist hervorgehoben.
 
 **Schiffe.** Genauso immer und nur 3D, sobald die Ebene `schiffe` Schiffe meldet (Stream, Digitraffic und BarentsWatch, bis zu 8000 aus dem Stream), auf jedem Zoom; `present()` des Schiffskanals blendet Symbole und Ring aus, die Spur und die Routenlinie des gewählten Schiffs zeichnet weiter die Basis (Kartenlinie, funktioniert auch unter 3D). Je Klasse ein Low-Poly-Modell (Fracht mit Containerstapeln, Tanker mit Deckleitung und Luken, Passagierschiff mit gestaffelten Decks und Schornstein, Fischer, Schlepper/Spezial, Segelboot mit Mast und Segel, Sonstige) als **eine** zusammengeführte Geometrie mit Zusatzattribut `aLight`: ein Material mischt die Klassenfarbe (wie Legende und 2D-Symbol) je Vertex zu Weiß (Rumpf 0, Aufbauten und Segel hell), sodass Details in jeder Klassenfarbe lesbar bleiben. Länge aus den AIS-Stammdaten (8–400 m), sonst typisch je Klasse; nie kürzer als ~22 px auf dem Bildschirm (fällt unter Zoom 9 sanft wie bei den Flugzeugen). Koppelnavigation nur, solange das Schiff fährt, höchstens 10 min (wie die 2D-Ebene), angeglichen an jede neue Meldung (kein Zurückziehen, Sprung nach langer Pause); der Bug folgt der wahren Peilung, sonst dem Kurs, ein liegendes Schiff behält seine Drehung. Schiffe, die 90 s nicht in der Liste sind, verschwinden (die Liste kommt etwa jede Sekunde, das einzelne Schiff meldet selten). Klick → `ships.select(id)` → die echte Karte der Ebene (Foto, Ziel, ETA) mit der Schaltfläche „Folgen“; das gewählte Schiff wächst und bekommt eine weiße Kontur, Name über Zeiger, Auswahl und Folgeziel. Klick auf ein Schiff während man einem Flugzeug folgt (oder umgekehrt) wechselt das Ziel. Schiffe liegen unter den Flugzeugen (Reihenfolge der Bühne). Die Bühne meldet `ships` und `shipsDrawn`.
+
+**Stromnetz.** Sobald die Ebene `stromnetz` ab Zoom 14 Masten veröffentlicht, zeichnet die Erweiterung das Netz in 3D. `network.ts` verbindet es aus den Kachelfeatures: eine Leitung läuft durch die Masten, auf denen sie liegt (Abstand zur Linie bis 12 m, der nächstgelegene Weg gewinnt; die Kacheln vereinfachen die Geometrie, Stützpunkte dürfen fehlen), geordnet nach der Lage entlang der Linie; an Kachelrändern zerschnittene Wege werden über ihre Schnittenden wieder zusammengesetzt, Kopien aus überlappenden Kacheln zählen einmal, mehrere Wege auf denselben Masten addieren ihre Stromkreise. Jeder Mast bekommt Ausrichtung (Winkelhalbierende der stärksten Leitungen), Entwurf (OSM `design`/`structure`/`material`, sonst nach Spannung und Stromkreisen mit Abwechslung nach OSM-Id) und Höhe (OSM `height`, sonst typisch). Neun Entwürfe (`designs.ts`, als Daten): Donau-, Tannen-, Tonnen- und Portalmast als Gitterwerk, Stahlrohrmast mit drei Traversen und mit einer, Beton-, Holz- und Holz-H-Mast. Die Drähte beginnen und enden an den Isolatoren genau dieser Modelle (`slotPosition`), je Stromkreis drei Leiter plus Erdseil, bei verschiedenen Entwürfen nach Lage quer zur Spannfeldrichtung gepaart, mit parabelförmigem Durchhang je Spannung (`sag.ts`). Masten und Drähte stehen auf dem 3D-Gelände (`queryTerrainElevation`, bei neuem Relief neu aufgebaut). Alle Drähte sind eine Mesh (`wires.ts`, Farbe nach Spannung, Erdseil grau). Die Bühne meldet `powerTowers`, `powerSpans`, `powerWires` und `powerDrawn`.
 
 **Folgekamera.** Schaltfläche „Folgen“ / „Folgen beenden“ auf der Karte. Sie verschiebt nur die Kartenmitte (auf der flachen
 Karte samt Mittenhöhe, sodass das Flugzeug mittig bleibt; auf dem Globus über `focusCentre`) und lässt Zoom, Drehung und Neigung
