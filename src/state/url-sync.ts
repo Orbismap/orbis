@@ -72,10 +72,13 @@ export function applyUrlState(u: UrlState): void {
 export function currentUrlState(): UrlState {
   const c = camera.value;
   const k = activeKarte.value;
+  const layers = k.layers.filter((l) => l.visible).map((l) => l.id);
+  // Detail menu closed and nothing shown: the Karte is not part of what the link shows, so leave k and l out
+  const bare = !detailOpen.value && !layers.length;
   return {
     view: { lat: c.lat, lng: c.lng, zoom: c.zoom, bearing: c.bearing, pitch: c.pitch },
-    karte: k.id,
-    layers: k.layers.filter((l) => l.visible).map((l) => l.id),
+    karte: bare ? undefined : k.id,
+    layers: bare ? undefined : layers,
     basemap: k.basemap,
     time: live.value ? undefined : time.value,
     globe: projection.value === 'globe',
