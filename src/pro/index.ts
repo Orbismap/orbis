@@ -33,9 +33,9 @@ export const extension: OrbisExtension = {
     let tilesPresent = false;
     let tilesRelease: (() => void) | null = null;
     let stateKey = '';
-    const tiles = new TilesetPart(map, ({ names, loading, error }) => {
-      const key = `${loading}|${error ?? ''}`;
-      if (key !== stateKey) { stateKey = key; host.reportTilesets({ loading, error }); }
+    const tiles = new TilesetPart(map, ({ names, loading, error, ionError, ionRoots }) => {
+      const key = `${loading}|${error ?? ''}|${ionError ?? ''}|${ionRoots ?? ''}`;
+      if (key !== stateKey) { stateKey = key; host.reportTilesets({ loading, error, ionError, ionRoots }); }
       // the base's outlines disappear while a model is in view; elsewhere they show where models exist
       const show = names.length > 0;
       if (show === tilesPresent) return;

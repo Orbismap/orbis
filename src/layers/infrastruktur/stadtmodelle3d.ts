@@ -5,7 +5,7 @@ import type { GeoJSONSourceSpecification, LayerSpecification } from 'maplibre-gl
 import type { Feature, FeatureCollection } from 'geojson';
 import { PLATEAU_ATTRIBUTION, PLATEAU_LICENSE, loadPlateau, type PlateauSample } from '../../data/plateau';
 import { hasOwnBuildings } from '../../map/basemaps';
-import { tilesetsChannel, tilesetsState } from '../../ext/channels';
+import { setTilesetSource, tilesetsChannel, tilesetsState } from '../../ext/channels';
 import { areaLayer } from '../../render/areas';
 import { defineLayer } from '../define';
 
@@ -51,7 +51,7 @@ export default defineLayer({
     const ownBuildings = () => hasOwnBuildings(ctx.map.getBasemap());
     let own = ownBuildings();
     const models = signal<readonly PlateauSample[]>([]);
-    const publish = () => tilesetsChannel.publish(() => (own ? [] : [...models.peek()]));
+    const publish = () => setTilesetSource(ctx.id, () => (own ? [] : [...models.peek()]));
     const stopWatching = tilesetsChannel.onListener(publish);
     const sync = () => {
       const now = ownBuildings();
@@ -113,7 +113,7 @@ export default defineLayer({
         ml.off('styledata', sync);
         ml.off('idle', sync);
         ctx.map.remove({ layers: [`${attrSource}-layer`], sources: [attrSource] });
-        tilesetsChannel.reset();
+        setTilesetSource(ctx.id, null);
         handle.destroy();
       },
     };

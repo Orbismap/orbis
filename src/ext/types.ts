@@ -111,6 +111,10 @@ export interface TilesetSample {
   license: string;
   /** shift in metres added to the tileset's heights (ellipsoid vs. sea level), 0 when none */
   heightOffsetM?: number;
+  /** Streamed through Cesium ion with the user's own token (`url` is then empty). */
+  ion?: { assetId: number; token: string };
+  /** Covers the world: `bbox` and `center` are ignored, the tileset is anchored at the middle of the view while it is looked at. */
+  global?: boolean;
 }
 
 /** What the extension reports about the streamed tilesets (for the status of the layer). */
@@ -119,6 +123,10 @@ export interface TilesetsState {
   loading: boolean;
   /** set when nothing could be loaded (host down, blocked, 404) */
   error?: string;
+  /** the same for the Cesium ion tilesets (a separate message: it concerns another layer than the Plateau models) */
+  ionError?: string;
+  /** root requests of Cesium ion this month (the free plan allows 1,000), when known */
+  ionRoots?: number;
 }
 
 /** A button an extension adds to the inspector card of a selected object. */

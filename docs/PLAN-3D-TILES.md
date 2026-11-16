@@ -104,6 +104,10 @@ Stand: Katalog (446 Plateau-Modelle, `scripts/build-plateau-catalog.mjs`), Karte
 
 ### Phase 4: Google Photorealistic und Cesium ion (ca. 2 Wochen)
 
+**Entscheidung (16.11.2026):** Cesium ion hat Vorrang vor weiterem Plateau-Ausbau; Orbis ist öffentlich, jeder Nutzer bringt seinen eigenen ion-Token mit (Boost-Schlüssel `cesiumion`), also kein Worker und keine eigenen Kosten. Google Photorealistic läuft über denselben Token (ion-Asset 2275207), Cesium OSM Buildings als Asset 96188.
+
+**Spike-Stand:** Ebene `cesium3d` („3D-Welt“, Option Gebäude/Fotorealistisch), Schlüssel `cesiumion`, `TilesetSample.ion` und `global`, `setTilesetSource` (mehrere Ebenen teilen den Kanal), `CesiumIonAuthPlugin` in `TilesetPart`; Anker folgt der Kartenmitte (Raster 0,05°), ab Zoom 12. Noch nicht mit echtem Token geprüft. Offen: Höhenbezug (Google/ion liefern Ellipsoidhöhen, `heightOffsetM` ist hier 0: erwartet wird ein Schweben um die Geoidhöhe, Abhilfe EGM96-Raster), Attribution aus den Tiles (`getAttributions`) statt fester Zeile, Google-Logo, Kostenlimit-Hinweis.
+
 - `GoogleCloudAuthPlugin` und `CesiumIonAuthPlugin` von `3d-tiles-renderer` (Namen prüfen).
 - **Flache Karte für weltweite Tilesets:** Per-Kachel-Anker (jede Kachel eigenes ENU-Frame mit Mercator-Maßstab am
   Kachelmittelpunkt). Alternative zunächst: nur im Globus-Modus freigeben.

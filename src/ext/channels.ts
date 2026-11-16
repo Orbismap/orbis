@@ -114,6 +114,17 @@ export const powerChannel: TracksPublisher<PowerGridSample> = createTracksChanne
 /** The one channel for streamed 3D city models (layer `stadtmodelle3d`). */
 export const tilesetsChannel: TracksPublisher<TilesetSample> = createTracksChannel<TilesetSample>();
 
+/**
+ * Several layers may offer tilesets (Plateau, Cesium ion): each one registers its list under its own name; the channel
+ * carries them all. `build: null` withdraws the source.
+ */
+const tilesetSources = new Map<string, () => TilesetSample[]>();
+export function setTilesetSource(name: string, build: (() => TilesetSample[]) | null): void {
+  if (build) tilesetSources.set(name, build);
+  else tilesetSources.delete(name);
+  tilesetsChannel.publish(() => [...tilesetSources.values()].flatMap((b) => b()));
+}
+
 /** What the extension does with the tilesets (written by the extension). */
 export const tilesetsState = signal<TilesetsState>({ loading: false });
 
