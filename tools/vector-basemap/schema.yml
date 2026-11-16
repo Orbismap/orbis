@@ -1,0 +1,155 @@
+schema_name: Orbis Basemap
+schema_description: Eigene Grundkarte aus OSM mit fein gestufter Landbedeckung
+version: 0.1.0
+attribution: <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>
+args:
+  osm_path:
+    description: Pfad zur OSM-PBF-Datei
+    default: /Users/malte/osm/geofabrik/hessen-261115.osm.pbf
+sources:
+  osm:
+    type: osm
+    local_path: ${ args.osm_path }
+tag_mappings:
+  bridge: boolean
+  tunnel: boolean
+  intermittent: boolean
+layers:
+# Landbedeckung: grobe Klassen ab niedrigem Zoom, feinere Unterklassen erst weiter drin
+- id: landcover
+  features:
+  - source: osm
+    geometry: polygon
+    min_zoom: 4
+    min_size: 2   # px-Kantenlaenge
+    include_when:
+      __any__:
+        - natural: [wood, scrub, heath, grassland, wetland, bare_rock, scree, sand, beach, glacier]
+        - landuse: [forest, farmland, meadow, grass, orchard, vineyard, residential, industrial, commercial, retail, cemetery, quarry, allotments, village_green, recreation_ground, education, institutional]
+        - leisure: [park, garden, nature_reserve, golf_course, pitch, stadium, sports_centre]
+        - amenity: [hospital, university, college, school]
+    attributes:
+    # class = grobe Gruppe (Zoom 5+), subclass = OSM-Wert (Zoom 9+)
+    - key: class
+      value: forest
+      include_when: { __any__: [{ natural: wood }, { landuse: forest }] }
+    - key: class
+      value: farmland
+      include_when: { __any__: [{ landuse: [farmland, orchard, vineyard, meadow, allotments] }] }
+    - key: class
+      value: grass
+      include_when: { __any__: [{ landuse: [grass, village_green, recreation_ground] }, { natural: grassland }, { leisure: [park, garden, golf_course] }] }
+    - key: class
+      value: wild
+      include_when: { __any__: [{ natural: [scrub, heath, wetland, bare_rock, scree, sand, beach, glacier] }, { leisure: nature_reserve }] }
+    - key: class
+      value: urban
+      include_when: { __any__: [{ landuse: [residential, industrial, cemetery, quarry] }, { leisure: [pitch, stadium, sports_centre] }] }
+    - key: class
+      value: commercial
+      include_when: { __any__: [{ landuse: [commercial, retail] }] }
+    - key: class
+      value: institutional
+      include_when: { __any__: [{ landuse: [education, institutional] }, { amenity: [hospital, university, college, school] }] }
+    - key: subclass
+      min_zoom: 9
+      tag_value: landuse
+    - key: subclass
+      min_zoom: 9
+      tag_value: natural
+    - key: subclass
+      min_zoom: 9
+      tag_value: leisure
+- id: water
+  tile_post_process:
+    merge_line_strings:
+      min_length: 0
+      tolerance: -1
+  features:
+  - source: osm
+    geometry: polygon
+    min_zoom: 4
+    min_size: 2   # Teiche und kleine Seen etwas weiter weg
+    include_when:
+      __any__: [{ natural: water }, { landuse: reservoir }]
+    attributes:
+    - key: name
+      min_zoom: 11
+  - source: osm
+    geometry: line
+    min_zoom: 6
+    include_when:
+      waterway: [river, canal]
+    attributes:
+    - key: waterway
+    - key: name
+      min_zoom: 11
+  - source: osm
+    geometry: line
+    min_zoom: 12
+    include_when:
+      waterway: stream
+  - source: osm
+    geometry: line
+    min_zoom: 12
+    include_when:
+      waterway: [drain, ditch]
+    attributes:
+    - key: waterway
+- id: road
+  tile_post_process:
+    merge_line_strings:
+      min_length: 0
+      tolerance: -1
+  features:
+  - source: osm
+    geometry: line
+    include_when:
+      highway: [motorway, trunk, primary, secondary, tertiary, motorway_link, trunk_link, primary_link, secondary_link, tertiary_link, unclassified, residential, living_street, service, pedestrian, track, path, footway, cycleway]
+    min_zoom:
+      default_value: 14
+      overrides:
+        4: { highway: motorway }
+        5: { highway: trunk }
+        7: { highway: primary }
+        10: { highway: [secondary, primary_link] }
+        11: { highway: [tertiary, motorway_link, trunk_link, secondary_link] }
+        12: { highway: [unclassified, residential, tertiary_link] }
+        13: { highway: [living_street, pedestrian] }
+    attributes:
+    - key: highway
+    - key: bridge
+      include_when: { bridge: true }
+    - key: tunnel
+      include_when: { tunnel: true }
+    - key: name
+      min_zoom: 13
+- id: rail
+  features:
+  - source: osm
+    geometry: line
+    min_zoom:
+      default_value: 11
+      overrides:
+        7: { railway: rail, service: __not_set__ }
+    include_when:
+      railway: [rail, light_rail, subway, tram]
+    attributes:
+    - key: railway
+# Gebaeude kommen nicht aus dieser Datei, sondern zur Laufzeit von OpenFreeMap (wie in den Orbis-Grundkarten); spart etwa die Haelfte der Dateigroesse
+- id: place
+  features:
+  - source: osm
+    geometry: point
+    include_when:
+      place: [city, town, village, suburb, hamlet]
+    min_zoom:
+      default_value: 12
+      overrides:
+        4: { place: city }
+        8: { place: town }
+        10: { place: village }
+    attributes:
+    - key: place
+    - key: name
+    - key: population

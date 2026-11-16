@@ -4,6 +4,7 @@
 import type { ExpressionSpecification, LayerSpecification, SourceSpecification } from 'maplibre-gl';
 import type { BasemapDef, LabelVariant } from './types';
 import { BUILDING_BASE, BUILDING_HEIGHT } from '../buildings-tilt';
+import { karteLabelLayers } from './karte-labels';
 
 export const OFM_URL = 'https://tiles.openfreemap.org/planet';
 export const OFM_GLYPHS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
@@ -133,6 +134,7 @@ const LABEL_PAINT: Record<LabelVariant, LabelPaint> = {
   dark: { text: '#A3AFC2', halo: 'rgba(10, 15, 24, 0.9)', water: '#5d7191', country: '#8794ab', border: '', borderSoft: '' },
   light: { text: '#4A5871', halo: 'rgba(255, 255, 255, 0.9)', water: '#6f87a8', country: '#5f6d86', border: '', borderSoft: '' },
   imagery: { text: '#ffffff', halo: 'rgba(0, 0, 0, 0.75)', water: 'rgba(190, 215, 255, 0.9)', country: '#ffffff', border: 'rgba(255, 255, 255, 0.5)', borderSoft: 'rgba(255, 255, 255, 0.28)' },
+  karte: { text: '#e8edf8', halo: 'rgba(10, 18, 45, 0.85)', water: '#5b86d8', country: '#bb9db8', border: '', borderSoft: '' }, // unused: labelLayers() returns karteLabelLayers()
 };
 
 /** ISO codes of micro-states and tiny territories: labelled only when zoomed in. */
@@ -158,6 +160,7 @@ function countryLabels(id: (s: string) => string, p: LabelPaint, text: Record<st
 
 /** Place names (and, on imagery, borders) for one basemap family. Ids start with `lbl-<variant>-`. */
 export function labelLayers(variant: LabelVariant): LayerSpecification[] {
+  if (variant === 'karte') return karteLabelLayers();
   const p = LABEL_PAINT[variant];
   const id = (s: string) => `lbl-${variant}-${s}`;
   const text = { 'text-color': p.text, 'text-halo-color': p.halo, 'text-halo-width': 1.3 };
@@ -214,4 +217,4 @@ export function labelLayers(variant: LabelVariant): LayerSpecification[] {
   return layers;
 }
 
-export const LABEL_VARIANTS: LabelVariant[] = ['dark', 'light', 'imagery'];
+export const LABEL_VARIANTS: LabelVariant[] = ['dark', 'light', 'imagery', 'karte'];
