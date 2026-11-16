@@ -82,6 +82,8 @@ const genericBuildings = (visible: boolean): LayerSpecification => ({
     'fill-extrusion-vertical-gradient': true,
   },
 } as LayerSpecification);
+/** Aerial images: the real 3D buildings (streamed 3D tiles, Orbis Pro) belong here, not the 2.5D ones. */
+export const hasTiles3d = (id: string | undefined): boolean => id === 'satellite' || id === 'esri-clarity';
 /** Does this basemap draw 2.5D buildings of its own? */
 export const hasOwnBuildings = (id: string | undefined): boolean => !!id && id.startsWith('orbis-');
 
@@ -102,7 +104,7 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
     Object.assign(sources, b.sources);
     for (const l of b.layers) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(id === shown) } } as LayerSpecification);
   }
-  // relief shading for the flat Orbis colours; only shown while 3D terrain is on (engine.setTerrain)
+  // relief shading for the flat Orbis colours; only shown while 3D terrain is on (every basemap but the aerial images)
   layers.push({
     id: HILLSHADE_LAYER, type: 'hillshade', source: TERRAIN_SOURCE, layout: { visibility: 'none' },
     paint: { 'hillshade-exaggeration': 0, 'hillshade-shadow-color': 'rgba(8, 12, 22, 0.55)', 'hillshade-highlight-color': 'rgba(255, 255, 255, 0.18)', 'hillshade-accent-color': 'rgba(8, 12, 22, 0.25)' },
@@ -113,7 +115,7 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
   for (const m of ['terminator', 'areas', 'lines'] as const) layers.push(marker(m));
   const buildings = o.buildings !== false;
   for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(buildings && id === shown) } } as LayerSpecification);
-  layers.push(genericBuildings(buildings && !hasOwnBuildings(shown)));
+  layers.push(genericBuildings(buildings && !hasOwnBuildings(shown) && !hasTiles3d(shown)));
   for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(o.labels && v === active) } } as LayerSpecification);
   for (const m of ['basemap-labels', 'points', 'labels', 'top'] as const) layers.push(marker(m));
   return {

@@ -111,7 +111,7 @@ export const shipsChannel: TracksPublisher<ShipSample> = createTracksChannel<Shi
 /** The one channel for the power grid (layer `stromnetz`): towers and overhead lines. */
 export const powerChannel: TracksPublisher<PowerGridSample> = createTracksChannel<PowerGridSample>();
 
-/** The one channel for streamed 3D city models (layer `stadtmodelle3d`). */
+/** The one channel for streamed 3D city models (`features/buildings3d/tiles-source.ts`). */
 export const tilesetsChannel: TracksPublisher<TilesetSample> = createTracksChannel<TilesetSample>();
 
 /**

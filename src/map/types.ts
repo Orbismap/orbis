@@ -38,7 +38,6 @@ export interface MapEngine {
   setProjection(p: 'globe' | 'mercator'): void;
   setLabels(on: boolean): void;
   /** 3D terrain from the elevation model (lifted only while the camera is tilted). */
-  setTerrain(on: boolean): void;
   setTerminator(mode: 'off' | 'auto'): void;
   addSource(id: string, spec: SourceSpecification): void;     // idempotent
   addLayer(spec: LayerSpecification, slot: SlotId): void;     // inserts into the slot (on top of its other layers)

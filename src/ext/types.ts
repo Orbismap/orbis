@@ -181,7 +181,7 @@ export interface ExtensionHost {
   readonly ships: TracksChannel<ShipSample>;
   /** Channel for power towers and overhead lines (layer `stromnetz`). */
   readonly power: TracksChannel<PowerGridSample>;
-  /** Channel for streamed 3D city models (layer `stadtmodelle3d`). */
+  /** Channel for streamed 3D city models (`features/buildings3d/tiles-source.ts`). */
   readonly tilesets: TracksChannel<TilesetSample>;
   /** Tells the base what the tilesets do: loading, errors. */
   reportTilesets(state: TilesetsState): void;

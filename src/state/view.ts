@@ -12,11 +12,9 @@ export const DEFAULT_CAMERA: CameraState = { lng: 10, lat: 30, zoom: 1.6, bearin
 export const camera = signal<CameraState>({ ...DEFAULT_CAMERA });
 export const projection = signal<Projection>('globe');
 /** 3D terrain (real elevation model); on by default. Not persisted. */
-export const terrain3d = signal(true);
-export const setTerrain3d = (on: boolean) => {
-  terrain3d.value = on;
-};
-/** 3D buildings (extruded OpenStreetMap buildings, 2.5D) on every basemap. Follows the basemap (on for Orbis dark/light, off otherwise) when that changes; not persisted. */
+/** The basemap on show (set by the map engine). */
+export const activeBasemap = signal<string>('');
+/** The switch "3D-Gebäude": 2.5D buildings on the Orbis colours and map-like basemaps, real 3D tiles on aerial images (Orbis Pro). Not persisted. */
 export const buildings3d = signal(true);
 export const setBuildings3d = (on: boolean) => {
   buildings3d.value = on;

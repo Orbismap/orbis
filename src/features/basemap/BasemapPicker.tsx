@@ -5,10 +5,12 @@ import { activeKarte } from '../../state/session';
 import { Icon } from '../../ui/icons/Icon';
 import { Segmented } from '../../ui/Segmented';
 import { tipProps } from '../../ui/tip-state';
-import { buildings3d, projection, setBuildings3d, setProjection, setTerrain3d, terrain3d } from '../../state/view';
+import { buildings3d, projection, setBuildings3d, setProjection } from '../../state/view';
 import { cx } from '../../ui/hooks';
 import { Popover } from '../../ui/Popover';
 import { Switch } from '../../ui/Switch';
+import { openKeySettings } from '../boost/open';
+import { KEY_TIP, tilesHint, tilesNeedKey, tilesQuota } from '../buildings3d/tiles-source';
 import { RegionalSelect, useRegional } from './RegionalSelect';
 import './basemap.css';
 
@@ -85,10 +87,28 @@ function PickerBody() {
       <RegionalSelect r={regional} />
       <div class="bm-switches">
         <Switch label="Beschriftung" checked={k.labels} onChange={(v) => setLabels(k.id, v)} />
-        <Switch label="3D-Gebäude" checked={buildings3d.value} onChange={setBuildings3d} />
-        <Switch label="3D-Gelände" checked={terrain3d.value} onChange={setTerrain3d} />
+        <div class="bm-switch-wrap">
+          <Switch label="3D-Gebäude" checked={buildings3d.value} onChange={setBuildings3d} />
+          {tilesNeedKey.value && (
+            <button type="button" class="bm-key" aria-label="Cesium-Token eintragen" {...tipProps(KEY_TIP, undefined, 'top')} onClick={() => openKeySettings('cesiumion')}>
+              <Icon name="key" size={14} />
+            </button>
+          )}
+        </div>
+        {tilesHint.value && <p class="bm-hint">{tilesHint.value}</p>}
+        {tilesQuota.value && <Quota used={tilesQuota.value.used} limit={tilesQuota.value.limit} />}
         <Switch label="Tag und Nacht" checked={k.terminator} onChange={(v) => setTerminator(k.id, v)} />
       </div>
     </>
+  );
+}
+
+/** The month's use of the free Cesium plan: a bar, the numbers in the tooltip. */
+function Quota({ used, limit }: { used: number; limit: number }) {
+  const text = `${used} von ${limit.toLocaleString('de-DE')} Abrufen bei Cesium diesen Monat (kostenloser Plan)`;
+  return (
+    <div class="bm-quota" role="progressbar" tabIndex={0} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={used} aria-label="Cesium-Abrufe diesen Monat" aria-valuetext={text} {...tipProps(text, undefined, 'top')}>
+      <span style={{ width: `${Math.min(100, (used / limit) * 100)}%` }} />
+    </div>
   );
 }

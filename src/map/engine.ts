@@ -8,9 +8,8 @@ import { collapseKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { tilesetsChannel } from '../ext/channels';
-import { buildings3d, camera, padding, projection as projectionSignal, terrain3d, viewport, type CameraState, type Padding } from '../state/view';
-import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, skyFor } from './basemaps';
+import { activeBasemap as activeBasemapSignal, buildings3d, camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
+import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
 import { activeMembers, loadRegional, memberIds, membersOf, regionalDef, regionalEntry, regionalReady, type Bounds } from './basemaps/regional';
@@ -66,10 +65,12 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   let labels = init.labels ?? true;
   let terminatorMode: 'off' | 'auto' = init.terminator === false ? 'off' : 'auto';
   let loaded = false;
-  let terrainOn = true;
+  /** 3D terrain: on for every basemap except the aerial images (their 3D tiles bring their own ground). No switch. */
+  let terrainOn = !hasTiles3d(basemap);
   registerDemTiles();
 
-  buildings3d.value = hasOwnBuildings(basemap);
+  buildings3d.value = true;
+  activeBasemapSignal.value = basemap;
 
   // a URL/state asking for more tilt than the zoom allows is clamped on load
   const cam = clampCamera(camera.peek());
@@ -170,12 +171,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     }),
     effect(() => {
       buildings3d.value;
-      tilesetsChannel.presented.value;
       if (loaded) applyBuildings();
-    }),
-    effect(() => {
-      terrainOn = terrain3d.value;
-      if (loaded) applyTerrain();
     }),
     effect(() => {
       const p = projectionSignal.value;
@@ -237,12 +233,12 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   ml.on('moveend', () => {
     if (loaded && dynamic && membersOf(regionalEntry(dynamic.id)!).length > 1) syncDynamic(dynamic.id);
   });
-  /** 2.5D buildings: the Orbis basemaps' own, or the generic ones elsewhere; off with the switch, and off where Orbis Pro draws the real city models instead. */
+  /** 2.5D buildings: the Orbis basemaps' own, or the generic ones elsewhere; off with the switch, and off on aerial images (the real 3D tiles belong there). */
   function applyBuildings() {
     const shown = isStaticBasemap(basemap) ? basemap : undefined;
     const on = buildings3d.peek();
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) setVis(l.id, on && id === shown);
-    setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !tilesetsChannel.presented.peek());
+    setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !hasTiles3d(shown));
   }
   function applyBasemap() {
     const regional = isStaticBasemap(basemap) ? undefined : regionalDef(basemap);
@@ -338,13 +334,9 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     setBasemap(id) {
       if (id === basemap) return;
       basemap = id;
-      // the switch follows the basemap: on for the Orbis ones (their own buildings), off for aerial images and the like; free to change after that
-      buildings3d.value = hasOwnBuildings(id);
+      activeBasemapSignal.value = id;
+      terrainOn = !hasTiles3d(id);
       if (loaded) applyBasemap();
-    },
-    setTerrain(on) {
-      terrainOn = on;
-      if (loaded) applyTerrain();
     },
     setProjection(p) {
       projectionSignal.value = p;

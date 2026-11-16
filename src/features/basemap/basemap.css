@@ -46,6 +46,47 @@
   .bm-regional .select {
     width: 100%;
   }
+  .bm-switch-wrap {
+    position: relative;
+  }
+  /* the key sits left of the toggle (40 px wide), outside the switch button so it can be a button of its own */
+  .bm-key {
+    position: absolute;
+    top: 50%;
+    right: calc(40px + var(--s-2));
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-round);
+    background: color-mix(in oklab, var(--boost) 22%, transparent);
+    color: var(--boost);
+    cursor: pointer;
+    transition: background var(--t-panel) var(--ease);
+  }
+  .bm-key:hover {
+    background: color-mix(in oklab, var(--boost) 38%, transparent);
+  }
+  .bm-quota {
+    height: 6px;
+    margin: var(--s-2) 0 var(--s-1);
+    border-radius: var(--r-round);
+    background: color-mix(in oklab, var(--boost) 22%, transparent);
+    overflow: hidden;
+    cursor: default;
+  }
+  .bm-quota span {
+    display: block;
+    height: 100%;
+    min-width: 2px;
+    border-radius: inherit;
+    background: var(--boost);
+    transition: width 200ms var(--ease);
+  }
   .bm-hint {
     margin: 0;
     color: var(--text-3);
@@ -91,6 +132,12 @@
   }
   .bm-opt[aria-checked='true'] .bm-thumb {
     box-shadow: 0 0 0 2px var(--limb);
+  }
+  .bm-hint {
+    margin: var(--s-1) 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-2);
   }
   .bm-switches {
     margin-top: var(--s-2);
