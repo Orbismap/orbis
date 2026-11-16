@@ -6,6 +6,7 @@ import type { ExtensionHost, FollowRef, OrbisExtension, TracksChannel } from '..
 import { PlanesPart } from './planes/planes';
 import { ShipsPart } from './ships/ships';
 import { StromnetzPart } from './stromnetz/stromnetz';
+import { TilesetPart } from './tiles3d/tileset';
 import { Follow } from './world3d/follow';
 import { Stage, type StagePart } from './world3d/stage';
 
@@ -29,8 +30,22 @@ export const extension: OrbisExtension = {
     const planes = new PlanesPart(map, stage, (id) => host.tracks.select(id), host.reducedMotion);
     const ships = new ShipsPart(map, stage, (id) => host.ships.select(id), host.reducedMotion);
     const power = new StromnetzPart(map, stage);
+    let tilesPresent = false;
+    let tilesRelease: (() => void) | null = null;
+    let stateKey = '';
+    const tiles = new TilesetPart(map, ({ names, loading, error, ionError, ionRoots }) => {
+      const key = `${loading}|${error ?? ''}|${ionError ?? ''}|${ionRoots ?? ''}`;
+      if (key !== stateKey) { stateKey = key; host.reportTilesets({ loading, error, ionError, ionRoots }); }
+      // the base's outlines disappear while a model is in view; elsewhere they show where models exist
+      const show = names.length > 0;
+      if (show === tilesPresent) return;
+      tilesPresent = show;
+      if (show) tilesRelease = host.tilesets.present();
+      else { tilesRelease?.(); tilesRelease = null; }
+    });
     const follow = new Follow(map, stage, host.reducedMotion, host.holdCamera);
     // below aircraft and ships: the stage asks the part added last first, so an aircraft over a pylon is the one clicked
+    stage.add(tiles);
     stage.add(power);
     stage.add(ships);
     stage.add(planes);
@@ -139,6 +154,7 @@ export const extension: OrbisExtension = {
       evaluatePower();
     });
     evaluatePower();
+    const stopTiles = host.tilesets.subscribe((items) => tiles.feed(items));
 
     return () => {
       stopWanted();
@@ -146,6 +162,8 @@ export const extension: OrbisExtension = {
       unbindPlanes();
       unbindShips();
       stopPower();
+      stopTiles();
+      tilesRelease?.();
       powerRelease?.();
       follow.dispose();
       host.removeLayer(stage.id);
