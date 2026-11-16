@@ -19,19 +19,13 @@ export function appleMapsUrl(cam: CameraState): string {
   return `https://maps.apple.com/frame?${p.toString()}`;
 }
 
-/** Google Maps documented URL: position + zoom (+ basemap). Google's public URL scheme does not carry rotation/tilt for the normal map view. */
-export function googleMapsUrl(cam: CameraState, basemap?: string): string {
-  const p = new URLSearchParams();
-  p.set('api', '1');
-  p.set('map_action', 'map');
-  p.set('center', `${cam.lat},${cam.lng}`);
-  p.set('zoom', String(Math.max(0, Math.min(21, Math.round(cam.zoom)))));
-  if (basemap === 'satellite') p.set('basemap', 'satellite');
-  else if (basemap === 'terrain') p.set('basemap', 'terrain');
-  return `https://www.google.com/maps/@?${p.toString()}`;
+/** OpenStreetMap: position and zoom (the website has no rotation or tilt). */
+export function osmUrl(cam: CameraState): string {
+  const zoom = Math.max(0, Math.min(19, Math.round(cam.zoom)));
+  return `https://www.openstreetmap.org/#map=${zoom}/${cam.lat.toFixed(5)}/${cam.lng.toFixed(5)}`;
 }
 
-/** Best-effort Google Maps 3D/Earth URL carrying rotation and tilt via the (undocumented) camera path. */
+/** Best-effort Google Maps URL (satellite 3D view) carrying rotation and tilt via the (undocumented) camera path. */
 export function googleMaps3dUrl(cam: CameraState): string {
   const distance = zoomToDistance(cam.zoom, cam.lat);
   const tilt = Math.max(0, Math.min(67.5, cam.pitch));

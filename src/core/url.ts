@@ -1,4 +1,4 @@
-// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&t=<iso>&g=1&f=flug:<hex>|schiff:<mmsi>&p=<lat>,<lng>,<name>,<region>[,<kind>]
+// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&t=<iso>&b=<basemap>&g=1&f=flug:<hex>|schiff:<mmsi>&p=<lat>,<lng>,<name>,<region>[,<kind>]
 // (p = a searched place; name, region and kind are percent-encoded, so their commas do not split)
 import type { FollowRef } from '../ext/types';
 
@@ -7,6 +7,8 @@ export interface UrlState {
   view?: UrlView;
   karte?: string;
   layers?: string[];
+  /** Basemap id of the Karte (validated by the caller). */
+  basemap?: string;
   /** Selected time in ms; absent = live. */
   time?: number;
   /** true = globe (g=1), false = mercator (g=0), undefined = default. */
@@ -46,6 +48,8 @@ export function parseHash(hash: string): UrlState {
   if (k) out.karte = k;
   const l = q.get('l');
   if (l !== null) out.layers = l.split(',').filter(Boolean);
+  const b = q.get('b');
+  if (b && /^[a-z0-9-]{1,32}$/.test(b)) out.basemap = b;
   const t = q.get('t');
   if (t) {
     const ms = Date.parse(t);
@@ -81,6 +85,7 @@ export function serializeHash(s: UrlState): string {
   const q: string[] = [];
   if (s.karte) q.push(`k=${encodeURIComponent(s.karte)}`);
   if (s.layers) q.push(`l=${s.layers.map(encodeURIComponent).join(',')}`);
+  if (s.basemap) q.push(`b=${encodeURIComponent(s.basemap)}`);
   if (s.time !== undefined) q.push(`t=${new Date(s.time).toISOString().slice(0, 16)}Z`);
   if (s.globe !== undefined) q.push(`g=${s.globe ? 1 : 0}`);
   if (s.follow) q.push(`f=${s.follow.kind}:${encodeURIComponent(s.follow.id)}`);

@@ -1,6 +1,6 @@
 import { getLayer } from '../../layers/registry';
 import type { LegendSpec } from '../../layers/types';
-import { BASEMAPS } from '../../map/basemaps';
+import { basemapDef } from '../../map/basemaps';
 import { activeKarte, legends } from '../../state/session';
 import { detailOpen } from '../../state/hud';
 import { leftPanelOpen, leftTab, leftView, isMobile, sheetDetent } from '../../state/ui';
@@ -46,7 +46,7 @@ function ScaleRow({ e, spec }: { e: Entry; spec: Extract<LegendSpec, { type: 'sc
   return (
     <>
       <span class="mlg-body mlg-scale">
-        <span class="mlg-bar" style={{ background: BASEMAPS[activeKarte.value.basemap].background }} role="img" aria-label={`Farbskala ${u.fmt(lo)} bis ${u.fmt(hi)} ${u.label}`}>
+        <span class="mlg-bar" style={{ background: basemapDef(activeKarte.value.basemap).background }} role="img" aria-label={`Farbskala ${u.fmt(lo)} bis ${u.fmt(hi)} ${u.label}`}>
           <span class="mlg-fill" style={{ background: grad, opacity: e.opacity }} />
           {marker != null && <span class="mlg-marker" style={{ left: `${pos(marker) * 100}%` }} />}
         </span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appleMapsUrl, googleMapsUrl, googleMaps3dUrl } from './external-maps';
+import { appleMapsUrl, googleMaps3dUrl, osmUrl } from './external-maps';
 
 const cam = { lng: 10, lat: 20, zoom: 8, bearing: 30, pitch: 40 };
 
@@ -11,10 +11,8 @@ describe('external maps urls', () => {
     expect(u).toContain('heading=30');
     expect(u).toContain('pitch=40');
   });
-  it('google standard', () => {
-    const u = googleMapsUrl(cam);
-    expect(u).toContain('map_action=map');
-    expect(u).toContain('center=20%2C10');
+  it('osm carries position and zoom', () => {
+    expect(osmUrl(cam)).toBe('https://www.openstreetmap.org/#map=8/20.00000/10.00000');
   });
   it('google 3d carries rotation and tilt', () => {
     const u = googleMaps3dUrl(cam);

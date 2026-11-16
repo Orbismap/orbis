@@ -1,0 +1,32 @@
+import { describe, expect, it } from 'vitest';
+import { BASEMAPS, BASEMAP_GROUPS, BASEMAP_IDS, DEFAULT_BASEMAP, isBasemapId } from '.';
+import { BASEMAP_CREDITS } from '../../features/attribution/credits';
+import { parseHash } from '../../core/url';
+
+describe('basemap registry', () => {
+  it('ids, groups, defs and credits agree and are URL-safe', () => {
+    expect(new Set(BASEMAP_IDS).size).toBe(BASEMAP_IDS.length);
+    expect(Object.keys(BASEMAPS).sort()).toEqual([...BASEMAP_IDS].sort());
+    expect(Object.keys(BASEMAP_CREDITS).sort()).toEqual([...BASEMAP_IDS].sort());
+    expect(BASEMAP_IDS).toContain(DEFAULT_BASEMAP);
+    for (const id of BASEMAP_IDS) {
+      expect(id).toMatch(/^[a-z0-9-]{1,32}$/);
+      expect(BASEMAPS[id].id).toBe(id);
+      expect(isBasemapId(id)).toBe(true);
+      expect(BASEMAP_CREDITS[id].length).toBeGreaterThan(0);
+      for (const l of BASEMAPS[id].layers) expect(l.id.startsWith(`bm-${id}-`)).toBe(true);
+      expect(parseHash(`#/?b=${id}`).basemap).toBe(id);
+    }
+    expect(BASEMAP_GROUPS.every((g) => g.ids.length > 0)).toBe(true);
+  });
+  it('regional basemaps carry bounds, keyless tile URLs only', () => {
+    for (const id of ['swissimage', 'swissalti3d', 'swisssurface3d', 'imagico-alps'] as const) {
+      const src = Object.values(BASEMAPS[id].sources)[0] as { bounds?: number[] };
+      expect(src.bounds).toHaveLength(4);
+    }
+    for (const id of BASEMAP_IDS) for (const s of Object.values(BASEMAPS[id].sources)) {
+      for (const t of (s as { tiles?: string[] }).tiles ?? []) expect(t).not.toMatch(/key|token/i);
+    }
+    expect((Object.values(BASEMAPS['imagico-alps'].sources)[0] as { scheme?: string }).scheme).toBe('tms');
+  });
+});

@@ -1,28 +1,52 @@
 // Basemap registry and the composed base style (all basemaps present, one visible).
 import type { LayerSpecification, SkySpecification, SourceSpecification, StyleSpecification } from 'maplibre-gl';
 import { MARKERS, markerLayerId } from '../slots';
-import type { BasemapId } from '../types';
-import { bluemarble, satellite, terrain } from './raster';
+import type { BasemapId, StaticBasemapId } from '../types';
+import { canonicalRegionalId, isRegionalId, regionalDef } from './regional';
+import { blank, bluemarble, esriClarity, imagicoAlps, osm, satellite, swissalti3d, swissimage, swisssurface3d, terrain } from './raster';
 import type { BasemapDef, LabelVariant } from './types';
 import { DEM_NATIVE_ZOOM, DEM_TILES } from '../dem-protocol';
 import { LABEL_VARIANTS, OFM_GLYPHS, OFM_SOURCE, labelLayers, vectorBasemap } from './vector';
 
-export type { BasemapId } from '../types';
+export type { BasemapId, StaticBasemapId } from '../types';
 export type { BasemapDef, LabelVariant } from './types';
 
-export const BASEMAP_IDS: BasemapId[] = ['orbis-dark', 'orbis-light', 'satellite', 'terrain', 'bluemarble'];
-export const DEFAULT_BASEMAP: BasemapId = 'orbis-dark';
+/** Global basemaps, in picker order (grouped, German titles). */
+export const BASEMAP_GROUPS: { title: string; ids: StaticBasemapId[] }[] = [
+  { title: 'Orbis', ids: ['orbis-dark', 'orbis-light'] },
+  { title: 'Luftbilder', ids: ['satellite', 'esri-clarity', 'bluemarble'] },
+  { title: 'Karten', ids: ['osm', 'terrain'] },
+  { title: 'Sonstige', ids: ['blank'] },
+];
+/** Hand-written regional basemaps (offered in the regional list, not in the grid). More come from regional.ts. */
+export const STATIC_REGIONAL_IDS: StaticBasemapId[] = ['swissimage', 'imagico-alps', 'swissalti3d', 'swisssurface3d'];
+/** Every static basemap (all of them are part of the composed style, hidden). */
+export const BASEMAP_IDS: StaticBasemapId[] = [...BASEMAP_GROUPS.flatMap((g) => g.ids), ...STATIC_REGIONAL_IDS];
+export const DEFAULT_BASEMAP: StaticBasemapId = 'orbis-dark';
 
-export const BASEMAPS: Record<BasemapId, BasemapDef> = {
+export const BASEMAPS: Record<StaticBasemapId, BasemapDef> = {
   'orbis-dark': vectorBasemap('dark'),
   'orbis-light': vectorBasemap('light'),
   satellite: satellite(),
-  terrain: terrain(),
+  'esri-clarity': esriClarity(),
+  swissimage: swissimage(),
+  'imagico-alps': imagicoAlps(),
   bluemarble: bluemarble(),
+  osm: osm(),
+  terrain: terrain(),
+  swissalti3d: swissalti3d(),
+  swisssurface3d: swisssurface3d(),
+  blank: blank(),
 };
 
-export const isBasemapId = (v: unknown): v is BasemapId => typeof v === 'string' && v in BASEMAPS;
-
+export const isStaticBasemap = (v: unknown): v is StaticBasemapId => typeof v === 'string' && Object.hasOwn(BASEMAPS, v);
+/** Static ids and the generated regional ids (valid before the regional data has loaded). */
+export const isBasemapId = (v: unknown): v is BasemapId => isStaticBasemap(v) || isRegionalId(v);
+/** The valid id for `v` (ids of merged yearly editions map to their series), or undefined. */
+export const resolveBasemapId = (v: unknown): BasemapId | undefined =>
+  isStaticBasemap(v) ? v : isRegionalId(v) ? (canonicalRegionalId(v) as BasemapId) : undefined;
+/** Definition of any basemap; a regional one whose data has not loaded yet shows as the default. */
+export const basemapDef = (id: BasemapId): BasemapDef => (isStaticBasemap(id) ? BASEMAPS[id] : regionalDef(id)) ?? BASEMAPS[DEFAULT_BASEMAP];
 
 /** Atmosphere of the globe: a thin blue limb glow on the dark space (dark) or a soft haze (light). */
 export function skyFor(theme: 'dark' | 'light'): SkySpecification {
@@ -54,28 +78,29 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
     [TERRAIN_SOURCE]: TERRAIN_SPEC,
   };
   const layers: LayerSpecification[] = [];
+  const shown = isStaticBasemap(o.basemap) ? o.basemap : DEFAULT_BASEMAP; // regional ones are added by the engine once their data is loaded
   for (const id of BASEMAP_IDS) {
     const b = BASEMAPS[id];
     Object.assign(sources, b.sources);
-    for (const l of b.layers) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(id === o.basemap) } } as LayerSpecification);
+    for (const l of b.layers) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(id === shown) } } as LayerSpecification);
   }
   // relief shading for the flat Orbis colours; only shown while 3D terrain is on (engine.setTerrain)
   layers.push({
     id: HILLSHADE_LAYER, type: 'hillshade', source: TERRAIN_SOURCE, layout: { visibility: 'none' },
     paint: { 'hillshade-exaggeration': 0, 'hillshade-shadow-color': 'rgba(8, 12, 22, 0.55)', 'hillshade-highlight-color': 'rgba(255, 255, 255, 0.18)', 'hillshade-accent-color': 'rgba(8, 12, 22, 0.25)' },
   } as LayerSpecification);
-  const active = BASEMAPS[o.basemap].labelVariant;
+  const active = BASEMAPS[shown].labelVariant;
   const marker = (m: (typeof MARKERS)[number]) => ({ id: markerLayerId(m), type: 'background', layout: { visibility: 'none' } }) as LayerSpecification;
   for (const m of ['field', 'raster'] as const) layers.push(marker(m));
   for (const m of ['terminator', 'areas', 'lines'] as const) layers.push(marker(m));
-  for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(id === o.basemap) } } as LayerSpecification);
+  for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(id === shown) } } as LayerSpecification);
   for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(o.labels && v === active) } } as LayerSpecification);
   for (const m of ['basemap-labels', 'points', 'labels', 'top'] as const) layers.push(marker(m));
   return {
     version: 8,
     projection: { type: o.projection },
     glyphs: OFM_GLYPHS,
-    sky: skyFor(BASEMAPS[o.basemap].theme === 'light' ? 'light' : 'dark'),
+    sky: skyFor(BASEMAPS[shown].theme === 'light' ? 'light' : 'dark'),
     sources,
     layers,
   };

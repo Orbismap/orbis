@@ -18,4 +18,6 @@ export interface BasemapDef {
   background: string;
   /** Dark basemaps get dark UI chrome hints (terminator tint, attribution). */
   theme: 'dark' | 'light';
+  /** Regional basemap: coverage as [west, south, east, north]; offered only where the view touches it. */
+  bounds?: [number, number, number, number];
 }

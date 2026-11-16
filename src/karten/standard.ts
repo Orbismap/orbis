@@ -39,6 +39,7 @@ const THEMES: Record<string, KarteTheme[]> = {
     T('netze', 'Netze', 'cable', ['telekomnetz', 'vermittlungsstellen', 'rechenzentren', 'internetknoten']),
     T('rohstoffe', 'Rohstoffe', 'mine', ['rohstoffe', 'oelgasleitungen']),
     T('wasser', 'Wasser', 'drop', ['wasserleitungen', 'wasserwerke', 'stauseen']),
+    T('gebaeude', 'Gebäude', 'map', ['gebaeude3d']),
     T('kameras', 'Kameras', 'camera', ['webcams', 'ueberwachung', 'kennzeichen']),
     T('medien', 'Medien', 'radio', ['radio']),
   ],
@@ -81,7 +82,7 @@ const DEFS: Karte[] = [
   },
   {
     id: 'infrastruktur', name: 'Infrastruktur', icon: 'power', color: '#58D0A0', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,
-    layers: [on('kraftwerke'), on('telekomnetz'), on('rechenzentren'), off('stromnetz'), off('vermittlungsstellen'), off('internetknoten'), off('rohstoffe'), off('oelgasleitungen'), off('wasserleitungen'), off('wasserwerke'), off('stauseen')],
+    layers: [on('kraftwerke'), on('telekomnetz'), on('rechenzentren'), off('stromnetz'), off('vermittlungsstellen'), off('internetknoten'), off('rohstoffe'), off('oelgasleitungen'), off('wasserleitungen'), off('wasserwerke'), off('stauseen'), off('gebaeude3d')],
   },
   {
     id: 'erde', name: 'Erde & Meer', icon: 'globe', color: '#8FDCFF', builtin: true, basemap: 'satellite', labels: true, terminator: true,
