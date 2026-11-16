@@ -4,7 +4,14 @@ import type { BBox, LngLat } from '../core/geo';
 import type { Padding } from '../state/view';
 
 export type SlotId = 'field' | 'raster' | 'areas' | 'lines' | 'points' | 'labels' | 'top';
-export type BasemapId = 'orbis-dark' | 'orbis-light' | 'satellite' | 'terrain' | 'bluemarble';
+export type StaticBasemapId =
+  | 'orbis-dark' | 'orbis-light'
+  | 'satellite' | 'esri-clarity' | 'swissimage' | 'imagico-alps' | 'bluemarble'
+  | 'osm' | 'terrain'
+  | 'swissalti3d' | 'swisssurface3d'
+  | 'blank';
+/** Static basemaps plus the generated regional ones (`r-…`, see map/basemaps/regional.ts). */
+export type BasemapId = StaticBasemapId | `r-${string}`;
 
 export interface PickHandler {
   click?(feature: MapGeoJSONFeature, lngLat: LngLat): void;

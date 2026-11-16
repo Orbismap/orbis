@@ -118,6 +118,13 @@ describe('url', () => {
     expect(h).toBe('#/@52.52,13.405,5.25z,30b,45p?k=wetter&l=erdbeben,seekabel&t=2026-11-10T12:00Z&g=1');
     expect(parseHash(h)).toEqual(s);
   });
+  it('round-trips the basemap', () => {
+    const s = { karte: 'wetter', basemap: 'satellite', globe: false };
+    const h = serializeHash(s);
+    expect(h).toBe('#/?k=wetter&b=satellite&g=0');
+    expect(parseHash(h)).toEqual(s);
+    expect(parseHash('#/?b=a<b').basemap).toBeUndefined();
+  });
   it('round-trips a searched place, commas in names included', () => {
     const s = { karte: 'wetter', place: { lat: 52.51874, lng: 13.40802, title: 'Berlin, Mitte', subtitle: 'Berlin, Deutschland', kind: 'city' } };
     const h = serializeHash(s);

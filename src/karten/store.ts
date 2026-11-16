@@ -2,7 +2,7 @@
 // silently; only a rebuild counts as a change (changes.ts). User Karten are edited in place and saved automatically. Persisted in localStorage, validated on load.
 import { computed, effect, signal } from '@preact/signals';
 import { getJSON, setJSON } from '../core/storage';
-import { BASEMAPS } from '../map/basemaps';
+import { resolveBasemapId } from '../map/basemaps';
 import { getLayer, hasLayer } from '../layers/registry';
 import type { OptionValues } from '../layers/types';
 import type { BasemapId } from '../map/types';
@@ -39,7 +39,7 @@ export function validateKarte(raw: unknown, known: (id: string) => boolean = has
     icon: (typeof r.icon === 'string' ? r.icon : 'map') as IconName,
     color: typeof r.color === 'string' ? r.color : '#72C8F0',
     builtin: r.builtin === true ? true : undefined,
-    basemap: (r.basemap && r.basemap in BASEMAPS ? r.basemap : 'orbis-dark') as BasemapId,
+    basemap: (resolveBasemapId(r.basemap) ?? 'orbis-dark') as BasemapId,
     labels: r.labels !== false,
     terminator: r.terminator === true,
     layers,

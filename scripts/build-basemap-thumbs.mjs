@@ -10,7 +10,7 @@ import { chromium } from 'playwright-core';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = 'dist-thumbs';
 const OUT = join(ROOT, 'public', 'basemaps');
-const IDS = ['orbis-dark', 'orbis-light', 'satellite', 'terrain', 'bluemarble'];
+const IDS = process.env.THUMBS_IDS ? process.env.THUMBS_IDS.split(',') : ['orbis-dark', 'orbis-light', 'satellite', 'terrain', 'bluemarble', 'esri-clarity', 'osm'];
 const CENTER = [10, 46];
 const VARIANTS = [
   { suffix: '', projection: 'mercator', zoom: 3.3 },

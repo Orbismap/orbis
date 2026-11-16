@@ -5,12 +5,12 @@ import { Icon } from '../../ui/icons/Icon';
 import { Popover, MenuItem } from '../../ui/Popover';
 import { tipProps } from '../../ui/tip-state';
 import { cx } from '../../ui/hooks';
-import { appleMapsUrl, googleMapsUrl, googleMaps3dUrl } from './external-maps';
+import { appleMapsUrl, googleMaps3dUrl, osmUrl } from './external-maps';
 import './open-in-maps.css';
 
+// always a new tab, never this one (with `noopener` window.open returns null, so its result says nothing about being blocked)
 const openUrl = (url: string) => {
-  const w = window.open(url, '_blank', 'noopener');
-  if (!w) window.location.href = url;
+  window.open(url, '_blank', 'noopener');
 };
 
 /** Button + menu that hands the current camera to Apple Maps / Google Maps. */
@@ -42,11 +42,11 @@ export function OpenInMaps({ popoverUp }: { popoverUp?: boolean }) {
         <MenuItem icon="map" onClick={() => { openUrl(appleMapsUrl(camera.peek())); close(); }} hint="Position, Drehung, Neigung">
           Apple Maps
         </MenuItem>
-        <MenuItem icon="map" onClick={() => { openUrl(googleMapsUrl(camera.peek())); close(); }} hint="Position, Zoom">
+        <MenuItem icon="map" onClick={() => { openUrl(googleMaps3dUrl(camera.peek())); close(); }} hint="Position, Drehung, Neigung">
           Google Maps
         </MenuItem>
-        <MenuItem icon="map" onClick={() => { openUrl(googleMaps3dUrl(camera.peek())); close(); }} hint="Position, Drehung, Neigung (3D)">
-          Google Maps 3D
+        <MenuItem icon="map" onClick={() => { openUrl(osmUrl(camera.peek())); close(); }} hint="Position, Zoom">
+          OpenStreetMap
         </MenuItem>
       </Popover>
     </div>

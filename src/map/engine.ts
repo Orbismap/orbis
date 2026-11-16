@@ -9,9 +9,10 @@ import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
 import { camera, padding, projection as projectionSignal, terrain3d, viewport, type CameraState, type Padding } from '../state/view';
-import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, skyFor } from './basemaps';
+import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
+import { activeMembers, loadRegional, memberIds, membersOf, regionalDef, regionalEntry, regionalReady, type Bounds } from './basemaps/regional';
 import { clampCamera, ENGINE_MAX_PITCH, flyToTarget, locate as locateImpl } from './camera';
 import { attachCameraLimits } from './limits';
 import { pokeCameraFrame } from './frame';
@@ -181,14 +182,65 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     const v = on ? 'visible' : 'none';
     if (ml.getLayoutProperty(id, 'visibility') !== v) ml.setLayoutProperty(id, 'visibility', v);
   };
+  /**
+   * Generated regional basemap currently added to the style: its background plus the member layers (editions of a
+   * series, newest on top) that touch the view. Only the selected one exists; hundreds would bloat the style.
+   */
+  let dynamic: { id: string; members: Set<number> } | undefined;
+  const dropDynamic = () => {
+    if (!dynamic) return;
+    const def = regionalDef(dynamic.id);
+    for (const l of def?.layers ?? []) if (ml.getLayer(l.id)) ml.removeLayer(l.id);
+    for (const id of Object.keys(def?.sources ?? {})) if (ml.getSource(id)) ml.removeSource(id);
+    dynamic = undefined;
+  };
+  /** Adds the background and the members for the current view; removes members that left it (also on every moveend). */
+  function syncDynamic(id: string | undefined) {
+    if (dynamic && dynamic.id !== id) dropDynamic();
+    const def = id ? regionalDef(id) : undefined;
+    const entry = id ? regionalEntry(id) : undefined;
+    if (!id || !def || !entry) return;
+    if (!dynamic) {
+      ml.addLayer({ ...def.layers[0]!, layout: { visibility: 'visible' } } as LayerSpecification, HILLSHADE_LAYER);
+      dynamic = { id, members: new Set() };
+    }
+    const b = ml.getBounds();
+    const want = activeMembers(entry, [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()] as Bounds);
+    for (const idx of [...dynamic.members]) {
+      if (want.includes(idx)) continue;
+      const ids = memberIds(id, idx);
+      if (ml.getLayer(ids.layer)) ml.removeLayer(ids.layer);
+      if (ml.getSource(ids.source)) ml.removeSource(ids.source);
+      dynamic.members.delete(idx);
+    }
+    // newest first: every new layer goes directly below its newer neighbour (the first one below the hillshade)
+    let above = HILLSHADE_LAYER;
+    for (const idx of want) {
+      const ids = memberIds(id, idx);
+      if (!dynamic.members.has(idx)) {
+        if (!ml.getSource(ids.source)) ml.addSource(ids.source, def.sources[ids.source]!);
+        const spec = def.layers.find((l) => l.id === ids.layer)!;
+        ml.addLayer({ ...spec, layout: { ...(spec.layout ?? {}), visibility: 'visible' } } as LayerSpecification, above);
+        dynamic.members.add(idx);
+      }
+      above = ids.layer;
+    }
+  }
+  ml.on('moveend', () => {
+    if (loaded && dynamic && membersOf(regionalEntry(dynamic.id)!).length > 1) syncDynamic(dynamic.id);
+  });
   function applyBasemap() {
-    for (const id of BASEMAP_IDS) for (const l of [...BASEMAPS[id].layers, ...(BASEMAPS[id].topLayers ?? [])]) setVis(l.id, id === basemap);
-    const variant = BASEMAPS[basemap].labelVariant;
-    for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) setVis(l.id, labels && v === variant);
-    container.style.background = BASEMAPS[basemap].background;
-    const theme = BASEMAPS[basemap].theme;
-    ml.setSky(skyFor(theme));
-    terminator.setLook(theme);
+    const regional = isStaticBasemap(basemap) ? undefined : regionalDef(basemap);
+    // regional data not loaded yet: show the default meanwhile and apply again when it is there
+    if (!isStaticBasemap(basemap) && !regional && !regionalReady.peek()) void loadRegional().then(() => loaded && applyBasemap(), () => {});
+    syncDynamic(regional?.id);
+    const shown = isStaticBasemap(basemap) ? basemap : regional ? undefined : DEFAULT_BASEMAP;
+    for (const id of BASEMAP_IDS) for (const l of [...BASEMAPS[id].layers, ...(BASEMAPS[id].topLayers ?? [])]) setVis(l.id, id === shown);
+    const look = regional ?? BASEMAPS[shown ?? DEFAULT_BASEMAP];
+    for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) setVis(l.id, labels && v === look.labelVariant);
+    container.style.background = look.background;
+    ml.setSky(skyFor(look.theme));
+    terminator.setLook(look.theme);
     applyTerrain();
   }
   // 3D terrain scales smoothly up and down (exaggeration tween). On the flat Orbis colours it exists only on the globe:
@@ -196,6 +248,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   const TERRAIN_MS = 700;
   /** from here on the globe has turned into the flat map: no terrain on the Orbis colours */
   const TERRAIN_MAX_ZOOM_ORBIS = 12;
+  /** Temporarily off: keeps the terrain at every zoom instead of fading it out from TERRAIN_MAX_ZOOM_ORBIS. Set true to restore. */
+  const TERRAIN_ZOOM_FADE = false;
   let terrainGoal = -1;
   let shadeGoal = -1;
   let terrainNow = 0;
@@ -209,7 +263,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   };
   const terrainTarget = () => {
     const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
-    return terrainOn && !(flatOrbis && (projectionSignal.peek() !== 'globe' || ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS)) ? TERRAIN_EXAGGERATION : 0;
+    return terrainOn && !(flatOrbis && (projectionSignal.peek() !== 'globe' || (TERRAIN_ZOOM_FADE && ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS))) ? TERRAIN_EXAGGERATION : 0;
   };
   /**
    * Changes the exaggeration of the running terrain in place. `map.setTerrain` would rebuild the whole terrain every

@@ -1,8 +1,10 @@
 import { useRef, useState } from 'preact/hooks';
 import { activeKarte } from '../../state/session';
+import { viewport } from '../../state/view';
 import { Icon } from '../../ui/icons/Icon';
 import { Popover } from '../../ui/Popover';
-import { BASEMAP_CREDITS, sourcesOf } from './credits';
+import { regionalReady } from '../../map/basemaps/regional';
+import { basemapCredits, sourcesOf } from './credits';
 import './attribution.css';
 
 /** Compact attribution, always visible; expands on click to basemap and active layer sources. */
@@ -10,7 +12,8 @@ export function Attribution() {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const k = activeKarte.value;
-  const base = BASEMAP_CREDITS[k.basemap];
+  regionalReady.value; // re-render once lazily loaded regional credits exist
+  const base = basemapCredits(k.basemap, viewport.value?.bounds);
   const layers = sourcesOf(k.layers.filter((l) => l.visible).map((l) => l.id));
   return (
     <div class="attr" ref={wrap}>
@@ -28,6 +31,11 @@ export function Attribution() {
                   {c.name}
                 </a>
                 {c.license && <span>{c.license}</span>}
+                {c.licenseUrl && (
+                  <a href={c.licenseUrl} target="_blank" rel="noopener noreferrer">
+                    Lizenz
+                  </a>
+                )}
               </li>
             ))}
           </ul>
