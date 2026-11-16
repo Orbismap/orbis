@@ -5,6 +5,7 @@ import { effect } from '@preact/signals';
 import type { ExtensionHost, FollowRef, OrbisExtension, TracksChannel } from '../ext/types';
 import { PlanesPart } from './planes/planes';
 import { ShipsPart } from './ships/ships';
+import { StromnetzPart } from './stromnetz/stromnetz';
 import { Follow } from './world3d/follow';
 import { Stage, type StagePart } from './world3d/stage';
 
@@ -27,8 +28,10 @@ export const extension: OrbisExtension = {
     const stage = new Stage(map);
     const planes = new PlanesPart(map, stage, (id) => host.tracks.select(id), host.reducedMotion);
     const ships = new ShipsPart(map, stage, (id) => host.ships.select(id), host.reducedMotion);
+    const power = new StromnetzPart(map, stage);
     const follow = new Follow(map, stage, host.reducedMotion, host.holdCamera);
-    // ships below aircraft: the stage asks the part added last first, so an aircraft over a ship is the one clicked
+    // below aircraft and ships: the stage asks the part added last first, so an aircraft over a pylon is the one clicked
+    stage.add(power);
     stage.add(ships);
     stage.add(planes);
     host.addCustomLayer(stage, 'points');
@@ -118,11 +121,32 @@ export const extension: OrbisExtension = {
 
     const unbindPlanes = bind(host.tracks, planes, () => planes.tracker.planes.size);
     const unbindShips = bind(host.ships, ships, () => ships.tracker.ships.size);
+
+    // The power grid has no selection or follow. The layer publishes towers from zoom 14 and an empty list below, so
+    // the 3D presentation switches itself on and off with the zoom; present() hides the 2D tower dots meanwhile.
+    let powerOn = false;
+    let powerRelease: (() => void) | null = null;
+    const evaluatePower = () => {
+      const show = power.count > 0;
+      if (show === powerOn) return;
+      powerOn = show;
+      power.setActive(show);
+      if (show) powerRelease = host.power.present();
+      else { powerRelease?.(); powerRelease = null; }
+    };
+    const stopPower = host.power.subscribe((items) => {
+      power.feed(items);
+      evaluatePower();
+    });
+    evaluatePower();
+
     return () => {
       stopWanted();
       stopReport();
       unbindPlanes();
       unbindShips();
+      stopPower();
+      powerRelease?.();
       follow.dispose();
       host.removeLayer(stage.id);
     };

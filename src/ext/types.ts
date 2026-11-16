@@ -66,6 +66,35 @@ export interface ShipSample {
   t: number;
 }
 
+/** One power tower (pylon or pole) as the vector tiles give it; the extension works out model and height itself. */
+export interface PowerTowerSample {
+  kind: 'tower';
+  /** OSM id, unique within the layer */
+  id: string;
+  lng: number;
+  lat: number;
+  /** OSM tags as the tiles carry them (`structure`, `design`, `material`, `type`, `height`, `angle` …) */
+  tags: Record<string, unknown>;
+}
+
+/** One overhead power line (a way, or the part of it inside a tile) as the vector tiles give it. */
+export interface PowerLineSample {
+  kind: 'line';
+  /** OSM id (a long way comes in several parts, hence not unique on its own) */
+  id: string;
+  /** [lon, lat] of the line, continuous (no jump at ±180°) */
+  points: [number, number][];
+  /** voltage in kV, 0 when unknown */
+  voltageKv: number;
+  /** colour of the 2D line as '#rrggbb' (by voltage), so both presentations agree */
+  color: string;
+  /** number of circuits (systems), undefined when untagged */
+  circuits?: number;
+}
+
+/** What the power grid channel carries: towers and overhead lines, to be connected by the extension. */
+export type PowerGridSample = PowerTowerSample | PowerLineSample;
+
 /** A button an extension adds to the inspector card of a selected object. */
 export interface CardAction {
   id: string;
@@ -116,6 +145,8 @@ export interface ExtensionHost {
   readonly tracks: TracksChannel;
   /** Channel for ships (layer `schiffe`). */
   readonly ships: TracksChannel<ShipSample>;
+  /** Channel for power towers and overhead lines (layer `stromnetz`). */
+  readonly power: TracksChannel<PowerGridSample>;
   /**
    * The extension steers the camera's tilt and bearing itself (a follow camera): the base's tilt and north limits stand
    * back until the returned function is called. Called with `ease`, the camera eases once back onto the limits (and to

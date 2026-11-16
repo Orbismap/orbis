@@ -27,6 +27,12 @@ export const voltageColor: ExpressionSpecification = [
   'step', kv, VOLTAGE_UNKNOWN, ...[...VOLTAGE_CLASSES].reverse().flatMap(([from, color]) => [from, color]),
 ] as unknown as ExpressionSpecification;
 
+/** The same colour as `voltageColor`, for code that builds data instead of a style expression. */
+export function voltageColorOf(voltageKv: number): string {
+  for (const [from, color] of VOLTAGE_CLASSES) if (voltageKv >= from) return color;
+  return VOLTAGE_UNKNOWN;
+}
+
 export const num = (v: unknown): number | undefined => {
   const n = typeof v === 'number' ? v : typeof v === 'string' ? parseFloat(v) : NaN;
   return Number.isFinite(n) ? n : undefined;
