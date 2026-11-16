@@ -1,7 +1,7 @@
 import type { LayerSpecification, SourceSpecification } from 'maplibre-gl';
 import type { BasemapId } from '../types';
 
-export type LabelVariant = 'dark' | 'light' | 'imagery';
+export type LabelVariant = 'dark' | 'light' | 'imagery' | 'karte';
 
 export interface BasemapDef {
   id: BasemapId;

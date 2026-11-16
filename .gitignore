@@ -14,3 +14,7 @@ test/out
 dist-smoke
 dist-thumbs
 models-staging/
+
+# local vector basemap build output
+tools/vector-basemap/out/
+public/data/karte/

@@ -7,6 +7,7 @@ import { blank, bluemarble, esriClarity, imagicoAlps, osm, satellite, swissalti3
 import type { BasemapDef, LabelVariant } from './types';
 import { BUILDING_BASE, BUILDING_HEIGHT } from '../buildings-tilt';
 import { DEM_NATIVE_ZOOM, DEM_TILES } from '../dem-protocol';
+import { karteBasemap } from './karte';
 import { LABEL_VARIANTS, OFM_GLYPHS, OFM_SOURCE, labelLayers, vectorBasemap } from './vector';
 
 export type { BasemapId, StaticBasemapId } from '../types';
@@ -14,7 +15,7 @@ export type { BasemapDef, LabelVariant } from './types';
 
 /** Global basemaps, in picker order (grouped, German titles). */
 export const BASEMAP_GROUPS: { title: string; ids: StaticBasemapId[] }[] = [
-  { title: 'Orbis', ids: ['orbis-dark', 'orbis-light'] },
+  { title: 'Orbis', ids: ['orbis-dark', 'orbis-light', 'orbis-karte'] },
   { title: 'Luftbilder', ids: ['satellite', 'esri-clarity', 'bluemarble'] },
   { title: 'Karten', ids: ['osm', 'terrain'] },
   { title: 'Sonstige', ids: ['blank'] },
@@ -28,6 +29,7 @@ export const DEFAULT_BASEMAP: StaticBasemapId = 'orbis-dark';
 export const BASEMAPS: Record<StaticBasemapId, BasemapDef> = {
   'orbis-dark': vectorBasemap('dark'),
   'orbis-light': vectorBasemap('light'),
+  'orbis-karte': karteBasemap(),
   satellite: satellite(),
   'esri-clarity': esriClarity(),
   swissimage: swissimage(),

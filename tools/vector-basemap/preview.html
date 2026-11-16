@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>Orbis Basemap Preview</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body,#map{margin:0;height:100%}body{background:#0c183f}#hud button{margin-left:6px;font:inherit;cursor:pointer}#hud{position:fixed;left:8px;top:8px;z-index:2;font:12px system-ui;color:#cfd8e6;background:#0008;padding:6px 8px;border-radius:6px}</style>
+</head><body><div id="map"></div><div id="hud"></div>
+<script type="module">
+import * as maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { Protocol } from 'pmtiles';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+maplibregl.setWorkerUrl(workerUrl);
+import { BUILDING_HEIGHT, BUILDING_BASE, installBuildingsTilt } from '/src/map/buildings-tilt.ts';
+import { registerDemTiles } from '/src/map/dem-protocol.ts';
+registerDemTiles();
+const p = new Protocol();
+maplibregl.addProtocol('pmtiles', p.tile);
+const url = new URL(location.href);
+const file = url.searchParams.get('f') ?? 'basemap.pmtiles';
+// Farben aus den Apple-Maps-Screenshots (Dunkel) gemessen: Mittelwerte der haeufigsten Farbflaechen je Zoomstufe
+const c = {
+  ocean:'#0c183b', land:'#356e58', water:'#1f3679',
+  forest:'#01645f', forestFar:'#3c735c', forestNear:'#00605c',
+  farmland:'#356e58', grass:'#1b6a5c', grassNear:'#07604d', wild:'#3a6f5a', bare:'#7c7c64',
+  urban:'#384d66', urbanNear:'#343f56', commercial:'#4a4670', commercialNear:'#3c415f', institutionalNear:'#3b3f56', institutional:'#4a3f56',
+  roadMinor:'#47617e', roadMinorNear:'#3f4c66', road:'#8496b2', roadNear:'#56668a', motorway:'#919cc5', motorwayNear:'#6b7ba0',
+  rail:'#3f4c68', roadDark:'#2e333e', path:'#9a7f5c', bridge:'#4a5a78', building:'#46597c',
+};
+const src = 'orbis';
+const fill = (id, cls, color, minzoom = 0) => ({ id, type:'fill', source:src, 'source-layer':'landcover', minzoom, filter:['==',['get','class'],cls], paint:{'fill-color':color} });
+const style = {
+  version: 8,
+  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+  sources: { ofm:{type:'vector',url:'https://tiles.openfreemap.org/planet',attribution:'OpenFreeMap © OpenStreetMap'}, dem:{type:'raster-dem',tiles:['orbis-dem://{z}/{x}/{y}'],encoding:'terrarium',tileSize:512,maxzoom:15}, [src]: { type:'vector', url:`pmtiles://${location.origin}/tools/vector-basemap/out/${file}?v=${Date.now()}` } },
+  layers: [
+    { id:'bg', type:'background', paint:{'background-color':c.land} },
+    { id:'lc-farmland', type:'fill', source:src, 'source-layer':'landcover', filter:['==',['get','class'],'farmland'], paint:{'fill-color':c.farmland} },
+    { id:'lc-grass', type:'fill', source:src, 'source-layer':'landcover', filter:['==',['get','class'],'grass'], paint:{'fill-color':['interpolate',['linear'],['zoom'],6,c.farmland,10,c.grass,15,c.grassNear]} },
+    { id:'lc-wild', type:'fill', source:src, 'source-layer':'landcover', filter:['==',['get','class'],'wild'], paint:{'fill-color':c.wild} },
+    { id:'lc-forest', type:'fill', source:src, 'source-layer':'landcover', filter:['==',['get','class'],'forest'], paint:{'fill-color':['interpolate',['linear'],['zoom'],5,c.forestFar,9,c.forest,15,c.forestNear]} },
+    { id:'lc-urban', type:'fill', source:src, 'source-layer':'landcover', filter:['==',['get','class'],'urban'], paint:{'fill-color':['interpolate',['linear'],['zoom'],4,c.urban,10,c.urban,15,c.urbanNear]} },
+    { id:'lc-commercial', type:'fill', source:src, 'source-layer':'landcover', minzoom:8, filter:['==',['get','class'],'commercial'], paint:{'fill-color':['interpolate',['linear'],['zoom'],13,c.commercial,17,c.commercialNear],'fill-opacity':['interpolate',['linear'],['zoom'],8,0,10.5,1]} },
+    { id:'lc-institutional', type:'fill', source:src, 'source-layer':'landcover', minzoom:8, filter:['==',['get','class'],'institutional'], paint:{'fill-color':['interpolate',['linear'],['zoom'],13,c.institutional,17,c.institutionalNear],'fill-opacity':['interpolate',['linear'],['zoom'],8,0,10.5,1]} },
+    // Hoehenschummerung als 2D-Overlay (DEM der App), dezent, ueber der Landbedeckung
+    { id:'hillshade', type:'hillshade', source:'dem', paint:{'hillshade-exaggeration':['interpolate',['linear'],['zoom'],5,0.3,12,0.2,16,0.08],'hillshade-shadow-color':'#000a1e','hillshade-highlight-color':'#7f9a9a','hillshade-accent-color':'#02142e','hillshade-illumination-direction':315} },
+    { id:'water', type:'fill', source:src, 'source-layer':'water', filter:['==',['geometry-type'],'Polygon'], paint:{'fill-color':c.water} },
+    { id:'waterway', type:'line', source:src, 'source-layer':'water', filter:['==',['geometry-type'],'LineString'], paint:{'line-color':c.water,'line-width':['interpolate',['linear'],['zoom'],8,0.6,14,3,18,10]} },
+    { id:'rail', type:'line', source:src, 'source-layer':'rail', paint:{'line-color':c.rail,'line-width':['interpolate',['linear'],['zoom'],10,0.5,16,1.5]} },
+    // Wege (Fussweg, Radweg, Pfad, Feldweg): bis Zoom 16 gestrichelt braun, ab 16 duenne durchgezogene dunkle Linie wie die Strassen
+    { id:'road-path-dash', type:'line', source:src, 'source-layer':'road', minzoom:15, maxzoom:16, filter:['in',['get','highway'],['literal',['path','footway','cycleway','track']]], layout:{'line-join':'round'}, paint:{'line-color':c.path,'line-opacity':['interpolate',['linear'],['zoom'],15,0,15.3,0.85,15.5,0.85,16,0],'line-width':['interpolate',['linear'],['zoom'],15,0.5,16,0.9],'line-dasharray':[3,2.5]} },
+    { id:'road-path', type:'line', source:src, 'source-layer':'road', minzoom:15.5, filter:['in',['get','highway'],['literal',['path','footway','cycleway','track']]], layout:{'line-join':'round','line-cap':'round'}, paint:{'line-color':c.roadDark,'line-opacity':['interpolate',['linear'],['zoom'],15.5,0,16,1],'line-width':['interpolate',['exponential',1.5],['zoom'],16,0.7,19,2.6]} },
+    // Bruecken: heller Rand unter der dunklen Strasse
+    { id:'road-bridge', type:'line', source:src, 'source-layer':'road', minzoom:15.5, filter:['all',['==',['get','bridge'],true],['!',['in',['get','highway'],['literal',['path','footway','cycleway','track']]]]], layout:{'line-cap':'butt'}, paint:{'line-color':c.bridge,'line-opacity':['interpolate',['linear'],['zoom'],15.5,0,16,1],'line-width':['interpolate',['exponential',1.5],['zoom'],16,7,19,26]} },
+    { id:'road-minor', type:'line', source:src, 'source-layer':'road', filter:['all',['!',['in',['get','highway'],['literal',['motorway','trunk','primary','secondary','path','footway','cycleway','track']]]]], layout:{'line-cap':'round','line-join':'round'}, paint:{'line-color':['interpolate',['linear'],['zoom'],10,'#4d6c7c',14,c.roadMinor,15.5,c.roadMinor,16,c.roadDark],'line-opacity':['interpolate',['linear'],['zoom'],10,0.55,14,1],'line-width':['interpolate',['exponential',1.5],['zoom'],10,0.4,16,5,19,18]} },
+    { id:'road-major', type:'line', source:src, 'source-layer':'road', filter:['in',['get','highway'],['literal',['motorway','trunk','primary','secondary']]], layout:{'line-cap':'round','line-join':'round'}, paint:{'line-color':['interpolate',['linear'],['zoom'],10,['match',['get','highway'],'motorway',c.motorway,c.road],15.5,['match',['get','highway'],'motorway',c.motorway,c.road],16,c.roadDark],'line-width':['interpolate',['exponential',1.5],['zoom'],5,0.4,16,9,19,34]} },
+    // Gebaeude aus OpenFreeMap (Quelle 'ofm', wie in den Orbis-Grundkarten); Hoehe folgt der Kameraneigung
+    { id:'building', type:'fill-extrusion', source:'ofm', 'source-layer':'building', minzoom:13.5, layout:{'fill-extrusion-rounded-corner-distance':1.5}, paint:{'fill-extrusion-color':c.building,'fill-extrusion-height':BUILDING_HEIGHT,'fill-extrusion-base':BUILDING_BASE,'fill-extrusion-opacity':1,'fill-extrusion-vertical-gradient':true} },
+    { id:'place', type:'symbol', source:src, 'source-layer':'place', layout:{'text-field':['get','name'],'text-font':['Noto Sans Regular'],'text-size':['match',['get','place'],'city',16,'town',13,11]}, paint:{'text-color':'#e8eef8','text-halo-color':'#0c183f','text-halo-width':1.2} },
+  ],
+};
+const map = new maplibregl.Map({ container:'map', style, center:[8.68,50.11], zoom:8, hash:true, attributionControl:{compact:true} });
+map.addControl(new maplibregl.NavigationControl());
+installBuildingsTilt(map);
+const hud = document.getElementById('hud');
+const zl = document.createElement('span');
+const go = (label, opts) => { const b = document.createElement('button'); b.textContent = label; b.onclick = () => map.flyTo({ duration: 800, ...opts }); hud.append(b); };
+hud.append(zl);
+go('Frankfurt', { center: [8.68, 50.11], zoom: 12 });
+go('Hessen', { center: [9.0, 50.5], zoom: 7.5 });
+const upd = () => (zl.textContent = `z${map.getZoom().toFixed(2)}`);
+map.on('move', upd); upd();
+</script></body></html>

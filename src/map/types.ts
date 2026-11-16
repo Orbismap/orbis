@@ -5,7 +5,7 @@ import type { Padding } from '../state/view';
 
 export type SlotId = 'field' | 'raster' | 'areas' | 'lines' | 'points' | 'labels' | 'top';
 export type StaticBasemapId =
-  | 'orbis-dark' | 'orbis-light'
+  | 'orbis-dark' | 'orbis-light' | 'orbis-karte'
   | 'satellite' | 'esri-clarity' | 'swissimage' | 'imagico-alps' | 'bluemarble'
   | 'osm' | 'terrain'
   | 'swissalti3d' | 'swisssurface3d'
