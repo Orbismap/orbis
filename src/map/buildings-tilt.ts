@@ -31,6 +31,10 @@ const tiltExpr = (v: ExpressionSpecification, c = 0): ExpressionSpecification =>
 export const BUILDING_HEIGHT = tiltExpr(HEIGHT, MIN_HEIGHT_M);
 export const BUILDING_BASE = tiltExpr(BASE);
 
+/** Draws building:part features and hides the outlines that have parts inside (OpenMapTiles marks those with hide_3d), otherwise the
+ *  outline covers its parts and they never show up at their own height. */
+export const BUILDING_FILTER: ExpressionSpecification = ['!', ['to-boolean', ['get', 'hide_3d']]];
+
 interface Binder {
   expression?: { zoomStops?: number[] };
   uniformNames?: string[];

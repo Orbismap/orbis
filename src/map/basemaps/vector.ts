@@ -3,7 +3,7 @@
 // so that data layers carry the picture.
 import type { ExpressionSpecification, LayerSpecification, SourceSpecification } from 'maplibre-gl';
 import type { BasemapDef, LabelVariant } from './types';
-import { BUILDING_BASE, BUILDING_HEIGHT } from '../buildings-tilt';
+import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../buildings-tilt';
 import { karteLabelLayers } from './karte-labels';
 
 export const OFM_URL = 'https://tiles.openfreemap.org/planet';
@@ -103,7 +103,7 @@ export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
   const topLayers: LayerSpecification[] = [
     {
       // 2.5D buildings (OpenMapTiles `building`: render_height / render_min_height, metres); height follows the pitch, see buildings-tilt.ts. Rounded corners need maplibre-gl >= 6.2.
-      id: id('building'), type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, layout: { ...hidden, 'fill-extrusion-rounded-corner-distance': 1.5 },
+      id: id('building'), type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER, layout: { ...hidden, 'fill-extrusion-rounded-corner-distance': 1.5 },
       paint: {
         'fill-extrusion-color': c.building,
         'fill-extrusion-height': BUILDING_HEIGHT,

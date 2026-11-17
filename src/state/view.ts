@@ -14,11 +14,13 @@ export const projection = signal<Projection>('globe');
 /** 3D terrain (real elevation model); on by default. Not persisted. */
 /** The basemap on show (set by the map engine). */
 export const activeBasemap = signal<string>('');
-/** The switch "3D-Gebäude": 2.5D buildings on the Orbis colours and map-like basemaps, real 3D tiles on aerial images (Orbis Pro). Not persisted. */
+/** The switch "3D-Gebäude" of the basemap popover: plain OSM 2.5D buildings, and the Cesium 3D tiles on aerial images (Orbis Pro). Plateau and the coloured OSM buildings belong to the layer "3D-Gebäude". Not persisted. */
 export const buildings3d = signal(true);
 export const setBuildings3d = (on: boolean) => {
   buildings3d.value = on;
 };
+/** The layer "3D-Gebäude" replaces the 2.5D buildings of the basemap (coloured OSM buildings, or real models in view): they go off whatever the switch says. Written by the layer. */
+export const buildingsReplaced = signal(false);
 /** Visible bounds and size in px; undefined before the map is ready. */
 export const viewport = signal<Viewport | undefined>(undefined);
 /** Area of the map covered by panels/sheet; the camera keeps targets inside the rest. */
