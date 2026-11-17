@@ -15,7 +15,7 @@ const SWISSTOPO: Credit = { name: '© swisstopo', url: 'https://www.swisstopo.ad
 export const BASEMAP_CREDITS: Record<StaticBasemapId, Credit[]> = {
   'orbis-dark': [OFM, OMT, OSM],
   'orbis-light': [OFM, OMT, OSM],
-  'orbis-karte': [OFM, OMT, OSM, { name: 'Mapterhorn, AWS Terrain Tiles (Reliefschattierung)', url: 'https://mapterhorn.com/attribution/', license: 'Höhendaten' }],
+  'orbis-karte': [OFM, OMT, OSM, { name: 'Mapterhorn (Reliefschattierung)', url: 'https://mapterhorn.com/attribution/', license: 'Höhendaten' }, { name: 'Mapzen Terrain Tiles (Meerestiefe: GEBCO, ETOPO1)', url: 'https://registry.opendata.aws/terrain-tiles/', license: 'frei nutzbar, Quellenangabe' }],
   satellite: [{ name: 'Esri World Imagery (Maxar, Earthstar Geographics)', url: 'https://www.esri.com/', license: 'Esri Nutzungsbedingungen' }, OFM, OSM],
   terrain: [{ name: 'OpenTopoMap', url: 'https://opentopomap.org/', license: 'CC-BY-SA' }, OSM],
   'esri-clarity': [{ name: 'Esri World Imagery Clarity (Maxar, Earthstar Geographics)', url: 'https://www.esri.com/', license: 'Esri Nutzungsbedingungen' }, OFM, OSM],

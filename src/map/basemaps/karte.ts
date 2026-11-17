@@ -12,6 +12,12 @@ import type { BasemapDef } from './types';
 export const KARTE_OVERLAY_SOURCE = 'karte-overlay';
 /** Global land cover as vector areas (Natural Earth classified, tools/vector-basemap/build-landcover-vector.sh): deserts, steppe, savanna, forests, ice at low zoom. */
 export const KARTE_LANDCOVER_SOURCE = 'karte-landcover';
+/**
+ * Sea floor for the depth gradient: the app's own terrain (Mapterhorn) is flat at 0 on the sea, so the gradient has its own DEM, the
+ * AWS Terrain Tiles (GEBCO/ETOPO1 sea floor). Only the sea is drawn from it (zoom <= 8, land is transparent), so its land datum and
+ * errors do not matter, and it is a separate source from the 3D terrain, as MapLibre wants it.
+ */
+export const KARTE_SEA_SOURCE = 'karte-sea-depth';
 /** Fine global land cover (Copernicus CGLS-LC100 vectorised, tools/vector-basemap/build-landcover-lc100.sh), classes see HI below. */
 export const KARTE_LANDCOVER_HI_SOURCE = 'karte-landcover-hi';
 
@@ -50,10 +56,10 @@ export function karteBasemap(): BasemapDef {
     { id: id('bg'), type: 'background', layout: hidden, paint: { 'background-color': K.land } },
     // flat ocean underneath: the safety net below the depth gradient (if the DEM tiles are slow or missing the sea stays dark blue, not land green)
     { id: id('ocean-flat'), type: 'fill', source: 'ofm', 'source-layer': 'water', layout: hidden, filter: cls('ocean'), paint: { 'fill-color': K.ocean } },
-    // ocean depth in Apple's blue steps (coast #1c3275 -> deep sea #000d2d), coloured from the DEM of the app (it holds the sea floor too).
+    // ocean depth in Apple's blue steps (coast #1c3275 -> deep sea #000d2d), coloured from its own sea-floor DEM (KARTE_SEA_SOURCE).
     // The flat vector ocean fades in from zoom 6 to 8 and takes over (see the water layer).
     {
-      id: id('bathymetry'), type: 'color-relief', source: 'terrain-dem', layout: hidden,
+      id: id('bathymetry'), type: 'color-relief', source: KARTE_SEA_SOURCE, layout: hidden,
       paint: {
         'color-relief-color': ['interpolate', ['linear'], ['elevation'],
           -6000, '#000d2d', -3500, '#0c163a', -2000, '#0c183b', -1000, '#0c1d4b', -500, '#0d2253', -200, '#13255c', -50, '#152963', -1, '#1c3275', 0, 'rgba(28, 50, 117, 0)'] as Ex,
@@ -187,5 +193,9 @@ export function karteBasemap(): BasemapDef {
       [KARTE_LABELS_SOURCE]: { type: 'vector', url: karteDataUrl('labels'), minzoom: 0, maxzoom: 6 },
       [KARTE_LANDCOVER_HI_SOURCE]: { type: 'vector', url: karteDataUrl('landcover-hi'), minzoom: 0, maxzoom: 8 },
       [KARTE_LANDCOVER_SOURCE]: { type: 'vector', url: karteDataUrl('landcover-vec'), minzoom: 0, maxzoom: 6 },
+      [KARTE_SEA_SOURCE]: {
+        type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 8, encoding: 'terrarium',
+        attribution: '<a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">Mapzen Terrain Tiles</a> (GEBCO, ETOPO1)',
+      },
     }, layers, topLayers, labelVariant: 'karte', background: K.space, theme: 'dark' };
 }
