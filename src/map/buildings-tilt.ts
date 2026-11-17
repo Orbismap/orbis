@@ -1,4 +1,5 @@
-// 2.5D buildings whose height follows the camera TILT instead of the zoom: flat at pitch 0, full height at TILT_FULL_DEG.
+// 2.5D buildings whose height follows the camera TILT instead of the zoom: MIN_HEIGHT_M metres at pitch 0
+// (not fully flat, so the 3D terrain does not poke through the roofs), real height + MIN_HEIGHT_M at TILT_FULL_DEG.
 // MapLibre has no `pitch` expression, and changing a data-driven paint property (setPaintProperty / global state) reloads the
 // tiles in the worker, which is no option per frame. So we use the composite (zoom + feature) paint binder instead:
 //   - the style expression is linear in zoom: z -> z * H (see tiltExpr), so a bucket parsed at tile zoom Z stores
@@ -20,10 +21,14 @@ export const tiltFactor = (pitchDeg: number) => clamp01(pitchDeg / TILT_FULL_DEG
 
 const HEIGHT: ExpressionSpecification = ['coalesce', ['to-number', ['get', 'render_height']], 9];
 const BASE: ExpressionSpecification = ['coalesce', ['to-number', ['get', 'render_min_height']], 0];
-const tiltExpr = (v: ExpressionSpecification): ExpressionSpecification => ['interpolate', ['linear'], ['zoom'], 0, 0, MAX_Z, ['*', MAX_Z, v]];
+/** Constant roof lift in metres, independent of the tilt: the 3D terrain is only sampled at the footprint vertices, so with a
+ *  few decimetres of height the terrain in between pokes through the roof. Stored as the stop offset: mix(min, max, t) keeps it
+ *  unscaled (c + t*v), so height = MIN_HEIGHT_M + k*H. */
+export const MIN_HEIGHT_M = 3;
+const tiltExpr = (v: ExpressionSpecification, c = 0): ExpressionSpecification => ['interpolate', ['linear'], ['zoom'], 0, c, MAX_Z, ['+', c, ['*', MAX_Z, v]]];
 
 /** fill-extrusion-height / -base for the style (zoom-linear, see above; the tilt factor is applied at draw time). */
-export const BUILDING_HEIGHT = tiltExpr(HEIGHT);
+export const BUILDING_HEIGHT = tiltExpr(HEIGHT, MIN_HEIGHT_M);
 export const BUILDING_BASE = tiltExpr(BASE);
 
 interface Binder {

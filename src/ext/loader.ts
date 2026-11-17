@@ -4,6 +4,7 @@
 // unchanged and `proAvailable` is false (the settings hide the switch). With the folder, three.js and all Pro code
 // end up in their own lazy chunk that only loads when Pro is switched on. This file is the ONLY place in the base
 // that mentions the folder (a unit test guards that).
+import { markerLayerId } from '../map/slots';
 import { effect } from '@preact/signals';
 import { mapEngine } from '../state/ui';
 import { projection } from '../state/view';
@@ -28,6 +29,16 @@ function makeHost(engine: MapEngine): ExtensionHost {
     map: engine.ml,
     addCustomLayer: (layer, slot) => engine.addCustomLayer(layer, slot),
     removeLayer: (id) => engine.remove({ layers: [id] }),
+    placeLayer: (id, where) => {
+      const ml = engine.ml;
+      if (!ml.getLayer(id)) return;
+      if (where === 'points') return ml.moveLayer(id, markerLayerId('points'));
+      // the first layer above the raster marker (the data layers start there), skipping the layer itself
+      const layers = ml.getStyle().layers ?? [];
+      const at = layers.findIndex((l) => l.id === markerLayerId('raster'));
+      const next = layers.slice(at + 1).find((l) => l.id !== id);
+      if (at >= 0 && next) ml.moveLayer(id, next.id);
+    },
     projection,
     tracks: tracksChannel,
     ships: shipsChannel,

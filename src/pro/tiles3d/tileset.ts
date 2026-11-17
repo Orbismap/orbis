@@ -6,6 +6,7 @@ import type { Map as MlMap } from 'maplibre-gl';
 import type { TilesetSample } from '../../ext/types';
 import type { GeoFrame } from '../world3d/frame';
 import type { StagePart } from '../world3d/stage';
+import { geoidHeight } from './geoid';
 import { ecefToEnu, proxyCamera } from './mapping';
 import { countRoot, ionProblem, rootsThisMonth } from './quota';
 
@@ -163,7 +164,8 @@ export class TilesetPart implements StagePart {
       e.seen = this.frameNo;
       names.add(s.name);
       const [lng, lat] = s.global ? this.anchorOf(e) : s.center;
-      frame.place(this.model, lng, lat, s.heightOffsetM ?? 0);
+      // ellipsoid heights of the tiles → the map's sea level (a world-wide tileset has no fixed offset: the geoid at its anchor)
+      frame.place(this.model, lng, lat, s.global ? -geoidHeight(lng, lat) : s.heightOffsetM ?? 0);
       e.root.matrix.copy(this.model);
       e.root.updateMatrixWorld(true);
       const metre = Math.hypot(...frame.basis(lng, lat).east);
@@ -225,6 +227,11 @@ export class TilesetPart implements StagePart {
     if (this.entries.size <= LIMITS.kept) return;
     const idle = [...this.entries].filter(([, e]) => e.seen !== this.frameNo).sort((a, b) => a[1].seen - b[1].seen);
     for (const [id, e] of idle.slice(0, this.entries.size - LIMITS.kept)) this.drop(id, e);
+  }
+
+  /** Tiles are on screen: they are the ground, the stage lays them over the map (see StagePart.coversMap). */
+  coversMap() {
+    return this.visibleTiles > 0;
   }
 
   stats() {
