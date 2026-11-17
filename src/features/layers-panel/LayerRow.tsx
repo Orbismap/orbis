@@ -10,6 +10,7 @@ import { camera } from '../../state/view';
 import { hasKey } from '../../keys';
 import { setLayerVisible } from '../../karten/store';
 import { useEscape } from '../../ui/hooks';
+import { multiValues } from '../../layers/multi';
 import { OptionFields } from './LayerDetails';
 import { Icon } from '../../ui/icons/Icon';
 import { cx } from '../../ui/hooks';
@@ -156,7 +157,7 @@ export function FieldRow({ layer, def, karteId, from, tabbable, onSelect }: { la
 }
 
 /** Layers with a select or a toggle option get the filter button. */
-const hasChoices = (def: LayerDef) => !!def.options?.some((o) => o.type === 'select' || o.type === 'toggle');
+const hasChoices = (def: LayerDef) => !!def.options?.some((o) => o.type === 'select' || o.type === 'multi' || o.type === 'toggle');
 
 /** Short text of the chosen options: the labels of the select choices (toggle labels are too long for a row). */
 function optionSummary(def: LayerDef, layer: KarteLayer): string {
@@ -164,6 +165,10 @@ function optionSummary(def: LayerDef, layer: KarteLayer): string {
   for (const o of def.options ?? []) {
     const v = layer.options?.[o.id] ?? o.default;
     if (o.type === 'select') parts.push(o.choices.find((c) => c.value === v)?.label ?? String(v));
+    else if (o.type === 'multi') {
+      const list = multiValues(v);
+      parts.push(list ? list.map((x) => o.choices.find((c) => c.value === x)?.label ?? x).join(', ') : o.choices.find((c) => c.value === 'all')?.label ?? 'Alle');
+    }
   }
   return parts.join(' · ').replace(/OpenStreetMap/g, 'OSM');
 }

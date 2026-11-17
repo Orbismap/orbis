@@ -7,7 +7,7 @@ import type { LayerDef, OptionSpec, SourceRef } from '../../layers/types';
 import { layerStatus, legends } from '../../state/session';
 import { Button } from '../../ui/Button';
 import { Segmented } from '../../ui/Segmented';
-import { Select } from '../../ui/Select';
+import { ChoiceList } from '../../ui/ChoiceList';
 import { Slider } from '../../ui/Slider';
 import { Switch } from '../../ui/Switch';
 import { openKeySettings } from '../boost/open';
@@ -32,9 +32,17 @@ export function Source({ s }: { s: SourceRef }) {
 
 export function Option({ spec, value, onChange }: { spec: OptionSpec; value: number | string | boolean; onChange(v: number | string | boolean): void }) {
   if (spec.type === 'toggle') return <Switch label={spec.label} checked={value === true} onChange={onChange} />;
+  if (spec.type === 'multi') {
+    return (
+      <div class="ld-field">
+        <span class="ld-label">{spec.label}</span>
+        <ChoiceList multiple aria-label={spec.label} value={String(value)} options={spec.choices} onChange={onChange} />
+      </div>
+    );
+  }
   if (spec.type === 'select') {
     const choices = spec.choices;
-    // a segmented control only while the labels fit in one row; otherwise a dropdown
+    // a segmented control only while the labels fit in one row; otherwise an open list (scrolls from 5 entries)
     const compact = choices.length <= 3 && choices.reduce((n, c) => n + c.label.length, 0) <= 24;
     return (
       <div class="ld-field">
@@ -42,7 +50,7 @@ export function Option({ spec, value, onChange }: { spec: OptionSpec; value: num
         {compact ? (
           <Segmented aria-label={spec.label} size="sm" value={String(value)} options={choices} onChange={onChange} />
         ) : (
-          <Select aria-label={spec.label} value={String(value)} options={choices} onChange={onChange} />
+          <ChoiceList aria-label={spec.label} value={String(value)} options={choices} onChange={onChange} />
         )}
       </div>
     );

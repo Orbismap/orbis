@@ -25,7 +25,7 @@ export default defineLayer({
     { name: 'Transport Victoria, CTA Chicago, Trafiklab Schweden (mit eigenem Schlüssel)', url: 'https://opendata.transport.vic.gov.au/', license: 'CC BY 4.0 / Betreiber' },
   ],
   options: [
-    { id: 'kind', label: 'Verkehrsmittel', type: 'select', default: 'all', choices: [{ value: 'all', label: 'Alle' }, { value: 'bus', label: 'Bus' }, { value: 'tram', label: 'Tram' }, { value: 'ubahn', label: 'U-Bahn' }, { value: 'faehre', label: 'Fähre' }] },
+    { id: 'kind', label: 'Verkehrsmittel', type: 'multi', default: 'all', choices: [{ value: 'all', label: 'Alle' }, { value: 'bus', label: 'Bus' }, { value: 'tram', label: 'Tram' }, { value: 'ubahn', label: 'U-Bahn' }, { value: 'faehre', label: 'Fähre' }] },
   ],
   legend: kindLegend([...KINDS]),
   keys: [{ id: 'victoria', required: false }, { id: 'cta', required: false }, { id: 'trafiklab', required: false }],

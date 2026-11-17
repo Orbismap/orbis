@@ -5,6 +5,7 @@ import { computed, effect, signal, type ReadonlySignal } from '@preact/signals';
 import type { ExpressionSpecification, FilterSpecification } from 'maplibre-gl';
 import { bearing, haversine, type BBox } from '../../core/geo';
 import { SECOND } from '../../core/time';
+import { multiValues } from '../../layers/multi';
 import type { InspectCard, LayerContext, LayerHandle, LegendSpec } from '../../layers/types';
 import { trackLayer, type TrackObject } from '../../render/tracks';
 import { fetchJson, describeError } from '../http';
@@ -207,11 +208,11 @@ export function mountVehicles(ctx: LayerContext, o: KitOptions, sizes: number[],
   const stopKeys = effect(() => { keyIds.forEach((k) => keys[k]!.value); feedAt.clear(); if (!disposed) void poll(true); });
 
   // --- filter, count
-  const kindOpt = computed(() => String(ctx.options.value.kind ?? 'all'));
+  const kindOpt = computed(() => multiValues(ctx.options.value.kind));
   const filter = computed<FilterSpecification | undefined>(() => {
     const k = kindOpt.value;
     const clauses: unknown[] = [visibleFilter];
-    if (k !== 'all') clauses.push(['==', ['get', 'kind'], k]);
+    if (k) clauses.push(['in', ['get', 'kind'], ['literal', k]]);
     const ef = extraFilter?.value;
     if (ef) clauses.push(ef);
     return ['all', ...clauses] as FilterSpecification;
@@ -222,7 +223,7 @@ export function mountVehicles(ctx: LayerContext, o: KitOptions, sizes: number[],
     const k = kindOpt.value;
     return t.filter((x) => {
       const p = x.props as unknown as VehicleProps;
-      return (p.hd || p.kmh < 2) && (k === 'all' || p.kind === k);
+      return (p.hd || p.kmh < 2) && (!k || k.includes(p.kind));
     }).length;
   });
 

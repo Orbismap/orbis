@@ -5,6 +5,7 @@ import { effect } from '@preact/signals';
 import type { ExpressionSpecification, FilterSpecification, LayerSpecification } from 'maplibre-gl';
 import type { InspectCard } from '../types';
 import { defineLayer } from '../define';
+import { multiValues } from '../multi';
 
 interface Group { id: string; label: string; color: string; classes: string[] }
 
@@ -25,10 +26,10 @@ const colorOf: ExpressionSpecification = ['match', ['get', 'class'],
 // OpenMapTiles `rank` is the importance inside a tile (1 = most important): few places at city level, all of them close up.
 const rankLimit: ExpressionSpecification = ['step', ['zoom'], 6, 13, 14, 14, 30, 15, 1000] as unknown as ExpressionSpecification;
 
-const filterFor = (group: string): FilterSpecification => {
+const filterFor = (groups: string | undefined): FilterSpecification => {
   const base: unknown[] = ['all', ['has', 'name'], ['<=', ['coalesce', ['get', 'rank'], 1], rankLimit]];
-  const g = GROUPS.find((x) => x.id === group);
-  if (g) base.push(['in', ['get', 'class'], ['literal', g.classes]]);
+  const picked = multiValues(groups);
+  if (picked) base.push(['in', ['get', 'class'], ['literal', GROUPS.filter((x) => picked.includes(x.id)).flatMap((x) => x.classes)]]);
   return base as FilterSpecification;
 };
 
@@ -47,7 +48,7 @@ export default defineLayer({
   minZoom: 12,
   sources: [{ name: 'OpenFreeMap / OpenStreetMap-Mitwirkende', url: 'https://openfreemap.org/', license: 'ODbL 1.0' }],
   options: [
-    { id: 'gruppe', label: 'Art', type: 'select', default: 'alle', choices: [{ value: 'alle', label: 'Alle' }, ...GROUPS.map((g) => ({ value: g.id, label: g.label }))] },
+    { id: 'gruppe', label: 'Art', type: 'multi', default: 'all', choices: [{ value: 'all', label: 'Alle' }, ...GROUPS.map((g) => ({ value: g.id, label: g.label }))] },
   ],
   legend: { type: 'classes', items: GROUPS.map((g) => ({ color: g.color, label: g.label, shape: 'dot' as const })) },
   keywords: ['poi', 'points of interest', 'orte', 'läden', 'geschäfte', 'shops', 'restaurant', 'café', 'cafe', 'bar', 'hotel', 'sehenswürdigkeit', 'museum', 'supermarkt', 'apotheke', 'tankstelle', 'google maps', 'apple maps'],
@@ -56,7 +57,7 @@ export default defineLayer({
     const ml = ctx.map.ml;
     const dots = `${ctx.id}.dots`, names = `${ctx.id}.names`;
     ctx.map.addLayer({
-      id: dots, type: 'circle', source: 'ofm', 'source-layer': 'poi', minzoom: 12, filter: filterFor('alle'),
+      id: dots, type: 'circle', source: 'ofm', 'source-layer': 'poi', minzoom: 12, filter: filterFor(undefined),
       layout: { 'circle-sort-key': ['coalesce', ['get', 'rank'], 100] } as never,
       paint: {
         'circle-color': colorOf,
@@ -66,7 +67,7 @@ export default defineLayer({
       },
     } as LayerSpecification, 'points');
     ctx.map.addLayer({
-      id: names, type: 'symbol', source: 'ofm', 'source-layer': 'poi', minzoom: 13.5, filter: filterFor('alle'),
+      id: names, type: 'symbol', source: 'ofm', 'source-layer': 'poi', minzoom: 13.5, filter: filterFor(undefined),
       layout: {
         'text-field': ['coalesce', ['get', 'name:latin'], ['get', 'name']],
         'text-font': ['Noto Sans Bold'],
@@ -100,7 +101,7 @@ export default defineLayer({
 
     const stop = effect(() => {
       const o = ctx.opacity.value;
-      const filter = filterFor(String(ctx.options.value.gruppe ?? 'alle'));
+      const filter = filterFor(String(ctx.options.value.gruppe ?? 'all'));
       if (ml.getLayer(dots)) {
         ml.setFilter(dots, filter);
         ml.setPaintProperty(dots, 'circle-opacity', o);

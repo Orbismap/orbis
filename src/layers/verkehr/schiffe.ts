@@ -22,6 +22,7 @@ import { extrapolate, trackLayer, type TrackObject } from '../../render/tracks';
 import { bucketUrl } from '../../data/endpoints';
 import { fetchJson } from '../../data/http';
 import { defineLayer } from '../define';
+import { multiHas, multiValues } from '../multi';
 import type { InspectCard } from '../types';
 
 const COLOR = '#4fc3f7';
@@ -88,7 +89,7 @@ export default defineLayer({
   options: [
     { id: 'moving', label: 'Nur fahrende Schiffe', type: 'toggle', default: false },
     {
-      id: 'cls', label: 'Schiffstyp', type: 'select', default: 'all',
+      id: 'cls', label: 'Schiffstyp', type: 'multi', default: 'all',
       choices: [{ value: 'all', label: 'Alle' }, ...SHIP_CLASSES.map((c) => ({ value: c.id, label: c.label }))],
     },
   ],
@@ -192,11 +193,12 @@ export default defineLayer({
       const o = ctx.options.value;
       const clauses: unknown[] = [];
       if (o.moving) clauses.push(['get', 'moving']);
-      if (o.cls && o.cls !== 'all') clauses.push(['==', ['get', 'cls'], String(o.cls)]);
+      const cls = multiValues(o.cls);
+      if (cls) clauses.push(['in', ['get', 'cls'], ['literal', cls]]);
       return clauses.length ? (['all', ...clauses] as FilterSpecification) : undefined;
     });
     // the options as the 2D icons apply them (same as `filter`): one predicate for the count and the channel
-    const passes = (x: TrackObject, o = ctx.options.peek()) => (!o.moving || (x.props as unknown as ShipProps).moving) && (!o.cls || o.cls === 'all' || (x.props as { cls: string }).cls === o.cls);
+    const passes = (x: TrackObject, o = ctx.options.peek()) => (!o.moving || (x.props as unknown as ShipProps).moving) && multiHas(o.cls, (x.props as { cls: string }).cls);
     const count = computed(() => {
       const t = tracks.value;
       if (!t) return undefined;

@@ -16,6 +16,8 @@ export interface SourceRef {
 export type OptionSpec =
   | { id: string; label: string; type: 'range'; min: number; max: number; step: number; default: number; unit?: string }
   | { id: string; label: string; type: 'select'; choices: { value: string; label: string }[]; default: string }
+  /** Multiple choice (a filter): the value is 'all' or the chosen values joined by commas, see layers/multi.ts. `choices` starts with the entry 'all'. */
+  | { id: string; label: string; type: 'multi'; choices: { value: string; label: string }[]; default: string }
   | { id: string; label: string; type: 'toggle'; default: boolean };
 export type OptionValues = Record<string, number | string | boolean>;
 

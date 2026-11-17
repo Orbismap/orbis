@@ -13,6 +13,7 @@ import { vectorTileLayer } from '../../render/vectortiles';
 import { OIM_ATTRIBUTION, OIM_SOURCE, oimTiles } from '../../data/openinframap';
 import { OSM_PLANTS_MIN_ZOOM, OSM_SOURCES, describeOsmPlant, osmPlantFilter, osmPlantParts } from '../../data/oimPlants';
 import { defineLayer } from '../define';
+import { multiValues } from '../multi';
 
 const COLOR = '#F5B73D';
 
@@ -45,7 +46,7 @@ export default defineLayer({
   ],
   options: [
     {
-      id: 'fuel', label: 'Energieträger', type: 'select', default: 'all',
+      id: 'fuel', label: 'Energieträger', type: 'multi', default: 'all',
       choices: [{ value: 'all', label: 'Alle' }, ...FUEL_ORDER.map((k) => ({ value: k, label: FUELS[k].label })), { value: 'storage', label: 'Speicher (nur OpenStreetMap)' }],
     },
     { id: 'minMw', label: 'Mindestleistung', type: 'range', min: 0, max: 2000, step: 10, default: 0, unit: 'MW' },
@@ -108,10 +109,10 @@ export default defineLayer({
     // --- WRI
     const filter = computed<FilterSpecification>(() => {
       const o = ctx.options.value;
-      const fuel = String(o.fuel ?? 'all');
-      if (fuel === 'storage') return ['==', ['get', 'mw'], -1] as FilterSpecification; // WRI has no storage
+      const fuels = multiValues(o.fuel)?.filter((f) => f !== 'storage'); // WRI has no storage
+      if (fuels?.length === 0) return ['==', ['get', 'mw'], -1] as FilterSpecification;
       const parts: unknown[] = [['>=', ['get', 'mw'], Math.max(Number(o.minMw ?? 0), minMwAt(zoom.value))]];
-      if (fuel !== 'all') parts.push(['==', ['get', 'fuel'], fuel]);
+      if (fuels) parts.push(['in', ['get', 'fuel'], ['literal', fuels]]);
       // matches only count while the OSM plants are on the map: zoomed out below their zoom, WRI shows everything again
       if (zoom.value >= OSM_PLANTS_MIN_ZOOM && hiddenCount.value > 0) parts.push(['!', ['in', ['get', 'id'], ['literal', [...matcher.hidden]]]]);
       return ['all', ...parts] as FilterSpecification;
