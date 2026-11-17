@@ -29,7 +29,6 @@ function ImageMedia({ m, alt }: { m: MediaSpec; alt: string }) {
           <img
             src={withStamp(m.url, stamp)}
             alt={alt}
-            loading="lazy"
             referrerpolicy="no-referrer"
             style={{ display: state === 'ok' ? 'block' : 'none' }}
             onLoad={() => setState('ok')}
