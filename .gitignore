@@ -3,6 +3,9 @@ dist
 .env
 .env.local
 .env.*.local
+# local only: Claude preview config and private research reports
+.claude/launch.json
+reports/
 *.log
 .DS_Store
 .vite
