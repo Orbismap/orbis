@@ -1,21 +1,22 @@
 import { computed } from '@preact/signals';
-import { setLayerVisible } from '../../karten/store';
+import { setLayerVisible } from '../../karten/active';
+import { guardOf } from '../../karten/standard';
 import { getLayer } from '../../layers/registry';
-import { activeKarte, setActiveKarte } from '../../state/session';
+import { activeKarte } from '../../state/session';
 import { confirmWarning, settings, warningKey } from '../../state/settings';
-import { DEFAULT_KARTE_ID } from '../../karten/standard';
 
 export interface PendingWarning { key: string; title: string; text: string; cancel(): void }
 
-/** First unconfirmed content warning of the active Karte: the Karte itself, then its visible layers. */
+/** First unconfirmed content warning among the visible layers: the one of the Karte that holds them, then the layer's own. */
 export const pendingWarning = computed<PendingWarning | null>(() => {
   const k = activeKarte.value;
   const done = settings.value.confirmedWarnings;
-  if (k.sensitive && !done.includes(warningKey(k.sensitive)) && !done.includes(`karte:${k.id}`))
-    return { key: warningKey(k.sensitive), ...k.sensitive, cancel: () => setActiveKarte(DEFAULT_KARTE_ID) };
   for (const l of k.layers) {
     const def = l.visible ? getLayer(l.id) : undefined;
-    if (def?.sensitive && !done.includes(warningKey(def.sensitive)) && !done.includes(`layer:${def.id}`))
+    if (!def) continue;
+    const g = guardOf(k, def.id);
+    if (g && !done.includes(warningKey(g)) && !done.includes(`karte:${g.karteId}`)) return { key: warningKey(g), title: g.title, text: g.text, cancel: () => k.layers.forEach((x) => x.visible && guardOf(k, x.id)?.karteId === g.karteId && setLayerVisible(k.id, x.id, false)) };
+    if (def.sensitive && !done.includes(warningKey(def.sensitive)) && !done.includes(`layer:${def.id}`))
       return { key: warningKey(def.sensitive), ...def.sensitive, cancel: () => setLayerVisible(k.id, def.id, false) };
   }
   return null;

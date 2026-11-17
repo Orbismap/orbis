@@ -1,4 +1,6 @@
-// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&t=<iso>&b=<basemap>&g=1&f=flug:<hex>|schiff:<mmsi>&p=<lat>,<lng>,<name>,<region>[,<kind>]
+// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?l=<id>,<id>…&t=<iso>&g=1&f=flug:<hex>|schiff:<mmsi>&p=
+// (l = the active layers; k= (a standard Karte) and b= (basemap) are only read, from older links, and never written)
+// p=<lat>,<lng>,<name>,<region>[,<kind>]
 // (p = a searched place; name, region and kind are percent-encoded, so their commas do not split)
 import type { FollowRef } from '../ext/types';
 
@@ -83,9 +85,7 @@ export function serializeHash(s: UrlState): string {
     if (v.pitch) path += `,${Math.round(v.pitch)}p`;
   }
   const q: string[] = [];
-  if (s.karte) q.push(`k=${encodeURIComponent(s.karte)}`);
   if (s.layers) q.push(`l=${s.layers.map(encodeURIComponent).join(',')}`);
-  if (s.basemap) q.push(`b=${encodeURIComponent(s.basemap)}`);
   if (s.time !== undefined) q.push(`t=${new Date(s.time).toISOString().slice(0, 16)}Z`);
   if (s.globe !== undefined) q.push(`g=${s.globe ? 1 : 0}`);
   if (s.follow) q.push(`f=${s.follow.kind}:${encodeURIComponent(s.follow.id)}`);

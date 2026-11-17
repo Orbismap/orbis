@@ -1,6 +1,6 @@
 import { effect } from '@preact/signals';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { setBasemap } from '../../karten/store';
+import { setBasemap } from '../../karten/active';
 import { isWorldwide, loadRegional, regionalReady, type Bounds } from '../../map/basemaps/regional';
 import { activeKarte } from '../../state/session';
 import { camera, viewport } from '../../state/view';

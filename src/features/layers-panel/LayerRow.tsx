@@ -8,7 +8,7 @@ import { layerStatus } from '../../state/session';
 import { now } from '../../state/time';
 import { camera } from '../../state/view';
 import { hasKey } from '../../keys';
-import { setLayerVisible } from '../../karten/store';
+import { setLayerVisible } from '../../karten/active';
 import { useEscape } from '../../ui/hooks';
 import { OptionFields } from './LayerDetails';
 import { Icon } from '../../ui/icons/Icon';
@@ -32,13 +32,15 @@ export interface LayerRowProps {
   count?: number;
   onGrip?(e: PointerEvent): void;
   onKeyMove?(dir: -1 | 1): void;
+  /** Edit mode: takes the layer out of this Karte. */
+  onRemove?(): void;
 }
 
 /**
  * One layer: a click on the row toggles it (active rows get a background), the three dots open the settings
  * (detail page). The status sits small on the right.
  */
-export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGrip, onKeyMove }: LayerRowProps) {
+export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGrip, onKeyMove, onRemove }: LayerRowProps) {
   const raw = layer.visible ? layerStatus.value[def.id] : undefined;
   const st = rowStatus(raw, def.cadence, now.value);
   const needsKey = raw?.needsKey;
@@ -111,7 +113,12 @@ export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGr
           {!editing && <span class="lrow-opts">{optionSummary(def, layer)}</span>}
         </span>
         {/* one button per row: the filter (its popup ends in "Einstellungen") or, without options, the gear */}
-        {!editing && hasChoices(def) ? <FilterButton def={def} layer={layer} karteId={karteId} onSettings={openPage} /> : <SettingsButton def={def} onClick={openPage} />}
+        {editing && onRemove && (
+          <button type="button" class="lrow-set" aria-label={`${def.title} aus der Karte entfernen`} onClick={onRemove}>
+            <Icon name="minus" size={16} />
+          </button>
+        )}
+        {editing ? null : hasChoices(def) ? <FilterButton def={def} layer={layer} karteId={karteId} onSettings={openPage} /> : <SettingsButton def={def} onClick={openPage} />}
       </div>
       {st.state === 'loading' && <span class="lrow-strip" role="progressbar" aria-label={`${def.title} lädt`} />}
     </li>

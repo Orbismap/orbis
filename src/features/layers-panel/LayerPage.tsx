@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { formatCompact } from '../../core/format';
 import { CADENCE_LABEL } from '../catalog/fuzzy';
-import { setLayerVisible } from '../../karten/store';
+import { setLayerVisible } from '../../karten/active';
 import type { KarteLayer } from '../../karten/types';
 import type { LayerDef, OptionSpec } from '../../layers/types';
 import { layerStatus } from '../../state/session';

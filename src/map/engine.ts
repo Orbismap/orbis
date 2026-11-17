@@ -4,7 +4,7 @@ import type { CustomLayerInterface, LayerSpecification, SourceSpecification } fr
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { effect } from '@preact/signals';
 import { throttle } from '../core/scheduler';
-import { collapseKarteDetail } from '../state/hud';
+import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
@@ -112,7 +112,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
         engine.flyTo({ center: [lbl.lng, lbl.lat], zoom: Math.max(ml.getZoom(), lbl.zoom) });
         return;
       }
-      if (at) (clearSelection(), collapseKarteDetail());
+      if (at) (clearSelection(), closeKarteDetail());
       else setProbe(null);
     },
     (at) => {

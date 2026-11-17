@@ -1,5 +1,5 @@
 import { useRef, useState } from 'preact/hooks';
-import { setBasemap, setLabels, setTerminator } from '../../karten/store';
+import { setBasemap, setLabels, setTerminator } from '../../karten/active';
 import { BASEMAPS, BASEMAP_GROUPS } from '../../map/basemaps';
 import { activeKarte } from '../../state/session';
 import { Icon } from '../../ui/icons/Icon';

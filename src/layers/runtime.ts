@@ -10,6 +10,8 @@ import { clearLayerSession, activeKarte, setFeed, setLayerStatus, setLegend, act
 import { inspector, selectCard, selectPlace } from '../state/selection';
 import { isMobile } from '../state/ui';
 import { time, timeSources } from '../state/time';
+import { guardOf } from '../karten/standard';
+import { browsedKarte } from '../karten/active';
 import { getLayer } from './registry';
 import type { InspectCard, LayerContext, LayerDef, LayerHandle, LayerStatus, OptionSpec, OptionValues } from './types';
 
@@ -183,12 +185,12 @@ export function startRuntime(engine: MapEngine): () => void {
       const wanted: string[] = [];
       const exclusive = new Set<string>();
       const confirmed = settings.value.confirmedWarnings;
-      const karteBlocked = !!k.sensitive && !confirmed.includes(warningKey(k.sensitive)) && !confirmed.includes(`karte:${k.id}`);
       gated.clear();
       for (const l of k.layers) {
         const def = l.visible ? getLayer(l.id) : undefined;
         if (!def) continue;
-        if (karteBlocked) {
+        const guard = guardOf(k, def.id);
+        if (guard && !confirmed.includes(warningKey(guard)) && !confirmed.includes(`karte:${guard.karteId}`)) {
           gated.set(def.id, { state: 'empty', note: 'Bestätigung nötig', needsConfirm: true });
           continue;
         }
@@ -236,7 +238,7 @@ export function startRuntime(engine: MapEngine): () => void {
       const id = activeKarteId.value;
       if (id === lastKarte) return;
       lastKarte = id;
-      const v = untracked(() => activeKarte.value.view);
+      const v = untracked(() => browsedKarte.value.view);
       if (v) engine.flyTo({ center: v.center, zoom: v.zoom });
     }),
   );

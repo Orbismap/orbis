@@ -1,24 +1,15 @@
-// Session state: active Karte, status/legend/feed of the mounted layers.
-import { computed, effect, signal } from '@preact/signals';
-import { getJSON, setJSON } from '../core/storage';
-import { DEFAULT_KARTE_ID } from '../karten/standard';
-import { editKarte, karten } from '../karten/store';
-import type { Karte } from '../karten/types';
+// Session state: status/legend/feed of the mounted layers (and the active Karte, re-exported).
+import { signal } from '@preact/signals';
+import { activeKarte, activeKarteId, browsedKarte, editActive, initActive, openActive, openKarte, setActiveKarte } from '../karten/active';
 import type { FeedItem, LayerStatus, LegendSpec } from '../layers/types';
 
-export const activeKarteId = signal<string>(getJSON('active-karte', 1, (r) => (typeof r === 'string' ? r : undefined), DEFAULT_KARTE_ID));
-/** The active Karte including the user's draft; falls back to the first Karte if the id is unknown. */
-export const activeKarte = computed<Karte>(() => karten.value.find((k) => k.id === activeKarteId.value) ?? karten.value[0]!);
+// The active layers and the Karte derived from them live in karten/active.ts; re-exported here for the UI.
+export { activeKarte, activeKarteId, browsedKarte, editActive, openActive, openKarte, setActiveKarte };
 
 export const layerStatus = signal<Record<string, LayerStatus>>({});
 export const legends = signal<Record<string, LegendSpec>>({});
 export const feeds = signal<Record<string, FeedItem[]>>({});
 
-export const setActiveKarte = (id: string) => {
-  if (karten.peek().some((k) => k.id === id)) activeKarteId.value = id;
-};
-/** Edits the active Karte (draft for builtins). */
-export const editActive = (mutate: (k: Karte) => Karte) => editKarte(activeKarte.peek().id, mutate);
 
 // setters read with peek(): layers call them from inside effects, which must not subscribe to what they write
 export const setLayerStatus = (id: string, s: LayerStatus) => (layerStatus.value = { ...layerStatus.peek(), [id]: s });
@@ -36,4 +27,4 @@ export function clearLayerSession(id: string): void {
   feeds.value = f;
 }
 
-export const initSession = () => effect(() => void setJSON('active-karte', 1, activeKarteId.value));
+export const initSession = initActive;

@@ -335,8 +335,8 @@ export interface KeyDef {
 
 Eine **Karte** ist eine gespeicherte Zusammenstellung: Grundkarte, Projektion, geordnete Ebenen mit Deckkraft und
 Optionen, optional eine Startansicht. Standardkarten: *Wetter*, *Gefahren*, *Verkehr*, *Infrastruktur*,
-*Erde & Meer*. Nutzer ändern jede Karte frei (Änderung = Entwurf je Karte, „Zurücksetzen“ stellt den Standard her)
-und speichern eigene.
+*Erde & Meer*. Standardkarten sind ein fester Katalog (kein Speichern, keine andere Grundkarte); Nutzer legen eigene
+Karten an. Was auf der Karte liegt, ist allein die Liste der aktiven Ebenen (`karten/active.ts`).
 
 ```ts
 export interface KarteLayer { id: string; visible: boolean; opacity: number; options?: OptionValues }
@@ -350,7 +350,7 @@ export interface Karte {
 
 ### Karten: Ansichten und eigene Karten
 
-`karten/changes.ts` ist rein: `structuralSignature(karte, standard)`, `isModified`, `discardModifications`. Das „Universum“ einer Standardkarte sind ihre Standardebenen plus alle Ebenen ihrer Themen. Der Entwurf (`drafts[id]`) einer Standardkarte ist der still gemerkte Stand; `isDirty(id)` ist nur wahr, wenn er sich strukturell unterscheidet. Eigene Karten werden an Ort und Stelle geändert und sofort persistiert. Migration beim Laden (`validatePersisted`): Entwurf einer eigenen Karte wird ihr Stand, Entwürfe unbekannter Karten entfallen, Entwürfe von Standardkarten bleiben ganz (Umbau wird daraus erkannt). UI: `features/karten-bar/actions.tsx` (`KartenPopover`, `KartenChangeRow`), gemeinsam für Desktop und Mobil.
+`karten/active.ts` hält die Wahrheit: `activeIds` (geordnete Liste der aktiven Ebenen, obenauf zuerst; localStorage `active-layers`, Link `l=`) und `layerPrefs` (Deckkraft/Optionen je Ebene, nur lokal). Die gezeigte Karte (`activeKarte`) wird abgeleitet: die Standardkarte, deren „Universum“ (Standardebenen plus alle Ebenen ihrer Themen) die meisten aktiven Ebenen enthält (bei Gleichstand die geöffnete); liegt eine aktive Ebene in keiner Standardkarte, ist es die ungespeicherte Karte (`scratch`, „Als Karte sichern“ legt daraus eine eigene an). `browsedKarte` ist die im Menü geöffnete Karte (Standardkarte = Katalog mit Schaltern, nicht bearbeitbar); Grundkarte, Ortsnamen und Tag-Nacht-Linie gelten für Standard- und ungespeicherte Karte nur für die Sitzung. Nur eine geöffnete eigene Karte hat ihre eigene Ebenenliste (an Ort und Stelle geändert, sofort persistiert; `activeIds` spiegelt sie). UI: `features/karten-bar/actions.tsx` (`KartenPopover`, `KartenChangeRow` für die ungespeicherte Karte), gemeinsam für Desktop und Mobil. Der Link kennt nur `l=` (ältere `k=`/`b=` werden gelesen, nie geschrieben).
 
 ## Zustand (`src/state`)
 

@@ -1,6 +1,6 @@
 import { computed } from '@preact/signals';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { addLayer, removeLayer, setLayerVisible } from '../../karten/store';
+import { addLayer, removeLayer } from '../../karten/active';
 import { allLayers, layersByCategory } from '../../layers/registry';
 import type { LayerDef } from '../../layers/types';
 import { activeKarte } from '../../state/session';
@@ -23,16 +23,8 @@ const membership = computed(() => new Map(activeKarte.value.layers.map((l) => [l
 
 function toggle(def: LayerDef) {
   const k = activeKarte.peek();
-  const m = membership.peek().get(def.id);
-  if (m === undefined) {
-    // exclusive field layers replace the current one
-    if (def.exclusive) {
-      const byId = new Map(allLayers().map((d) => [d.id, d]));
-      for (const l of k.layers) if (l.id !== def.id && byId.get(l.id)?.exclusive === def.exclusive) removeLayer(k.id, l.id);
-    }
-    addLayer(k.id, def.id);
-  } else if (m) removeLayer(k.id, def.id);
-  else setLayerVisible(k.id, def.id, true);
+  if (membership.peek().get(def.id)) removeLayer(k.id, def.id);
+  else addLayer(k.id, def.id);
 }
 
 function KeyMark({ def }: { def: LayerDef }) {

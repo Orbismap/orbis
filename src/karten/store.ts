@@ -1,13 +1,12 @@
-// Karten: builtin + user Karten. Standard Karten are views: the user's state per Karte is a draft that is remembered
-// silently; only a rebuild counts as a change (changes.ts). User Karten are edited in place and saved automatically. Persisted in localStorage, validated on load.
+// Karten: builtin + own Karten. Standard Karten are a fixed catalog (see active.ts for what is on the map). Own Karten are
+// edited in place and saved automatically. Persisted in localStorage, validated on load.
 import { computed, effect, signal } from '@preact/signals';
 import { getJSON, setJSON } from '../core/storage';
 import { resolveBasemapId } from '../map/basemaps';
-import { getLayer, hasLayer } from '../layers/registry';
+import { hasLayer } from '../layers/registry';
 import type { OptionValues } from '../layers/types';
 import type { BasemapId } from '../map/types';
 import type { IconName } from '../ui/icons/names';
-import { discardModifications, isModified } from './changes';
 import { builtinKarten } from './standard';
 import type { Karte, KarteLayer } from './types';
 
@@ -48,97 +47,61 @@ export function validateKarte(raw: unknown, known: (id: string) => boolean = has
   };
 }
 
-interface Persisted { custom: Karte[]; drafts: Record<string, Karte> }
+interface Persisted { custom: Karte[] }
 const validatePersisted = (raw: unknown): Persisted | undefined => {
   if (!raw || typeof raw !== 'object') return undefined;
   const r = raw as Partial<Persisted>;
-  const custom = (Array.isArray(r.custom) ? r.custom : []).map((k) => validateKarte(k)).filter((k): k is Karte => !!k && !k.builtin);
-  const drafts: Record<string, Karte> = {};
-  for (const [id, k] of Object.entries(r.drafts ?? {})) {
-    const v = validateKarte(k);
-    if (v) drafts[id] = { ...v, id };
-  }
-  // migration: a draft of an own Karte is its state; drafts of unknown Karten are dropped. Drafts of standard Karten
-  // stay whole: what is structural counts as a change (see changes.ts), the rest is the silently remembered state.
   const std = new Set(builtinKarten().map((k) => k.id));
-  const merged = custom.map((k) => (drafts[k.id] && !std.has(k.id) ? { ...drafts[k.id]!, id: k.id, builtin: undefined } : k));
-  for (const id of Object.keys(drafts)) if (!std.has(id)) delete drafts[id];
-  return { custom: merged, drafts };
+  const custom = (Array.isArray(r.custom) ? r.custom : []).map((k) => validateKarte(k)).filter((k): k is Karte => !!k && !k.builtin && !std.has(k.id));
+  return { custom };
 };
 
-const loaded = getJSON<Persisted>('karten', VERSION, validatePersisted, { custom: [], drafts: {} });
-// One-time migration: layers that moved to another standard Karte are dropped from the remembered state of the old
-// one (otherwise they would stay there as a foreign layer). Done once, so adding them back by hand sticks.
-const MOVED: { id: string; from: string; layers: string[] }[] = [{ id: 'geld-zu-zeitzeugen', from: 'gesellschaft', layers: ['geldfluesse', 'ukraine-hilfe'] }];
-for (const m of MOVED) {
-  const done = getJSON<boolean>(`karten-moved-${m.id}`, 1, (r) => (r === true ? true : undefined), false);
-  if (done) continue;
-  const d = loaded.drafts[m.from];
-  if (d) loaded.drafts[m.from] = { ...d, layers: d.layers.filter((l) => !m.layers.includes(l.id)) };
-  setJSON(`karten-moved-${m.id}`, 1, true);
-}
+const loaded = getJSON<Persisted>('karten', VERSION, validatePersisted, { custom: [] });
 export const customKarten = signal<Karte[]>(loaded.custom);
-export const drafts = signal<Record<string, Karte>>(loaded.drafts);
 const builtins = computed(() => builtinKarten());
 
-/** All Karten as the user sees them: builtins (with draft) first, then own Karten. */
-// Themes always come from the code, never from a draft.
-export const karten = computed<Karte[]>(() => [...builtins.value.map((k) => (drafts.value[k.id] ? { ...drafts.value[k.id]!, themes: k.themes } : k)), ...customKarten.value]);
-/** The Karten the user may pick: all except hidden ones (the plain start map). */
-export const listedKarten = computed<Karte[]>(() => karten.value.filter((k) => !k.hidden));
+/** All Karten: the standard Karten first, then own Karten. */
+export const karten = computed<Karte[]>(() => [...builtins.value, ...customKarten.value]);
+/** Own order of the Karten (standard and own), set in the main menu. Ids not in it keep their default place at the end. */
+export const karteOrder = signal<string[]>(getJSON('karten-order', 1, (r) => (Array.isArray(r) ? r.filter((x): x is string => typeof x === 'string') : undefined), []));
+/** The Karten the user may pick, in the user's order: all except hidden ones (the plain start map). */
+export const listedKarten = computed<Karte[]>(() => {
+  const all = karten.value.filter((k) => !k.hidden);
+  const rank = (id: string) => {
+    const i = karteOrder.value.indexOf(id);
+    return i < 0 ? Infinity : i;
+  };
+  return all.map((k, i) => ({ k, i })).sort((a, b) => rank(a.k.id) - rank(b.k.id) || a.i - b.i).map((x) => x.k);
+});
+/** Moves a Karte to index `to` of the list. */
+export function moveKarteTo(id: string, to: number): void {
+  const ids = listedKarten.peek().map((k) => k.id);
+  const at = ids.indexOf(id);
+  if (at < 0) return;
+  ids.splice(Math.max(0, Math.min(ids.length - 1, to)), 0, ids.splice(at, 1)[0]!);
+  karteOrder.value = ids;
+}
 export const getKarte = (id: string): Karte | undefined => karten.value.find((k) => k.id === id);
 export const isBuiltin = (id: string) => builtins.value.some((k) => k.id === id);
-/** True only for a standard Karte that was really rebuilt (not for silently remembered switches). Own Karten never. */
-export const isDirty = (id: string): boolean => {
-  const d = drafts.value[id];
-  const std = d && builtins.value.find((k) => k.id === id);
-  return !!d && !!std && isModified(d, std);
-};
-const standardOf = (id: string) => builtins.peek().find((k) => k.id === id);
 
-/** Persists changes; call once at start. */
+/** Persists own Karten; call once at start. */
 export function initKartenStore(): () => void {
-  return effect(() => {
-    const strip = ({ themes: _t, ...k }: Karte): Karte => k;
-    setJSON('karten', VERSION, { custom: customKarten.value.map(strip), drafts: Object.fromEntries(Object.entries(drafts.value).map(([id, k]) => [id, strip(k)])) } satisfies Persisted);
-  });
+  return effect(() => void setJSON('karten', VERSION, { custom: customKarten.value } satisfies Persisted));
 }
 
-/** Applies an edit: drafts for builtin Karten, in place for own Karten. */
+/** Applies an edit to an own Karte (standard Karten cannot be edited). */
 export function editKarte(id: string, mutate: (k: Karte) => Karte): void {
-  const cur = karten.peek().find((k) => k.id === id);
-  if (!cur) return;
-  const next = mutate(cur);
-  if (builtins.peek().some((k) => k.id === id)) drafts.value = { ...drafts.peek(), [id]: next };
-  else customKarten.value = customKarten.peek().map((k) => (k.id === id ? next : k));
+  customKarten.value = customKarten.peek().map((k) => (k.id === id ? mutate(k) : k));
 }
 
-/** Restores the start view of a standard Karte, including everything remembered silently. */
-export function resetKarte(id: string): void {
-  const { [id]: _drop, ...rest } = drafts.peek();
-  drafts.value = rest;
-}
-
-/** Removes only the rebuild of a standard Karte. Returns the previous draft for undo. */
-export function discardChanges(id: string): Karte | undefined {
-  const d = drafts.peek()[id];
-  const std = standardOf(id);
-  if (!d || !std) return undefined;
-  drafts.value = { ...drafts.peek(), [id]: discardModifications(d, std) };
-  return d;
-}
-/** Puts a draft back (undo of discard/reset); undefined removes it. */
-export function restoreDraft(id: string, draft: Karte | undefined): void {
-  if (draft) drafts.value = { ...drafts.peek(), [id]: draft };
-  else resetKarte(id);
-}
+const newId = () => `k-${Math.random().toString(36).slice(2, 8)}`;
 
 /** Creates an empty own Karte and returns its id. */
 export function createKarte(): string {
   const taken = new Set(karten.peek().map((k) => k.name));
   let name = 'Neue Karte';
   for (let n = 2; taken.has(name); n++) name = `Neue Karte ${n}`;
-  const id = `k-${Math.random().toString(36).slice(2, 8)}`;
+  const id = newId();
   customKarten.value = [...customKarten.peek(), { id, name, icon: 'pin', color: '#A58BFF', basemap: 'orbis-dark', labels: true, terminator: false, layers: [] }];
   return id;
 }
@@ -146,57 +109,15 @@ export function createKarte(): string {
 export const updateKarteMeta = (id: string, meta: { name?: string; icon?: IconName; color?: string }) =>
   !isBuiltin(id) && editKarte(id, (k) => ({ ...k, ...(meta.name?.trim() ? { name: meta.name.trim() } : {}), ...(meta.icon ? { icon: meta.icon } : {}), ...(meta.color ? { color: meta.color } : {}) }));
 
-/** Saves the current state of a Karte as a new own Karte and returns its id. */
-export function saveAs(id: string, name: string, meta: { icon?: IconName; color?: string } = {}): string | undefined {
-  const src = karten.peek().find((k) => k.id === id);
-  if (!src) return undefined;
-  const newId = `k-${Math.random().toString(36).slice(2, 8)}`;
-  customKarten.value = [...customKarten.peek(), { ...structuredClone({ ...src, themes: undefined }), id: newId, name: name.trim() || `${src.name} (Kopie)`, builtin: undefined, ...(meta.icon ? { icon: meta.icon } : {}), ...(meta.color ? { color: meta.color } : {}) }];
-  return newId;
+/** Saves `src` (an own Karte, or what the scratch Karte currently shows) as a new own Karte and returns its id. */
+export function saveAs(src: Karte, name: string, meta: { icon?: IconName; color?: string } = {}): string {
+  const id = newId();
+  const layers = src.layers.map((l) => ({ ...l }));
+  customKarten.value = [...customKarten.peek(), { ...structuredClone({ ...src, themes: undefined, sensitive: undefined, layers }), id, name: name.trim() || `${src.name} (Kopie)`, builtin: undefined, hidden: undefined, ...(meta.icon ? { icon: meta.icon } : {}), ...(meta.color ? { color: meta.color } : {}) }];
+  return id;
 }
 
 export function deleteKarte(id: string): void {
-  if (!builtins.peek().some((k) => k.id === id)) customKarten.value = customKarten.peek().filter((k) => k.id !== id);
+  if (!isBuiltin(id)) customKarten.value = customKarten.peek().filter((k) => k.id !== id);
 }
 export const renameKarte = (id: string, name: string) => !isBuiltin(id) && editKarte(id, (k) => ({ ...k, name: name.trim() || k.name }));
-
-// ---- layer edits ------------------------------------------------------------
-
-/** Applies `fn` to one layer; a layer that is not in the Karte yet (topic rows) is added hidden first. */
-const mapLayer = (k: Karte, layerId: string, fn: (l: KarteLayer) => KarteLayer): Karte => {
-  const base = k.layers.some((l) => l.id === layerId) ? k.layers : [{ id: layerId, visible: false, opacity: 1 }, ...k.layers];
-  return { ...k, layers: base.map((l) => (l.id === layerId ? fn(l) : l)) };
-};
-
-/** Switches a layer on/off. Switching on a field layer switches other field layers off (exclusive). */
-export function setLayerVisible(karteId: string, layerId: string, visible: boolean): void {
-  editKarte(karteId, (k) => {
-    const exists = k.layers.some((l) => l.id === layerId);
-    let layers = exists ? k.layers : visible ? [{ id: layerId, visible, opacity: 1 }, ...k.layers] : k.layers;
-    layers = layers.map((l) => (l.id === layerId ? { ...l, visible } : l));
-    if (visible && getLayer(layerId)?.exclusive) {
-      const ex = getLayer(layerId)!.exclusive;
-      layers = layers.map((l) => (l.id !== layerId && l.visible && getLayer(l.id)?.exclusive === ex ? { ...l, visible: false } : l));
-    }
-    return { ...k, layers };
-  });
-}
-export const addLayer = (karteId: string, layerId: string) => setLayerVisible(karteId, layerId, true);
-export const removeLayer = (karteId: string, layerId: string) => editKarte(karteId, (k) => ({ ...k, layers: k.layers.filter((l) => l.id !== layerId) }));
-export const setLayerOpacity = (karteId: string, layerId: string, opacity: number) => editKarte(karteId, (k) => mapLayer(k, layerId, (l) => ({ ...l, opacity: clamp01(opacity) })));
-export const setLayerOption = (karteId: string, layerId: string, option: string, value: number | string | boolean) =>
-  editKarte(karteId, (k) => mapLayer(k, layerId, (l) => ({ ...l, options: { ...l.options, [option]: value } })));
-/** Moves a layer to index `to` (0 = top of the stack). */
-export function moveLayer(karteId: string, layerId: string, to: number): void {
-  editKarte(karteId, (k) => {
-    const from = k.layers.findIndex((l) => l.id === layerId);
-    if (from < 0) return k;
-    const layers = [...k.layers];
-    const [item] = layers.splice(from, 1);
-    layers.splice(Math.max(0, Math.min(layers.length, to)), 0, item!);
-    return { ...k, layers };
-  });
-}
-export const setBasemap = (karteId: string, basemap: BasemapId) => editKarte(karteId, (k) => ({ ...k, basemap }));
-export const setLabels = (karteId: string, labels: boolean) => editKarte(karteId, (k) => ({ ...k, labels }));
-export const setTerminator = (karteId: string, terminator: boolean) => editKarte(karteId, (k) => ({ ...k, terminator }));

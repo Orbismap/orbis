@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { cx } from '../../ui/hooks';
-import { moveLayer, setLayerVisible } from '../../karten/store';
+import { moveLayer, removeLayer, setLayerVisible } from '../../karten/active';
 import type { Karte, KarteLayer } from '../../karten/types';
 import { getLayer } from '../../layers/registry';
 import type { LayerDef } from '../../layers/types';
-import { activeKarte } from '../../state/session';
+import { browsedKarte } from '../../state/session';
+import { builtinKarten, universeOf } from '../../karten/standard';
 import { isMobile, leftView } from '../../state/ui';
 import { Icon } from '../../ui/icons/Icon';
 import { useFlip } from './flip';
@@ -36,6 +37,13 @@ interface Group { id: string; title?: string; ids: string[] }
 
 const OTHER = '_other';
 
+/** A standard Karte lists only the layers of its own topics (other active layers are shown in the main menu); own and unsaved Karten list all. */
+const inKarte = (k: Karte) => {
+  if (!k.builtin) return () => true;
+  const u = universeOf(builtinKarten().find((x) => x.id === k.id) ?? k);
+  return (id: string) => u.has(id);
+};
+
 /** Groups of the menu: the Karte's themes (own order applied), plus the layers that belong to no theme. */
 function buildGroups(k: Karte): Group[] {
   const saved = menuOrder.value[k.id];
@@ -47,7 +55,8 @@ function buildGroups(k: Karte): Group[] {
   const groups: Group[] = (k.themes ?? [])
     .map((t) => ({ id: t.id, title: t.title, ids: applyOrder(t.layers.filter((id) => usable(id) && !seen.has(id) && seen.add(id)), saved?.layers?.[t.id]) }))
     .filter((g) => g.ids.length);
-  const rest = k.layers.filter((l) => usable(l.id) && !seen.has(l.id)).map((l) => l.id);
+  const mine = inKarte(k);
+  const rest = [...new Set([...k.layers.filter((l) => usable(l.id) && !seen.has(l.id) && mine(l.id)).map((l) => l.id)])];
   if (rest.length) groups.push({ id: OTHER, title: groups.length ? 'Weitere' : undefined, ids: rest });
   return applyOrder(groups.map((g) => g.id), saved?.groups).map((id) => groups.find((g) => g.id === id)!);
 }
@@ -56,7 +65,7 @@ function buildGroups(k: Karte): Group[] {
 function GroupBlock({ karte, group, index, count, onGrip }: { karte: Karte; group: Group; index: number; count: number; onGrip?: (e: PointerEvent) => void }) {
   const list = useRef<HTMLUListElement>(null);
   const flipPrev = useFlip(list);
-  const edit = editMode.value;
+  const edit = editMode.value && !karte.builtin;
   const ids = group.ids;
   const move = (id: string, to: number) => {
     if (group.id === OTHER) moveLayer(karte.id, id, karte.layers.findIndex((x) => x.id === ids[to]));
@@ -93,6 +102,7 @@ function GroupBlock({ karte, group, index, count, onGrip }: { karte: Karte; grou
               count={ids.length}
               onGrip={edit ? (e) => startRowDrag(e, id, { list, flipPrev, onDrop: (key, to) => move(key, to) }) : undefined}
               onKeyMove={edit ? (dir) => i + dir >= 0 && i + dir < ids.length && move(id, i + dir) : undefined}
+              onRemove={edit ? () => removeLayer(karte.id, id) : undefined}
             />
           );
         })}
@@ -194,7 +204,7 @@ function FieldSection({ karte, fields }: { karte: Karte; fields: LayerDef[] }) {
 
 /** Left menu of the active Karte: active layers, suggestions from its themes, catalog entry, detail page (push). */
 export function LayersList() {
-  const k = activeKarte.value;
+  const k = browsedKarte.value;
   const detail = detailPage.value;
   const root = useRef<HTMLDivElement>(null);
   const was = useRef<string | null>(null);
@@ -221,12 +231,21 @@ export function LayersList() {
     );
   }
 
-  const fieldIds = [...new Set([...(k.themes ?? []).flatMap((t) => t.layers), ...k.layers.map((l) => l.id)])];
+  const mine = inKarte(k);
+  const fieldIds = [...new Set([...(k.themes ?? []).flatMap((t) => t.layers), ...k.layers.map((l) => l.id)])].filter(mine);
   const fields = fieldIds.map((id) => getLayer(id)).filter((d): d is LayerDef => isField(d));
   return (
     <div class="lnav" ref={root} onKeyDown={navKey} key="list">
       <MenuSection karte={k} groups={buildGroups(k)} />
       <FieldSection karte={k} fields={fields} />
+      {editMode.value && !k.builtin && !isMobile.value && (
+        <button type="button" class="ladd" data-nav onClick={() => (leftView.value = 'catalog')}>
+          <span class="lrow-badge ladd-badge" aria-hidden="true">
+            <Icon name="plus" size={16} />
+          </span>
+          <span class="ladd-text">Ebene hinzufügen</span>
+        </button>
+      )}
       {isMobile.value && (
       <section class="lsec">
         <h3 class="lsec-title">Alle Ebenen</h3>

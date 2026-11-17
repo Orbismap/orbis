@@ -111,3 +111,23 @@ export const builtinKarten = (): Karte[] =>
     themes: k.themes?.map((t) => ({ ...t, layers: t.layers.filter(hasLayer) })).filter((t) => t.layers.length),
   }));
 export const DEFAULT_KARTE_ID = 'start';
+
+/** Ids a standard Karte owns: its default layers and every layer of its topics. */
+export const universeOf = (k: Karte): Set<string> => new Set([...k.layers.map((l) => l.id), ...(k.themes ?? []).flatMap((t) => t.layers)]);
+
+/** Layers that appear in any standard Karte (the plain start map has none). */
+export const standardLayerIds = (): Set<string> => new Set(builtinKarten().flatMap((k) => [...universeOf(k)]));
+
+/** The content warning that guards a layer: set when it only appears in sensitive standard Karten. */
+export function sensitiveOfLayer(layerId: string): { karteId: string; title: string; text: string } | undefined {
+  const holders = builtinKarten().filter((k) => universeOf(k).has(layerId));
+  if (!holders.length || holders.some((k) => !k.sensitive)) return undefined;
+  const k = holders[0]!;
+  return { karteId: k.id, ...k.sensitive! };
+}
+
+/** The Karte-level content warning that applies to `layerId` while `k` is shown: an own Karte's own, else the one of a standard Karte only holding it. */
+export function guardOf(k: Karte, layerId: string): { karteId: string; title: string; text: string } | undefined {
+  if (!k.builtin) return k.sensitive ? { karteId: k.id, ...k.sensitive } : undefined;
+  return sensitiveOfLayer(layerId);
+}

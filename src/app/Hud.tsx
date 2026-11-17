@@ -9,18 +9,18 @@ import { flyToPoint } from '../features/shared/map';
 import { openDetail } from '../features/layers-panel/themes-state';
 import { selectCard, setProbe } from '../state/selection';
 import { InspectorCard } from '../features/inspector/Inspector';
-import { KartenChangeRow, KartenPopover } from '../features/karten-bar/actions';
+import { KartenChangeRow, KartenPopover, NameForm, saveAsKarte } from '../features/karten-bar/actions';
 import { detailPage, editMode } from '../features/layers-panel/themes-state';
 import { PlaceCard } from '../features/place/PlaceCard';
 import { ProbeCard } from '../features/probe/ProbeCard';
 import '../features/karten-bar/karten-bar.css';
-import type { Karte } from '../karten/types';
-import { createKarte, isDirty, karten, listedKarten } from '../karten/store';
+import { SCRATCH_ID, activeIds, openActive, openKarte, setActiveIds, setLayerVisible } from '../karten/active';
+import { createKarte, karten, listedKarten, moveKarteTo } from '../karten/store';
 import { clearSelection, inspector, place, probe, selectPlace } from '../state/selection';
-import { activeKarte, setActiveKarte } from '../state/session';
+import { activeKarte, browsedKarte } from '../state/session';
 import { RoutePanel } from '../features/routes/RoutePanel';
 import { SavedPlaces } from '../features/routes/SavedPlaces';
-import { closeKarteDetail, collapseKarteDetail, orteView, collapsedKarten, dismissKarte, expandKarte, detailOpen, detailVisible, hudSearchFocus, HUD_DETAIL_W, HUD_GAP, HUD_MAIN_DEFAULT, hudMainWidth, setHudMainWidth } from '../state/hud';
+import { closeKarteDetail, orteView, detailOpen, detailVisible, hudSearchFocus, HUD_DETAIL_W, HUD_GAP, HUD_MAIN_DEFAULT, hudMainWidth, setHudMainWidth } from '../state/hud';
 import { leftPanelOpen, leftView } from '../state/ui';
 import { Button, IconButton } from '../ui/Button';
 import { SettingsView } from '../features/settings/Settings';
@@ -30,7 +30,9 @@ import { Icon } from '../ui/icons/Icon';
 import { Panel } from '../ui/Panel';
 import { ScrollArea } from '../ui/ScrollArea';
 import { flyToPlace } from '../features/search/results';
-import { Popover } from '../ui/Popover';
+import { useFlip } from '../features/layers-panel/flip';
+import { startRowDrag } from '../features/layers-panel/reorder';
+import { MenuItem, Popover } from '../ui/Popover';
 import { OrbisMark } from '../ui/brand/OrbisMark';
 import { Catalog } from '../features/catalog/Catalog';
 import { LeftBody } from './LeftBody';
@@ -41,8 +43,18 @@ function pickKarte(id: string) {
   clearSelection();
   orteView.value = null;
   leftView.value = 'layers';
-  setActiveKarte(id);
+  openKarte(id);
   detailOpen.value = true;
+}
+
+/** Click on an active layer in the main menu: opens its page in the detail menu. */
+function openActiveLayer(layerId: string) {
+  clearSelection();
+  orteView.value = null;
+  leftView.value = 'layers';
+  openActive();
+  detailOpen.value = true;
+  openDetail(activeKarte.peek().id, layerId, 'Karte');
 }
 
 const FILTERS: { id: HistoryKind; label: string }[] = [
@@ -54,8 +66,9 @@ const FILTERS: { id: HistoryKind; label: string }[] = [
 
 function openEntry(e: HistoryEntry) {
   if (e.kind === 'layer' && e.layerId) {
-    pickKarte(e.karteId && karten.peek().some((k) => k.id === e.karteId) ? e.karteId : activeKarte.peek().id);
-    openDetail(activeKarte.peek().id, e.layerId, 'Karte');
+    const id = e.karteId && karten.peek().some((k) => k.id === e.karteId) ? e.karteId : activeKarte.peek().id;
+    pickKarte(id);
+    openDetail(id, e.layerId, 'Karte');
   } else if (e.kind === 'object' && e.layerId && e.card) {
     selectCard(e.layerId, e.card);
     if (e.lng !== undefined && e.lat !== undefined) flyToPoint(e.lng, e.lat, 9);
@@ -131,13 +144,87 @@ function Recents() {
   );
 }
 
+/** Section heading with a small options button (settings icon) and its menu. `children` gets `close` and `form` (true: the popup holds a form, not menu items). */
+function SectHead({ title, label, children }: { title: string; label: string; children(api: { close(): void; form(on: boolean): void; formOn: boolean }): preact.ComponentChildren }) {
+  const [open, setOpen] = useState(false);
+  const [formOn, setForm] = useState(false);
+  const anchor = useRef<HTMLDivElement>(null);
+  const menuEl = useRef<HTMLDivElement>(null);
+  const both = { get current() { return { contains: (n: Node) => !!(anchor.current?.contains(n) || menuEl.current?.contains(n)) } as HTMLElement; } };
+  const r = open ? anchor.current?.getBoundingClientRect() : undefined;
+  const close = () => (setOpen(false), setForm(false));
+  return (
+    <div class="hud-secthead">
+      <h2 class="hud-sect">{title}</h2>
+      <div class="hud-filter" ref={anchor}>
+        <button type="button" class="hud-filterbtn hud-optbtn" aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => (open ? close() : setOpen(true))}>
+          <Icon name="sliders" size={14} />
+        </button>
+        {r &&
+          createPortal(
+            <div ref={menuEl} class="hud-filterwrap" style={{ top: `${r.bottom + 6}px`, right: `${window.innerWidth - r.right}px` }}>
+              <Popover open={open} onClose={close} align="end" label={label} anchorRef={both} menu={!formOn} class="hud-filtermenu">
+                {children({ close, form: setForm, formOn })}
+              </Popover>
+            </div>,
+            document.body,
+          )}
+      </div>
+    </div>
+  );
+}
+
+/** "Aktive Ebenen": options menu (save the active layers as an own Karte, switch all off). */
+function ActiveHead() {
+  return (
+    <SectHead title="Aktive Ebenen" label="Optionen für aktive Ebenen">
+      {({ close, form, formOn }) =>
+        formOn ? (
+          <NameForm
+            initial="Neue Karte"
+            icon="pin"
+            color="#A58BFF"
+            action="Sichern"
+            onCancel={() => form(false)}
+            onSubmit={(v) => {
+              const k = activeKarte.peek();
+              saveAsKarte({ ...k, layers: k.layers.filter((l) => l.visible) }, v);
+              close();
+            }}
+          />
+        ) : (
+          <>
+            <MenuItem icon="plus" onClick={() => form(true)}>
+              Als Karte sichern
+            </MenuItem>
+            <MenuItem
+              icon="eye-off"
+              onClick={() => {
+                setActiveIds([]);
+                close();
+              }}
+            >
+              Alle ausschalten
+            </MenuItem>
+          </>
+        )
+      }
+    </SectHead>
+  );
+}
+
 const KARTEN_SHOWN = 5;
 
 /** Main menu: search and the list of Karten. */
 function MainPanel() {
   const all = listedKarten.value;
-  const active = activeKarte.value;
+  const active = browsedKarte.value;
+  const working = activeKarte.value;
+  const activeLayers = activeIds.value;
   const [more, setMore] = useState(false);
+  const [sorting, setSorting] = useState(false);
+  const kList = useRef<HTMLUListElement>(null);
+  const flipPrev = useFlip(kList);
   const [q, setQ] = useState('');
   const [sel, setActive] = useState(0);
   const [popOpen, setPopOpen] = useState(false);
@@ -202,7 +289,7 @@ function MainPanel() {
     );
   });
   // the first five stay visible; the rest and "Neue Karte" sit behind "Mehr anzeigen"
-  const expanded = more;
+  const expanded = more || sorting;
   const list = expanded ? all : all.slice(0, KARTEN_SHOWN);
   const showing = detailVisible.value && leftView.value !== 'settings' && !inspector.value && !probe.value && !orteView.value;
   return (
@@ -267,17 +354,60 @@ function MainPanel() {
             </li>
           ))}
         </ul>
-        <h2 class="hud-sect">Karten</h2>
-        <ul class="hud-rows" role="list" aria-label="Karten">
-          {list.map((k) => (
-            <li key={k.id}>
-              <button type="button" class="hud-row" aria-current={showing && k.id === active.id ? 'true' : undefined} onClick={() => pickKarte(k.id)}>
+        {activeLayers.length > 0 && (
+          <>
+            <ActiveHead />
+            <ul class="hud-rows" role="list" aria-label="Aktive Ebenen">
+              {activeLayers.map((id) => {
+                const def = getLayer(id);
+                if (!def) return null;
+                return (
+                  <li key={id} class="hud-arow">
+                    <button type="button" class="hud-row" aria-current={showing && detailPage.value?.layerId === id ? 'true' : undefined} onClick={() => openActiveLayer(id)}>
+                      <span class="hud-badge" style={{ color: def.color }}>
+                        <Icon name={def.icon} size={18} />
+                      </span>
+                      <span class="hud-rt">{def.title}</span>
+                    </button>
+                    <button type="button" class="hud-rowx" aria-label={`${def.title} ausschalten`} onClick={() => setLayerVisible(working.id, id, false)}>
+                      <Icon name="close" size={13} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+        <div class="hud-secthead">
+          <h2 class="hud-sect">Karten</h2>
+          <div class="hud-filter">
+            <button type="button" class="hud-filterbtn hud-optbtn" data-on={sorting} aria-pressed={sorting} aria-label={sorting ? 'Anordnung speichern' : 'Karten anordnen'} onClick={() => setSorting(!sorting)}>
+              <span class="hud-optico" aria-hidden="true">
+                <Icon name="sliders" size={14} class="hud-ico-a" />
+                <Icon name="check" size={14} class="hud-ico-b" />
+              </span>
+              <span class="hud-optlabel" aria-hidden="true">
+                <span>Speichern</span>
+              </span>
+            </button>
+          </div>
+        </div>
+        <ul class="hud-rows" role="list" aria-label="Karten" ref={kList}>
+          {(working.id === SCRATCH_ID ? [working, ...list] : list).map((k) => (
+            <li key={k.id} data-key={k.id === SCRATCH_ID ? undefined : k.id}>
+              <div class={cx('hud-arow', sorting && k.id !== SCRATCH_ID && 'is-sortable')} onPointerDown={sorting && k.id !== SCRATCH_ID ? (e) => startRowDrag(e, k.id, { list: kList, flipPrev, onDrop: moveKarteTo }) : undefined}>
+              {k.id !== SCRATCH_ID && (
+                <span class="hud-grip-row" data-on={sorting} aria-hidden="true">
+                  <Icon name="grip" size={16} />
+                </span>
+              )}
+              <button type="button" class="hud-row" aria-current={showing && k.id === active.id ? 'true' : undefined} onClick={() => (sorting ? undefined : pickKarte(k.id))}>
                 <span class="hud-badge">
                   <Icon name={k.icon} size={18} />
                 </span>
                 <span class="hud-rt">{k.name}</span>
-                {isDirty(k.id) && <span class="kbar-dirty" role="img" aria-label="geändert" />}
               </button>
+              </div>
             </li>
           ))}
           {expanded && (
@@ -288,7 +418,7 @@ function MainPanel() {
               onClick={() => {
                 clearSelection();
                 leftView.value = 'layers';
-                setActiveKarte(createKarte());
+                openKarte(createKarte());
                 detailOpen.value = true;
               }}
             >
@@ -340,9 +470,10 @@ function Grip() {
   );
 }
 
-/** Floating capsule at the bottom of the Karte detail: add a layer, reorder (pencil), Karte actions. */
+/** Floating capsule at the bottom of the Karte detail: add a layer, edit layers and order (pencil), actions of an own Karte. */
 function BottomBar() {
-  const k = activeKarte.value;
+  const k = browsedKarte.value;
+  const own = !k.builtin && k.id !== SCRATCH_ID;
   const [menu, setMenu] = useState(false);
   const bar = useRef<HTMLDivElement>(null);
   return (
@@ -351,9 +482,9 @@ function BottomBar() {
         {menu && <KartenPopover key={k.id} open onClose={() => setMenu(false)} anchor={bar} only={k.id} up align="start" class="hud-fmenu" />}
       </div>
       <div class="hudd-fbar" ref={bar} role="group" aria-label="Karte">
-        <IconButton icon="plus-square" size={21} label="Ebene hinzufügen" onClick={() => ((setMenu(false)), (leftView.value = 'catalog'))} />
+        {<IconButton icon="plus-square" size={21} label="Ebene hinzufügen" onClick={() => ((setMenu(false)), (leftView.value = 'catalog'))} />}
         <IconButton icon="pencil" size={21} label="Reihenfolge bearbeiten" pressed={editMode.value} onClick={() => (editMode.value = !editMode.value)} />
-        <IconButton icon="more" size={21} label="Karte bearbeiten" pressed={menu} onClick={() => setMenu(!menu)} />
+        {own && <IconButton icon="more" size={21} label="Karte bearbeiten" pressed={menu} onClick={() => setMenu(!menu)} />}
       </div>
     </>
   );
@@ -365,7 +496,7 @@ function DetailPanel() {
   if (orteView.value === 'places') return <SavedPlaces />;
   const sel = inspector.value;
   const p = probe.value;
-  const k = activeKarte.value;
+  const k = browsedKarte.value;
 
   if (sel || p) {
     return (
@@ -383,7 +514,6 @@ function DetailPanel() {
         <header class="hudd-head">
           <h2>{k.name}</h2>
           <span class="hudd-btns">
-            <IconButton icon="chevron-up" label="Einklappen" class="hud-rbtn" onClick={collapseKarteDetail} />
             <IconButton icon="close" label="Schließen" shortcut="Esc" class="hud-rbtn" onClick={closeKarteDetail} />
           </span>
         </header>
@@ -392,52 +522,7 @@ function DetailPanel() {
       <div class="lcontent">
         <LeftBody view="layers" />
       </div>
-      {!pushed && <BottomBar />}
-    </Panel>
-  );
-}
-
-/** Folded Karte: title, number of active layers, buttons to unfold and to close (layers off). */
-function CollapsedCard({ k }: { k: Karte }) {
-  const names = k.layers.filter((l) => l.visible).map((l) => getLayer(l.id)?.title ?? l.id);
-  const list = useRef<HTMLUListElement>(null);
-  const [hidden, setHidden] = useState(0);
-  const shownN = useRef(0); // keeps the number while the chip fades out
-  if (hidden > 0) shownN.current = hidden;
-  // chips that are not fully visible yet: shown as "+n" at the right end
-  useEffect(() => {
-    const el = list.current;
-    if (!el) return;
-    const measure = () => {
-      const edge = el.getBoundingClientRect().right;
-      // the "+n" chip counts the chips that are still completely out of view; it fades out as soon as the last one shows
-      setHidden([...el.children].filter((c) => c.getBoundingClientRect().left >= edge - 1).length);
-    };
-    measure();
-    el.addEventListener('scroll', measure, { passive: true });
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => (el.removeEventListener('scroll', measure), ro.disconnect());
-  }, [names.join('|')]);
-  return (
-    <Panel as="section" class="hudk" aria-label={k.name}>
-      <header class="hudk-head">
-        <h2>{k.name}</h2>
-        <IconButton icon="chevron-down" label="Ausklappen" class="hud-rbtn" onClick={() => expandKarte(k.id)} />
-        <IconButton icon="close" label="Schließen" class="hud-rbtn" onClick={() => dismissKarte(k.id)} />
-      </header>
-      <div class="hudk-wrap">
-        <ul class="hudk-list" aria-label="Aktive Ebenen" tabIndex={0} ref={list}>
-          {names.map((n, i) => (
-            <li key={i}>{n}</li>
-          ))}
-        </ul>
-        {shownN.current > 0 && (
-          <span class="hudk-more" data-on={hidden > 0} aria-hidden="true">
-            +{shownN.current}
-          </span>
-        )}
-      </div>
+      {!pushed && !k.builtin && <BottomBar />}
     </Panel>
   );
 }
@@ -446,14 +531,13 @@ function CollapsedCard({ k }: { k: Karte }) {
 export function LeftHud() {
   const open = leftPanelOpen.value;
   const detail = detailVisible.value;
-  const collapsed = collapsedKarten.value;
   return (
     <div class="hudl" data-main={open ? 'open' : 'closed'} style={{ '--hud-main-w': `${hudMainWidth.value}px`, '--hud-detail-w': `${HUD_DETAIL_W}px`, '--hud-gap': `${HUD_GAP}px` }}>
       <div class="hudl-main" {...(open ? {} : ({ inert: '' } as object))}>
         <MainPanel />
         <Grip />
       </div>
-      {detail ? <DetailPanel /> : collapsed.length > 0 && <div class="hudk-stack">{collapsed.map((k) => <CollapsedCard key={k.id} k={k} />)}</div>}
+      {detail && <DetailPanel />}
       {!open && (
         <Panel as="div" class="hudl-mini">
           <h1>
