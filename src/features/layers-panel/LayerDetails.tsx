@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { formatAge, formatNumber, formatPercent } from '../../core/format';
 import { manifestEntrySignal } from '../../data/manifest';
-import { removeLayer, setLayerOpacity, setLayerOption, setLayerVisible } from '../../karten/store';
+import { removeLayer, setLayerOpacity, setLayerOption, setLayerVisible } from '../../karten/active';
 import type { KarteLayer } from '../../karten/types';
 import type { LayerDef, OptionSpec, SourceRef } from '../../layers/types';
 import { layerStatus, legends } from '../../state/session';

@@ -1,8 +1,8 @@
-import { addLayer, setLayerVisible } from '../../karten/store';
+import { addLayer, openKarte, setLayerVisible } from '../../karten/active';
 import { listedKarten } from '../../karten/store';
 import { allLayers } from '../../layers/registry';
 import { categoryById } from '../../layers/categories';
-import { activeKarte, setActiveKarte } from '../../state/session';
+import { activeKarte } from '../../state/session';
 import { updateSettings } from '../../state/settings';
 import { selectPlace, setProbe } from '../../state/selection';
 import { goLive } from '../../state/time';
@@ -92,7 +92,7 @@ export function localResults(q: string): Result[] {
     .filter((r) => r.s > 0 && r.x.id !== k.id)
     .sort((a, b) => b.s - a.s)
     .slice(0, 5);
-  for (const { x } of kk) out.push({ id: `karte:${x.id}`, group: 'Karten', icon: x.icon, title: x.name, subtitle: 'Karte wechseln', run: () => setActiveKarte(x.id) });
+  for (const { x } of kk) out.push({ id: `karte:${x.id}`, group: 'Karten', icon: x.icon, title: x.name, subtitle: 'Karte öffnen', run: () => openKarte(x.id) });
 
   const cmds = COMMANDS.map((c) => ({ c, s: scoreText(c.title, query, [...c.words, c.subtitle ?? '']) }))
     .filter((r) => r.s > 0 && !(r.c.id === 'globe' && projection.value === 'globe') && !(r.c.id === 'flat' && projection.value === 'mercator'))

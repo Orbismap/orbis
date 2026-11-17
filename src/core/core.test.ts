@@ -113,22 +113,27 @@ describe('format + units', () => {
 
 describe('url', () => {
   it('round-trips', () => {
-    const s = { view: { lat: 52.52, lng: 13.405, zoom: 5.25, bearing: 30, pitch: 45 }, karte: 'wetter', layers: ['erdbeben', 'seekabel'], time: Date.UTC(2026, 10, 10, 12, 0), globe: true };
+    const s = { view: { lat: 52.52, lng: 13.405, zoom: 5.25, bearing: 30, pitch: 45 }, layers: ['erdbeben', 'seekabel'], time: Date.UTC(2026, 10, 10, 12, 0), globe: true };
     const h = serializeHash(s);
-    expect(h).toBe('#/@52.52,13.405,5.25z,30b,45p?k=wetter&l=erdbeben,seekabel&t=2026-11-10T12:00Z&g=1');
+    expect(h).toBe('#/@52.52,13.405,5.25z,30b,45p?l=erdbeben,seekabel&t=2026-11-10T12:00Z&g=1');
     expect(parseHash(h)).toEqual(s);
   });
-  it('round-trips the basemap', () => {
-    const s = { karte: 'wetter', basemap: 'satellite', globe: false };
-    const h = serializeHash(s);
-    expect(h).toBe('#/?k=wetter&b=satellite&g=0');
-    expect(parseHash(h)).toEqual(s);
+  it('reads k= and b= of older links but never writes them', () => {
+    expect(serializeHash({ karte: 'wetter', basemap: 'satellite', globe: false })).toBe('#/?g=0');
+    expect(parseHash('#/?k=wetter&b=satellite')).toEqual({ karte: 'wetter', basemap: 'satellite' });
     expect(parseHash('#/?b=a<b').basemap).toBeUndefined();
   });
-  it('round-trips a searched place, commas in names included', () => {
-    const s = { karte: 'wetter', place: { lat: 52.51874, lng: 13.40802, title: 'Berlin, Mitte', subtitle: 'Berlin, Deutschland', kind: 'city' } };
+  it('round-trips a shared own Karte', () => {
+    const s = { layers: ['erdbeben'], shared: { name: 'Mein, Wetter', icon: 'cloud', color: '#72C8F0', basemap: 'satellite' } };
     const h = serializeHash(s);
-    expect(h).toBe('#/?k=wetter&p=52.51874,13.40802,Berlin%2C%20Mitte,Berlin%2C%20Deutschland,city');
+    expect(h).toBe('#/?m=Mein%2C%20Wetter,cloud,72C8F0,satellite&l=erdbeben');
+    expect(parseHash(h)).toEqual(s);
+    expect(parseHash('#/?m=x,cloud,zzz').shared).toBeUndefined();
+  });
+  it('round-trips a searched place, commas in names included', () => {
+    const s = { place: { lat: 52.51874, lng: 13.40802, title: 'Berlin, Mitte', subtitle: 'Berlin, Deutschland', kind: 'city' } };
+    const h = serializeHash(s);
+    expect(h).toBe('#/?p=52.51874,13.40802,Berlin%2C%20Mitte,Berlin%2C%20Deutschland,city');
     expect(parseHash(h)).toEqual(s);
     expect(parseHash('#/?p=1,2,%E0%A4%A').place).toBeUndefined();
   });

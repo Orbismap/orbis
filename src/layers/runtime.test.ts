@@ -59,6 +59,7 @@ describe('runtime', () => {
 
   it('mounts visible layers, enforces exclusive fields, handles errors and races', async () => {
     const store = await import('../karten/store');
+    const active = await import('../karten/active');
     const session = await import('../state/session');
     const { startRuntime } = await import('./runtime');
     store.customKarten.value = [testKarte('t', [{ id: 'temperatur', visible: true, opacity: 1 }, { id: 'wind', visible: false, opacity: 1 }, { id: 'erdbeben', visible: false, opacity: 1 }])];
@@ -75,7 +76,7 @@ describe('runtime', () => {
     expect(timeSources.value).toHaveLength(1);
 
     // switching wind on switches temperatur off (store) and the runtime swaps them
-    store.setLayerVisible('t', 'wind', true);
+    active.setLayerVisible('t', 'wind', true);
     await tick();
     expect(store.getKarte('t')!.layers.find((l) => l.id === 'temperatur')!.visible).toBe(false);
     expect(calls).toEqual(expect.arrayContaining(['destroy:temperatur', 'mount:wind']));
@@ -97,7 +98,7 @@ describe('runtime', () => {
     // async mount switched off before it finishes: destroyed right after resolving
     store.editKarte('t', (k) => ({ ...k, layers: [{ id: 'langsam', visible: true, opacity: 1 }, ...k.layers] }));
     await tick();
-    store.setLayerVisible('t', 'langsam', false);
+    active.setLayerVisible('t', 'langsam', false);
     await tick();
     releaseSlow?.();
     await tick();
@@ -111,6 +112,7 @@ describe('runtime', () => {
 
   it('reorders layers inside a slot to the order of the Karte', async () => {
     const store = await import('../karten/store');
+    const active = await import('../karten/active');
     const { startRuntime } = await import('./runtime');
     const e = engine();
     const session = await import('../state/session');
@@ -122,7 +124,7 @@ describe('runtime', () => {
     store.editKarte('t', (k) => ({ ...k, layers: [{ id: 'erdbeben', visible: true, opacity: 1 }, { id: 'zweite', visible: true, opacity: 1 }, ...k.layers.filter((l) => l.id !== 'erdbeben')] }));
     await tick();
     e.moved.length = 0;
-    store.moveLayer('t', 'zweite', 0);
+    active.moveLayer('t', 'zweite', 0);
     await tick();
     // bottom to top: erdbeben first, then zweite (zweite is now the top layer)
     expect(e.moved.slice(-2)).toEqual(['erdbeben-l', 'zweite-l']);

@@ -1,14 +1,18 @@
 import { useRef, useState } from 'preact/hooks';
 import { serializeHash } from '../../core/url';
-import { createKarte, customKarten, deleteKarte, discardChanges, drafts, isBuiltin, isDirty, listedKarten, resetKarte, restoreDraft, saveAs, updateKarteMeta } from '../../karten/store';
+import { activeKarteId, openKarte, SCRATCH_ID, setActiveIds, setActiveKarte } from '../../karten/active';
+import { DEFAULT_KARTE_ID } from '../../karten/standard';
+import { createKarte, customKarten, deleteKarte, isBuiltin, listedKarten, saveAs, updateKarteMeta } from '../../karten/store';
 import type { Karte } from '../../karten/types';
-import { activeKarte, setActiveKarte } from '../../state/session';
+import { activeKarte, browsedKarte } from '../../state/session';
 import { Button } from '../../ui/Button';
 import { cx } from '../../ui/hooks';
 import { Icon } from '../../ui/icons/Icon';
 import type { IconName } from '../../ui/icons/names';
 import { MenuItem, MenuSeparator, Popover } from '../../ui/Popover';
+import { leftView } from '../../state/ui';
 import { toast } from '../../ui/toast';
+import { editMode } from '../layers-panel/themes-state';
 
 const ICONS: IconName[] = ['pin', 'map', 'globe', 'layers', 'cloud', 'plane', 'ship', 'camera', 'leaf', 'mountain', 'drop', 'flame', 'bolt', 'sun', 'moon', 'people'];
 const COLORS = ['#72C8F0', '#FF6B5E', '#F2B45A', '#58D0A0', '#C0A0FF', '#A58BFF', '#FF8FB8', '#8FDCFF'];
@@ -54,23 +58,15 @@ export function NameForm({ initial, icon: icon0, color: color0, action, onSubmit
   );
 }
 
-/** "Sichern als Karte": creates an own Karte from the current state, switches to it and returns the standard Karte to its start. */
+/** "Sichern als Karte": saves what the unsaved Karte shows as an own Karte and opens it. */
 export function saveAsKarte(source: Karte, v: { name: string; icon: IconName; color: string }): void {
-  const id = saveAs(source.id, v.name, v);
-  if (!id) return;
-  if (isBuiltin(source.id)) resetKarte(source.id);
+  const id = saveAs(source, v.name, v);
   setActiveKarte(id);
   toast(`Karte „${v.name}“ gespeichert`, { kind: 'ok' });
 }
 
-/** Removes the rebuild of a standard Karte (with undo). */
-export function discardKarte(karte: Karte): void {
-  const before = discardChanges(karte.id);
-  if (before) toast(`Änderungen an „${karte.name}“ verworfen`, { action: { label: 'Rückgängig', run: () => restoreDraft(karte.id, before) } });
-}
-
-async function copyLink(id: string): Promise<void> {
-  const url = `${location.origin}${location.pathname}${serializeHash({ karte: id })}`;
+async function copyLink(k: Karte): Promise<void> {
+  const url = `${location.origin}${location.pathname}${serializeHash({ layers: k.layers.filter((l) => l.visible).map((l) => l.id), shared: { name: k.name, icon: k.icon, color: k.color, basemap: k.basemap } })}`;
   try {
     await navigator.clipboard.writeText(url);
     toast('Link kopiert', { kind: 'ok' });
@@ -79,50 +75,54 @@ async function copyLink(id: string): Promise<void> {
   }
 }
 
+/** Deletes an own Karte (leaving it, if it was open) with an undo toast. */
+export function removeKarte(k: Karte): void {
+  const snapshot = structuredClone(k);
+  const idx = customKarten.peek().findIndex((x) => x.id === k.id);
+  const wasOpen = activeKarteId.peek() === k.id;
+  deleteKarte(k.id);
+  editMode.value = false;
+  if (wasOpen) (setActiveKarte(DEFAULT_KARTE_ID), setActiveIds([]));
+  toast(`„${snapshot.name}“ gelöscht`, {
+    action: {
+      label: 'Rückgängig',
+      run: () => {
+        const next = [...customKarten.peek()];
+        next.splice(Math.max(0, idx), 0, snapshot);
+        customKarten.value = next;
+        if (wasOpen) setActiveKarte(snapshot.id);
+      },
+    },
+  });
+}
+
 type View = { kind: 'list' } | { kind: 'actions'; id: string } | { kind: 'rename'; id: string } | { kind: 'delete'; id: string };
 
 /**
- * "Alle Karten": standard Karten, own Karten and "Neue Karte". Every row has a "⋯" with the actions for its type.
+ * "Alle Karten": standard Karten (a catalog), own Karten and "Neue Karte". Own Karten have a "⋯" with their actions.
  * Own popover state, so desktop (tab bar) and mobile (switcher) share it.
  */
 export function KartenPopover({ open, onClose, anchor, align = 'end', up, class: cls, style, only, onPicked }: { open: boolean; onClose(): void; anchor: { current: HTMLElement | null }; align?: 'start' | 'end'; up?: boolean; class?: string; style?: Record<string, string | number>; /** Only the actions of this Karte (no list). */ only?: string; onPicked?(id: string): void }) {
   const home = (): View => (only ? { kind: 'actions', id: only } : { kind: 'list' });
   const [view, setView] = useState<View>(home);
   const list = listedKarten.value;
-  const active = activeKarte.value;
+  const active = browsedKarte.value;
   const close = () => {
     setView(home());
     onClose();
   };
   const pick = (id: string) => {
-    setActiveKarte(id);
+    openKarte(id);
     close();
     onPicked?.(id);
   };
   const remove = (k: Karte) => {
-    const snapshot = structuredClone(k);
-    const idx = customKarten.value.findIndex((x) => x.id === k.id);
-    deleteKarte(k.id);
-    if (active.id === k.id) setActiveKarte('wetter');
+    removeKarte(k);
     close();
-    toast(`„${snapshot.name}“ gelöscht`, {
-      action: {
-        label: 'Rückgängig',
-        run: () => {
-          const next = [...customKarten.value];
-          next.splice(Math.max(0, idx), 0, snapshot);
-          customKarten.value = next;
-          setActiveKarte(snapshot.id);
-        },
-      },
-    });
   };
   const duplicate = (k: Karte) => {
-    const id = saveAs(k.id, `${k.name} (Kopie)`);
-    if (id) {
-      setActiveKarte(id);
-      toast(`„${k.name}“ als eigene Karte dupliziert`, { kind: 'ok' });
-    }
+    setActiveKarte(saveAs(k, `${k.name} (Kopie)`));
+    toast(`„${k.name}“ dupliziert`, { kind: 'ok' });
     close();
   };
   const row = (k: Karte) => (
@@ -132,16 +132,16 @@ export function KartenPopover({ open, onClose, anchor, align = 'end', up, class:
           <Icon name={k.icon} size={16} />
         </span>
         <span class="menuitem-label">{k.name}</span>
-        {isDirty(k.id) && <span class="kbar-dirty" role="img" aria-label="geändert" />}
         {k.id === active.id && <Icon name="check" size={16} />}
       </button>
-      <button type="button" role="menuitem" class="kall-more" aria-haspopup="menu" aria-label={`Aktionen für ${k.name}`} onClick={() => setView({ kind: 'actions', id: k.id })}>
-        <Icon name="more" size={16} />
-      </button>
+      {!isBuiltin(k.id) && (
+        <button type="button" role="menuitem" class="kall-more" aria-haspopup="menu" aria-label={`Aktionen für ${k.name}`} onClick={() => setView({ kind: 'actions', id: k.id })}>
+          <Icon name="more" size={16} />
+        </button>
+      )}
     </div>
   );
   const target = 'id' in view ? list.find((k) => k.id === view.id) : undefined;
-  const builtin = target ? isBuiltin(target.id) : false;
   return (
     <Popover open={open} onClose={close} align={align} up={up} label={only ? 'Kartenaktionen' : 'Alle Karten'} menu={view.kind === 'list' || view.kind === 'actions'} anchorRef={anchor} style={style} class={cx('kbar-all', cls)}>
       {view.kind === 'list' && (
@@ -183,44 +183,28 @@ export function KartenPopover({ open, onClose, anchor, align = 'end', up, class:
               <span>{target.name}</span>
             </button>
           )}
-          {builtin ? (
-            <MenuItem
-              icon="reset"
-              disabled={!drafts.value[target.id]}
-              onClick={() => {
-                const before = drafts.peek()[target.id];
-                resetKarte(target.id);
-                close();
-                toast(`„${target.name}“ auf Startansicht zurückgesetzt`, { action: { label: 'Rückgängig', run: () => restoreDraft(target.id, before) } });
-              }}
-            >
-              Auf Startansicht zurücksetzen
-            </MenuItem>
-          ) : (
-            <MenuItem icon="pencil" onClick={() => setView({ kind: 'rename', id: target.id })}>
-              Umbenennen, Symbol und Farbe
-            </MenuItem>
-          )}
-          <MenuItem icon="plus" onClick={() => duplicate(target)}>
-            Duplizieren als eigene Karte
+          <MenuItem icon="pencil" onClick={() => setView({ kind: 'rename', id: target.id })}>
+            {target.name} umbenennen
+          </MenuItem>
+          <MenuItem icon="plus" onClick={() => (leftView.value = 'catalog')}>
+            Ebene hinzufügen
+          </MenuItem>
+          <MenuItem icon="copy" onClick={() => duplicate(target)}>
+            Duplizieren
           </MenuItem>
           <MenuItem
             icon="link"
             onClick={() => {
-              void copyLink(target.id);
+              void copyLink(target);
               close();
             }}
           >
             Link kopieren
           </MenuItem>
-          {!builtin && (
-            <>
-              <MenuSeparator />
-              <MenuItem icon="trash" danger onClick={() => setView({ kind: 'delete', id: target.id })}>
-                Karte löschen
-              </MenuItem>
-            </>
-          )}
+          <MenuSeparator />
+          <MenuItem icon="trash" danger onClick={() => setView({ kind: 'delete', id: target.id })}>
+            Karte löschen
+          </MenuItem>
         </>
       )}
       {view.kind === 'rename' && target && (
@@ -253,41 +237,39 @@ export function KartenPopover({ open, onClose, anchor, align = 'end', up, class:
   );
 }
 
-/** Slim row under the tab bar: shown only when the active standard Karte was really rebuilt. */
-/** `short`: the Karte name is already shown above (desktop detail menu), so just "Angepasst". */
+/** Slim row shown while the layers on the map belong to no standard Karte (the unsaved Karte): save them as an own Karte, or clear them. */
+/** `short`: the Karte name is already shown above (desktop detail menu), so the text stays short. */
 export function KartenChangeRow({ short }: { short?: boolean } = {}) {
   const k = activeKarte.value;
-  const show = isDirty(k.id);
+  const show = k.id === SCRATCH_ID;
   const [saving, setSaving] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
-  const name = useRef(k.name);
-  if (show) name.current = k.name;
   return (
     <div class="kchange" ref={wrap} data-open={show} {...(show ? {} : ({ inert: '' } as object))}>
       <div class="kchange-clip">
         <div class="kchange-row" role="status">
-          <span class="kchange-text">{short ? "Angepasst" : `${name.current} angepasst`}</span>
+          <span class="kchange-text">{short ? 'Nicht gespeichert' : 'Ungespeicherte Karte'}</span>
           <button type="button" class="kchange-btn is-primary" onClick={() => setSaving(true)}>
-            Sichern als Karte
+            Als Karte sichern
           </button>
-          <button type="button" class="kchange-btn" onClick={() => discardKarte(k)}>
-            Verwerfen
+          <button type="button" class="kchange-btn" onClick={() => setActiveIds([])}>
+            Leeren
           </button>
         </div>
       </div>
-        <Popover open={saving && show} onClose={() => setSaving(false)} align="end" label="Sichern als Karte" anchorRef={wrap} class="karten-pop">
-          <NameForm
-            initial={`${k.name} (eigene)`}
-            icon={k.icon}
-            color={k.color}
-            action="Sichern"
-            onCancel={() => setSaving(false)}
-            onSubmit={(v) => {
-              setSaving(false);
-              saveAsKarte(k, v);
-            }}
-          />
-        </Popover>
+      <Popover open={saving && show} onClose={() => setSaving(false)} align="end" label="Als Karte sichern" anchorRef={wrap} class="karten-pop">
+        <NameForm
+          initial="Neue Karte"
+          icon="pin"
+          color="#A58BFF"
+          action="Sichern"
+          onCancel={() => setSaving(false)}
+          onSubmit={(v) => {
+            setSaving(false);
+            saveAsKarte(k, v);
+          }}
+        />
+      </Popover>
     </div>
   );
 }

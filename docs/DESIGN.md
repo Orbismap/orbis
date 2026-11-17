@@ -201,10 +201,10 @@ Schmales, dichtes Paneel (300 px, `--panel-left` in `ui/tokens.css`). Zeilen
 
 ## Karten: Ansichten und eigene Karten
 
-- **Standardkarten sind Ansichten.** Ebenen der eigenen Themen schalten, Feld wählen, Optionen dieser Ebenen gelten nie als Änderung; sie werden still je Karte gemerkt und beim nächsten Start wiederhergestellt. Nur ein Umbau zählt: Ebene aus dem Katalog, geänderte Reihenfolge oder Deckkraft, andere Grundkarte/Ortsnamen/Tag-Nacht-Linie, Name oder Symbol.
-- **Kartenleiste:** volle Breite, keine Dauer-Knöpfe. Der Punkt an der Pille und die schmale Glaszeile „<Name> angepasst“ (Sichern als Karte, Verwerfen) erscheinen nur bei echtem Umbau. Verwerfen entfernt nur den Umbau und bietet Rückgängig.
-- **„Alle Karten“** (Knopf am Ende der Leiste, immer da; bei Überlauf „+n“): Standardkarten, Eigene Karten, „Neue Karte“. Jede Zeile hat „⋯“: Standardkarte mit Auf Startansicht zurücksetzen, Duplizieren, Link kopieren; eigene Karte mit Umbenennen/Symbol/Farbe, Duplizieren, Link kopieren, Löschen (mit Bestätigung). Das Popover liegt neben, nicht in der geclippten Tab-Fläche, und scrollt bei vielen Karten.
-- **Eigene Karten** speichern jede Änderung sofort; sie haben keinen „geändert“-Zustand. Mobil gilt dasselbe (Schalter, Liste, Änderungszeile im Sheet).
+- **Standardkarten sind ein Katalog.** Ein Klick öffnet die Karte im Detailmenü mit ihren Ebenen zum Schalten; sie lässt sich weder sichern noch in Grundkarte oder Deckkraft umbauen. Auch der Stift gibt es dort nicht; Ebenen hinzufügen und Reihenfolge ändern geht nur in eigenen Karten. Welche Ebenen aktiv sind, steht im Hauptmenü unter „Aktive Ebenen“ (zwischen „Orte“ und „Karten“) und ist das Einzige, was in Link und localStorage landet; die Zuordnung zur Standardkarte ergibt sich daraus. Eine Ebene, die in keiner Standardkarte liegt (z. B. über Cmd+K), landet in der ungespeicherten Karte („Als Karte sichern“ macht eine eigene daraus). Grundkarte-Wahl gilt nur für die Sitzung, außer in eigenen Karten.
+- **Ungespeicherte Karte:** schmale Glaszeile „Nicht gespeichert“ (Als Karte sichern, Leeren), solange aktive Ebenen in keiner Standardkarte liegen.
+- **„Alle Karten“:** Standardkarten, Eigene Karten, „Neue Karte“. Nur eigene Karten haben „⋯“ (Umbenennen/Symbol/Farbe, Duplizieren, Link kopieren, Löschen mit Bestätigung). Das Popover scrollt bei vielen Karten.
+- **Eigene Karten** speichern jede Änderung sofort (Ebenen, Reihenfolge, Deckkraft, Grundkarte); sie haben keinen „geändert“-Zustand.
 
 ## Verhalten
 

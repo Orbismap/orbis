@@ -7,6 +7,7 @@ import { getLayer } from '../layers/registry';
 import type { InspectCard } from '../layers/types';
 import type { IconName } from '../ui/icons/names';
 import { inspector, place, probe } from './selection';
+import { ownOpen } from '../karten/active';
 import { activeKarte } from './session';
 
 export type HistoryKind = 'layer' | 'object' | 'place' | 'search';
@@ -79,13 +80,14 @@ export function startHistory(): () => void {
       if (!p || place.peek()) return; // a searched place is recorded as such
       record({ key: `p:${p.lng.toFixed(2)},${p.lat.toFixed(2)}`, kind: 'place', title: formatCoord(p.lat, p.lng, 2), sub: 'Ort', icon: 'locate', color: '#72C8F0', lng: p.lng, lat: p.lat });
     }),
-    // layers newly switched on in the same Karte (a Karte switch is not a switch of its layers)
+    // layers newly switched on (opening an own Karte is not a switch of its layers)
     effect(() => {
       const k = activeKarte.value;
       const vis = new Set(k.layers.filter((l) => l.visible).map((l) => l.id));
       const before = prev;
-      prev = { karte: k.id, vis };
-      if (!before || before.karte !== k.id) return;
+      const key = ownOpen.value?.id ?? 'auto';
+      prev = { karte: key, vis };
+      if (!before || before.karte !== key) return;
       for (const id of vis) if (!before.vis.has(id)) recordLayer(id, k);
     }),
     effect(() => void setJSON(KEY, VERSION, history.value)),

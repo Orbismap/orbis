@@ -1,7 +1,7 @@
 import { getLayer } from '../../layers/registry';
 import type { LegendSpec } from '../../layers/types';
 import { basemapDef } from '../../map/basemaps';
-import { activeKarte, legends } from '../../state/session';
+import { activeKarte, legends, openActive } from '../../state/session';
 import { detailOpen } from '../../state/hud';
 import { leftPanelOpen, leftTab, leftView, isMobile, sheetDetent } from '../../state/ui';
 import { closeDetail, openDetail } from '../layers-panel/themes-state';
@@ -31,7 +31,7 @@ function reveal(): void {
   detailOpen.value = true;
   if (isMobile.peek() && sheetDetent.peek() === 'peek') sheetDetent.value = 'half';
 }
-const openLayer = (id: string) => (reveal(), openDetail(activeKarte.peek().id, id, 'Karte'));
+const openLayer = (id: string) => (reveal(), openActive(), openDetail(activeKarte.peek().id, id, 'Karte'));
 const openList = () => (reveal(), closeDetail());
 
 function ScaleRow({ e, spec }: { e: Entry; spec: Extract<LegendSpec, { type: 'scale' }> }) {
