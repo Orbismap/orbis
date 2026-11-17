@@ -1,5 +1,5 @@
 import { addLayer, setLayerVisible } from '../../karten/store';
-import { karten } from '../../karten/store';
+import { listedKarten } from '../../karten/store';
 import { allLayers } from '../../layers/registry';
 import { categoryById } from '../../layers/categories';
 import { activeKarte, setActiveKarte } from '../../state/session';
@@ -87,7 +87,7 @@ export function localResults(q: string): Result[] {
     });
   }
 
-  const kk = karten.value
+  const kk = listedKarten.value
     .map((x) => ({ x, s: scoreText(x.name, query, ['karte']) }))
     .filter((r) => r.s > 0 && r.x.id !== k.id)
     .sort((a, b) => b.s - a.s)

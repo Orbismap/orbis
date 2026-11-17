@@ -1,6 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import { serializeHash } from '../../core/url';
-import { createKarte, customKarten, deleteKarte, discardChanges, drafts, isBuiltin, isDirty, karten, resetKarte, restoreDraft, saveAs, updateKarteMeta } from '../../karten/store';
+import { createKarte, customKarten, deleteKarte, discardChanges, drafts, isBuiltin, isDirty, listedKarten, resetKarte, restoreDraft, saveAs, updateKarteMeta } from '../../karten/store';
 import type { Karte } from '../../karten/types';
 import { activeKarte, setActiveKarte } from '../../state/session';
 import { Button } from '../../ui/Button';
@@ -88,7 +88,7 @@ type View = { kind: 'list' } | { kind: 'actions'; id: string } | { kind: 'rename
 export function KartenPopover({ open, onClose, anchor, align = 'end', up, class: cls, style, only, onPicked }: { open: boolean; onClose(): void; anchor: { current: HTMLElement | null }; align?: 'start' | 'end'; up?: boolean; class?: string; style?: Record<string, string | number>; /** Only the actions of this Karte (no list). */ only?: string; onPicked?(id: string): void }) {
   const home = (): View => (only ? { kind: 'actions', id: only } : { kind: 'list' });
   const [view, setView] = useState<View>(home);
-  const list = karten.value;
+  const list = listedKarten.value;
   const active = activeKarte.value;
   const close = () => {
     setView(home());

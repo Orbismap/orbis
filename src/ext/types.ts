@@ -95,6 +95,20 @@ export interface PowerLineSample {
 /** What the power grid channel carries: towers and overhead lines, to be connected by the extension. */
 export type PowerGridSample = PowerTowerSample | PowerLineSample;
 
+/** One tree (OpenStreetMap `natural=tree`) as the tiles give it; the extension works out the model itself. */
+export interface TreeSample {
+  /** OSM id, unique within the layer */
+  id: string;
+  lng: number;
+  lat: number;
+  /** height in metres, undefined when untagged */
+  heightM?: number;
+  /** trunk circumference in metres, undefined when untagged */
+  circumferenceM?: number;
+  leafType?: 'broadleaved' | 'needleleaved';
+  leafCycle?: 'evergreen' | 'deciduous';
+}
+
 /** One streamed 3D tileset (a city model) the base layer offers; the extension loads and draws it. */
 export interface TilesetSample {
   /** unique within the layer */
@@ -183,6 +197,8 @@ export interface ExtensionHost {
   readonly ships: TracksChannel<ShipSample>;
   /** Channel for power towers and overhead lines (layer `stromnetz`). */
   readonly power: TracksChannel<PowerGridSample>;
+  /** Channel for single trees (layer `baeume`). */
+  readonly trees: TracksChannel<TreeSample>;
   /** Channel for streamed 3D city models (`features/buildings3d/tiles-source.ts`). */
   readonly tilesets: TracksChannel<TilesetSample>;
   /** Tells the base what the tilesets do: loading, errors. */

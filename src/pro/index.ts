@@ -3,6 +3,7 @@
 // und Orbis Pro"). three.js is imported only from here, so it ends up in its own lazy chunk.
 import { effect } from '@preact/signals';
 import type { ExtensionHost, FollowRef, OrbisExtension, TracksChannel } from '../ext/types';
+import { BaeumePart } from './baeume/baeume';
 import { PlanesPart } from './planes/planes';
 import { ShipsPart } from './ships/ships';
 import { StromnetzPart } from './stromnetz/stromnetz';
@@ -30,6 +31,7 @@ export const extension: OrbisExtension = {
     const planes = new PlanesPart(map, stage, (id) => host.tracks.select(id), host.reducedMotion);
     const ships = new ShipsPart(map, stage, (id) => host.ships.select(id), host.reducedMotion);
     const power = new StromnetzPart(map, stage);
+    const trees = new BaeumePart(map, stage);
     let tilesPresent = false;
     let tilesRelease: (() => void) | null = null;
     let stateKey = '';
@@ -47,6 +49,7 @@ export const extension: OrbisExtension = {
     // below aircraft and ships: the stage asks the part added last first, so an aircraft over a pylon is the one clicked
     stage.add(tiles);
     stage.add(power);
+    stage.add(trees);
     stage.add(ships);
     stage.add(planes);
     host.addCustomLayer(stage, 'points');
@@ -154,6 +157,22 @@ export const extension: OrbisExtension = {
       evaluatePower();
     });
     evaluatePower();
+    // Trees work the same way: the layer publishes them from zoom 15 and an empty list below.
+    let treesOn = false;
+    let treesRelease: (() => void) | null = null;
+    const evaluateTrees = () => {
+      const show = trees.count > 0;
+      if (show === treesOn) return;
+      treesOn = show;
+      trees.setActive(show);
+      if (show) treesRelease = host.trees.present();
+      else { treesRelease?.(); treesRelease = null; }
+    };
+    const stopTrees = host.trees.subscribe((items) => {
+      trees.feed(items);
+      evaluateTrees();
+    });
+    evaluateTrees();
     const stopTiles = host.tilesets.subscribe((items) => tiles.feed(items));
 
     return () => {
@@ -162,9 +181,11 @@ export const extension: OrbisExtension = {
       unbindPlanes();
       unbindShips();
       stopPower();
+      stopTrees();
       stopTiles();
       tilesRelease?.();
       powerRelease?.();
+      treesRelease?.();
       follow.dispose();
       host.removeLayer(stage.id);
     };
