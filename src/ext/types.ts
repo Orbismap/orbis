@@ -174,6 +174,8 @@ export interface ExtensionHost {
   /** Adds a custom layer in the slot of the layer stack, same as base layers do. */
   addCustomLayer(layer: CustomLayerInterface, slot: 'points' | 'labels' | 'top'): void;
   removeLayer(id: string): void;
+  /** Moves a custom layer of the extension: `belowData` puts it just above the raster slot (data layers draw over it), else on top of the points slot. */
+  placeLayer(id: string, where: 'below-data' | 'points'): void;
   /** 'globe' | 'mercator' */
   readonly projection: ReadonlySignal<'globe' | 'mercator'>;
   readonly tracks: TracksChannel;

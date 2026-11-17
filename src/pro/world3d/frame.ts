@@ -213,6 +213,11 @@ export class GeoFrame {
     return (w / this.pxDistance) * (unitM / this.unitPx);
   }
 
+  /** The view depth (clip w) of the map centre: what a perspective size is measured against. */
+  get centreDepth(): number {
+    return Math.abs(this.clip(this.lng, this.lat, 0).w);
+  }
+
   /** Metres covered by one CSS pixel at the map centre. */
   get centreMetresPerPixel(): number {
     return this.metresPerPixel(this.lng, this.lat);

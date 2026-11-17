@@ -66,8 +66,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   let labels = init.labels ?? true;
   let terminatorMode: 'off' | 'auto' = init.terminator === false ? 'off' : 'auto';
   let loaded = false;
-  /** 3D terrain: on for every basemap except the aerial images (their 3D tiles bring their own ground). No switch. */
-  let terrainOn = !hasTiles3d(basemap);
+  /** 3D terrain: on for every basemap. No switch. (On the aerial images at true scale and only as the camera's height reference: the 3D tiles are laid over it, see StagePart.coversMap.) */
+  let terrainOn = true;
   registerDemTiles();
   registerPmtilesProtocol(); // the Orbis Karte overlay (PMTiles) is part of the basemap style
 
@@ -275,9 +275,11 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     if (!terrainOn || !(basemap === 'orbis-dark' || basemap === 'orbis-light')) return 0;
     return terrainTarget() > 0 ? 1 : SHADE_FLAT;
   };
+  /** The 3D tiles of the aerial images are true to scale (sea level, see tiles3d/geoid): no exaggeration under them, so the camera's height agrees with theirs. */
+  const TILES_TERRAIN_EXAGGERATION = 1;
   const terrainTarget = () => {
     const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
-    return terrainOn && !(flatOrbis && (projectionSignal.peek() !== 'globe' || (TERRAIN_ZOOM_FADE && ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS))) ? TERRAIN_EXAGGERATION : 0;
+    return terrainOn && !(flatOrbis && (projectionSignal.peek() !== 'globe' || (TERRAIN_ZOOM_FADE && ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS))) ? (hasTiles3d(basemap) ? TILES_TERRAIN_EXAGGERATION : TERRAIN_EXAGGERATION) : 0;
   };
   /**
    * Changes the exaggeration of the running terrain in place. `map.setTerrain` would rebuild the whole terrain every
@@ -337,7 +339,6 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       if (id === basemap) return;
       basemap = id;
       activeBasemapSignal.value = id;
-      terrainOn = !hasTiles3d(id);
       if (loaded) applyBasemap();
     },
     setProjection(p) {

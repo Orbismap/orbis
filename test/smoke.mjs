@@ -292,7 +292,7 @@ async function main() {
       await page.evaluate(() => window.__orbis.engine.ml.jumpTo({ pitch: 45 }));
       await sleep(600);
       const b = await read();
-      report(a.patched && !a.fellBack && a.drawn > 0 && Math.abs(a.lastK - 0.05) < 1e-6 && b.lastK > 0.7 && b.lastK < 0.9, '7 building height follows tilt (no tile reload)', `patched ${a.patched} fellBack ${a.fellBack} k@0=${a.lastK} k@45=${b.lastK.toFixed(2)} draws ${b.drawn}`);
+      report(a.patched && !a.fellBack && a.drawn > 0 && a.lastK === 0 && b.lastK > 0.7 && b.lastK < 0.9, '7 building height follows tilt (no tile reload)', `patched ${a.patched} fellBack ${a.fellBack} k@0=${a.lastK} k@45=${b.lastK.toFixed(2)} draws ${b.drawn}`);
     }
 
     // 3. basemaps + projection

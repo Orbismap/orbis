@@ -8,7 +8,7 @@ import { ShipsPart } from './ships/ships';
 import { StromnetzPart } from './stromnetz/stromnetz';
 import { TilesetPart } from './tiles3d/tileset';
 import { Follow } from './world3d/follow';
-import { Stage, type StagePart } from './world3d/stage';
+import { Stage, STAGE_LAYER_ID, type StagePart } from './world3d/stage';
 
 /** What the extension needs of a part that presents a channel (aircraft, ships). */
 /** how long a followed object from the URL is waited for (ms): the data may take a while to arrive */
@@ -26,7 +26,7 @@ export const extension: OrbisExtension = {
   id: 'orbis-pro',
   start(host: ExtensionHost) {
     const map = host.map;
-    const stage = new Stage(map);
+    const stage = new Stage(map, (below) => host.placeLayer(STAGE_LAYER_ID, below ? 'below-data' : 'points'));
     const planes = new PlanesPart(map, stage, (id) => host.tracks.select(id), host.reducedMotion);
     const ships = new ShipsPart(map, stage, (id) => host.ships.select(id), host.reducedMotion);
     const power = new StromnetzPart(map, stage);

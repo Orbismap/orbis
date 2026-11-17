@@ -6,8 +6,11 @@ import { anchorUniforms, BEHIND_GLOBE_GLSL, BLEND_GLSL, setAnchor } from '../wor
 // is a screen-space quad carrying both endpoints on the sphere and in mercator, blended like the map, so the wires stay
 // right through the globe transition without being rebuilt. The wires themselves (sag, insulator points) come from network.ts.
 
-/** Width on screen (CSS px). */
-const WIRE_PX = 0.8;
+/** Thickness of a wire in the world (m, exaggerated: a real one is a few centimetres): seen in perspective, near wires are thicker. */
+const WIRE_M = 0.22;
+/** limits of the width on screen (CSS px): far wires stay visible, near ones do not turn into ribbons */
+const MIN_PX = 0.6;
+const MAX_PX = 3.5;
 const OPACITY = 0.9;
 
 const VERTEX = `
@@ -18,7 +21,8 @@ attribute vec3 aMercEnd;
 attribute vec2 aCorner;
 attribute vec3 aColor;
 uniform vec2 uRes;
-uniform float uWidth;
+uniform float uK; // width on screen = uK / depth
+uniform vec2 uLimit;
 varying vec3 vSphere;
 varying vec3 vColor;
 ${BLEND_GLSL}
@@ -35,7 +39,8 @@ void main() {
   float len = length(d);
   vec2 dir = len > 0.0001 ? d / len : vec2(1.0, 0.0);
   vec4 c = mix(cs, ce, aCorner.x);
-  c.xy += vec2(-dir.y, dir.x) * aCorner.y * uWidth / uRes * c.w;
+  float width = clamp(uK / c.w, uLimit.x, uLimit.y);
+  c.xy += vec2(-dir.y, dir.x) * aCorner.y * width / uRes * c.w;
   gl_Position = c;
 }`;
 const FRAGMENT = `
@@ -57,7 +62,7 @@ export interface DrawWire {
 
 export class WireMesh {
   readonly object: THREE.Mesh;
-  private u = { ...anchorUniforms(), uRes: { value: new THREE.Vector2(1, 1) }, uWidth: { value: WIRE_PX }, uOpacity: { value: OPACITY } };
+  private u = { ...anchorUniforms(), uRes: { value: new THREE.Vector2(1, 1) }, uK: { value: 0 }, uLimit: { value: new THREE.Vector2(MIN_PX, MAX_PX) }, uOpacity: { value: OPACITY } };
   private material: THREE.ShaderMaterial;
   private anchorUnit: Vec3 = [0, 0, 1];
   private anchorMerc: Vec3 = [0, 0, 0];
@@ -138,7 +143,10 @@ export class WireMesh {
     if (!this.object.visible) return;
     const px = frame.pixels;
     this.u.uRes.value.set(px[0], px[1]);
-    this.u.uWidth.value = WIRE_PX * (px[0] / frame.width);
+    const ratio = px[0] / frame.width;
+    // pixels at the map centre, scaled by (depth of the centre / depth here): a perspective width
+    this.u.uK.value = (WIRE_M / frame.centreMetresPerPixel) * frame.centreDepth * ratio;
+    this.u.uLimit.value.set(MIN_PX * ratio, MAX_PX * ratio);
     setAnchor(this.u, frame, this.anchorUnit, this.anchorMerc);
   }
 

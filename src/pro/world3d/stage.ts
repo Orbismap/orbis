@@ -34,6 +34,12 @@ export interface StagePart {
   step?(now: number): void;
   /** The camera follows `id` (null: nothing is followed any more); the part may keep its label visible. */
   setFollowed?(id: string | null): void;
+  /**
+   * True while the part draws the ground itself (streamed 3D tiles of a city): the stage then draws everything into its own
+   * framebuffer and lays it over the map, so the map below is only the fallback where nothing has loaded yet. Without that the
+   * tiles and the map's ground would fight over the depth buffer at every height difference.
+   */
+  coversMap?(): boolean;
   /** Numbers for the test hook. */
   stats?(): Record<string, number>;
   dispose?(): void;
@@ -108,8 +114,11 @@ export class Stage implements CustomLayerInterface {
   private lastHover = 0;
   private repaintTimer = 0;
   private frames = 0;
+  /** the stage sits below the data layers (see lower) */
+  private lowered = false;
 
-  constructor(private map: MlMap) {
+  /** `place(true)`: below the data layers, `place(false)`: on top of the points slot. Given by the host (it knows the layer stack). */
+  constructor(private map: MlMap, private place: (belowData: boolean) => void = () => {}) {
     this.scene.add(new THREE.AmbientLight(0xffffff, 1.5), this.sun);
     this.earth.renderOrder = -1;
     this.earth.frustumCulled = false;
@@ -190,6 +199,7 @@ export class Stage implements CustomLayerInterface {
     const now = this.clock ?? performance.now();
     let moving = false;
     for (const p of this.parts) if (p.update(frame, now)) moving = true;
+    this.lower(this.parts.some((p) => p.object.visible && p.coversMap?.()));
     // nothing to draw: no framebuffer and no pass over the whole screen
     if (this.parts.some((p) => p.object.visible)) {
       this.draw(renderer, frame, canvas);
@@ -210,7 +220,8 @@ export class Stage implements CustomLayerInterface {
     // three.js and MapLibre each cache GL state: three starts from scratch, MapLibre resets its own after custom layers
     renderer.resetState();
     renderer.setViewport(0, 0, canvas.width, canvas.height);
-    if (frame.globe) {
+    // on the globe the depth buffer is no real depth, and where a part brings its own ground it must not compete with the map's
+    if (frame.globe || this.parts.some((p) => p.object.visible && p.coversMap?.())) {
       const target = this.renderTarget(canvas.width, canvas.height);
       renderer.setRenderTarget(target);
       renderer.setClearColor(0x000000, 0);
@@ -223,6 +234,22 @@ export class Stage implements CustomLayerInterface {
       renderer.setRenderTarget(null);
       renderer.render(this.scene, this.camera);
     }
+  }
+
+  /**
+   * Where the stage sits in the layer stack. Normally on top of the points slot (aircraft and the like above the data). Where a
+   * part brings the ground (3D tiles), the stage moves down to just above the raster slot, so the data layers (areas, lines,
+   * points, labels) are drawn over the ground and not hidden by it; the 3D objects stay with the ground in the same depth buffer.
+   * The move happens after the frame (a layer is not moved while the map is drawing).
+   */
+  private lower(on: boolean) {
+    if (on === this.lowered) return;
+    this.lowered = on;
+    queueMicrotask(() => {
+      if (!this.map.getLayer(this.id)) return;
+      this.place(on);
+      this.map.triggerRepaint();
+    });
   }
 
   /** The next frame for moving objects; the map draws at full rate anyway while the camera moves. */
