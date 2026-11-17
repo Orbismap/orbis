@@ -21,6 +21,7 @@ import { createPicking } from './picking';
 import { beforeIdFor } from './slots';
 import { createTerminator } from './terminator';
 import { installBuildingsTilt } from './buildings-tilt';
+import { installGlobeTerrainFix } from './globe-terrain-fix';
 import type { BasemapId, CameraTarget, MapEngine, PickHandler, SlotId } from './types';
 
 // MapLibre 6 ships its worker as a separate module; let Vite bundle it (with its shared chunk) and point MapLibre at it.
@@ -96,6 +97,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   if (import.meta.env?.DEV) ml.on('error', (e) => console.warn('[map]', e.error?.message ?? e));
 
   const disposeBuildingsTilt = installBuildingsTilt(ml);
+  const disposeGlobeTerrainFix = installGlobeTerrainFix(ml);
   const terminator = createTerminator(ml);
   // Desktop: a plain click on empty map closes the detail menu (selection and Karte menu, layers stay on); the point
   // query needs a 1 s press. Mobile keeps tap-to-query.
@@ -400,6 +402,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       terminator.destroy();
       picking.destroy();
       disposeBuildingsTilt();
+      disposeGlobeTerrainFix();
       cancelAnimationFrame(terrainRaf);
       ml.remove();
       if (current === engine) current = undefined;
