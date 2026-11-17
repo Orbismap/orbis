@@ -28,13 +28,38 @@ export function unit(id: string, salt = 0): number {
   return (h >>> 0) / 4294967296;
 }
 
+/** The model of a genus (lower case), for the trees that have one. The rest goes by the leaf type. */
+const GENUS_SHAPE: Record<string, TreeShape> = {
+  quercus: 'eiche',
+  betula: 'birke',
+  populus: 'pappel',
+  salix: 'weide',
+  pinus: 'kiefer',
+  picea: 'nadel', abies: 'nadel', larix: 'nadel', pseudotsuga: 'nadel', cedrus: 'nadel', tsuga: 'nadel',
+  cupressus: 'zypresse', thuja: 'zypresse', juniperus: 'zypresse', taxus: 'zypresse', chamaecyparis: 'zypresse', cupressocyparis: 'zypresse',
+  phoenix: 'palme', washingtonia: 'palme', trachycarpus: 'palme', cocos: 'palme', chamaerops: 'palme', butia: 'palme', livistona: 'palme', roystonea: 'palme', syagrus: 'palme',
+};
+
+/** Height of an untagged tree by its genus (m), where it differs from the 9 m broadleaf / 12 m conifer default. */
+const TYPICAL_H: Partial<Record<TreeShape, number>> = { pappel: 18, palme: 9, weide: 10, zypresse: 8, kiefer: 14, eiche: 14 };
+
+const genusShape = (genus?: string): TreeShape | undefined => (genus ? GENUS_SHAPE[genus] : undefined);
+
+/** Height of a hedge in metres when the channel gives none (it always does), and the range a hedge is held to. */
+const HEDGE_HEIGHT_M = 1.6;
+
 /** Height of the model in metres: the tagged one, else guessed from the trunk, else a typical tree. */
-export function treeHeight(t: Pick<TreeSample, 'heightM' | 'circumferenceM' | 'leafType'>): number {
-  const h = t.heightM ?? (t.circumferenceM ? 4 + 5 * t.circumferenceM : t.leafType === 'needleleaved' ? 12 : 9);
+export function treeHeight(t: Pick<TreeSample, 'heightM' | 'circumferenceM' | 'leafType' | 'genus' | 'hedge'>): number {
+  if (t.hedge) return Math.min(6, Math.max(0.5, t.heightM ?? HEDGE_HEIGHT_M));
+  const typical = TYPICAL_H[genusShape(t.genus) ?? 'rund'] ?? (t.leafType === 'needleleaved' ? 12 : 9);
+  const h = t.heightM ?? (t.circumferenceM ? 4 + 5 * t.circumferenceM : typical);
   return Math.min(40, Math.max(2, h));
 }
 
-export function shapeOf(t: Pick<TreeSample, 'id' | 'leafType'>): TreeShape {
+export function shapeOf(t: Pick<TreeSample, 'id' | 'leafType' | 'genus' | 'hedge'>): TreeShape {
+  if (t.hedge) return 'busch';
+  const byGenus = genusShape(t.genus);
+  if (byGenus) return byGenus;
   if (t.leafType === 'needleleaved') return 'nadel';
   return BROAD_SHAPES[Math.floor(unit(t.id) * BROAD_SHAPES.length)]!;
 }

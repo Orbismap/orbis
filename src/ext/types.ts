@@ -69,7 +69,7 @@ export interface ShipSample {
 /** One power tower (pylon or pole) as the vector tiles give it; the extension works out model and height itself. */
 export interface PowerTowerSample {
   kind: 'tower';
-  /** OSM id, unique within the layer */
+  /** unique within the layer: the position (the tiles carry no OSM ids) */
   id: string;
   lng: number;
   lat: number;
@@ -95,9 +95,9 @@ export interface PowerLineSample {
 /** What the power grid channel carries: towers and overhead lines, to be connected by the extension. */
 export type PowerGridSample = PowerTowerSample | PowerLineSample;
 
-/** One tree (OpenStreetMap `natural=tree`) as the tiles give it; the extension works out the model itself. */
+/** One tree as the tiles give it (OpenStreetMap `natural=tree`, or a point on a `tree_row` / `hedge` line); the extension works out the model itself. */
 export interface TreeSample {
-  /** OSM id, unique within the layer */
+  /** unique within the layer: the position (the tiles carry no OSM ids) */
   id: string;
   lng: number;
   lat: number;
@@ -107,6 +107,10 @@ export interface TreeSample {
   circumferenceM?: number;
   leafType?: 'broadleaved' | 'needleleaved';
   leafCycle?: 'evergreen' | 'deciduous';
+  /** a bush of a hedge (barrier=hedge) rather than a tree */
+  hedge?: boolean;
+  /** genus in lower case ("quercus"), the first word of the species tag */
+  genus?: string;
 }
 
 /** One streamed 3D tileset (a city model) the base layer offers; the extension loads and draws it. */
