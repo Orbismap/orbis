@@ -1,6 +1,6 @@
 import { clearSelection, inspector, probe } from '../state/selection';
 import { listedKarten } from '../karten/store';
-import { setActiveKarte } from '../state/session';
+import { openKarte } from '../karten/active';
 import { goLive, step } from '../state/time';
 import { closeKarteDetail, hudSearchFocus, detailOpen, orteView } from '../state/hud';
 import { isMobile, leftPanelOpen, leftView, searchOpen, settingsOpen, shortcutsOpen, sheetDetent } from '../state/ui';
@@ -94,7 +94,7 @@ export function startKeyboard(): () => void {
       default:
         if (/^[1-9]$/.test(e.key)) {
           const k = listedKarten.peek()[Number(e.key) - 1];
-          if (k) setActiveKarte(k.id);
+          if (k) openKarte(k.id);
         }
     }
   };
