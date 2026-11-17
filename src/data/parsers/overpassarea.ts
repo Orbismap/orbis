@@ -21,6 +21,8 @@ export interface AreaOptions<N extends ParserName> {
   minZoom: number;
   /** grid size in degrees */
   grid: number;
+  /** the box reaches at most this far (degrees) from the map centre in every direction: a tilted view shows kilometres of ground */
+  maxSpan?: number;
 }
 
 export function overpassArea<N extends ParserName>(ctx: LayerContext, o: AreaOptions<N>): LiveResource<ParserResult<N>> {
@@ -33,8 +35,10 @@ export function overpassArea<N extends ParserName>(ctx: LayerContext, o: AreaOpt
       if (ml.getZoom() < o.minZoom - 0.05) return o.empty;
       const b = ml.getBounds();
       const g = o.grid;
-      const s = Math.max(-85, Math.floor(b.getSouth() / g) * g), n = Math.min(85, Math.ceil(b.getNorth() / g) * g);
-      const w = Math.max(-180, Math.floor(b.getWest() / g) * g), e = Math.min(180, Math.ceil(b.getEast() / g) * g);
+      const c = ml.getCenter();
+      const span = o.maxSpan ?? Infinity;
+      const s = Math.max(-85, Math.floor(Math.max(b.getSouth(), c.lat - span) / g) * g), n = Math.min(85, Math.ceil(Math.min(b.getNorth(), c.lat + span) / g) * g);
+      const w = Math.max(-180, Math.floor(Math.max(b.getWest(), c.lng - span) / g) * g), e = Math.min(180, Math.ceil(Math.min(b.getEast(), c.lng + span) / g) * g);
       const key = `${s},${w},${n},${e}`;
       const hit = cache.get(key);
       if (hit) return hit;

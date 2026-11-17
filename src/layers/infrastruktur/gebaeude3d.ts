@@ -3,12 +3,16 @@
 //   osm      OSM buildings from the OpenFreeMap tiles (source `ofm`, shared with the basemap): building parts at their own height,
 //            outlines with parts hidden (`hide_3d`), the colour OSM knows (`colour`: building:colour / colour). It replaces the
 //            plain 2.5D buildings of the basemap switch.
+//   dach     OSM buildings with their roof shapes and building parts (Simple 3D Buildings): footprints and tags from Overpass for the view
+//            (from zoom 16), Orbis Pro models walls and roofs in 3D; the 2.5D buildings go while they are drawn.
 //   plateau  the streamed Plateau city models of Japan (3D Tiles, Orbis Pro draws them); the 2.5D buildings go while one is in view.
 // The basemap switch "3D-Gebäude" is separate: plain OSM 2.5D buildings and the Cesium 3D tiles on aerial images.
 import { effect, signal } from '@preact/signals';
 import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl';
 import { loadPlateau, PLATEAU_ATTRIBUTION, type PlateauSample } from '../../data/plateau';
-import { setTilesetSource, tilesetsChannel } from '../../ext/channels';
+import { buildingsQuery } from '../../data/parsers/gebaeude';
+import { overpassArea } from '../../data/parsers/overpassarea';
+import { buildingsChannel, setTilesetSource, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../../map/buildings-tilt';
@@ -20,21 +24,25 @@ const COLOR = '#B9A58C';
 const PLAIN = '#d6dae3';
 const OSM_COLORED = '#c4825a';
 const PLATEAU_COLOR = '#7FA6C9';
+const ROOF_COLOR = '#A0624E';
+/** The roof shapes come from Overpass per view: below this zoom one request would cover too many buildings. */
+const ROOF_MIN_ZOOM = 16;
 const SOURCE = 'plateau';
 const CREDIT = 'gebaeude3d-plateau-attribution';
 
-type Typ = 'osm' | 'plateau';
+type Typ = 'osm' | 'dach' | 'plateau';
 const TYPES: { value: Typ; label: string }[] = [
   { value: 'osm', label: 'OSM eingefärbt' },
+  { value: 'dach', label: 'Dachformen (Orbis Pro)' },
   { value: 'plateau', label: 'Plateau (Japan)' },
 ];
-const asTyp = (v: unknown): Typ => (v === 'plateau' ? 'plateau' : 'osm');
+const asTyp = (v: unknown): Typ => (v === 'plateau' || v === 'dach' ? v : 'osm');
 
 export default defineLayer({
   id: 'gebaeude3d',
   category: 'infrastruktur',
   title: '3D-Gebäude',
-  summary: 'Gebäude in 3D mit Gebäudeteilen: OSM mit ihren Farben, Japan als Stadtmodell (Plateau)',
+  summary: 'Gebäude in 3D mit Gebäudeteilen: OSM mit ihren Farben oder mit Dachformen (Orbis Pro), Japan als Stadtmodell (Plateau)',
   icon: 'building',
   color: COLOR,
   form: 'areas',
@@ -42,14 +50,16 @@ export default defineLayer({
   minZoom: 14,
   coverage: 'Welt (OSM), Japan (Plateau)',
   sources: [
-    { name: 'OpenFreeMap / OpenStreetMap-Mitwirkende', url: 'https://openfreemap.org/', license: 'ODbL 1.0' },
+    { name: 'OpenFreeMap / OpenStreetMap-Mitwirkende (Dachformen: Overpass API)', url: 'https://openfreemap.org/', license: 'ODbL 1.0' },
     { name: PLATEAU_ATTRIBUTION, url: 'https://www.mlit.go.jp/plateau/', license: 'CC BY 4.0' },
   ],
   options: [{ id: 'typ', label: 'Typ', type: 'select', default: 'osm', choices: TYPES }],
   legend: (o) => (asTyp(o.typ) === 'plateau'
     ? { type: 'classes', items: [{ color: PLATEAU_COLOR, label: 'Stadtmodell Japan (mit Orbis Pro)', shape: 'square' }] }
+    : asTyp(o.typ) === 'dach'
+    ? { type: 'classes', items: [{ color: ROOF_COLOR, label: 'Dach mit Form (roof:shape) und Höhe aus OSM', shape: 'square' }, { color: OSM_COLORED, label: 'Wandfarbe wie in OSM eingetragen', shape: 'square' }, { color: PLAIN, label: 'Ohne Angabe: Flachdach, Höhe nach Etagen', shape: 'square' }] }
     : { type: 'classes', items: [{ color: OSM_COLORED, label: 'Farbe wie in OSM eingetragen', shape: 'square' }, { color: PLAIN, label: 'Keine Farbe in OSM', shape: 'square' }] }),
-  keywords: ['gebäude', '3d', 'haus', 'häuser', 'gebäudeteile', 'building', 'buildings', 'osm', 'farbe', 'plateau', 'japan', 'tokio', 'stadtmodell', 'fotomesh', 'lod'],
+  keywords: ['gebäude', '3d', 'haus', 'häuser', 'gebäudeteile', 'dach', 'dachform', 'satteldach', 'walmdach', 'kuppel', 'roof', 'building:part', 'building', 'buildings', 'osm', 'farbe', 'plateau', 'japan', 'tokio', 'stadtmodell', 'fotomesh', 'lod'],
 
   mount(ctx) {
     const ml = ctx.map.ml;
@@ -80,6 +90,23 @@ export default defineLayer({
         }
         buildingsReplaced.value = on;
         ctx.status({ state: 'ready' });
+      }),
+      // the roof shapes: footprints and tags from Overpass go to Orbis Pro, which models them; the 2.5D buildings give way while they are drawn
+      effect(() => {
+        if (typ() !== 'dach') return;
+        if (!proAvailable || !proEnabled.value) { ctx.status({ state: 'empty', note: 'Die Dachformen zeichnet Orbis Pro.' }); return; }
+        const res = overpassArea(ctx, { parser: 'overpassBuildings', query: buildingsQuery, empty: [], minZoom: ROOF_MIN_ZOOM, grid: 0.004, maxSpan: 0.007 });
+        const stopData = effect(() => {
+          const items = res.data.value;
+          if (items === undefined) { ctx.status(res.error.value ? { state: 'error', note: res.error.value } : { state: 'loading' }); return; }
+          buildingsChannel.publish(() => items);
+          const roofs = items.filter((b) => b.tags['roof:shape'] && b.tags['roof:shape'] !== 'flat').length;
+          ctx.status(items.length
+            ? { state: 'ready', count: items.length, updatedAt: res.updatedAt.value, note: `${roofs} mit Dachform, ${items.filter((b) => b.part).length} Gebäudeteile` }
+            : { state: ml.getZoom() < ROOF_MIN_ZOOM ? 'ready' : 'empty', updatedAt: res.updatedAt.value, note: ml.getZoom() < ROOF_MIN_ZOOM ? `Ab Zoomstufe ${ROOF_MIN_ZOOM}` : undefined });
+        });
+        const stopReplace = effect(() => { buildingsReplaced.value = buildingsChannel.presented.value; });
+        return () => { stopData(); stopReplace(); res.dispose(); buildingsChannel.reset(); }; // buildingsReplaced: the effect of the next type sets it
       }),
       // the Plateau models (Orbis Pro streams them)
       effect(() => {

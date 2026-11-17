@@ -4,7 +4,7 @@ import './ui/base.css';
 import { App } from './app/App';
 import * as karten from './karten/store';
 import { initKartenStore } from './karten/store';
-import { powerChannel, shipsChannel, tracksChannel, treesChannel } from './ext/channels';
+import { buildingsChannel, powerChannel, shipsChannel, tracksChannel, treesChannel } from './ext/channels';
 import { extensionStatus, proAvailable, startExtensions } from './ext/loader';
 import { allLayers, getLayer } from './layers/registry';
 import { getEngine } from './map/engine';
@@ -50,6 +50,7 @@ if (location.search.includes('smoke') || import.meta.env.DEV) {
       ships: shipsChannel,
       power: powerChannel,
       trees: treesChannel,
+      buildings: buildingsChannel,
       stage: () => (getEngine()?.ml.getLayer('orbis-stage') as unknown as { implementation?: { stats?(): unknown } } | undefined)?.implementation?.stats?.(),
     },
   };

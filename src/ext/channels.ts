@@ -6,7 +6,7 @@
 //  - `present()` only hides the layer's own icons; data, polling, selection and cards keep working.
 //  - When the last presenter releases (or the extension is disposed), the 2D presentation is back at once.
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
-import type { CardAction, FollowRef, PowerGridSample, ShipSample, TreeSample, TilesetSample, TilesetsState, TrackSample, TracksChannel } from './types';
+import type { BuildingSample, CardAction, FollowRef, PowerGridSample, ShipSample, TreeSample, TilesetSample, TilesetsState, TrackSample, TracksChannel } from './types';
 
 /** The side of the layer: everything of `TracksChannel` plus what only the publishing layer may do. */
 export interface TracksPublisher<T = TrackSample> extends TracksChannel<T> {
@@ -113,6 +113,9 @@ export const powerChannel: TracksPublisher<PowerGridSample> = createTracksChanne
 
 /** The one channel for single trees (layer `baeume`). */
 export const treesChannel: TracksPublisher<TreeSample> = createTracksChannel<TreeSample>();
+
+/** The one channel for building footprints with roof tags (layer `gebaeude3d`, type "dach"). */
+export const buildingsChannel: TracksPublisher<BuildingSample> = createTracksChannel<BuildingSample>();
 
 /** The one channel for streamed 3D city models (`features/buildings3d/tiles-source.ts`). */
 export const tilesetsChannel: TracksPublisher<TilesetSample> = createTracksChannel<TilesetSample>();
