@@ -77,8 +77,10 @@
   .hud-row[aria-current='true'] { background: var(--g-fill-active); }
   .hud-arow { display: flex; align-items: center; border-radius: 8px; }
   .hud-arow .hud-row { flex: 1; min-width: 0; }
-  .hud-rowx { flex: none; width: 24px; height: 24px; margin-right: 6px; border-radius: 50%; display: grid; place-items: center; color: var(--text-3); opacity: 0; transition: opacity 120ms; }
-  .hud-arow:hover .hud-rowx, .hud-rowx:focus-visible { opacity: 1; }
+  .hud-rowx { flex: none; width: 24px; height: 24px; margin-right: 6px; border-radius: 7px; display: grid; place-items: center; color: var(--text-3); opacity: 0; transition: opacity 160ms var(--ease); }
+  .hud-arow:hover .hud-rowx, .hud-rowx:focus-visible, .hud-rowx.hud-rowdel { opacity: 1; }
+  .hud-rowx.hud-rowdel { animation: hud-rowx-in 200ms var(--ease); }
+  @keyframes hud-rowx-in { from { opacity: 0; } }
   .hud-rowx:hover { background: var(--g-fill-hover); color: var(--text-1); }
   @media (hover: none) { .hud-rowx { opacity: 1; } }
   .hud-rt { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -159,10 +161,12 @@
   .hud-optbtn[data-on='true'] .hud-ico-b { opacity: 1; transform: none; }
   .hud-optlabel { display: inline-block; max-width: 0; overflow: hidden; white-space: nowrap; opacity: 0; transition: max-width 240ms var(--ease), opacity 200ms var(--ease), margin 240ms var(--ease); }
   .hud-optbtn[data-on='true'] .hud-optlabel { max-width: 70px; opacity: 1; margin-left: 4px; margin-right: 2px; }
+  .hud-rowdel { opacity: 1; color: var(--text-2); }
+  .hud-rowdel:hover { color: #ff6b5e; }
   .hud-arow.is-sortable { cursor: grab; touch-action: none; user-select: none; }
   .hud-arow.is-sortable .hud-row { cursor: grab; pointer-events: none; }
-  .hud-grip-row { flex: none; width: 0; height: 28px; margin-left: 0; overflow: hidden; display: grid; place-items: center; color: var(--text-3); opacity: 0; transform: translateX(-10px); transition: width 220ms var(--ease), margin 220ms var(--ease), opacity 180ms var(--ease), transform 220ms var(--ease); }
-  .hud-grip-row[data-on='true'] { width: 18px; margin-left: 2px; opacity: 1; transform: none; }
+  .hud-grip-row { flex: none; width: 0; height: 28px; margin-left: 0; overflow: hidden; display: grid; place-items: center; color: transparent; opacity: 0; transform: translateX(-10px); transition: width 220ms var(--ease), margin 220ms var(--ease), opacity 180ms var(--ease), transform 220ms var(--ease), color 220ms var(--ease); }
+  .hud-grip-row[data-on='true'] { width: 18px; margin-left: 2px; opacity: 1; transform: none; color: var(--text-3); }
   .hud-rows li.is-dragging { position: relative; z-index: 3; background: var(--g-fill-active); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
   .hud-rows.is-reordering { user-select: none; }
   .hud-filter { position: relative; padding-bottom: 2px; }

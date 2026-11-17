@@ -115,7 +115,7 @@ export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGr
         {/* one button per row: the filter (its popup ends in "Einstellungen") or, without options, the gear */}
         {editing && onRemove && (
           <button type="button" class="lrow-set" aria-label={`${def.title} aus der Karte entfernen`} onClick={onRemove}>
-            <Icon name="minus" size={16} />
+            <Icon name="close" size={16} />
           </button>
         )}
         {editing ? null : hasChoices(def) ? <FilterButton def={def} layer={layer} karteId={karteId} onSettings={openPage} /> : <SettingsButton def={def} onClick={openPage} />}
@@ -138,7 +138,7 @@ function SettingsButton({ def, onClick }: { def: LayerDef; onClick(): void }) {
  * One option of the field choice list (single selection, Apple HIG: list with checkmark, not a switch).
  * The chosen row also shows data age/status and the settings button.
  */
-export function FieldRow({ layer, def, karteId, from, tabbable, onSelect }: { layer: KarteLayer; def: LayerDef; karteId: string; from: string; tabbable: boolean; onSelect(): void }) {
+export function FieldRow({ layer, def, karteId, from, tabbable, onSelect, onRemove }: { layer: KarteLayer; def: LayerDef; karteId: string; from: string; tabbable: boolean; onSelect(): void; /** Edit mode: takes the layer out of this Karte. */ onRemove?(): void }) {
   const selected = layer.visible;
   const raw = selected ? layerStatus.value[def.id] : undefined;
   const st = rowStatus(raw, def.cadence, now.value);
@@ -156,7 +156,12 @@ export function FieldRow({ layer, def, karteId, from, tabbable, onSelect }: { la
             {selected && <Icon name="check" size={16} />}
           </span>
         </button>
-        {selected && (hasChoices(def) ? <FilterButton def={def} layer={layer} karteId={karteId} onSettings={() => openDetail(karteId, def.id, from)} /> : <SettingsButton def={def} onClick={() => openDetail(karteId, def.id, from)} />)}
+        {onRemove && (
+          <button type="button" class="lrow-set" aria-label={`${def.title} aus der Karte entfernen`} onClick={onRemove}>
+            <Icon name="close" size={16} />
+          </button>
+        )}
+        {selected && !onRemove && (hasChoices(def) ? <FilterButton def={def} layer={layer} karteId={karteId} onSettings={() => openDetail(karteId, def.id, from)} /> : <SettingsButton def={def} onClick={() => openDetail(karteId, def.id, from)} />)}
       </div>
     </div>
   );

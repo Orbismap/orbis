@@ -123,6 +123,13 @@ describe('url', () => {
     expect(parseHash('#/?k=wetter&b=satellite')).toEqual({ karte: 'wetter', basemap: 'satellite' });
     expect(parseHash('#/?b=a<b').basemap).toBeUndefined();
   });
+  it('round-trips a shared own Karte', () => {
+    const s = { layers: ['erdbeben'], shared: { name: 'Mein, Wetter', icon: 'cloud', color: '#72C8F0', basemap: 'satellite' } };
+    const h = serializeHash(s);
+    expect(h).toBe('#/?m=Mein%2C%20Wetter,cloud,72C8F0,satellite&l=erdbeben');
+    expect(parseHash(h)).toEqual(s);
+    expect(parseHash('#/?m=x,cloud,zzz').shared).toBeUndefined();
+  });
   it('round-trips a searched place, commas in names included', () => {
     const s = { place: { lat: 52.51874, lng: 13.40802, title: 'Berlin, Mitte', subtitle: 'Berlin, Deutschland', kind: 'city' } };
     const h = serializeHash(s);

@@ -117,6 +117,16 @@ export function saveAs(src: Karte, name: string, meta: { icon?: IconName; color?
   return id;
 }
 
+/** Creates an own Karte from a shared link (or opens the one that already matches) and returns its id. */
+export function importKarte(v: { name: string; icon: string; color: string; basemap?: string; layers: string[] }): string {
+  const ids = [...new Set(v.layers.filter(hasLayer))];
+  const same = customKarten.peek().find((k) => k.name === v.name.slice(0, 60) && k.layers.map((l) => l.id).join() === ids.join());
+  if (same) return same.id;
+  const id = newId();
+  customKarten.value = [...customKarten.peek(), { id, name: v.name.slice(0, 60), icon: v.icon as IconName, color: v.color, basemap: (resolveBasemapId(v.basemap) ?? 'orbis-dark') as BasemapId, labels: true, terminator: false, layers: ids.map((l) => ({ id: l, visible: true, opacity: 1 })) }];
+  return id;
+}
+
 export function deleteKarte(id: string): void {
   if (!isBuiltin(id)) customKarten.value = customKarten.peek().filter((k) => k.id !== id);
 }

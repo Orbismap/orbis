@@ -33,6 +33,18 @@ describe('url layers', () => {
   });
 });
 
+describe('shared own Karte', () => {
+  it('opening the link creates the own Karte once and opens it', () => {
+    const h = '#/?m=Geteilt,cloud,72C8F0&l=erdbeben,radar';
+    applyUrlState(parseHash(h));
+    expect(activeKarte.value.name).toBe('Geteilt');
+    expect(activeKarte.value.layers.filter((l) => l.visible).map((l) => l.id)).toEqual(['erdbeben', 'radar']);
+    const id = activeKarte.value.id;
+    applyUrlState(parseHash(h));
+    expect(activeKarte.value.id).toBe(id);
+  });
+});
+
 describe('derived Karte', () => {
   it('is the unsaved Karte while a layer belongs to no standard Karte', () => {
     setActiveIds(['radar']);

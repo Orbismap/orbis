@@ -3,7 +3,8 @@ import { effect, batch } from '@preact/signals';
 import { throttle } from '../core/scheduler';
 import { followCurrent, followWanted } from '../ext/channels';
 import { parseHash, serializeHash, type UrlState } from '../core/url';
-import { activeIds, openKarte, setActiveIds, setBasemap } from '../karten/active';
+import { activeIds, openKarte, setActiveIds, setActiveKarte, setBasemap } from '../karten/active';
+import { importKarte } from '../karten/store';
 import { resolveBasemapId } from '../map/basemaps';
 import { activeKarte } from './session';
 import { place, selectPlace } from './selection';
@@ -14,12 +15,13 @@ import { camera, projection, setCamera, setProjection } from './view';
 export function applyUrlState(u: UrlState): void {
   batch(() => {
     // The link only says which layers are on; the Karte follows from them. An old link with `k=` and no layers opens that standard Karte.
-    if (u.layers) setActiveIds(u.layers);
+    if (u.shared && u.layers) setActiveKarte(importKarte({ ...u.shared, layers: u.layers }));
+    else if (u.layers) setActiveIds(u.layers);
     else if (u.karte) openKarte(u.karte);
     if (u.view) setCamera({ lng: u.view.lng, lat: u.view.lat, zoom: u.view.zoom, bearing: u.view.bearing ?? 0, pitch: u.view.pitch ?? 0 });
     if (u.globe !== undefined) setProjection(u.globe ? 'globe' : 'mercator');
     // a basemap in a link is taken for this session only
-    const wanted = resolveBasemapId(u.basemap);
+    const wanted = u.shared ? undefined : resolveBasemapId(u.basemap);
     if (wanted) setBasemap(activeKarte.peek().id, wanted);
     if (u.time !== undefined) setTime(u.time);
     // a new object each time: the same object asked for again starts the follow again

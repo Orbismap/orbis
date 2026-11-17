@@ -112,7 +112,7 @@ function GroupBlock({ karte, group, index, count, onGrip }: { karte: Karte; grou
 }
 
 /** All layers of the Karte, grouped by category. Active rows stay in place (background only); groups are sortable in edit mode. */
-function MenuSection({ karte, groups }: { karte: Karte; groups: Group[] }) {
+function MenuSection({ karte, groups, hasFields }: { karte: Karte; groups: Group[]; hasFields: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const flipPrev = useFlip(box);
   const moveGroup = (id: string, to: number) => {
@@ -136,7 +136,7 @@ function MenuSection({ karte, groups }: { karte: Karte; groups: Group[] }) {
             />
           ))}
         </div>
-      ) : (
+      ) : hasFields ? null : (
         <p class="lsec-empty">Noch keine Ebenen. Füge unten eine hinzu.</p>
       )}
       <div class="sr-only" role="status" aria-live="polite">
@@ -190,7 +190,7 @@ function FieldSection({ karte, fields }: { karte: Karte; fields: LayerDef[] }) {
           </div>
         </div>
         {shown.map((def) => (
-          <FieldRow key={def.id} layer={layerOf(karte, def.id)} def={def} karteId={karte.id} from={FROM} tabbable={sel?.id === def.id} onSelect={() => choose(def.id)} />
+          <FieldRow key={def.id} layer={layerOf(karte, def.id)} def={def} karteId={karte.id} from={FROM} tabbable={sel?.id === def.id} onSelect={() => choose(def.id)} onRemove={editMode.value && !karte.builtin ? () => removeLayer(karte.id, def.id) : undefined} />
         ))}
       </div>
       {(hidden > 0 || (all && fields.length > FIELD_LIMIT)) && (
@@ -236,7 +236,7 @@ export function LayersList() {
   const fields = fieldIds.map((id) => getLayer(id)).filter((d): d is LayerDef => isField(d));
   return (
     <div class="lnav" ref={root} onKeyDown={navKey} key="list">
-      <MenuSection karte={k} groups={buildGroups(k)} />
+      <MenuSection karte={k} groups={buildGroups(k)} hasFields={fields.length > 0} />
       <FieldSection karte={k} fields={fields} />
       {editMode.value && !k.builtin && !isMobile.value && (
         <button type="button" class="ladd" data-nav onClick={() => (leftView.value = 'catalog')}>

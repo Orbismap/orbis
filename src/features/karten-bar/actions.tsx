@@ -1,6 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import { serializeHash } from '../../core/url';
-import { openKarte, SCRATCH_ID, setActiveIds, setActiveKarte } from '../../karten/active';
+import { activeKarteId, openKarte, SCRATCH_ID, setActiveIds, setActiveKarte } from '../../karten/active';
 import { DEFAULT_KARTE_ID } from '../../karten/standard';
 import { createKarte, customKarten, deleteKarte, isBuiltin, listedKarten, saveAs, updateKarteMeta } from '../../karten/store';
 import type { Karte } from '../../karten/types';
@@ -10,7 +10,9 @@ import { cx } from '../../ui/hooks';
 import { Icon } from '../../ui/icons/Icon';
 import type { IconName } from '../../ui/icons/names';
 import { MenuItem, MenuSeparator, Popover } from '../../ui/Popover';
+import { leftView } from '../../state/ui';
 import { toast } from '../../ui/toast';
+import { editMode } from '../layers-panel/themes-state';
 
 const ICONS: IconName[] = ['pin', 'map', 'globe', 'layers', 'cloud', 'plane', 'ship', 'camera', 'leaf', 'mountain', 'drop', 'flame', 'bolt', 'sun', 'moon', 'people'];
 const COLORS = ['#72C8F0', '#FF6B5E', '#F2B45A', '#58D0A0', '#C0A0FF', '#A58BFF', '#FF8FB8', '#8FDCFF'];
@@ -64,13 +66,34 @@ export function saveAsKarte(source: Karte, v: { name: string; icon: IconName; co
 }
 
 async function copyLink(k: Karte): Promise<void> {
-  const url = `${location.origin}${location.pathname}${serializeHash({ layers: k.layers.filter((l) => l.visible).map((l) => l.id) })}`;
+  const url = `${location.origin}${location.pathname}${serializeHash({ layers: k.layers.filter((l) => l.visible).map((l) => l.id), shared: { name: k.name, icon: k.icon, color: k.color, basemap: k.basemap } })}`;
   try {
     await navigator.clipboard.writeText(url);
     toast('Link kopiert', { kind: 'ok' });
   } catch {
     toast('Link konnte nicht kopiert werden', { kind: 'error' });
   }
+}
+
+/** Deletes an own Karte (leaving it, if it was open) with an undo toast. */
+export function removeKarte(k: Karte): void {
+  const snapshot = structuredClone(k);
+  const idx = customKarten.peek().findIndex((x) => x.id === k.id);
+  const wasOpen = activeKarteId.peek() === k.id;
+  deleteKarte(k.id);
+  editMode.value = false;
+  if (wasOpen) (setActiveKarte(DEFAULT_KARTE_ID), setActiveIds([]));
+  toast(`„${snapshot.name}“ gelöscht`, {
+    action: {
+      label: 'Rückgängig',
+      run: () => {
+        const next = [...customKarten.peek()];
+        next.splice(Math.max(0, idx), 0, snapshot);
+        customKarten.value = next;
+        if (wasOpen) setActiveKarte(snapshot.id);
+      },
+    },
+  });
 }
 
 type View = { kind: 'list' } | { kind: 'actions'; id: string } | { kind: 'rename'; id: string } | { kind: 'delete'; id: string };
@@ -94,22 +117,8 @@ export function KartenPopover({ open, onClose, anchor, align = 'end', up, class:
     onPicked?.(id);
   };
   const remove = (k: Karte) => {
-    const snapshot = structuredClone(k);
-    const idx = customKarten.value.findIndex((x) => x.id === k.id);
-    deleteKarte(k.id);
-    if (active.id === k.id) (setActiveKarte(DEFAULT_KARTE_ID), setActiveIds([]));
+    removeKarte(k);
     close();
-    toast(`„${snapshot.name}“ gelöscht`, {
-      action: {
-        label: 'Rückgängig',
-        run: () => {
-          const next = [...customKarten.value];
-          next.splice(Math.max(0, idx), 0, snapshot);
-          customKarten.value = next;
-          setActiveKarte(snapshot.id);
-        },
-      },
-    });
   };
   const duplicate = (k: Karte) => {
     setActiveKarte(saveAs(k, `${k.name} (Kopie)`));
@@ -175,9 +184,12 @@ export function KartenPopover({ open, onClose, anchor, align = 'end', up, class:
             </button>
           )}
           <MenuItem icon="pencil" onClick={() => setView({ kind: 'rename', id: target.id })}>
-            Umbenennen, Symbol und Farbe
+            {target.name} umbenennen
           </MenuItem>
-          <MenuItem icon="plus" onClick={() => duplicate(target)}>
+          <MenuItem icon="plus" onClick={() => (leftView.value = 'catalog')}>
+            Ebene hinzufügen
+          </MenuItem>
+          <MenuItem icon="copy" onClick={() => duplicate(target)}>
             Duplizieren
           </MenuItem>
           <MenuItem

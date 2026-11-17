@@ -1,4 +1,4 @@
-// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?l=<id>,<id>…&t=<iso>&g=1&f=flug:<hex>|schiff:<mmsi>&p=
+// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?l=<id>,<id>…&m=<name>,<icon>,<color>[,<basemap>]&t=<iso>&g=1&f=flug:<hex>|schiff:<mmsi>&p=
 // (l = the active layers; k= (a standard Karte) and b= (basemap) are only read, from older links, and never written)
 // p=<lat>,<lng>,<name>,<region>[,<kind>]
 // (p = a searched place; name, region and kind are percent-encoded, so their commas do not split)
@@ -9,6 +9,8 @@ export interface UrlState {
   view?: UrlView;
   karte?: string;
   layers?: string[];
+  /** A shared own Karte (m=name,icon,color[,basemap]): opening the link creates it with the layers of `l=`. */
+  shared?: { name: string; icon: string; color: string; basemap?: string };
   /** Basemap id of the Karte (validated by the caller). */
   basemap?: string;
   /** Selected time in ms; absent = live. */
@@ -50,6 +52,16 @@ export function parseHash(hash: string): UrlState {
   if (k) out.karte = k;
   const l = q.get('l');
   if (l !== null) out.layers = l.split(',').filter(Boolean);
+  const sh = query.split('&').find((x) => x.startsWith('m='))?.slice(2);
+  if (sh) {
+    try {
+      const [name, icon, color, basemap] = sh.split(',').map(decodeURIComponent);
+      if (name && icon && color && /^[a-z0-9-]{1,24}$/.test(icon) && /^[0-9a-fA-F]{6}$/.test(color) && (!basemap || /^[a-z0-9-]{1,32}$/.test(basemap)))
+        out.shared = { name: name.slice(0, 60), icon, color: `#${color}`, ...(basemap ? { basemap } : {}) };
+    } catch {
+      /* malformed escape: ignore */
+    }
+  }
   const b = q.get('b');
   if (b && /^[a-z0-9-]{1,32}$/.test(b)) out.basemap = b;
   const t = q.get('t');
@@ -85,6 +97,7 @@ export function serializeHash(s: UrlState): string {
     if (v.pitch) path += `,${Math.round(v.pitch)}p`;
   }
   const q: string[] = [];
+  if (s.shared) q.push(`m=${[s.shared.name, s.shared.icon, s.shared.color.replace('#', ''), ...(s.shared.basemap ? [s.shared.basemap] : [])].map(encodeURIComponent).join(',')}`);
   if (s.layers) q.push(`l=${s.layers.map(encodeURIComponent).join(',')}`);
   if (s.time !== undefined) q.push(`t=${new Date(s.time).toISOString().slice(0, 16)}Z`);
   if (s.globe !== undefined) q.push(`g=${s.globe ? 1 : 0}`);
