@@ -1,5 +1,5 @@
 import { clearSelection, inspector, probe } from '../state/selection';
-import { karten } from '../karten/store';
+import { listedKarten } from '../karten/store';
 import { setActiveKarte } from '../state/session';
 import { goLive, step } from '../state/time';
 import { closeKarteDetail, hudSearchFocus, detailOpen, orteView } from '../state/hud';
@@ -93,7 +93,7 @@ export function startKeyboard(): () => void {
         break;
       default:
         if (/^[1-9]$/.test(e.key)) {
-          const k = karten.peek()[Number(e.key) - 1];
+          const k = listedKarten.peek()[Number(e.key) - 1];
           if (k) setActiveKarte(k.id);
         }
     }

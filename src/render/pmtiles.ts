@@ -27,6 +27,8 @@ export interface PmtilesLayerOptions {
   minZoom?: number;
   maxZoom?: number;
   attribution?: string;
+  /** While true the layer is hidden (an extension draws the objects in 3D); picking, cards and data keep working. */
+  hideWhen?: ReadonlySignal<boolean>;
 }
 
 /** Added asynchronously (the pmtiles library loads on demand); destroy() before that cancels cleanly. */
@@ -54,9 +56,16 @@ export function pmtilesLayer(ctx: LayerContext, o: PmtilesLayerOptions): LayerHa
     const main = specs.main.id;
     clean.add(bindProp(ml, main, 'paint', symbol ? 'icon-color' : 'circle-color', o.color));
     if (!symbol) clean.add(bindProp(ml, main, 'paint', 'circle-radius', o.radius, (r) => mapOutputs(r, hoverScale)));
-    if (o.filter) {
+    // Hidden through the filter, not through `visibility`: a layer that is not visible lets MapLibre drop the source's tiles,
+    // and an extension that reads the features (querySourceFeatures) would then see nothing.
+    const hideWhen = o.hideWhen;
+    if (o.filter || hideWhen) {
       const f = o.filter;
-      clean.add(effect(() => { if (ml.getLayer(main)) ml.setFilter(main, andFilter(f.value) ?? null); }));
+      clean.add(effect(() => {
+        const hidden = hideWhen?.value === true;
+        const filter = andFilter(f?.value);
+        if (ml.getLayer(main)) ml.setFilter(main, hidden ? (['literal', false] as unknown as FilterSpecification) : filter ?? null);
+      }));
     }
     clean.add(bindOpacity(ctx, ml, specs.opacity));
     const selectedId = signal<unknown>(null);

@@ -15,7 +15,7 @@ import { PlaceCard } from '../features/place/PlaceCard';
 import { ProbeCard } from '../features/probe/ProbeCard';
 import '../features/karten-bar/karten-bar.css';
 import type { Karte } from '../karten/types';
-import { createKarte, isDirty, karten } from '../karten/store';
+import { createKarte, isDirty, karten, listedKarten } from '../karten/store';
 import { clearSelection, inspector, place, probe, selectPlace } from '../state/selection';
 import { activeKarte, setActiveKarte } from '../state/session';
 import { RoutePanel } from '../features/routes/RoutePanel';
@@ -135,7 +135,7 @@ const KARTEN_SHOWN = 5;
 
 /** Main menu: search and the list of Karten. */
 function MainPanel() {
-  const all = karten.value;
+  const all = listedKarten.value;
   const active = activeKarte.value;
   const [more, setMore] = useState(false);
   const [q, setQ] = useState('');

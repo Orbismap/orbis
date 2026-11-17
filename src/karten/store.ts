@@ -84,6 +84,8 @@ const builtins = computed(() => builtinKarten());
 /** All Karten as the user sees them: builtins (with draft) first, then own Karten. */
 // Themes always come from the code, never from a draft.
 export const karten = computed<Karte[]>(() => [...builtins.value.map((k) => (drafts.value[k.id] ? { ...drafts.value[k.id]!, themes: k.themes } : k)), ...customKarten.value]);
+/** The Karten the user may pick: all except hidden ones (the plain start map). */
+export const listedKarten = computed<Karte[]>(() => karten.value.filter((k) => !k.hidden));
 export const getKarte = (id: string): Karte | undefined => karten.value.find((k) => k.id === id);
 export const isBuiltin = (id: string) => builtins.value.some((k) => k.id === id);
 /** True only for a standard Karte that was really rebuilt (not for silently remembered switches). Own Karten never. */

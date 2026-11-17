@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { createKarte, isDirty, karten } from '../../karten/store';
+import { createKarte, isDirty, listedKarten } from '../../karten/store';
 import { activeKarte, setActiveKarte } from '../../state/session';
 import { Icon } from '../../ui/icons/Icon';
 import { cx } from '../../ui/hooks';
@@ -16,7 +16,7 @@ const LONG_PRESS = 500;
  * A click on the active pill, a right click or a long press opens the actions of that Karte.
  */
 export function KartenBar() {
-  const list = karten.value;
+  const list = listedKarten.value;
   const active = activeKarte.value;
   const row = useRef<HTMLDivElement>(null);
   const clip = useRef<HTMLDivElement>(null);

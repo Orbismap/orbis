@@ -7,6 +7,8 @@ export interface KarteLayer { id: string; visible: boolean; opacity: number; opt
 export interface KarteTheme { id: string; title: string; icon: IconName; layers: string[] }
 export interface Karte {
   id: string; name: string; icon: IconName; color: string; builtin?: boolean;
+  /** Works as a Karte but is not offered in any list (menu, bar, shortcuts, search): the plain start map. */
+  hidden?: boolean;
   basemap: BasemapId; labels: boolean; terminator: boolean;
   layers: KarteLayer[];             // order = stack inside the slots, topmost first
   view?: { center: [number, number]; zoom: number };

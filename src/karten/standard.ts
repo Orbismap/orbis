@@ -43,7 +43,7 @@ const THEMES: Record<string, KarteTheme[]> = {
     T('medien', 'Medien', 'radio', ['radio']),
   ],
   erde: [
-    T('oberflaeche', 'Oberfläche', 'leaf', ['satellitenbild', 'vegetation', 'landbedeckung', 'schneedecke', 'bodentemperatur', 'aerosole', 'nachtlichter']),
+    T('oberflaeche', 'Oberfläche', 'leaf', ['satellitenbild', 'vegetation', 'baeume', 'landbedeckung', 'schneedecke', 'bodentemperatur', 'aerosole', 'nachtlichter']),
     T('untergrund', 'Untergrund', 'mountain', ['geologie', 'plattengrenzen', 'erdbeben', 'vulkane']),
     T('meer', 'Meer', 'wave', ['meerestemperatur', 'meeresstroemung', 'seegang', 'meerestiefe', 'meereis', 'chlorophyll']),
     T('gewaesser', 'Küste und Gewässer', 'drop', ['fluesse', 'pegel', 'gezeiten', 'bojen', 'schiffsrouten']),
@@ -64,9 +64,11 @@ const THEMES: Record<string, KarteTheme[]> = {
 };
 
 const DEFS: Karte[] = [
+  // What a first visit starts with: the plain map, no layers (the user picks a Karte from the menu).
+  { id: 'start', name: 'Karte', icon: 'map', color: '#9AA7B8', builtin: true, hidden: true, basemap: 'orbis-dark', labels: true, terminator: false, layers: [] },
   {
     id: 'wetter', name: 'Wetter', icon: 'cloud', color: '#72C8F0', builtin: true, basemap: 'orbis-dark', labels: true, terminator: true,
-    layers: [on('radar'), off('wind', 0.85), off('temperatur', 0.8), off('gefuehlt', 0.8), off('staedte'), off('luftqualitaet', 0.85), off('niederschlag'), off('bewoelkung'), off('luftdruck'), off('satellit'), on('stroemung'), off('blitze'), off('feinstaub')],
+    layers: [on('radar'), off('wind', 0.85), off('temperatur', 0.8), off('gefuehlt', 0.8), off('staedte'), off('luftqualitaet', 0.85), off('niederschlag'), off('bewoelkung'), off('luftdruck'), off('satellit'), off('stroemung'),off('blitze'), off('feinstaub')],
   },
   {
     id: 'gefahren', name: 'Gefahren', icon: 'warning', color: '#FF6B5E', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,
@@ -108,4 +110,4 @@ export const builtinKarten = (): Karte[] =>
     layers: k.layers.filter((l) => hasLayer(l.id)).map((l) => ({ ...l })),
     themes: k.themes?.map((t) => ({ ...t, layers: t.layers.filter(hasLayer) })).filter((t) => t.layers.length),
   }));
-export const DEFAULT_KARTE_ID = 'wetter';
+export const DEFAULT_KARTE_ID = 'start';
