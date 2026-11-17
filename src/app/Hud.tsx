@@ -9,7 +9,7 @@ import { flyToPoint } from '../features/shared/map';
 import { openDetail } from '../features/layers-panel/themes-state';
 import { selectCard, setProbe } from '../state/selection';
 import { InspectorCard } from '../features/inspector/Inspector';
-import { KartenChangeRow, KartenPopover, NameForm, saveAsKarte } from '../features/karten-bar/actions';
+import { KartenChangeRow, KartenPopover, NameForm, removeKarte, saveAsKarte } from '../features/karten-bar/actions';
 import { detailPage, editMode } from '../features/layers-panel/themes-state';
 import { PlaceCard } from '../features/place/PlaceCard';
 import { ProbeCard } from '../features/probe/ProbeCard';
@@ -407,6 +407,11 @@ function MainPanel() {
                 </span>
                 <span class="hud-rt">{k.name}</span>
               </button>
+              {sorting && !k.builtin && k.id !== SCRATCH_ID && (
+                <button type="button" class="hud-rowx hud-rowdel" aria-label={`${k.name} löschen`} onPointerDown={(e) => e.stopPropagation()} onClick={() => removeKarte(k)}>
+                  <Icon name="close" size={13} />
+                </button>
+              )}
               </div>
             </li>
           ))}
@@ -474,17 +479,24 @@ function Grip() {
 function BottomBar() {
   const k = browsedKarte.value;
   const own = !k.builtin && k.id !== SCRATCH_ID;
-  const [menu, setMenu] = useState(false);
-  const bar = useRef<HTMLDivElement>(null);
+  const editing = editMode.value;
+  useEffect(() => () => void (editMode.value = false), []);
+  // a press on anything that is not part of editing (the map, the main menu, empty space in the panel, ...) ends the edit mode
+  useEffect(() => {
+    if (!editing) return;
+    const on = (e: PointerEvent) => {
+      if (!(e.target as Element).closest('.lrow, .lgrp-head, .ladd, .hudd-fbar, .hudd-fpop, .hudd-head button, .kchange, .popover, .hudc-scrim, .toasts')) editMode.value = false;
+    };
+    document.addEventListener('pointerdown', on, true);
+    return () => document.removeEventListener('pointerdown', on, true);
+  }, [editing]);
   return (
     <>
-      <div class="hudd-fpop">
-        {menu && <KartenPopover key={k.id} open onClose={() => setMenu(false)} anchor={bar} only={k.id} up align="start" class="hud-fmenu" />}
-      </div>
-      <div class="hudd-fbar" ref={bar} role="group" aria-label="Karte">
-        {<IconButton icon="plus-square" size={21} label="Ebene hinzufügen" onClick={() => ((setMenu(false)), (leftView.value = 'catalog'))} />}
-        <IconButton icon="pencil" size={21} label="Reihenfolge bearbeiten" pressed={editMode.value} onClick={() => (editMode.value = !editMode.value)} />
-        {own && <IconButton icon="more" size={21} label="Karte bearbeiten" pressed={menu} onClick={() => setMenu(!menu)} />}
+      {/* edit mode of an own Karte: its actions (rename, duplicate, link, delete) stay open above the capsule until the pencil is pressed again */}
+      <div class="hudd-fpop">{editing && own && <KartenPopover key={k.id} open onClose={() => {}} anchor={{ current: null }} only={k.id} up align="start" class="hud-fmenu" />}</div>
+      <div class="hudd-fbar" role="group" aria-label="Karte">
+        <IconButton icon="plus-square" size={21} label="Ebene hinzufügen" onClick={() => (leftView.value = 'catalog')} />
+        <IconButton icon="pencil" size={21} label="Bearbeiten" pressed={editing} onClick={() => (editMode.value = !editing)} />
       </div>
     </>
   );
