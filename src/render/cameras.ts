@@ -34,6 +34,8 @@ export interface CameraSource {
   data: CameraData;
   /** First zoom this source is drawn at, default 0 (world view). */
   minZoom?: number;
+  /** Last zoom this source is drawn at (exclusive), default: always. For decorative sources whose rounded positions would show up as duplicates. */
+  maxZoom?: number;
   /** Card of one object. Without it the source is decorative: no hover, no picking, no glyph. */
   describe?(feature: AnyFeature): InspectCard;
   /** Property with a unique id (hover, selection), default 'id'. */
@@ -130,7 +132,7 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
       const idKey = s.idKey ?? 'id';
       const dirKey = s.dirKey ?? 'dir';
       const picks = !!s.describe;
-      const minzoom = s.minZoom ? { minzoom: s.minZoom } : {};
+      const minzoom = { ...(s.minZoom ? { minzoom: s.minZoom } : {}), ...(s.maxZoom ? { maxzoom: s.maxZoom } : {}) };
       const detailZoom = Math.max(s.minZoom ?? 0, CAMERA_DETAIL_ZOOM);
       const sl = s.data.kind === 'pmtiles' ? { 'source-layer': s.data.sourceLayer } : {};
       const lowLayer = s.data.kind === 'pmtiles' && s.data.lowLayer !== false ? (s.data.lowLayer ?? `${s.data.sourceLayer}_lo`) : undefined;

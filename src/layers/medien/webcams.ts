@@ -125,7 +125,8 @@ export default defineLayer({
       color: COLOR,
       resources: [world],
       count: computed(() => world.data.value?.features.length),
-      overview: { name: 'overview', data: { kind: 'geojson', data: world.data } },
+      // world.json positions are rounded (4 decimals, ~7 m): from zoom 13 on the regional feeds / OSM show the exact ones
+      overview: { name: 'overview', maxZoom: 13, data: { kind: 'geojson', data: world.data } },
       detail: [
         {
           name: 'feeds',

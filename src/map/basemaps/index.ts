@@ -51,21 +51,37 @@ export const resolveBasemapId = (v: unknown): BasemapId | undefined =>
 /** Definition of any basemap; a regional one whose data has not loaded yet shows as the default. */
 export const basemapDef = (id: BasemapId): BasemapDef => (isStaticBasemap(id) ? BASEMAPS[id] : regionalDef(id)) ?? BASEMAPS[DEFAULT_BASEMAP];
 
+/** Fog and horizon colour of the flat map per theme (the sky blends from the fog colour into the horizon colour, see skyFor). */
+const FOG_LOOK = { dark: { fog: '#0A0F18', horizon: '#4aa3d6' }, light: { fog: '#F4F6F9', horizon: '#d7e6f4' } } as const;
+
 /** Atmosphere of the globe: a thin blue limb glow on the dark space (dark) or a soft haze (light). */
 export function skyFor(theme: 'dark' | 'light'): SkySpecification {
   const blend: SkySpecification['atmosphere-blend'] = ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0];
+  // MapLibre draws the globe until zoom 12 and then switches to the flat map; only the flat map has a sky, which would pop up at once
+  // at zoom 12. It is blended in instead: the sky starts as the fog colour (invisible) and turns blue over two zoom steps. The sky
+  // colours do not matter on the globe between zoom 7 and 12. No ground fog (1 = it never starts): it veils only the terrain, never the
+  // 2.5D buildings, which looked worse than the plain edge.
+  const groundFog: SkySpecification['fog-ground-blend'] = 1;
+  const fade = (fog: string, sky: string): SkySpecification['sky-color'] => ['interpolate', ['linear'], ['zoom'], 5, sky, 7, fog, 12, fog, 14, sky];
   return theme === 'dark'
-    ? { 'sky-color': '#16486f', 'horizon-color': '#4aa3d6', 'fog-color': '#0A0F18', 'sky-horizon-blend': 0.35, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.5, 'atmosphere-blend': blend }
-    : { 'sky-color': '#9cc3e4', 'horizon-color': '#d7e6f4', 'fog-color': '#F4F6F9', 'sky-horizon-blend': 0.5, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.5, 'atmosphere-blend': blend };
+    ? { 'sky-color': fade(FOG_LOOK.dark.fog, '#16486f'), 'horizon-color': fade(FOG_LOOK.dark.fog, FOG_LOOK.dark.horizon), 'fog-color': FOG_LOOK.dark.fog, 'sky-horizon-blend': 0.35, 'horizon-fog-blend': 0.5, 'fog-ground-blend': groundFog, 'atmosphere-blend': blend }
+    : { 'sky-color': fade(FOG_LOOK.light.fog, '#9cc3e4'), 'horizon-color': fade(FOG_LOOK.light.fog, FOG_LOOK.light.horizon), 'fog-color': FOG_LOOK.light.fog, 'sky-horizon-blend': 0.5, 'horizon-fog-blend': 0.5, 'fog-ground-blend': groundFog, 'atmosphere-blend': blend };
 }
 
 const vis = (on: boolean) => ({ visibility: on ? ('visible' as const) : ('none' as const) });
 
 export const TERRAIN_SOURCE = 'terrain-dem';
+/** The relief shading reads the same tiles from a source of its own (MapLibre warns when it shares the 3D terrain's source). */
+export const HILLSHADE_SOURCE = 'terrain-dem-shade';
 export const HILLSHADE_LAYER = 'terrain-hillshade';
 export const TERRAIN_EXAGGERATION = 1.4;
 export const HILLSHADE_STRENGTH = 0.35;
-export const TERRAIN_ATTRIBUTION = 'Gelände: <a href="https://mapterhorn.com/attribution/" target="_blank" rel="noopener">Mapterhorn</a>, <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles</a>';
+export const TERRAIN_ATTRIBUTION = 'Gelände: <a href="https://mapterhorn.com/attribution/" target="_blank" rel="noopener">Mapterhorn</a>';
+/** The terrain spec for the relief shading: the same tiles, without the attribution again. */
+const hillshadeSpec = (): SourceSpecification => {
+  const { attribution: _attribution, ...rest } = TERRAIN_SPEC as SourceSpecification & { attribution?: string };
+  return rest as SourceSpecification;
+};
 export const TERRAIN_SPEC: SourceSpecification = { type: 'raster-dem', tiles: [DEM_TILES], tileSize: 512, maxzoom: DEM_NATIVE_ZOOM, encoding: 'terrarium', attribution: TERRAIN_ATTRIBUTION };
 
 export interface StyleOptions { basemap: BasemapId; labels: boolean; terminator: boolean; projection: 'globe' | 'mercator'; /** 2.5D buildings, default true */ buildings?: boolean }
@@ -98,6 +114,7 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
   const sources: Record<string, SourceSpecification> = {
     ofm: OFM_SOURCE,
     [TERRAIN_SOURCE]: TERRAIN_SPEC,
+    [HILLSHADE_SOURCE]: hillshadeSpec(),
   };
   const layers: LayerSpecification[] = [];
   const shown = isStaticBasemap(o.basemap) ? o.basemap : DEFAULT_BASEMAP; // regional ones are added by the engine once their data is loaded
@@ -108,7 +125,7 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
   }
   // relief shading for the flat Orbis colours; only shown while 3D terrain is on (every basemap but the aerial images)
   layers.push({
-    id: HILLSHADE_LAYER, type: 'hillshade', source: TERRAIN_SOURCE, layout: { visibility: 'none' },
+    id: HILLSHADE_LAYER, type: 'hillshade', source: HILLSHADE_SOURCE, layout: { visibility: 'none' },
     paint: { 'hillshade-exaggeration': 0, 'hillshade-shadow-color': 'rgba(8, 12, 22, 0.55)', 'hillshade-highlight-color': 'rgba(255, 255, 255, 0.18)', 'hillshade-accent-color': 'rgba(8, 12, 22, 0.25)' },
   } as LayerSpecification);
   const active = BASEMAPS[shown].labelVariant;
