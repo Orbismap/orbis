@@ -1,9 +1,11 @@
 // Single trees mapped in OpenStreetMap (natural=tree, 35 million points, monthly extract as PMTiles in the osm bucket): round
 // dots sized by the tree's height, coloured by leaf type. Orbis Pro swaps them for 3D trees (same zoom range), like the power towers.
+// The same file has a second layer `tree_lines` (tree rows and hedges as lines): only the channel reads it, Pro plants trees and
+// bushes along the lines; the 2D map shows the single trees only.
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { formatNumber } from '../../core/format';
 import { bucketUrl } from '../../data/endpoints';
-import { LEAF_CYCLES, LEAF_TYPES, buildTreeSamples, type RawTree } from '../../data/parsers/trees';
+import { LEAF_CYCLES, LEAF_TYPES, buildTreeSamples, type RawTree, type RawTreeLine } from '../../data/parsers/trees';
 import { treesChannel } from '../../ext/channels';
 import type { AnyFeature } from '../../render/common';
 import { pmtilesLayer } from '../../render/pmtiles';
@@ -39,7 +41,7 @@ export default defineLayer({
   coverage: 'Welt, wo Bäume einzeln kartiert sind (vor allem Europa und Städte)',
   sources: [
     {
-      name: 'OpenStreetMap-Mitwirkende, natural=tree', url: 'https://www.openstreetmap.org/copyright', license: 'ODbL 1.0',
+      name: 'OpenStreetMap-Mitwirkende, natural=tree, tree_row, hedge', url: 'https://www.openstreetmap.org/copyright', license: 'ODbL 1.0',
       manifest: { bucket: 'osm', key: 'trees.pmtiles' },
     },
   ],
@@ -64,23 +66,24 @@ export default defineLayer({
       stroke: { color: 'rgba(10, 30, 20, 0.55)', width: 0.5 },
       hideWhen: treesChannel.presented,
       describe(f: AnyFeature) {
-        const p = f.properties as { id?: number; genus?: string; species?: string; height?: number; circumference?: number; leaf_type?: string; leaf_cycle?: string };
+        const p = f.properties as { species?: string; height?: number; circumference?: number; leaf_type?: string; leaf_cycle?: string };
         const type = LEAF_TYPES[p.leaf_type as keyof typeof LEAF_TYPES];
         const cycle = LEAF_CYCLES[p.leaf_cycle as keyof typeof LEAF_CYCLES];
-        const name = p.species?.trim() || p.genus?.trim();
+        const name = p.species?.trim();
+        // the tiles carry no OSM ids: the link opens the map at the tree
+        const [lng, lat] = f.geometry.type === 'Point' ? f.geometry.coordinates : [];
         return {
           title: name || type || 'Baum',
           subtitle: name && type ? type : 'Baum',
           color: COLOR,
           icon: 'leaf',
           facts: [
-            ...(p.genus?.trim() && p.species?.trim() ? [{ label: 'Gattung', value: p.genus.trim() }] : []),
             ...(p.height ? [{ label: 'Höhe', value: `${formatNumber(p.height, 1)} m`, emphasis: true }] : []),
             ...(p.circumference ? [{ label: 'Stammumfang', value: `${formatNumber(p.circumference, 2)} m` }] : []),
             ...(type ? [{ label: 'Art', value: type }] : []),
             ...(cycle ? [{ label: 'Laub', value: cycle }] : []),
           ],
-          links: p.id ? [{ label: 'OpenStreetMap', url: `https://www.openstreetmap.org/node/${p.id}` }] : [],
+          links: typeof lng === 'number' && typeof lat === 'number' ? [{ label: 'OpenStreetMap', url: `https://www.openstreetmap.org/?mlat=${lat.toFixed(6)}&mlon=${lng.toFixed(6)}#map=20/${lat.toFixed(6)}/${lng.toFixed(6)}` }] : [],
         };
       },
     });
@@ -109,9 +112,15 @@ export default defineLayer({
         if (typeof lng !== 'number' || typeof lat !== 'number') continue;
         raw.push({ lng, lat, props: (f.properties ?? {}) as Record<string, unknown> });
       }
+      const lines: RawTreeLine[] = [];
+      for (const f of ml.querySourceFeatures(src, { sourceLayer: 'tree_lines' })) {
+        const g = f.geometry;
+        const parts = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
+        for (const coords of parts) lines.push({ coords: coords.map((c) => [c[0]!, c[1]!] as [number, number]), props: (f.properties ?? {}) as Record<string, unknown> });
+      }
       const b = ml.getBounds();
       const c = ml.getCenter();
-      const samples = buildTreeSamples(raw, { west: b.getWest(), east: b.getEast(), south: b.getSouth(), north: b.getNorth(), centreLng: c.lng, centreLat: c.lat });
+      const samples = buildTreeSamples(raw, lines, { west: b.getWest(), east: b.getEast(), south: b.getSouth(), north: b.getNorth(), centreLng: c.lng, centreLat: c.lat });
       published = true;
       treesChannel.publish(() => samples);
     };

@@ -8,6 +8,7 @@ Vier Berichte, Stand 15.11.2026:
 | [01-existing-sources.md](01-existing-sources.md) | vorhandene Anbieter, ungenutzte Produkte |
 | [02-earth-science.md](02-earth-science.md) | Erdsystem, Natur, Wissenschaft |
 | [03-human-tech.md](03-human-tech.md) | Mensch, Technik, Wirtschaft, Kultur |
+| [06-building-roofs.md](06-building-roofs.md) | Dachformen für 2.5D-Häuser (Overture, 3D BAG, LoD2) |
 
 Regel für alles hier: **offene Lizenz** (Public Domain, CC0, CC BY, CC BY-SA, ODbL, OGL, DL-DE,
 Copernicus, NLOD). NC-Kandidaten sind mit ⚠ markiert und stehen unten separat.

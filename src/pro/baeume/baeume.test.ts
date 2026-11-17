@@ -17,11 +17,29 @@ describe('tree shapes', () => {
     expect(shapeOf({ id: '7' })).toBe(shapeOf({ id: '7' }));
   });
 
+  it('picks the model of the genus, whatever the leaf type says', () => {
+    expect(shapeOf({ id: '1', genus: 'quercus', leafType: 'broadleaved' })).toBe('eiche');
+    expect(shapeOf({ id: '1', genus: 'pinus' })).toBe('kiefer');
+    expect(shapeOf({ id: '1', genus: 'thuja', leafType: 'needleleaved' })).toBe('zypresse');
+    expect(shapeOf({ id: '1', genus: 'phoenix' })).toBe('palme');
+    expect(shapeOf({ id: '1', genus: 'picea' })).toBe('nadel');
+    expect(shapeOf({ id: '1', genus: 'unknownus', leafType: 'needleleaved' })).toBe('nadel');
+  });
+
+  it('makes bushes of hedges and keeps them low', () => {
+    expect(shapeOf({ id: '1', hedge: true, genus: 'quercus' })).toBe('busch');
+    expect(treeHeight({ hedge: true })).toBe(1.6);
+    expect(treeHeight({ hedge: true, heightM: 0.1 })).toBe(0.5);
+    expect(treeHeight({ hedge: true, heightM: 30 })).toBe(6);
+  });
+
   it('guesses the height when it is not tagged and keeps it sensible', () => {
     expect(treeHeight({ heightM: 15 })).toBe(15);
     expect(treeHeight({})).toBe(9);
     expect(treeHeight({ leafType: 'needleleaved' })).toBe(12);
     expect(treeHeight({ circumferenceM: 2 })).toBe(14);
+    expect(treeHeight({ genus: 'populus' })).toBe(18);
+    expect(treeHeight({ genus: 'populus', heightM: 7 })).toBe(7);
     expect(treeHeight({ heightM: 300 })).toBe(40);
     expect(treeHeight({ heightM: 0.2 })).toBe(2);
   });
