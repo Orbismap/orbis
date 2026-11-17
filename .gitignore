@@ -3,6 +3,10 @@ dist
 .env
 .env.local
 .env.*.local
+# local only: Claude preview config and private research
+.claude/launch.json
+research_notes/Apple Karten Farbpalette/
+reports/Apple Karten Farbpalette.md
 *.log
 .DS_Store
 .vite
