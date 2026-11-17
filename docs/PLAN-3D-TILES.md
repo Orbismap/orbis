@@ -145,3 +145,5 @@ Stand: Katalog (446 Plateau-Modelle, `scripts/build-plateau-catalog.mjs`), Karte
 - Visuelle Prüfung macht der Nutzer; keine Browser-Screenshot-Tests durch Claude (siehe Memory „No browser screenshot testing“).
 - Paketmanager pnpm.
 - Nach Abschluss einer Phase: Abschnitt „Erweiterungen und Orbis Pro“ in `docs/ARCHITECTURE.md` und `docs/LAYERS.md` ergänzen.
+
+**Ebene „3D-Gebäude“ (17.11.2026):** `layers/infrastruktur/gebaeude3d.ts` ist der Sammelplatz für alles 3D-Gebäudeartige (später Fotomesh, LOD-Modelle). Option „Typ“: `osm` (Standard, OSM eingefärbt: OFM-Attribut `colour`, Gebäudeteile in eigener Höhe, Umrisse mit `hide_3d` ausgeblendet) und `plateau` (Japan, die Modelle zeichnet Orbis Pro). Der Grundkarten-Schalter „3D-Gebäude“ steuert nur noch die ungefärbten OSM-2.5D-Gebäude und die Cesium-3D-Tiles auf Luftbildern (`features/buildings3d/tiles-source.ts`, ohne Token keine Tiles). Die Ebene schaltet die 2.5D-Gebäude der Grundkarte ab, solange sie eigene zeigt (`buildingsReplaced` in `state/view.ts`).

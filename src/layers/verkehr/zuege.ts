@@ -23,7 +23,7 @@ export default defineLayer({
     { name: 'Entur – Norwegen', url: 'https://developer.entur.org/', license: 'NLOD' },
   ],
   options: [
-    { id: 'kind', label: 'Zugart', type: 'select', default: 'all', choices: [{ value: 'all', label: 'Alle' }, { value: 'fern', label: 'Fernzug' }, { value: 'regio', label: 'Regionalzug' }, { value: 'sbahn', label: 'S-Bahn' }] },
+    { id: 'kind', label: 'Zugart', type: 'multi', default: 'all', choices: [{ value: 'all', label: 'Alle' }, { value: 'fern', label: 'Fernzug' }, { value: 'regio', label: 'Regionalzug' }, { value: 'sbahn', label: 'S-Bahn' }] },
   ],
   legend: kindLegend([...KINDS, 'andere']),
   keywords: ['zug', 'bahn', 'ice', 'db', 'finnland', 'train', 'rail', 'vr', 'amtrak', 'entur', 'transitous', 's-bahn', 'regionalzug', 'europa'],

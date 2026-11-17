@@ -1,9 +1,8 @@
-// Where the real 3D buildings come from. The switch "3D-Gebäude" of the basemap popover decides: on the Orbis colours and the
-// map-like basemaps the 2.5D buildings (map engine), on the aerial images the streamed 3D tiles (Orbis Pro draws them). This file is
-// the base's side of the latter: it hands the extension the tilesets (the user's own Cesium ion token: photorealistic, world-wide;
-// without a token the free Plateau models of Japan) and the credit line the providers ask for.
-import { computed, effect, signal } from '@preact/signals';
-import { loadPlateau, PLATEAU_ATTRIBUTION, type PlateauSample } from '../../data/plateau';
+// The 3D tiles of the basemap switch "3D-Gebäude": on aerial images Orbis Pro streams Google's photorealistic cities through the
+// user's own Cesium ion token (world-wide); without a token there are none. The Plateau models of Japan and the coloured OSM
+// buildings belong to the layer "3D-Gebäude" (`layers/infrastruktur/gebaeude3d.ts`), not to the switch. This file is the base's
+// side: it hands the extension the tileset and the credit line the provider asks for.
+import { computed, effect } from '@preact/signals';
 import { setTilesetSource, tilesetsChannel, tilesetsState } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
@@ -28,12 +27,13 @@ export const tilesHint = computed<string | undefined>(() => {
   const s = tilesetsState.value;
   if (s.ionError) return s.ionError;
   if (s.error) return s.error;
+  if (!keySignal('cesiumion').value) return 'Fotorealistische 3D-Tiles brauchen deinen Cesium-Token.';
   return undefined;
 });
 
-/** The key mark next to the switch: tiles are wanted and Orbis Pro runs, but there is no Cesium token (so only Japan's Plateau models). */
+/** The key mark next to the switch: tiles are wanted and Orbis Pro runs, but there is no Cesium token. */
 export const tilesNeedKey = computed(() => tilesWanted.value && proAvailable && proEnabled.value && !keySignal('cesiumion').value);
-export const KEY_TIP = 'Ohne eigenen Cesium-Token nur Japan (Plateau). Mit Token fotorealistisch weltweit: Einstellungen → Boost.';
+export const KEY_TIP = 'Fotorealistische 3D-Tiles weltweit brauchen deinen eigenen Cesium-Token: Einstellungen → Boost.';
 
 /** root requests the free Cesium plan allows per month for the Google tiles */
 export const ION_FREE_ROOTS = 1000;
@@ -50,23 +50,16 @@ const googleSample = (token: string): TilesetSample => ({
 
 /** Starts the source; returns the function that stops it. */
 export function startBuildingTiles(): () => void {
-  const plateau = signal<readonly PlateauSample[]>([]);
-  let asked = false;
   const stopSource = effect(() => {
     const token = keySignal('cesiumion').value;
-    const on = tilesWanted.value && proAvailable && proEnabled.value;
-    if (!on) { setTilesetSource(SOURCE, null); return; }
-    if (token) { setTilesetSource(SOURCE, () => [googleSample(token)]); return; }
-    if (!asked) { asked = true; void loadPlateau().then((all) => { plateau.value = all; }); }
-    const all = plateau.value;
-    setTilesetSource(SOURCE, () => [...all]);
+    const on = tilesWanted.value && proAvailable && proEnabled.value && !!token;
+    setTilesetSource(SOURCE, on ? () => [googleSample(token!)] : null);
   });
   // the credit line in the corner of the map, while a model is in view (a source needs a layer to show its credit)
   const stopCredit = effect(() => {
     const engine = mapEngine.value;
-    if (!engine || !tilesetsChannel.presented.value) return;
-    const [text, url] = keySignal('cesiumion').value ? [GOOGLE.credit, GOOGLE.url] : [PLATEAU_ATTRIBUTION, 'https://www.mlit.go.jp/plateau/'];
-    engine.addSource(CREDIT, { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, attribution: `<a href="${url}" target="_blank" rel="noopener">${text}</a>` });
+    if (!engine || !tilesWanted.value || !keySignal('cesiumion').value || !tilesetsChannel.presented.value) return;
+    engine.addSource(CREDIT, { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, attribution: `<a href="${GOOGLE.url}" target="_blank" rel="noopener">${GOOGLE.credit}</a>` });
     engine.addLayer({ id: `${CREDIT}-layer`, type: 'circle', source: CREDIT, paint: { 'circle-radius': 0 } }, 'points');
     return () => engine.remove({ layers: [`${CREDIT}-layer`], sources: [CREDIT] });
   });

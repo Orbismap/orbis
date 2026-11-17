@@ -104,6 +104,75 @@
     color: var(--text-2);
   }
 
+  /* ---- choice list: grouped rounded container, hairlines, trailing checkmark; scrolls with a cut row and edge fades ---- */
+  .choices {
+    --choice-h: 36px;
+    display: flex;
+    flex-direction: column;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--text-1) 7%, transparent);
+    overflow: hidden;
+    overscroll-behavior: contain;
+  }
+  /* air between a field label and its list */
+  .ld-label + .choices {
+    margin-top: 6px;
+  }
+  .choices.is-scroll {
+    /* half a row less than --choices-max: the cut row shows that the list goes on */
+    max-height: calc((var(--choices-max) - 0.5) * var(--choice-h));
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .choices.is-scroll.has-below:not(.has-above) {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent);
+  }
+  .choices.is-scroll.has-above:not(.has-below) {
+    mask-image: linear-gradient(to bottom, transparent, #000 22px);
+  }
+  .choices.is-scroll.has-above.has-below {
+    mask-image: linear-gradient(to bottom, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  }
+  .choice {
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: var(--choice-h);
+    padding: 0 12px;
+    color: var(--text-1);
+    font-size: var(--fs-ui);
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .choice + .choice::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 12px;
+    right: 0;
+    height: 1px;
+    background: color-mix(in srgb, var(--text-1) 12%, transparent);
+  }
+  .choice-check {
+    flex: none;
+    color: var(--limb);
+    visibility: hidden;
+  }
+  .choice[aria-checked='true'] .choice-check {
+    visibility: visible;
+  }
+  .choice:active {
+    background: color-mix(in srgb, var(--text-1) 12%, transparent);
+  }
+  @media (hover: hover) {
+    .choice:hover {
+      background: color-mix(in srgb, var(--text-1) 8%, transparent);
+    }
+  }
+
   /* ---- select ---- */
   .select {
     position: relative;

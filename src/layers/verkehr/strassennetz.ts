@@ -3,6 +3,7 @@
 import { effect } from '@preact/signals';
 import type { ExpressionSpecification, FilterSpecification, LayerSpecification } from 'maplibre-gl';
 import { defineLayer } from '../define';
+import { multiHas } from '../multi';
 
 const CLASSES = [
   { id: 'motorway', label: 'Autobahn', color: '#ff4d4d', halo: '#b02a2a', minzoom: 3, width: [3, 0.7, 14, 7] },
@@ -23,7 +24,7 @@ export default defineLayer({
   coverage: 'Welt',
   sources: [{ name: 'OpenFreeMap / OpenStreetMap-Mitwirkende', url: 'https://openfreemap.org/', license: 'ODbL 1.0' }],
   options: [
-    { id: 'detail', label: 'Straßen bis', type: 'select', default: 'secondary', choices: [{ value: 'primary', label: 'Bundesstraße' }, { value: 'secondary', label: 'Landstraße' }] },
+    { id: 'klassen', label: 'Straßenart', type: 'multi', default: 'all', choices: [{ value: 'all', label: 'Alle' }, ...CLASSES.map((c) => ({ value: c.id, label: c.label }))] },
   ],
   legend: { type: 'classes', items: CLASSES.map((c) => ({ color: c.color, label: c.label, shape: 'line' as const })) },
   keywords: ['straße', 'straßennetz', 'autobahn', 'bundesstraße', 'landstraße', 'straßennummer', 'roads', 'highway', 'motorway', 'a7', 'b1'],
@@ -61,16 +62,16 @@ export default defineLayer({
 
     const stop = effect(() => {
       const o = ctx.opacity.value;
-      const upTo = ctx.options.value.detail === 'primary' ? 3 : 4;
-      CLASSES.forEach((c, i) => {
+      const picked = ctx.options.value.klassen;
+      CLASSES.forEach((c) => {
         const id = `${ctx.id}.${c.id}`;
         if (!ml.getLayer(id)) return;
-        ml.setLayoutProperty(id, 'visibility', i < upTo ? 'visible' : 'none');
+        ml.setLayoutProperty(id, 'visibility', multiHas(picked, c.id) ? 'visible' : 'none');
         ml.setPaintProperty(id, 'line-opacity', ['*', ['case', ['==', ['get', 'brunnel'], 'tunnel'], 0.45, 0.9], o] as ExpressionSpecification);
       });
       if (ml.getLayer(labels)) {
         ml.setPaintProperty(labels, 'text-opacity', o);
-        ml.setFilter(labels, ['all', ['has', 'ref'], ['in', ['get', 'class'], ['literal', CLASSES.slice(0, upTo).map((c) => c.id)]]] as FilterSpecification);
+        ml.setFilter(labels, ['all', ['has', 'ref'], ['in', ['get', 'class'], ['literal', CLASSES.filter((c) => multiHas(picked, c.id)).map((c) => c.id)]]] as FilterSpecification);
       }
     });
     ctx.status({ state: 'ready' });

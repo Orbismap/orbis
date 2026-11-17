@@ -3,7 +3,7 @@
 // (tools/vector-basemap/palette.md); the OFM tiles only tell us which classes exist, WHEN a class shows is decided here.
 // Zoom values are MapLibre zooms (512 px tiles).
 import type { ExpressionSpecification as Ex, LayerSpecification } from 'maplibre-gl';
-import { BUILDING_BASE, BUILDING_HEIGHT } from '../buildings-tilt';
+import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../buildings-tilt';
 import { karteDataUrl } from './karte-data';
 import { KARTE_LABELS_SOURCE } from './karte-labels';
 import type { BasemapDef } from './types';
@@ -178,7 +178,7 @@ export function karteBasemap(): BasemapDef {
   const topLayers: LayerSpecification[] = [
     {
       // flat at pitch 0, full height at the tilt limit, see buildings-tilt.ts
-      id: id('building'), type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, layout: { ...hidden, 'fill-extrusion-rounded-corner-distance': 1.5 },
+      id: id('building'), type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER, layout: { ...hidden, 'fill-extrusion-rounded-corner-distance': 1.5 },
       paint: {
         'fill-extrusion-color': K.building,
         'fill-extrusion-height': BUILDING_HEIGHT,

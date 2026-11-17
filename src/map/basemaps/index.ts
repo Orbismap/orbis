@@ -5,7 +5,7 @@ import type { BasemapId, StaticBasemapId } from '../types';
 import { canonicalRegionalId, isRegionalId, regionalDef } from './regional';
 import { blank, bluemarble, esriClarity, imagicoAlps, osm, satellite, swissalti3d, swissimage, swisssurface3d, terrain } from './raster';
 import type { BasemapDef, LabelVariant } from './types';
-import { BUILDING_BASE, BUILDING_HEIGHT } from '../buildings-tilt';
+import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../buildings-tilt';
 import { DEM_NATIVE_ZOOM, DEM_TILES } from '../dem-protocol';
 import { karteBasemap } from './karte';
 import { LABEL_VARIANTS, OFM_GLYPHS, OFM_SOURCE, labelLayers, vectorBasemap } from './vector';
@@ -90,7 +90,7 @@ export interface StyleOptions { basemap: BasemapId; labels: boolean; terminator:
 export const GENERIC_BUILDINGS_ID = 'bm-buildings';
 const GENERIC_BUILDINGS_COLOR = '#d6dae3';
 const genericBuildings = (visible: boolean): LayerSpecification => ({
-  id: GENERIC_BUILDINGS_ID, type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5,
+  id: GENERIC_BUILDINGS_ID, type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER,
   layout: { visibility: visible ? 'visible' : 'none', 'fill-extrusion-rounded-corner-distance': 1.5 },
   paint: {
     'fill-extrusion-color': GENERIC_BUILDINGS_COLOR,

@@ -22,6 +22,7 @@ import { tracksChannel } from '../../ext/channels';
 import type { TrackSample } from '../../ext/types';
 import { extrapolate, trackLayer, type TrackObject } from '../../render/tracks';
 import { defineLayer } from '../define';
+import { multiValues } from '../multi';
 import type { InspectCard, LayerContext } from '../types';
 
 const COLOR = AIRCRAFT_COLOR;
@@ -75,6 +76,9 @@ async function loadEnrich(hex: string, call: string, reg: string, changed: () =>
   changed();
 }
 
+/** Only military chosen: the overview then needs just the military list. */
+const onlyMil = (kind: unknown): boolean => multiValues(kind)?.every((k) => k === 'mil') ?? false;
+
 export default defineLayer({
   id: 'flugzeuge',
   category: 'verkehr',
@@ -93,11 +97,9 @@ export default defineLayer({
     { name: 'Planespotters.net (Fotos)', url: 'https://www.planespotters.net/', license: 'Fotos bei den Fotografen, Namensnennung und Link' },
   ],
   options: [
-    { id: 'milOnly', label: 'Nur Militär', type: 'toggle', default: false },
+    { id: 'kind', label: 'Anzeigen', type: 'multi', choices: [{ value: 'all', label: 'Alle' }, { value: 'mil', label: 'Militär' }, { value: 'heli', label: 'Hubschrauber' }, { value: 'drone', label: 'Drohnen' }, { value: 'vehicle', label: 'Flughafenfahrzeuge' }], default: 'all' },
     { id: 'minAlt', label: 'Mindesthöhe', type: 'range', min: 0, max: 12000, step: 500, default: 0, unit: 'm' },
-    { id: 'kind', label: 'Anzeigen', type: 'select', choices: [{ value: 'all', label: 'Alle' }, { value: 'heli', label: 'Hubschrauber' }, { value: 'drone', label: 'Drohnen' }, { value: 'vehicle', label: 'Flughafenfahrzeuge' }], default: 'all' },
     { id: 'ground', label: 'Flugzeuge am Boden', type: 'toggle', default: false },
-    { id: 'vehicles', label: 'Flughafenfahrzeuge', type: 'toggle', default: true },
   ],
   legend: {
     type: 'classes',
@@ -125,7 +127,7 @@ export default defineLayer({
     const stopRemember = effect(() => { const d = detail.res.data.value; if (d) rememberLive(d); });
     const world = computed<TrackObject[] | undefined>(() => {
       detail.res.data.value; // newer detailed positions replace overview ones
-      return mergeOverview(oskList.value ?? fallback.data.value, milRes.data.value, !!ctx.options.value.milOnly);
+      return mergeOverview(oskList.value ?? fallback.data.value, milRes.data.value, onlyMil(ctx.options.value.kind));
     });
 
     const zoom = signal(ml.getZoom());
@@ -137,14 +139,18 @@ export default defineLayer({
       const o = ctx.options.value;
       const clauses: unknown[] = [];
       const vehicle: unknown = ['in', ['get', 'cat'], ['literal', ['C1', 'C2']]];
-      const noVehicles = o.vehicles === false && o.kind !== 'vehicle';
-      if (!o.ground) clauses.push(noVehicles ? ['!', ['get', 'gnd']] : ['any', ['!', ['get', 'gnd']], vehicle]);
-      if (noVehicles) clauses.push(['!', vehicle]);
+      if (!o.ground) clauses.push(['any', ['!', ['get', 'gnd']], vehicle]);
       if (Number(o.minAlt) > 0) clauses.push(['any', ['get', 'emerg'], ['>=', ['get', 'alt'], Number(o.minAlt)]]);
-      if (o.kind === 'heli') clauses.push(['get', 'heli']);
-      if (o.kind === 'drone') clauses.push(['==', ['get', 'cat'], 'B6']);
-      if (o.kind === 'vehicle') clauses.push(vehicle);
-      if (o.milOnly) clauses.push(['get', 'mil']);
+      // the chosen kinds are alternatives: military or helicopters or ... ("all" has no condition, vehicles included)
+      const kinds = multiValues(o.kind);
+      if (kinds) {
+        const any: unknown[] = [];
+        if (kinds.includes('mil')) any.push(['get', 'mil']);
+        if (kinds.includes('heli')) any.push(['get', 'heli']);
+        if (kinds.includes('drone')) any.push(['==', ['get', 'cat'], 'B6']);
+        if (kinds.includes('vehicle')) any.push(vehicle);
+        clauses.push(any.length === 1 ? any[0] : ['any', ...any]);
+      }
       return clauses.length ? (['all', ...clauses] as FilterSpecification) : undefined;
     });
     const passes = (t: TrackObject): boolean => {
@@ -152,13 +158,10 @@ export default defineLayer({
       const min = Number(o.minAlt);
       const p = t.props as unknown as AircraftProps;
       const vehicle = p.cat === 'C1' || p.cat === 'C2';
-      if (vehicle && o.vehicles === false && o.kind !== 'vehicle') return false;
       if (!o.ground && p.gnd && !vehicle) return false;
       if (min > 0 && p.alt < min && !p.emerg) return false;
-      if (o.kind === 'heli' && !p.heli) return false;
-      if (o.kind === 'drone' && p.cat !== 'B6') return false;
-      if (o.kind === 'vehicle' && !vehicle) return false;
-      if (o.milOnly && !p.mil) return false;
+      const kinds = multiValues(o.kind);
+      if (kinds && !((kinds.includes('mil') && p.mil) || (kinds.includes('heli') && p.heli) || (kinds.includes('drone') && p.cat === 'B6') || (kinds.includes('vehicle') && vehicle))) return false;
       return true;
     };
     const countOf = (list: TrackObject[] | undefined) => {

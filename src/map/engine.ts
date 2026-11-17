@@ -8,7 +8,7 @@ import { collapseKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { activeBasemap as activeBasemapSignal, buildings3d, camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
+import { activeBasemap as activeBasemapSignal, buildings3d, buildingsReplaced, camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { registerPmtilesProtocol } from './pmtiles-protocol';
@@ -175,6 +175,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     }),
     effect(() => {
       buildings3d.value;
+      buildingsReplaced.value;
       if (loaded) applyBuildings();
     }),
     effect(() => {
@@ -240,7 +241,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   /** 2.5D buildings: the Orbis basemaps' own, or the generic ones elsewhere; off with the switch, and off on aerial images (the real 3D tiles belong there). */
   function applyBuildings() {
     const shown = isStaticBasemap(basemap) ? basemap : undefined;
-    const on = buildings3d.peek();
+    const on = buildings3d.peek() && !buildingsReplaced.peek();
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) setVis(l.id, on && id === shown);
     setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !hasTiles3d(shown));
   }

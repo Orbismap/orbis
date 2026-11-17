@@ -9,6 +9,7 @@ import type { AnyFeature } from '../../render/common';
 import { lineLayer } from '../../render/lines';
 import { pointLayer } from '../../render/points';
 import { defineLayer } from '../define';
+import { multiValues } from '../multi';
 import type { InspectCard } from '../types';
 
 const EMPTY: OepnvResult = { lines: { type: 'FeatureCollection', features: [] }, stops: { type: 'FeatureCollection', features: [] } };
@@ -39,22 +40,23 @@ export default defineLayer({
   minZoom: 11,
   sources: [{ name: 'OpenStreetMap-Mitwirkende (Overpass API)', url: 'https://www.openstreetmap.org/copyright', license: 'ODbL 1.0' }],
   options: [
-    { id: 'kind', label: 'Verkehrsmittel', type: 'select', default: 'all', choices: [{ value: 'all', label: 'Alle' }, { value: 'bus', label: 'Bus' }, { value: 'tram', label: 'Tram' }, { value: 'ubahn', label: 'U-Bahn / Stadtbahn' }, { value: 'faehre', label: 'Fähre' }] },
+    { id: 'kind', label: 'Verkehrsmittel', type: 'multi', default: 'all', choices: [{ value: 'all', label: 'Alle' }, { value: 'bus', label: 'Bus' }, { value: 'tram', label: 'Tram' }, { value: 'ubahn', label: 'U-Bahn / Stadtbahn' }, { value: 'faehre', label: 'Fähre' }] },
   ],
   legend: { type: 'classes', items: Object.values(ROUTE_STYLE).filter((s) => s.label !== 'O-Bus').sort((a, b) => b.order - a.order).map((s) => ({ color: s.color, label: s.label, shape: 'line' as const })) },
   keywords: ['linien', 'buslinie', 'tram', 'u-bahn', 'öpnv', 'haltestelle', 'liniennetz', 'fähre', 'overpass', 'bus lines'],
 
   mount(ctx) {
     const res = overpassArea(ctx, { parser: 'overpassRoutes', query: oepnvQuery, empty: EMPTY, minZoom: 11, grid: 0.25 });
-    const kind = computed(() => String(ctx.options.value.kind ?? 'all'));
+    /** the modes of the chosen kinds; undefined: all */
+    const modes = computed<string[] | undefined>(() => multiValues(ctx.options.value.kind)?.flatMap((k) => MODE_FILTER[k] ?? []));
     const lines = computed<FeatureCollection | undefined>(() => res.data.value?.lines);
     const stops = computed<FeatureCollection | undefined>(() => res.data.value?.stops);
-    const filter = computed<FilterSpecification | undefined>(() => (kind.value === 'all' ? undefined : (['in', ['get', 'mode'], ['literal', MODE_FILTER[kind.value] ?? []]] as FilterSpecification)));
+    const filter = computed<FilterSpecification | undefined>(() => (modes.value ? (['in', ['get', 'mode'], ['literal', modes.value]] as FilterSpecification) : undefined));
     const count = computed(() => {
       const d = res.data.value;
       if (!d) return undefined;
-      const modes = MODE_FILTER[kind.value];
-      return modes ? d.lines.features.filter((f) => modes.includes(f.properties.mode)).length : d.lines.features.length;
+      const m = modes.value;
+      return m ? d.lines.features.filter((f) => m.includes(f.properties.mode)).length : d.lines.features.length;
     });
     const color = ['get', 'color'] as unknown as ExpressionSpecification;
     const l = lineLayer(ctx, {

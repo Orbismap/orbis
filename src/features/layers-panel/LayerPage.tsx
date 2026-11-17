@@ -13,7 +13,7 @@ import { closeDetail } from './themes-state';
 /** Options grouped by kind; a single group is simply called "Optionen". */
 export function optionSections(options: OptionSpec[] | undefined): { title: string; specs: OptionSpec[] }[] {
   const groups = [
-    { title: 'Auswahl', specs: (options ?? []).filter((o) => o.type === 'select') },
+    { title: 'Auswahl', specs: (options ?? []).filter((o) => o.type === 'select' || o.type === 'multi') },
     { title: 'Werte', specs: (options ?? []).filter((o) => o.type === 'range') },
     { title: 'Schalter', specs: (options ?? []).filter((o) => o.type === 'toggle') },
   ].filter((g) => g.specs.length);

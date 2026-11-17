@@ -2,6 +2,7 @@
 // Includes wind farm areas (power_plant polygons) and individual generators (wind turbines, solar panels) from zoom 9.
 import type { ExpressionSpecification, FilterSpecification } from 'maplibre-gl';
 import { formatNumber } from '../core/format';
+import { multiValues } from '../layers/multi';
 import type { InspectCard } from '../layers/types';
 import type { AnyFeature } from '../render/common';
 import type { VtPart } from '../render/vectortiles';
@@ -31,13 +32,21 @@ const FUEL_SOURCES: Record<string, string[]> = {
 };
 const KNOWN = [...new Set([...Object.values(FUEL_SOURCES).flat(), 'geothermal', 'battery'])];
 
-/** `fuel`: option value ('all', a fuel class, 'other' or 'storage'); `minMw`: smallest output shown. */
+/** One value of the `fuel` option as a condition ('other' and 'storage' have their own; null: unknown value). */
+function fuelClause(fuel: string): unknown {
+  if (fuel === 'storage') return storage;
+  if (fuel === 'other') return ['all', ['!', ['in', ['get', 'source'], ['literal', KNOWN.filter((k) => k !== 'battery' && k !== 'geothermal')]]], ['!', storage]];
+  if (FUEL_SOURCES[fuel]) return ['in', ['get', 'source'], ['literal', FUEL_SOURCES[fuel]]];
+  return null;
+}
+
+/** `fuel`: option value ('all', or fuel classes, 'other' and 'storage' joined by commas, see layers/multi.ts); `minMw`: smallest output shown. */
 export function osmPlantFilter(fuel: string, minMw: number): FilterSpecification {
   const parts: unknown[] = [active];
   if (minMw > 0) parts.push(['>=', mw, minMw]);
-  if (fuel === 'storage') parts.push(storage);
-  else if (fuel === 'other') parts.push(['!', ['in', ['get', 'source'], ['literal', KNOWN.filter((k) => k !== 'battery' && k !== 'geothermal')]]], ['!', storage]);
-  else if (FUEL_SOURCES[fuel]) parts.push(['in', ['get', 'source'], ['literal', FUEL_SOURCES[fuel]]]);
+  const clauses = (multiValues(fuel) ?? []).map(fuelClause).filter((c) => c !== null);
+  if (clauses.length === 1) parts.push(clauses[0]);
+  else if (clauses.length > 1) parts.push(['any', ...clauses]);
   return flt(['all', ...parts]);
 }
 

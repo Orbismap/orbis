@@ -11,6 +11,7 @@ import { pmtilesLayer } from '../../render/pmtiles';
 import { pointLayer } from '../../render/points';
 import type { AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
+import { multiValues } from '../multi';
 
 const COLOR = '#F29B1D';
 const DETAIL_ZOOM = 9;
@@ -54,7 +55,7 @@ export default defineLayer({
     { name: 'BGR, Karte oberflächennaher Rohstoffe KOR250 (nur Deutschland, ab Zoomstufe 6)', url: 'https://www.bgr.bund.de/', license: 'GeoNutzV, Quellenvermerk BGR' },
     { name: 'OpenStreetMap-Mitwirkende', url: 'https://www.openstreetmap.org/copyright', license: 'ODbL 1.0', manifest: { bucket: 'osm', key: 'resource.pmtiles' } },
   ],
-  options: [{ id: 'group', label: 'Rohstoff', type: 'select', default: 'all', choices: [{ value: 'all', label: 'Alle' }, ...RESOURCE_ORDER.map((k) => ({ value: k, label: RESOURCE_GROUPS[k].label }))] }],
+  options: [{ id: 'group', label: 'Rohstoff', type: 'multi', default: 'all', choices: [{ value: 'all', label: 'Alle' }, ...RESOURCE_ORDER.map((k) => ({ value: k, label: RESOURCE_GROUPS[k].label }))] }],
   legend: { type: 'classes', items: [...RESOURCE_ORDER.map((k) => ({ color: G(k), label: RESOURCE_GROUPS[k].label })), { color: '#9C7A4F', label: 'Deutschland: BGR-Rohstoffkarte KOR250 (Flächen, ab Zoom 6)', shape: 'square' as const }] },
   keywords: ['mine', 'bergbau', 'bergwerk', 'öl', 'gas', 'kohle', 'gold', 'kupfer', 'lithium', 'uran', 'steinbruch', 'erz', 'ölfeld'],
 
@@ -62,9 +63,9 @@ export default defineLayer({
     const wd = ctx.resource<ResourceCollection>({ key: 'data:wikidata-resources', url: bucketUrl('data', 'wikidata/resources.json'), parse: 'wikiResources', timeout: 40_000 });
     const shown = computed<ResourceCollection | undefined>(() => {
       const d = wd.data.value;
-      const g = String(ctx.options.value.group ?? 'all');
-      if (!d || g === 'all') return d;
-      return { type: 'FeatureCollection', features: d.features.filter((f) => f.properties.group === g) };
+      const g = multiValues(ctx.options.value.group);
+      if (!d || !g) return d;
+      return { type: 'FeatureCollection', features: d.features.filter((f) => g.includes(f.properties.group)) };
     });
 
     const overview = pointLayer(ctx, {
@@ -121,9 +122,9 @@ export default defineLayer({
     // regional detail 1: USGS MRDS for the USA, loaded per viewport from zoom 6 (public WFS, CORS open)
     const mrds = signal<MrdsCollection>(EMPTY_MRDS);
     const mrdsShown = computed<MrdsCollection>(() => {
-      const g = String(ctx.options.value.group ?? 'all');
+      const g = multiValues(ctx.options.value.group);
       const d = mrds.value;
-      return g === 'all' ? d : { type: 'FeatureCollection', features: d.features.filter((f) => f.properties.group === g) };
+      return !g ? d : { type: 'FeatureCollection', features: d.features.filter((f) => g.includes(f.properties.group)) };
     });
     const ml = ctx.map.ml;
     let ctl: AbortController | undefined;
