@@ -1,4 +1,5 @@
-// 2.5D buildings whose height follows the camera TILT instead of the zoom: flat at pitch 0, full height at TILT_FULL_DEG.
+// 2.5D buildings whose height follows the camera TILT instead of the zoom: MIN_HEIGHT_FACTOR of the real height at pitch 0
+// (not fully flat, so they do not z-fight with 3D terrain), full height at TILT_FULL_DEG.
 // MapLibre has no `pitch` expression, and changing a data-driven paint property (setPaintProperty / global state) reloads the
 // tiles in the worker, which is no option per frame. So we use the composite (zoom + feature) paint binder instead:
 //   - the style expression is linear in zoom: z -> z * H (see tiltExpr), so a bucket parsed at tile zoom Z stores
@@ -15,8 +16,10 @@ const MAX_Z = 24;
 const SOURCE = 'ofm';
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+/** Share of the real height kept at pitch 0, so the footprints stay above the 3D terrain. */
+export const MIN_HEIGHT_FACTOR = 0.05;
 /** Share of the real height shown at a pitch (degrees). */
-export const tiltFactor = (pitchDeg: number) => clamp01(pitchDeg / TILT_FULL_DEG);
+export const tiltFactor = (pitchDeg: number) => MIN_HEIGHT_FACTOR + (1 - MIN_HEIGHT_FACTOR) * clamp01(pitchDeg / TILT_FULL_DEG);
 
 const HEIGHT: ExpressionSpecification = ['coalesce', ['to-number', ['get', 'render_height']], 9];
 const BASE: ExpressionSpecification = ['coalesce', ['to-number', ['get', 'render_min_height']], 0];
