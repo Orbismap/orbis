@@ -11,6 +11,7 @@ import { isMobile } from '../state/ui';
 import { activeBasemap as activeBasemapSignal, buildings3d, buildingsReplaced, camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
+import { registerKeyedTiles } from './basemaps/keyed-protocol';
 import { registerPmtilesProtocol } from './pmtiles-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
 import { activeMembers, loadRegional, memberIds, membersOf, regionalDef, regionalEntry, regionalReady, type Bounds } from './basemaps/regional';
@@ -70,6 +71,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   /** 3D terrain: on for every basemap. No switch. (On the aerial images at true scale and only as the camera's height reference: the 3D tiles are laid over it, see StagePart.coversMap.) */
   let terrainOn = true;
   registerDemTiles();
+  registerKeyedTiles();
   registerPmtilesProtocol(); // the Orbis Karte overlay (PMTiles) is part of the basemap style
 
   buildings3d.value = true;

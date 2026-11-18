@@ -3,22 +3,53 @@ import type { LayerSpecification, SkySpecification, SourceSpecification, StyleSp
 import { MARKERS, markerLayerId } from '../slots';
 import type { BasemapId, StaticBasemapId } from '../types';
 import { canonicalRegionalId, isRegionalId, regionalDef } from './regional';
-import { blank, bluemarble, esriClarity, imagicoAlps, osm, satellite, swissalti3d, swissimage, swisssurface3d, terrain } from './raster';
+import { blank, bluemarble, cyclosm, EOX_YEARS, eox, oepnv, osmDe, osmFr, wikimedia, esriDarkGray, esriHillshade, esriLightGray, esriNatgeo, esriNavigation, esriOcean, esriPhysical, esriShadedRelief, esriStreets, esriTerrain, esriTopo, osmHot, esriClarity, imagicoAlps, osm, satellite, swissalti3d, swissimage, swisssurface3d, terrain } from './raster';
 import type { BasemapDef, LabelVariant } from './types';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../buildings-tilt';
 import { DEM_NATIVE_ZOOM, DEM_TILES } from '../dem-protocol';
 import { karteBasemap } from './karte';
+import { keyedBasemaps, keyedGroups, type KeyedBasemapId } from './keyed';
 import { LABEL_VARIANTS, OFM_GLYPHS, OFM_SOURCE, labelLayers, vectorBasemap } from './vector';
 
 export type { BasemapId, StaticBasemapId } from '../types';
 export type { BasemapDef, LabelVariant } from './types';
 
-/** Global basemaps, in picker order (grouped, German titles). */
-export const BASEMAP_GROUPS: { title: string; ids: StaticBasemapId[] }[] = [
+/**
+ * Global basemaps in picker order. A group without `key` is a category: the picker shows one tab; the first id is its best map. A group with `key` is a provider that needs the user's own key.
+ */
+export interface BasemapGroup {
+  title: string;
+  /** shorter name for the tab */
+  short?: string;
+  ids: StaticBasemapId[];
+  /** optional subheadings within the group (the ids are the same, in the same order) */
+  sections?: { title: string; ids: StaticBasemapId[] }[];
+  /** id of the key the group needs (providers with the user's own key) */
+  key?: string;
+}
+/**
+ * Maps of one provider that differ only by date: the picker shows one tile (label with the years) and, while one of them is active,
+ * a slider for the year. `ids` are newest first, `years` run alongside.
+ */
+export interface BasemapSeries { label: string; ids: StaticBasemapId[]; years: number[] }
+export const BASEMAP_SERIES: BasemapSeries[] = [
+  { label: 'Sentinel-2', ids: EOX_YEARS.map((y) => `eox-${y}` as const), years: [...EOX_YEARS] },
+];
+export const seriesOf = (id: string): BasemapSeries | undefined => BASEMAP_SERIES.find((s) => (s.ids as string[]).includes(id));
+const withSections = (title: string, sections: NonNullable<BasemapGroup['sections']>): BasemapGroup => ({ title, ids: sections.flatMap((x) => x.ids), sections });
+export const BASEMAP_GROUPS: BasemapGroup[] = [
   { title: 'Orbis', ids: ['orbis-dark', 'orbis-light', 'orbis-karte'] },
-  { title: 'Luftbilder', ids: ['satellite', 'esri-clarity', 'bluemarble'] },
-  { title: 'Karten', ids: ['osm', 'terrain'] },
-  { title: 'Sonstige', ids: ['blank'] },
+  { title: 'OpenStreetMap', short: 'OSM', ids: ['osm', 'osm-hot', 'osm-fr', 'osm-de', 'wikimedia', 'cyclosm', 'oepnv', 'terrain'] },
+  withSections('Esri', [
+    { title: 'Luftbilder', ids: ['satellite', 'esri-clarity'] },
+    { title: 'Karten', ids: ['esri-streets', 'esri-topo', 'esri-natgeo', 'esri-light-gray', 'esri-dark-gray'] },
+    { title: 'Relief und Meer', ids: ['esri-terrain', 'esri-shaded-relief', 'esri-physical', 'esri-hillshade', 'esri-ocean', 'esri-navigation'] },
+  ]),
+  withSections('Mehr', [
+    { title: 'Sentinel-2 (EOX)', ids: EOX_YEARS.map((y) => `eox-${y}` as const) },
+    { title: 'Weitere', ids: ['bluemarble', 'blank'] },
+  ]),
+  ...keyedGroups().map(({ provider, ids }): BasemapGroup => ({ title: provider.title, ids, key: provider.key })),
 ];
 /** Hand-written regional basemaps (offered in the regional list, not in the grid). More come from regional.ts. */
 export const STATIC_REGIONAL_IDS: StaticBasemapId[] = ['swissimage', 'imagico-alps', 'swissalti3d', 'swisssurface3d'];
@@ -36,10 +67,37 @@ export const BASEMAPS: Record<StaticBasemapId, BasemapDef> = {
   'imagico-alps': imagicoAlps(),
   bluemarble: bluemarble(),
   osm: osm(),
+  'osm-fr': osmFr(),
+  'osm-de': osmDe(),
+  wikimedia: wikimedia(),
+  cyclosm: cyclosm(),
+  oepnv: oepnv(),
+  'eox-2025': eox(2025),
+  'eox-2024': eox(2024),
+  'eox-2023': eox(2023),
+  'eox-2022': eox(2022),
+  'eox-2021': eox(2021),
+  'eox-2020': eox(2020),
+  'eox-2019': eox(2019),
+  'eox-2018': eox(2018),
+  'eox-2017': eox(2017),
   terrain: terrain(),
+  'osm-hot': osmHot(),
+  'esri-streets': esriStreets(),
+  'esri-topo': esriTopo(),
+  'esri-natgeo': esriNatgeo(),
+  'esri-terrain': esriTerrain(),
+  'esri-shaded-relief': esriShadedRelief(),
+  'esri-physical': esriPhysical(),
+  'esri-hillshade': esriHillshade(),
+  'esri-ocean': esriOcean(),
+  'esri-navigation': esriNavigation(),
+  'esri-dark-gray': esriDarkGray(),
+  'esri-light-gray': esriLightGray(),
   swissalti3d: swissalti3d(),
   swisssurface3d: swisssurface3d(),
   blank: blank(),
+  ...(keyedBasemaps() as Record<KeyedBasemapId, BasemapDef>),
 };
 
 export const isStaticBasemap = (v: unknown): v is StaticBasemapId => typeof v === 'string' && Object.hasOwn(BASEMAPS, v);

@@ -1,6 +1,7 @@
 import { allLayers, getLayer } from '../../layers/registry';
 import type { SourceRef } from '../../layers/types';
 import { isStaticBasemap } from '../../map/basemaps';
+import { KEYED_ENTRIES, KEYED_PROVIDERS, type KeyedBasemapId } from '../../map/basemaps/keyed';
 import { activeMembers, membersOf, regionalEntry, type Bounds, type Member } from '../../map/basemaps/regional';
 import type { BasemapId, StaticBasemapId } from '../../map/types';
 
@@ -10,7 +11,12 @@ const OSM: Credit = { name: '© OpenStreetMap-Mitwirkende', url: 'https://www.op
 const OFM: Credit = { name: 'OpenFreeMap', url: 'https://openfreemap.org/', license: 'Kartenkacheln' };
 const OMT: Credit = { name: 'OpenMapTiles', url: 'https://openmaptiles.org/', license: 'CC-BY 4.0' };
 
+const ESRI = (name: string, providers: string): Credit => ({ name: `Esri ${name} (${providers})`, url: 'https://www.esri.com/', license: 'Esri Nutzungsbedingungen, Powered by Esri' });
+const EOX_CREDIT = (year: number): Credit => ({ name: `Sentinel-2 cloudless ${year}, EOX IT Services (enthält modifizierte Copernicus-Sentinel-Daten)`, url: 'https://s2maps.eu/', license: 'CC BY-NC-SA 4.0 laut EOX (nicht kommerziell)' });
 const SWISSTOPO: Credit = { name: '© swisstopo', url: 'https://www.swisstopo.admin.ch/de/geodaten-kostenlos', license: 'Open Government Data (OGD), Quellenangabe' };
+
+/** Keyed basemaps (the user's own key): one credit per provider, the same for each of its basemaps. */
+const KEYED_CREDITS = Object.fromEntries(KEYED_ENTRIES.map((e) => [e.id, [{ name: KEYED_PROVIDERS[e.provider].title, url: KEYED_PROVIDERS[e.provider].home, license: 'Nutzungsbedingungen des Anbieters, mit eigenem Schlüssel' }, ...(e.provider === 'tomtom' || e.provider === 'here' ? [] : [OSM])]])) as Record<KeyedBasemapId, Credit[]>;
 
 export const BASEMAP_CREDITS: Record<StaticBasemapId, Credit[]> = {
   'orbis-dark': [OFM, OMT, OSM],
@@ -24,7 +30,34 @@ export const BASEMAP_CREDITS: Record<StaticBasemapId, Credit[]> = {
   osm: [OSM, { name: 'OSMF Tile Usage Policy', url: 'https://operations.osmfoundation.org/policies/tiles/', license: 'Kachelserver der OSMF, faire Nutzung' }],
   swissalti3d: [{ ...SWISSTOPO, name: 'swisstopo SWISSALTI3D (Reliefschattierung)' }],
   swisssurface3d: [{ ...SWISSTOPO, name: 'swisstopo swissSURFACE3D (Reliefschattierung)' }],
+  'osm-hot': [OSM, { name: 'Humanitarian OpenStreetMap Team, OSM France', url: 'https://www.hotosm.org/', license: 'Darstellung, ODbL' }],
+  'esri-streets': [ESRI('Straßenkarte', 'Esri, HERE, Garmin, FAO, NOAA, USGS, OpenStreetMap')],
+  'esri-topo': [ESRI('Topografie', 'Esri, TomTom, Garmin, FAO, NOAA, USGS, OpenStreetMap')],
+  'esri-natgeo': [ESRI('National Geographic', 'National Geographic, Esri, Garmin, HERE, USGS, NASA, ESA, GEBCO, NOAA')],
+  'esri-terrain': [ESRI('Gelände', 'Esri, USGS, NOAA')],
+  'esri-shaded-relief': [ESRI('Reliefkarte', 'Esri, USGS, NOAA')],
+  'esri-physical': [ESRI('Physische Karte', 'US National Park Service')],
+  'esri-hillshade': [ESRI('Schummerung', 'Esri, NASA, NGA, USGS')],
+  'esri-ocean': [ESRI('Ozeane', 'Esri, GEBCO, NOAA, National Geographic, DeLorme, HERE')],
+  'esri-navigation': [ESRI('Seekarte', 'Esri, GEBCO, NOAA, IHO-IOC')],
+  'esri-dark-gray': [ESRI('Dunkelgrau', 'Esri, HERE, Garmin, OpenStreetMap')],
+  'esri-light-gray': [ESRI('Hellgrau', 'Esri, HERE, Garmin, OpenStreetMap')],
+  'osm-fr': [OSM, { name: 'OpenStreetMap France', url: 'https://www.openstreetmap.fr/', license: 'Kacheln' }],
+  'osm-de': [OSM, { name: 'OpenStreetMap Deutschland', url: 'https://www.openstreetmap.de/', license: 'Kacheln' }],
+  wikimedia: [OSM, { name: 'Wikimedia Maps', url: 'https://foundation.wikimedia.org/wiki/Maps_Terms_of_Use', license: 'Nutzungsbedingungen von Wikimedia' }],
+  cyclosm: [OSM, { name: 'CyclOSM (Kacheln: OpenStreetMap France)', url: 'https://www.cyclosm.org/', license: 'Darstellung, Quellenangabe' }],
+  oepnv: [OSM, { name: 'ÖPNV-Karte (MeMoMaps)', url: 'https://memomaps.de/', license: 'Darstellung, Quellenangabe' }],
+  'eox-2025': [EOX_CREDIT(2025)],
+  'eox-2024': [EOX_CREDIT(2024)],
+  'eox-2023': [EOX_CREDIT(2023)],
+  'eox-2022': [EOX_CREDIT(2022)],
+  'eox-2021': [EOX_CREDIT(2021)],
+  'eox-2020': [EOX_CREDIT(2020)],
+  'eox-2019': [EOX_CREDIT(2019)],
+  'eox-2018': [EOX_CREDIT(2018)],
+  'eox-2017': [EOX_CREDIT(2017)],
   blank: [OFM, OSM],
+  ...KEYED_CREDITS,
   bluemarble: [{ name: 'NASA Blue Marble, GIBS', url: 'https://earthdata.nasa.gov/gibs', license: 'gemeinfrei' }],
 };
 
