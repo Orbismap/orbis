@@ -4,6 +4,7 @@
 import { computed, effect, signal } from '@preact/signals';
 import type { FeatureCollection, Point } from 'geojson';
 import { bucketUrl } from '../../data/endpoints';
+import { osmPmtilesUrl } from '../../data/osmfiles';
 import type { WebcamCollection, WebcamProps } from '../../data/parsers/webcams';
 import type { Resource } from '../../data/resource';
 import { KEYED_FEEDS, createKeyedFeeds } from '../../data/parsers/webcamkeys-feeds';
@@ -151,7 +152,7 @@ export default defineLayer({
         {
           // OpenStreetMap webcams: thinned from zoom 0, full from zoom 5
           name: 'osm',
-          data: { kind: 'pmtiles', url: bucketUrl('osm', 'webcam.pmtiles'), sourceLayer: 'webcam', attribution: '© OpenStreetMap-Mitwirkende (ODbL)' },
+          data: { kind: 'pmtiles', url: osmPmtilesUrl('webcam'), sourceLayer: 'webcam', attribution: '© OpenStreetMap-Mitwirkende (ODbL)' },
           describe: (f: AnyFeature) => {
             const p = f.properties as { id: number; name?: string; operator?: string; link?: string; dir?: number; panning?: number };
             const link = /^https?:\/\//.test(p.link ?? '') ? p.link! : '';

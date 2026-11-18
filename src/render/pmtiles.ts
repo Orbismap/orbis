@@ -2,6 +2,7 @@
 import { effect, signal, type ReadonlySignal } from '@preact/signals';
 import type { FilterSpecification } from 'maplibre-gl';
 import type { InspectCard, LayerContext, LayerHandle } from '../layers/types';
+import type { OsmUrl } from '../data/osmfiles';
 import { ensurePmtilesProtocol } from '../map/pmtiles-protocol';
 import type { SlotId } from '../map/types';
 import { Cleanup, bindOpacity, bindProp, idBase, mapOutputs, peek, type AnyFeature, type Dyn, type Expr, type NumOrExpr } from './common';
@@ -9,8 +10,8 @@ import { ensureIcons } from './icons';
 import { andFilter, hoverScale, pointSpecs, ringFilter, type SymbolStyle } from './pointstyle';
 
 export interface PmtilesLayerOptions {
-  /** Full URL of the .pmtiles file, e.g. bucketUrl('osm', 'cctv.pmtiles'). */
-  url: string;
+  /** Full URL of the .pmtiles file, e.g. osmPmtilesUrl('cctv') (the dated name comes from the bucket's meta.json, so it may still be looked up). */
+  url: OsmUrl;
   /** Name of the vector tile layer inside the file. */
   sourceLayer: string;
   slot?: SlotId;
@@ -44,9 +45,9 @@ export function pmtilesLayer(ctx: LayerContext, o: PmtilesLayerOptions): LayerHa
   const slot = o.slot ?? 'points';
   ctx.status({ state: 'loading' });
 
-  void ensurePmtilesProtocol().then(() => {
+  void Promise.all([ensurePmtilesProtocol(), o.url]).then(([, url]) => {
     if (destroyed || ctx.signal.aborted) return;
-    engine.addSource(src, { type: 'vector', url: `pmtiles://${o.url}`, promoteId: idKey, ...(o.attribution ? { attribution: o.attribution } : {}) });
+    engine.addSource(src, { type: 'vector', url: `pmtiles://${url}`, promoteId: idKey, ...(o.attribution ? { attribution: o.attribution } : {}) });
     const symbol: SymbolStyle | undefined = o.symbol ? { icon: o.symbol.icon, size: peek(o.symbol.size), rotate: o.symbol.rotate === undefined ? undefined : peek(o.symbol.rotate) } : undefined;
     if (symbol) ensureIcons(ml, [symbol.icon]);
     const specs = pointSpecs(base, src, o.sourceLayer, { radius: peek(o.radius), color: peek(o.color), stroke: o.stroke, symbol, sortKey: o.sortKey, minZoom: o.minZoom, maxZoom: o.maxZoom }, andFilter(o.filter?.peek()), idKey);
