@@ -58,6 +58,7 @@ export const BASEMAP_CREDITS: Record<StaticBasemapId, Credit[]> = {
   'eox-2017': [EOX_CREDIT(2017)],
   blank: [OFM, OSM],
   ...KEYED_CREDITS,
+  nachtlichter: [{ name: 'NASA Black Marble (VIIRS), GIBS', url: 'https://earthdata.nasa.gov/gibs', license: 'NASA, frei nutzbar' }],
   bluemarble: [{ name: 'NASA Blue Marble, GIBS', url: 'https://earthdata.nasa.gov/gibs', license: 'gemeinfrei' }],
 };
 

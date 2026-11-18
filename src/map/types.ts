@@ -7,7 +7,7 @@ import type { KeyedBasemapId } from './basemaps/keyed';
 export type SlotId = 'field' | 'raster' | 'areas' | 'lines' | 'points' | 'labels' | 'top';
 export type StaticBasemapId =
   | 'orbis-dark' | 'orbis-light' | 'orbis-karte'
-  | 'satellite' | 'esri-clarity' | 'swissimage' | 'imagico-alps' | 'bluemarble'
+  | 'satellite' | 'esri-clarity' | 'swissimage' | 'imagico-alps' | 'bluemarble' | 'nachtlichter'
   | 'osm' | 'osm-hot' | 'osm-fr' | 'osm-de' | 'wikimedia' | 'cyclosm' | 'oepnv' | 'terrain'
   | 'eox-2025' | 'eox-2024' | 'eox-2023' | 'eox-2022' | 'eox-2021' | 'eox-2020' | 'eox-2019' | 'eox-2018' | 'eox-2017'
   | 'esri-streets' | 'esri-topo' | 'esri-natgeo' | 'esri-terrain' | 'esri-shaded-relief' | 'esri-physical' | 'esri-hillshade' | 'esri-ocean' | 'esri-navigation' | 'esri-dark-gray' | 'esri-light-gray'

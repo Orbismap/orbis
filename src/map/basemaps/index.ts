@@ -3,7 +3,7 @@ import type { LayerSpecification, SkySpecification, SourceSpecification, StyleSp
 import { MARKERS, markerLayerId } from '../slots';
 import type { BasemapId, StaticBasemapId } from '../types';
 import { canonicalRegionalId, isRegionalId, regionalDef } from './regional';
-import { blank, bluemarble, cyclosm, EOX_YEARS, eox, oepnv, osmDe, osmFr, wikimedia, esriDarkGray, esriHillshade, esriLightGray, esriNatgeo, esriNavigation, esriOcean, esriPhysical, esriShadedRelief, esriStreets, esriTerrain, esriTopo, osmHot, esriClarity, imagicoAlps, osm, satellite, swissalti3d, swissimage, swisssurface3d, terrain } from './raster';
+import { blank, bluemarble, nachtlichter, cyclosm, EOX_YEARS, eox, oepnv, osmDe, osmFr, wikimedia, esriDarkGray, esriHillshade, esriLightGray, esriNatgeo, esriNavigation, esriOcean, esriPhysical, esriShadedRelief, esriStreets, esriTerrain, esriTopo, osmHot, esriClarity, imagicoAlps, osm, satellite, swissalti3d, swissimage, swisssurface3d, terrain } from './raster';
 import type { BasemapDef, LabelVariant } from './types';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../buildings-tilt';
 import { DEM_NATIVE_ZOOM, DEM_TILES } from '../dem-protocol';
@@ -47,7 +47,7 @@ export const BASEMAP_GROUPS: BasemapGroup[] = [
   ]),
   withSections('Mehr', [
     { title: 'Sentinel-2 (EOX)', ids: EOX_YEARS.map((y) => `eox-${y}` as const) },
-    { title: 'Weitere', ids: ['bluemarble', 'blank'] },
+    { title: 'Weitere', ids: ['bluemarble', 'nachtlichter', 'blank'] },
   ]),
   ...keyedGroups().map(({ provider, ids }): BasemapGroup => ({ title: provider.title, ids, key: provider.key })),
 ];
@@ -66,6 +66,7 @@ export const BASEMAPS: Record<StaticBasemapId, BasemapDef> = {
   swissimage: swissimage(),
   'imagico-alps': imagicoAlps(),
   bluemarble: bluemarble(),
+  nachtlichter: nachtlichter(),
   osm: osm(),
   'osm-fr': osmFr(),
   'osm-de': osmDe(),
@@ -99,6 +100,10 @@ export const BASEMAPS: Record<StaticBasemapId, BasemapDef> = {
   blank: blank(),
   ...(keyedBasemaps() as Record<KeyedBasemapId, BasemapDef>),
 };
+
+/** Raster basemaps whose tiles show place names already (the keyed ones are marked in keyed.ts, the regional ones in regional.ts). */
+const OWN_LABELS: StaticBasemapId[] = ['osm', 'osm-hot', 'osm-fr', 'osm-de', 'wikimedia', 'cyclosm', 'oepnv', 'terrain', 'esri-streets', 'esri-topo', 'esri-natgeo', 'esri-navigation', 'esri-light-gray', 'esri-dark-gray'];
+for (const id of OWN_LABELS) BASEMAPS[id].ownLabels = true;
 
 export const isStaticBasemap = (v: unknown): v is StaticBasemapId => typeof v === 'string' && Object.hasOwn(BASEMAPS, v);
 /** Static ids and the generated regional ids (valid before the regional data has loaded). */
@@ -187,13 +192,14 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
     paint: { 'hillshade-exaggeration': 0, 'hillshade-shadow-color': 'rgba(8, 12, 22, 0.55)', 'hillshade-highlight-color': 'rgba(255, 255, 255, 0.18)', 'hillshade-accent-color': 'rgba(8, 12, 22, 0.25)' },
   } as LayerSpecification);
   const active = BASEMAPS[shown].labelVariant;
+  const labelsOn = o.labels && !BASEMAPS[shown].ownLabels;
   const marker = (m: (typeof MARKERS)[number]) => ({ id: markerLayerId(m), type: 'background', layout: { visibility: 'none' } }) as LayerSpecification;
   for (const m of ['field', 'raster'] as const) layers.push(marker(m));
   for (const m of ['terminator', 'areas', 'lines'] as const) layers.push(marker(m));
   const buildings = o.buildings !== false;
   for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(buildings && id === shown) } } as LayerSpecification);
   layers.push(genericBuildings(buildings && !hasOwnBuildings(shown) && !hasTiles3d(shown)));
-  for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(o.labels && v === active) } } as LayerSpecification);
+  for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(labelsOn && v === active) } } as LayerSpecification);
   for (const m of ['basemap-labels', 'points', 'labels', 'top'] as const) layers.push(marker(m));
   return {
     version: 8,

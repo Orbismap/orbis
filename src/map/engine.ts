@@ -256,7 +256,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].layers) setVis(l.id, id === shown);
     applyBuildings();
     const look = regional ?? BASEMAPS[shown ?? DEFAULT_BASEMAP];
-    for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) setVis(l.id, labels && v === look.labelVariant);
+    for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) setVis(l.id, labels && !look.ownLabels && v === look.labelVariant);
     container.style.background = look.background;
     ml.setSky(skyFor(look.theme));
     terminator.setLook(look.theme);

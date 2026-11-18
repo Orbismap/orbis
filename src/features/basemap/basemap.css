@@ -15,8 +15,248 @@
     top: auto;
     bottom: 0;
   }
-  .bm-pop .seg {
+  .bm-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin-bottom: var(--s-2);
+  }
+  .bm-top .seg {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+  }
+  .bm-expand {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-round);
+    background: color-mix(in oklab, var(--line) 35%, transparent);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: background var(--t-panel) var(--ease), color var(--t-panel) var(--ease);
+  }
+  @media (hover: hover) {
+    .bm-expand:hover {
+      background: color-mix(in oklab, var(--text-1) 16%, transparent);
+      color: var(--text-1);
+    }
+  }
+  /* ---- large view: the popover grows into a modal ---- */
+  .bmf-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-sheet, 20);
+    background: rgba(0, 0, 0, 0.28);
+    opacity: 0;
+    transition: opacity 360ms var(--ease);
+  }
+  .bmf-scrim[data-stage='full'] {
+    opacity: 1;
+  }
+  .bmf {
+    position: fixed;
+    z-index: calc(var(--z-sheet, 20) + 1);
+    overflow: hidden;
+    border-radius: 18px;
+    background: color-mix(in oklab, var(--ink-1) 94%, transparent);
+    backdrop-filter: var(--panel-blur);
+    -webkit-backdrop-filter: var(--panel-blur);
+    border: var(--panel-border);
+    box-shadow: var(--shadow);
+    transition: left 360ms var(--ease), top 360ms var(--ease), width 360ms var(--ease), height 360ms var(--ease), border-radius 360ms var(--ease);
+  }
+  .bmf[data-stage='full'] {
+    border-radius: 28px;
+  }
+  /* the compact content while the panel is small: it fades out as the panel grows and back in as it shrinks */
+  .bmf-ghost {
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+    padding: 6px;
+    overflow: hidden;
+    pointer-events: none;
+    transition: opacity 160ms var(--ease);
+  }
+  .bmf-ghost[data-hidden] {
+    opacity: 0;
+  }
+  .bmf-ghost .seg {
+    margin-bottom: 0;
+  }
+  .bmf-main {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms var(--ease);
+  }
+  .bmf[data-stage='full'] .bmf-main {
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 240ms var(--ease) 150ms;
+  }
+  .bmf-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3, 12px);
+    padding: var(--s-3, 12px) var(--s-3, 12px) var(--s-2);
+  }
+  .bmf-head h2 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .bmf-view {
+    width: 200px;
+  }
+  .bmf-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+  .bmf-side {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--s-3, 12px);
+    width: 232px;
+    padding: 0 var(--s-3, 12px) var(--s-3, 12px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .bmf-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .bmf-tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: 8px 10px;
+    border: 0;
+    border-radius: var(--r-input);
+    background: none;
+    color: var(--text-2);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--t-panel) var(--ease), color var(--t-panel) var(--ease);
+  }
+  .bmf-tab > span:first-child:not(.bm-pill) {
+    flex: 1;
+    min-width: 0;
+  }
+  .bmf-tab[data-active]::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--limb);
+  }
+  @media (hover: hover) {
+    .bmf-tab:hover {
+      background: color-mix(in oklab, var(--text-1) 8%, transparent);
+    }
+  }
+  .bmf-tab[aria-selected='true'] {
+    background: color-mix(in oklab, var(--text-1) 14%, transparent);
+    color: var(--text-1);
+  }
+  /* the providers with their own key: one purple box, the entries look like all the others */
+  .bmf-tabs-boost {
+    margin: var(--s-2) calc(-1 * (var(--s-1) + 1px)) 0; /* reaches into the side padding, so its entries are as wide as all others */
+    padding: var(--s-2) var(--s-1);
+    border: 1px solid color-mix(in oklab, var(--boost) 45%, transparent);
+    border-radius: 14px;
+    background: color-mix(in oklab, var(--boost) 9%, transparent);
+  }
+  .bmf-tabs-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0;
+    padding: 0 10px;
+    color: var(--boost);
+    font-size: var(--fs-axis);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .bmf-side-foot .bm-regional {
+    margin-top: 0;
+  }
+  .bmf-content {
+    flex: 1;
+    min-width: 0;
+    padding: 0 var(--s-3, 12px) var(--s-3, 12px) var(--s-2);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .bmf .bm-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--s-3, 12px);
+  }
+  .bmf .bm-gtitle {
+    margin: var(--s-3, 12px) 0 var(--s-2);
+  }
+  .bmf .bm-gtitle:first-child {
+    margin-top: 0;
+  }
+  .bmf .bm-name {
+    font-size: 13px;
+  }
+  .bmf .bm-slider {
+    max-width: 420px;
+  }
+  @media (max-width: 640px) {
+    .bmf-body {
+      flex-direction: column;
+    }
+    .bmf-side {
+      width: auto;
+      overflow: visible;
+      padding-bottom: var(--s-2);
+    }
+    .bmf-tabs {
+      flex-direction: row;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .bmf-tab {
+      flex: none;
+    }
+    .bmf-side-foot {
+      display: none;
+    }
+    .bmf-view {
+      display: none;
+    }
+    .bmf .bm-grid {
+      grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bmf,
+    .bmf-scrim,
+    .bmf-ghost,
+    .bmf-main {
+      transition: none;
+    }
   }
   .bm-scroll {
     max-height: min(46vh, 360px);

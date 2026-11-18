@@ -15,7 +15,6 @@ export const previewImages = signal<Partial<Record<string, string>>>({});
 /** render size in px: 3:2, 2x of the largest thumbnail, so it stays sharp */
 const W = 432;
 const H = 288;
-const TIMEOUT = 8000;
 
 /** Just this basemap, visible, without labels and slots. */
 function styleFor(id: StaticBasemapId, proj: 'globe' | 'mercator'): StyleSpecification {
@@ -34,9 +33,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export interface Previews {
   /** Renders the miniatures that are not there yet; `first` puts them before the ones still waiting. */
   request(ids: readonly StaticBasemapId[], first?: boolean): void;
-  /** Stops and frees the map. */
+  /** Stops and frees the maps. */
   dispose(): void;
 }
+
+/** Maps rendering at the same time: a slow tile server holds up one lane, not the whole queue. */
+const LANES = 4;
+/** A miniature is taken after this long even if tiles are missing (a partial picture beats none); it gets a second go at the end. */
+const SOFT = 3500;
+const HARD = 9000;
 
 /** The view of the big map is read once, now; the picker shows a snapshot of it. */
 export function createPreviews(): Previews {
@@ -46,44 +51,70 @@ export function createPreviews(): Previews {
   // same area as the big map, shrunk: the thumbnail sits as many zoom steps below the camera as it is smaller than the viewport
   const zoom = Math.max(0, cam.zoom + Math.log2(H / Math.max(H, viewport.peek()?.height ?? 800)));
   let dead = false;
-  let running = false;
-  let host: HTMLDivElement | undefined;
-  let ml: maplibregl.Map | undefined;
+  let lanes = 0;
   let queue: StaticBasemapId[] = [];
+  /** the ones that were cut off at SOFT, for a second try when the queue is empty */
+  let late: StaticBasemapId[] = [];
+  let second = false;
   const known = new Set<string>();
+  const maps: { ml: maplibregl.Map; host: HTMLDivElement }[] = [];
 
-  const render = async (id: StaticBasemapId) => {
-    if (!ml) {
-      host = document.createElement('div');
+  /** One lane: its own hidden map. Returns true when every tile of the picture had arrived. */
+  const render = async (lane: { ml?: maplibregl.Map; host?: HTMLDivElement }, id: StaticBasemapId, limit: number): Promise<boolean> => {
+    if (!lane.ml) {
+      const host = document.createElement('div');
       host.setAttribute('aria-hidden', 'true');
       host.style.cssText = `position:fixed;left:-10000px;top:0;width:${W}px;height:${H}px;pointer-events:none`;
       document.body.append(host);
-      ml = new maplibregl.Map({
+      const ml = new maplibregl.Map({
         container: host, style: styleFor(id, proj), center: [cam.lng, cam.lat], zoom, bearing: cam.bearing, pitch: cam.pitch,
         interactive: false, attributionControl: false, fadeDuration: 0, canvasContextAttributes: { preserveDrawingBuffer: true },
       });
-    } else ml.setStyle(styleFor(id, proj));
-    const map = ml;
-    await sleep(150);
+      lane.ml = ml;
+      lane.host = host;
+      maps.push({ ml, host });
+    } else lane.ml.setStyle(styleFor(id, proj));
+    const map = lane.ml;
+    await sleep(100);
     const t0 = performance.now();
-    while (!dead && performance.now() - t0 < TIMEOUT && !(map.isStyleLoaded() && map.areTilesLoaded())) await sleep(100);
-    if (dead) return;
+    let done = false;
+    for (;;) {
+      done = !!map.isStyleLoaded() && map.areTilesLoaded();
+      if (dead || done || performance.now() - t0 >= limit) break;
+      await sleep(60);
+    }
+    if (dead) return true;
     // the canvas holds the finished frame only inside a render event
     const url = await new Promise<string>((res) => {
       map.once('render', () => res(map.getCanvas().toDataURL('image/webp', 0.85)));
       map.triggerRepaint();
     });
     if (!dead) previewImages.value = { ...previewImages.peek(), [id]: url };
+    return done;
   };
 
-  const pump = async () => {
-    if (running) return;
-    running = true;
-    while (!dead && queue.length) {
-      const id = queue.shift()!;
-      try { await render(id); } catch { /* a failed miniature stays the plain colour of its basemap */ }
+  const runLane = async () => {
+    const lane: { ml?: maplibregl.Map; host?: HTMLDivElement } = {};
+    lanes++;
+    while (!dead) {
+      if (!queue.length && late.length && !second) {
+        // everything else is done: give the cut-off ones another, longer try
+        second = true;
+        queue = late;
+        late = [];
+      }
+      const id = queue.shift();
+      if (!id) break;
+      try {
+        const complete = await render(lane, id, second ? HARD : SOFT);
+        if (!complete && !second) late.push(id);
+      } catch { /* a failed miniature stays the plain colour of its basemap */ }
     }
-    running = false;
+    lanes--;
+  };
+
+  const pump = () => {
+    while (!dead && lanes < LANES && lanes < queue.length) void runLane();
   };
 
   return {
@@ -91,12 +122,16 @@ export function createPreviews(): Previews {
       const fresh = ids.filter((id) => !known.has(id));
       for (const id of fresh) known.add(id);
       queue = first ? [...fresh, ...queue] : [...queue, ...fresh];
-      void pump();
+      second = false; // new work: the cut-off ones wait for the end again
+      pump();
     },
     dispose() {
       dead = true;
-      ml?.remove();
-      host?.remove();
+      for (const m of maps) {
+        m.ml.remove();
+        m.host.remove();
+      }
+      maps.length = 0;
     },
   };
 }

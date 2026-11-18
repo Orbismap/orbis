@@ -124,6 +124,16 @@ export const bluemarble = (): BasemapDef =>
     attribution: 'Bilder: NASA Blue Marble, <a href="https://earthdata.nasa.gov/gibs" target="_blank" rel="noopener">NASA GIBS</a>',
   });
 
+/** NASA Black Marble (VIIRS), the lights of the Earth at night (composite of 2016). */
+export const nachtlichter = (): BasemapDef =>
+  rasterDef('nachtlichter', 'Nachtlichter', {
+    type: 'raster',
+    tiles: ['https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png'],
+    tileSize: 256,
+    maxzoom: 8,
+    attribution: 'Bilder: NASA Black Marble (VIIRS), <a href="https://earthdata.nasa.gov/gibs" target="_blank" rel="noopener">NASA GIBS</a>',
+  });
+
 /** Esri World Imagery "Clarity" (Beta): sharper, more recent selection of the same imagery. */
 export const esriClarity = (): BasemapDef =>
   rasterDef('esri-clarity', 'Esri Weltbilder (Klarheit, Beta)', {
