@@ -4,7 +4,8 @@ import { computed, effect } from '@preact/signals';
 import type { FeatureCollection } from 'geojson';
 import { formatAge, formatNumber } from '../../core/format';
 import { MINUTE } from '../../core/time';
-import { bucketUrl, proxied } from '../../data/endpoints';
+import { proxied } from '../../data/endpoints';
+import { osmPmtilesUrl } from '../../data/osmfiles';
 import { fetchRaw } from '../../data/http';
 import { blitzerdeMarkers, blitzerdeUrl, type MobileProps } from '../../data/parsers/blitzerde';
 import { liveResource } from '../../data/parsers/liveresource';
@@ -86,7 +87,7 @@ export default defineLayer({
       softResources: [resource],
       detail: [{
         name: 'blitzer',
-        data: { kind: 'pmtiles', url: bucketUrl('osm', 'blitzer.pmtiles'), sourceLayer: 'blitzer', attribution: '© OpenStreetMap-Mitwirkende (ODbL)' },
+        data: { kind: 'pmtiles', url: osmPmtilesUrl('blitzer'), sourceLayer: 'blitzer', attribution: '© OpenStreetMap-Mitwirkende (ODbL)' },
         describe: (f: AnyFeature) => {
           const p = f.properties as { kind?: string; speed?: string; dir?: number; operator?: string; ref?: string; id?: number };
           return {

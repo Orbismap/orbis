@@ -1,6 +1,6 @@
 // Surveillance cameras (OpenStreetMap, cctv.pmtiles) in the shared camera look (render/cameras.ts). The archive carries
 // thinned tiles from zoom 0 (73,899 of 438,165 cameras at z0, all of them from z5), so the dots are visible from the world view.
-import { bucketUrl } from '../../data/endpoints';
+import { osmPmtilesUrl } from '../../data/osmfiles';
 import { cameraLayer, directionFact, osmNodeLink, osmSetCount } from '../../render/cameras';
 import type { AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
@@ -33,7 +33,7 @@ export default defineLayer({
       softResources: [resource],
       detail: {
         name: 'cctv',
-        data: { kind: 'pmtiles', url: bucketUrl('osm', 'cctv.pmtiles'), sourceLayer: 'cctv', attribution: '© OpenStreetMap-Mitwirkende (ODbL)' },
+        data: { kind: 'pmtiles', url: osmPmtilesUrl('cctv'), sourceLayer: 'cctv', attribution: '© OpenStreetMap-Mitwirkende (ODbL)' },
         describe: (f: AnyFeature) => {
           const p = f.properties as { id: number; surveillance?: string; ctype?: string; mount?: string; guard?: number; operator?: string; dir?: number };
           return {
