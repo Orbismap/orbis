@@ -5,7 +5,7 @@ import type { SourceSpecification } from 'maplibre-gl';
 import type { BasemapId } from '../types';
 import { rasterDef } from './raster';
 import type { BasemapDef } from './types';
-import { REGIONAL_ALIASES, REGIONAL_IDS } from './regional.ids.generated';
+import { REGIONAL_ALIASES, REGIONAL_IDS, REGIONAL_STATIC_ALIASES } from './regional.ids.generated';
 
 export type Bounds = [number, number, number, number];
 
@@ -26,9 +26,9 @@ export interface RegionalEntry extends Partial<Member> {
 export interface RegionalItem { id: BasemapId; label: string; country?: string; bounds: Bounds; area: number; /** bounds of the members of a series */ parts?: Bounds[] }
 
 const ID_SET = new Set<string>(REGIONAL_IDS);
-export const isRegionalId = (v: unknown): v is BasemapId => typeof v === 'string' && (ID_SET.has(v) || Object.hasOwn(REGIONAL_ALIASES, v));
-/** Ids of merged yearly entries map to their series; everything else stays as it is. */
-export const canonicalRegionalId = (id: string): string => (Object.hasOwn(REGIONAL_ALIASES, id) ? REGIONAL_ALIASES[id]! : id);
+export const isRegionalId = (v: unknown): v is BasemapId => typeof v === 'string' && (ID_SET.has(v) || Object.hasOwn(REGIONAL_ALIASES, v) || Object.hasOwn(REGIONAL_STATIC_ALIASES, v));
+/** Ids of merged yearly entries map to their series, ids of entries that became static basemaps to those; everything else stays as it is. */
+export const canonicalRegionalId = (id: string): string => (Object.hasOwn(REGIONAL_ALIASES, id) ? REGIONAL_ALIASES[id]! : Object.hasOwn(REGIONAL_STATIC_ALIASES, id) ? REGIONAL_STATIC_ALIASES[id]! : id);
 
 /** True once regional.generated.json has been loaded. */
 export const regionalReady = signal(false);
@@ -81,6 +81,8 @@ export function activeMembers(e: RegionalEntry, view: Bounds | undefined): numbe
 export const memberIds = (id: string, idx: number) => ({ source: `bm-${id}-m${idx}`, layer: `bm-${id}-m${idx}-tiles` });
 
 const LIGHT_CATEGORIES = new Set(['map', 'osmbasedmap', 'historicmap', 'elevation']);
+/** Map styles whose tiles show place names already (aerial photos and relief do not). */
+const LABELLED_CATEGORIES = new Set(['map', 'osmbasedmap', 'historicmap']);
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const memberSource = (m: Member): SourceSpecification => ({
@@ -113,7 +115,7 @@ export function regionalDef(id: string): BasemapDef | undefined {
     layers.splice(1, 0, // newest first, each inserted right above the background: the oldest ends up lowest
       { ...d.layers[1]!, id: ids.layer, source: ids.source } as never);
   });
-  const def = { ...d, sources, layers, bounds: e.b };
+  const def = { ...d, sources, layers, bounds: e.b, ...(LABELLED_CATEGORIES.has(e.k) ? { ownLabels: true } : {}) };
   defs.set(e.i, def);
   return def;
 }

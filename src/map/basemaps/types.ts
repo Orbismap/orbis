@@ -12,6 +12,8 @@ export interface BasemapDef {
   layers: LayerSpecification[];
   /** Layers that stand on the ground (2.5D buildings): placed above the 'lines' slot, below the labels. */
   topLayers?: LayerSpecification[];
+  /** The tiles carry their own labels: the shared label layers stay off on this basemap. */
+  ownLabels?: boolean;
   /** Colour set of the label layers on top of this basemap. */
   labelVariant: LabelVariant;
   /** Colour of the container behind the map (space around the globe). */
