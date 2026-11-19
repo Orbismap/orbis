@@ -395,7 +395,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     getBasemap: () => basemap,
     async locate() {
       const pos = await locateImpl();
-      engine.flyTo({ center: [pos.lng, pos.lat], zoom: Math.max(ml.getZoom(), pos.accuracy > 2000 ? 9 : 12) });
+      engine.flyTo({ center: [pos.lng, pos.lat], zoom: Math.max(ml.getZoom(), pos.accuracy > 2000 ? 9 : 14) });
       return pos;
     },
     destroy() {
