@@ -5,6 +5,7 @@ import { tipProps } from '../../ui/tip-state';
 import { projection } from '../../state/view';
 import { cx } from '../../ui/hooks';
 import { Popover } from '../../ui/Popover';
+import { goToMyLocation } from '../tools/my-location';
 import { BasemapFull, type Rect } from './BasemapFull';
 import { PickerBody, usePickerState } from './picker-parts';
 import './basemap.css';
@@ -40,7 +41,7 @@ export function BasemapPicker({ side = 'down' }: { side?: 'down' | 'left' }) {
   };
   return (
     <div class="bm" ref={wrap}>
-      <div class="cap rail-cap">
+      <div class="cap rail-cap rail-stack">
         <button
           ref={btn}
           type="button"
@@ -53,6 +54,10 @@ export function BasemapPicker({ side = 'down' }: { side?: 'down' | 'left' }) {
           {...tipProps('Grundkarte und Ansicht', undefined, 'left')}
         >
           <Icon name={globe ? 'globe' : 'map'} size={20} />
+        </button>
+        <span class="rail-hair" aria-hidden="true" />
+        <button type="button" class="railbtn" aria-label="Zum eigenen Standort" onClick={goToMyLocation} {...tipProps('Mein Standort', undefined, 'left')}>
+          <Icon name="navigate" size={20} />
         </button>
       </div>
       <Popover open={open} onClose={close} align="end" class={cx('bm-pop', 'bm-left', side === 'left' && 'bm-up')} label="Grundkarte und Ansicht" anchorRef={wrap}>
