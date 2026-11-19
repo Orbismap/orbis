@@ -137,7 +137,7 @@ export const TERRAIN_SOURCE = 'terrain-dem';
 /** The relief shading reads the same tiles from a source of its own (MapLibre warns when it shares the 3D terrain's source). */
 export const HILLSHADE_SOURCE = 'terrain-dem-shade';
 export const HILLSHADE_LAYER = 'terrain-hillshade';
-export const TERRAIN_EXAGGERATION = 1.4;
+export const TERRAIN_EXAGGERATION = 1;
 export const HILLSHADE_STRENGTH = 0.35;
 export const TERRAIN_ATTRIBUTION = 'Gelände: <a href="https://mapterhorn.com/attribution/" target="_blank" rel="noopener">Mapterhorn</a>';
 /** The terrain spec for the relief shading: the same tiles, without the attribution again. */
