@@ -40,3 +40,46 @@ export function roofSamples(features: readonly RoofTileFeature[], max = MAX_ROOF
   }
   return [...out.values()];
 }
+
+/** A building of the 2.5D layer (OpenFreeMap): its feature id and its outer ring. */
+export interface FlatBuilding { id: number; ring: [number, number][] }
+
+const inRing = (x: number, y: number, ring: readonly P[]): boolean => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]!, [xj, yj] = ring[j]!;
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+};
+const centre = (ring: readonly P[]): P => {
+  let x = 0, y = 0;
+  for (const p of ring) { x += p[0]; y += p[1]; }
+  return [x / ring.length, y / ring.length];
+};
+const bbox = (ring: readonly P[]) => {
+  let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
+  for (const [x, y] of ring) { if (x < w) w = x; if (x > e) e = x; if (y < s) s = y; if (y > n) n = y; }
+  return { w, s, e, n };
+};
+
+/**
+ * The ids of the 2.5D buildings that lie where a roof sample is drawn in 3D. The tiles share no ids with OpenFreeMap, so a flat building
+ * counts as covered when the middle of its outline lies in a roof's outline (and not in a hole), or the middle of the roof's outline
+ * lies in the flat building: the same OSM building drawn twice has the same shape, and either middle may fall outside a concave one.
+ */
+export function coveredIds(flat: readonly FlatBuilding[], roofs: readonly BuildingSample[]): number[] {
+  const boxes = roofs.map((r) => ({ r, b: bbox(r.rings[0]!), c: centre(r.rings[0]!) }));
+  const out: number[] = [];
+  for (const f of flat) {
+    if (f.ring.length < 4) continue;
+    const fc = centre(f.ring);
+    const fb = bbox(f.ring);
+    for (const { r, b, c } of boxes) {
+      if (fb.e < b.w || fb.w > b.e || fb.n < b.s || fb.s > b.n) continue;
+      const inRoof = inRing(fc[0], fc[1], r.rings[0]!) && !r.rings.slice(1).some((h) => inRing(fc[0], fc[1], h));
+      if (inRoof || inRing(c[0], c[1], f.ring)) { out.push(f.id); break; }
+    }
+  }
+  return out;
+}

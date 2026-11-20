@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { roofSamples } from './roofs-tiles';
+import { coveredIds, roofSamples } from './roofs-tiles';
 
 const square = (x: number, y: number, s = 0.0001): [number, number][] => [[x, y], [x + s, y], [x + s, y + s], [x, y + s], [x, y]];
 const multi = (rings: [number, number][][][]) => ({ type: 'MultiPolygon', coordinates: rings });
@@ -42,5 +42,28 @@ describe('roofSamples', () => {
   it('stops at the cap', () => {
     const fs = Array.from({ length: 10 }, (_, i) => ({ geometry: multi([[square(8 + i * 0.01, 50)]]), properties: { building: 'yes', 'roof:shape': 'flat' } }));
     expect(roofSamples(fs, 4)).toHaveLength(4);
+  });
+});
+
+describe('coveredIds', () => {
+  const sq = (x: number, y: number, s = 0.0001): [number, number][] => [[x, y], [x + s, y], [x + s, y + s], [x, y + s], [x, y]];
+  const roof = (ring: [number, number][], holes: [number, number][][] = []) => ({ id: 'r', part: false, rings: [ring, ...holes], tags: {} });
+
+  it('covers the flat building of the same shape and leaves the others', () => {
+    expect(coveredIds([{ id: 1, ring: sq(8, 50) }, { id: 2, ring: sq(8.01, 50) }], [roof(sq(8, 50))])).toEqual([1]);
+  });
+
+  it('covers a flat building inside the roof outline, but not one in a courtyard hole', () => {
+    const r = roof(sq(8, 50, 0.001), [sq(8.0004, 50.0004, 0.0002)]);
+    expect(coveredIds([{ id: 1, ring: sq(8.0001, 50.0001, 0.00005) }, { id: 2, ring: sq(8.00045, 50.00045, 0.00005) }], [r])).toEqual([1]);
+  });
+
+  it('covers a larger flat outline that contains a roof part', () => {
+    expect(coveredIds([{ id: 7, ring: sq(8, 50, 0.001) }], [roof(sq(8.0004, 50.0004, 0.0001))])).toEqual([7]);
+  });
+
+  it('ignores degenerate rings and no roofs', () => {
+    expect(coveredIds([{ id: 1, ring: [[8, 50], [8, 50], [8, 50]] }], [roof(sq(8, 50))])).toEqual([]);
+    expect(coveredIds([{ id: 1, ring: sq(8, 50) }], [])).toEqual([]);
   });
 });

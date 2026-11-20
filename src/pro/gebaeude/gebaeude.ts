@@ -8,7 +8,7 @@ import { roofColour, wallColour } from './colours';
 import { withoutSplitOutlines } from './outlines';
 import { buildBuilding, roofShapeOf, type Pt } from './roofs';
 
-// 3D buildings: walls, roofs and building parts of the footprints the layer `gebaeude3d` (type "dach") publishes (OpenStreetMap, Simple 3D
+// 3D buildings: walls, roofs and building parts of the footprints `features/buildings3d/roofs-source.ts` publishes (OpenStreetMap, Simple 3D
 // Buildings). All buildings of the view are ONE mesh (one draw call), in metres around one origin, placed on the map with
 // GeoFrame.place. Every building is modelled once (cache by id) and stands on the terrain under its centre.
 

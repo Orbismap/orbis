@@ -21,6 +21,8 @@ export const setBuildings3d = (on: boolean) => {
 };
 /** The layer "3D-Gebäude" replaces the 2.5D buildings of the basemap (coloured OSM buildings, or real models in view): they go off whatever the switch says. Written by the layer. */
 export const buildingsReplaced = signal(false);
+/** OpenFreeMap ids of the 2.5D buildings that Orbis Pro draws in 3D (roofs, parts): they are hidden, the rest stays. Written by `features/buildings3d/roofs-source.ts`. */
+export const buildingsCovered = signal<readonly number[]>([]);
 /** Visible bounds and size in px; undefined before the map is ready. */
 export const viewport = signal<Viewport | undefined>(undefined);
 /** Area of the map covered by panels/sheet; the camera keeps targets inside the rest. */

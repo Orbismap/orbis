@@ -114,7 +114,7 @@ export const powerChannel: TracksPublisher<PowerGridSample> = createTracksChanne
 /** The one channel for single trees (layer `baeume`). */
 export const treesChannel: TracksPublisher<TreeSample> = createTracksChannel<TreeSample>();
 
-/** The one channel for building footprints with roof tags (layer `gebaeude3d`, type "dach"). */
+/** The one channel for building footprints with roof tags (`features/buildings3d/roofs-source.ts`). */
 export const buildingsChannel: TracksPublisher<BuildingSample> = createTracksChannel<BuildingSample>();
 
 /** The one channel for streamed 3D city models (`features/buildings3d/tiles-source.ts`). */

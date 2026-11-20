@@ -15,6 +15,7 @@ import * as view from './state/view';
 import * as time from './state/time';
 import * as settings from './state/settings';
 import { initSession } from './state/session';
+import { startBuildingRoofs } from './features/buildings3d/roofs-source';
 import { startBuildingTiles } from './features/buildings3d/tiles-source';
 import { initSettings } from './state/settings';
 import { startClock, watchRange } from './state/time';
@@ -32,6 +33,7 @@ startUrlSync();
 startHistory();
 startExtensions();
 startBuildingTiles();
+startBuildingRoofs();
 
 render(<App />, document.getElementById('app')!);
 

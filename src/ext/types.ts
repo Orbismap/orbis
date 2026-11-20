@@ -218,7 +218,7 @@ export interface ExtensionHost {
   readonly power: TracksChannel<PowerGridSample>;
   /** Channel for single trees (layer `baeume`). */
   readonly trees: TracksChannel<TreeSample>;
-  /** Channel for building footprints with their roof and height tags (layer `gebaeude3d`, type "dach"). */
+  /** Channel for building footprints with their roof and height tags (`features/buildings3d/roofs-source.ts`, no layer). */
   readonly buildings: TracksChannel<BuildingSample>;
   /** Channel for streamed 3D city models (`features/buildings3d/tiles-source.ts`). */
   readonly tilesets: TracksChannel<TilesetSample>;
