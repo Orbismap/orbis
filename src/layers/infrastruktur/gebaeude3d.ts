@@ -3,19 +3,21 @@
 //   osm      OSM buildings from the OpenFreeMap tiles (source `ofm`, shared with the basemap): building parts at their own height,
 //            outlines with parts hidden (`hide_3d`), the colour OSM knows (`colour`: building:colour / colour). It replaces the
 //            plain 2.5D buildings of the basemap switch.
-//   dach     OSM buildings with their roof shapes and building parts (Simple 3D Buildings): footprints and tags from Overpass for the view
-//            (from zoom 16), Orbis Pro models walls and roofs in 3D; the 2.5D buildings go while they are drawn.
+//   dach     OSM buildings with their roof shapes and building parts (Simple 3D Buildings): footprints and tags from the self-hosted PMTiles
+//            `roofs` (only buildings with a roof tag) for the view (from zoom 16), Orbis Pro models walls and roofs in 3D; the 2.5D buildings
+//            of OpenFreeMap stay for everything else.
 //   plateau  the streamed Plateau city models of Japan (3D Tiles, Orbis Pro draws them); the 2.5D buildings go while one is in view.
 // The basemap switch "3D-Gebäude" is separate: plain OSM 2.5D buildings and the Cesium 3D tiles on aerial images.
 import { effect, signal } from '@preact/signals';
 import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl';
 import { loadPlateau, PLATEAU_ATTRIBUTION, type PlateauSample } from '../../data/plateau';
-import { buildingsQuery } from '../../data/parsers/gebaeude';
-import { overpassArea } from '../../data/parsers/overpassarea';
+import { osmPmtilesUrl } from '../../data/osmfiles';
+import { roofSamples } from '../../data/parsers/roofs-tiles';
 import { buildingsChannel, setTilesetSource, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../../map/buildings-tilt';
+import { ensurePmtilesProtocol } from '../../map/pmtiles-protocol';
 import { buildingsReplaced } from '../../state/view';
 import { defineLayer } from '../define';
 
@@ -25,8 +27,10 @@ const PLAIN = '#d6dae3';
 const OSM_COLORED = '#c4825a';
 const PLATEAU_COLOR = '#7FA6C9';
 const ROOF_COLOR = '#A0624E';
-/** The roof shapes come from Overpass per view: below this zoom one request would cover too many buildings. */
+/** The roofs come from the PMTiles (zoom 15, overzoomed); the model is drawn from this zoom on, below it the 2.5D buildings are enough. */
 const ROOF_MIN_ZOOM = 16;
+const ROOF_SRC = 'gebaeude3d-roofs';
+const ROOF_SCAN_DELAY_MS = 250;
 const SOURCE = 'plateau';
 const CREDIT = 'gebaeude3d-plateau-attribution';
 
@@ -50,7 +54,7 @@ export default defineLayer({
   minZoom: 14,
   coverage: 'Welt (OSM), Japan (Plateau)',
   sources: [
-    { name: 'OpenFreeMap / OpenStreetMap-Mitwirkende (Dachformen: Overpass API)', url: 'https://openfreemap.org/', license: 'ODbL 1.0' },
+    { name: 'OpenFreeMap / OpenStreetMap-Mitwirkende (Dachformen: Orbis-Datenbestand aus OSM)', url: 'https://openfreemap.org/', license: 'ODbL 1.0' },
     { name: PLATEAU_ATTRIBUTION, url: 'https://www.mlit.go.jp/plateau/', license: 'CC BY 4.0' },
   ],
   options: [{ id: 'typ', label: 'Typ', type: 'select', default: 'osm', choices: TYPES }],
@@ -91,22 +95,52 @@ export default defineLayer({
         buildingsReplaced.value = on;
         ctx.status({ state: 'ready' });
       }),
-      // the roof shapes: footprints and tags from Overpass go to Orbis Pro, which models them; the 2.5D buildings give way while they are drawn
+      // the roof shapes: footprints and tags from the PMTiles go to Orbis Pro, which models them
       effect(() => {
         if (typ() !== 'dach') return;
         if (!proAvailable || !proEnabled.value) { ctx.status({ state: 'empty', note: 'Die Dachformen zeichnet Orbis Pro.' }); return; }
-        const res = overpassArea(ctx, { parser: 'overpassBuildings', query: buildingsQuery, empty: [], minZoom: ROOF_MIN_ZOOM, grid: 0.004, maxSpan: 0.007 });
-        const stopData = effect(() => {
-          const items = res.data.value;
-          if (items === undefined) { ctx.status(res.error.value ? { state: 'error', note: res.error.value } : { state: 'loading' }); return; }
+        ctx.status({ state: 'loading' });
+        let dead = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let published = false;
+        const scan = () => {
+          timer = undefined;
+          if (dead || !ml.getSource(ROOF_SRC)) return;
+          if (ml.getZoom() < ROOF_MIN_ZOOM) {
+            if (published) { published = false; buildingsChannel.reset(); }
+            ctx.status({ state: 'ready', note: `Ab Zoomstufe ${ROOF_MIN_ZOOM}` });
+            return;
+          }
+          // while tiles load the query sees few buildings: publishing that would make the roofs flicker
+          if (!ml.isSourceLoaded(ROOF_SRC)) return;
+          const items = roofSamples(ml.querySourceFeatures(ROOF_SRC, { sourceLayer: 'roofs' }));
+          published = true;
           buildingsChannel.publish(() => items);
           const roofs = items.filter((b) => b.tags['roof:shape'] && b.tags['roof:shape'] !== 'flat').length;
           ctx.status(items.length
-            ? { state: 'ready', count: items.length, updatedAt: res.updatedAt.value, note: `${roofs} mit Dachform, ${items.filter((b) => b.part).length} Gebäudeteile` }
-            : { state: ml.getZoom() < ROOF_MIN_ZOOM ? 'ready' : 'empty', updatedAt: res.updatedAt.value, note: ml.getZoom() < ROOF_MIN_ZOOM ? `Ab Zoomstufe ${ROOF_MIN_ZOOM}` : undefined });
+            ? { state: 'ready', count: items.length, note: `${roofs} mit Dachform, ${items.filter((b) => b.part).length} Gebäudeteile` }
+            : { state: 'empty', note: 'Hier sind keine Dachformen in OSM eingetragen (oder noch nicht im Datenbestand).' });
+        };
+        const schedule = () => { if (timer === undefined) timer = setTimeout(scan, ROOF_SCAN_DELAY_MS); };
+        const onSource = (e: { sourceId?: string }) => { if (e.sourceId === ROOF_SRC) schedule(); };
+        // the footprints and tags come from the self-hosted PMTiles (zoom 15, overzoomed); the fill is invisible, but a layer keeps the tiles loaded
+        void Promise.all([ensurePmtilesProtocol(), osmPmtilesUrl('roofs')]).then(([, url]) => {
+          if (dead || ctx.signal.aborted) return;
+          ctx.map.addSource(ROOF_SRC, { type: 'vector', url: `pmtiles://${url}`, attribution: '© OpenStreetMap-Mitwirkende' });
+          ctx.map.addLayer({ id: ROOF_SRC, type: 'fill', source: ROOF_SRC, 'source-layer': 'roofs', minzoom: ROOF_MIN_ZOOM - 1, paint: { 'fill-opacity': 0 } } as LayerSpecification, 'areas');
+          ml.on('sourcedata', onSource as never);
+          ml.on('moveend', schedule);
+          schedule();
         });
-        const stopReplace = effect(() => { buildingsReplaced.value = buildingsChannel.presented.value; });
-        return () => { stopData(); stopReplace(); res.dispose(); buildingsChannel.reset(); }; // buildingsReplaced: the effect of the next type sets it
+        // the 2.5D buildings stay (OpenFreeMap): the tiles carry only buildings with a roof tag, the rest keeps its flat extrusion
+        return () => {
+          dead = true;
+          clearTimeout(timer);
+          ml.off('sourcedata', onSource as never);
+          ml.off('moveend', schedule);
+          ctx.map.remove({ layers: [ROOF_SRC], sources: [ROOF_SRC] });
+          buildingsChannel.reset();
+        };
       }),
       // the Plateau models (Orbis Pro streams them)
       effect(() => {

@@ -3,6 +3,7 @@
 import { computed, signal } from '@preact/signals';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { bucketUrl } from '../../data/endpoints';
+import { osmPmtilesUrl } from '../../data/osmfiles';
 import { fetchRaw } from '../../data/http';
 import { mrdsSites, type MrdsCollection, type MrdsProps } from '../../data/parsers/mrds';
 import { rasterLayer } from '../../render/raster';
@@ -95,7 +96,7 @@ export default defineLayer({
 
     // the detail layer reports no status of its own (the overview carries count and age)
     const detail = pmtilesLayer({ ...ctx, status: () => {} }, {
-      url: bucketUrl('osm', 'resource.pmtiles'),
+      url: osmPmtilesUrl('resource'),
       sourceLayer: 'resource',
       name: 'osm',
       minZoom: DETAIL_ZOOM,
