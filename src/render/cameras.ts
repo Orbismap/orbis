@@ -8,6 +8,7 @@ import { computed, effect, signal, type ReadonlySignal } from '@preact/signals';
 import type { ExpressionSpecification, FilterSpecification, LayerSpecification } from 'maplibre-gl';
 import type { Resource } from '../data/resource';
 import { bucketUrl } from '../data/endpoints';
+import type { OsmUrl } from '../data/osmfiles';
 import { formatInt } from '../core/format';
 import type { InspectCard, LayerContext, LayerHandle, LayerStatus } from '../layers/types';
 import { ensurePmtilesProtocol } from '../map/pmtiles-protocol';
@@ -25,7 +26,7 @@ export type CameraData =
    * 1024-grid cell of a tile, zooms 0 .. lowEnd - 1; the full layer starts at lowEnd). Default `<sourceLayer>_lo` with lowEnd 6,
    * false to switch off. Files built before it simply lack the layer (the full layer then still draws everything).
    */
-  | { kind: 'pmtiles'; url: string; sourceLayer: string; attribution?: string; lowLayer?: string | false; lowEnd?: number }
+  | { kind: 'pmtiles'; url: OsmUrl; sourceLayer: string; attribution?: string; lowLayer?: string | false; lowEnd?: number }
   | { kind: 'geojson'; data: FeatureData };
 
 export interface CameraSource {
@@ -125,6 +126,9 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
   let lastCard: InspectCard | null = null;
   clean.add(effect(() => { const c = ctx.selection.value; if (c !== lastCard && !ctx.ownSelection?.(c)) selected.value = null; }));
 
+  /** the resolved PMTiles URLs (the dated file names come from the bucket's meta.json) */
+  const urls = new Map<CameraSource, string>();
+
   function build() {
     ensureIcons(ml, ['camera', 'fov']);
     for (const s of sources) {
@@ -140,7 +144,7 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
       const lo = `${base}.${s.name}-lo`;
 
       if (s.data.kind === 'pmtiles') {
-        engine.addSource(src, { type: 'vector', url: `pmtiles://${s.data.url}`, promoteId: idKey, ...(s.data.attribution ? { attribution: s.data.attribution } : {}) });
+        engine.addSource(src, { type: 'vector', url: `pmtiles://${urls.get(s)}`, promoteId: idKey, ...(s.data.attribution ? { attribution: s.data.attribution } : {}) });
       } else {
         engine.addSource(src, { type: 'geojson', data: EMPTY_FC, promoteId: idKey });
       }
@@ -266,7 +270,10 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
 
   // PMTiles needs its protocol registered first (library loads on demand); everything is added in one go to keep the order
   const needsProtocol = sources.some((s) => s.data.kind === 'pmtiles');
-  void (needsProtocol ? ensurePmtilesProtocol() : Promise.resolve())
+  void Promise.all([
+    needsProtocol ? ensurePmtilesProtocol() : undefined,
+    ...sources.map(async (s) => { if (s.data.kind === 'pmtiles') urls.set(s, await s.data.url); }),
+  ])
     .then(() => { if (!destroyed && !ctx.signal.aborted) build(); })
     .catch(() => ctx.status({ state: 'error', note: 'Kartenkacheln nicht ladbar' }));
 

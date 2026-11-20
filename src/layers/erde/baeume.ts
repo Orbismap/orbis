@@ -4,7 +4,7 @@
 // bushes along the lines; the 2D map shows the single trees only.
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { formatNumber } from '../../core/format';
-import { bucketUrl } from '../../data/endpoints';
+import { osmPmtilesUrl } from '../../data/osmfiles';
 import { LEAF_CYCLES, LEAF_TYPES, buildTreeSamples, type RawTree, type RawTreeLine } from '../../data/parsers/trees';
 import { treesChannel } from '../../ext/channels';
 import type { AnyFeature } from '../../render/common';
@@ -58,7 +58,7 @@ export default defineLayer({
   mount(ctx) {
     // while Orbis Pro draws 3D trees the dots disappear (data, cards and the channel keep working)
     const handle = pmtilesLayer(ctx, {
-      url: bucketUrl('osm', 'trees.pmtiles'),
+      url: osmPmtilesUrl('trees'),
       sourceLayer: 'trees',
       minZoom: MIN_ZOOM,
       radius,

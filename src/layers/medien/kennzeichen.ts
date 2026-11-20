@@ -1,6 +1,6 @@
 // Automatic licence plate readers (ALPR, e.g. Flock Safety) from OpenStreetMap, as in the DeFlock community map, in the
 // shared camera look (render/cameras.ts). alpr.pmtiles carries thinned tiles from zoom 0 (66,347 of 157,243 at z0, all from z3).
-import { bucketUrl } from '../../data/endpoints';
+import { osmPmtilesUrl } from '../../data/osmfiles';
 import { cameraLayer, directionFact, osmNodeLink, osmSetCount } from '../../render/cameras';
 import type { AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
@@ -33,7 +33,7 @@ export default defineLayer({
       softResources: [resource],
       detail: {
         name: 'alpr',
-        data: { kind: 'pmtiles', url: bucketUrl('osm', 'alpr.pmtiles'), sourceLayer: 'alpr', attribution: '© OpenStreetMap-Mitwirkende (ODbL)' },
+        data: { kind: 'pmtiles', url: osmPmtilesUrl('alpr'), sourceLayer: 'alpr', attribution: '© OpenStreetMap-Mitwirkende (ODbL)' },
         describe: (f: AnyFeature) => {
           const p = f.properties as { id: number; brand?: string; flock?: number; operator?: string; dir?: number; mount?: string; zone?: string; since?: string; ref?: string };
           const [lng, lat] = f.geometry.type === 'Point' ? f.geometry.coordinates : [0, 0];
