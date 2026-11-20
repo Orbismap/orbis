@@ -228,4 +228,4 @@ Ebenen heißen nach dem, was man sieht („Erdbeben“, „Seekabel“), nicht n
 Satz ohne Punkt am Ende. Alter: „vor 3 min“, „heute 14:20“, „Stand 9. Nov.“. Zahlen mit `Intl.NumberFormat('de-DE')`,
 Einheiten mit schmalem Leerzeichen. Keine Ausrufezeichen, keine Emojis.
 
-Die Vorschaubilder der Grundkartenauswahl (`public/basemaps/*.webp`) sind echte Kartenausschnitte; ändert sich ein Kartenstil, werden sie mit `pnpm thumbs` neu erzeugt.
+Die Vorschau der Grundkartenauswahl ist eine Miniatur der Hauptkarte (gleiche Position, Zoom, Neigung und Projektion): `features/basemap/preview.ts` rendert beim Öffnen einmal je Kategorie mit einer versteckten MapLibre-Karte. Die Bilder in `public/basemaps/*.webp` (`pnpm thumbs`) braucht nur noch das Mockup.

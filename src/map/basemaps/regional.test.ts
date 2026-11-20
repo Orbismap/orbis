@@ -6,7 +6,7 @@ import { basemapCredits } from '../../features/attribution/credits';
 import { validateKarte } from '../../karten/store';
 import { parseHash } from '../../core/url';
 import data from './regional.generated.json';
-import { REGIONAL_ALIASES, REGIONAL_IDS } from './regional.ids.generated';
+import { REGIONAL_ALIASES, REGIONAL_IDS, REGIONAL_STATIC_ALIASES } from './regional.ids.generated';
 import { STACK_CAP, activeMembers, boundsArea, entryLabel, intersects, loadRegional, memberIds, membersOf, regionalDef, type Bounds, type RegionalEntry } from './regional';
 
 const entries = data as unknown as RegionalEntry[];
@@ -64,6 +64,16 @@ describe('generated regional data', () => {
       expect(entries.some((e) => e.i === target)).toBe(true);
       expect(entries.some((e) => e.i === old)).toBe(false);
     }
+  });
+  it('old ids of worldwide entries map to static basemaps', () => {
+    for (const [old, target] of Object.entries(REGIONAL_STATIC_ALIASES)) {
+      expect(isBasemapId(old)).toBe(true);
+      expect(resolveBasemapId(old)).toBe(target);
+      expect(isBasemapId(target)).toBe(true);
+      expect(entries.some((e) => e.i === old)).toBe(false);
+    }
+    expect(resolveBasemapId('r-cyclosm')).toBe('cyclosm');
+    expect(resolveBasemapId('r-eoxat2024cloudless')).toBe('eox-2024');
   });
   it('series stack only members touching the view, capped, newest first', async () => {
     const mv = entries.find((e) => e.i === 'r-mecklenburg-vorpommern-dop20')!;

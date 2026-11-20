@@ -4,11 +4,13 @@
 import type { IconName } from './names';
 
 /** Icons the UI needs in addition to the names layers may reference. */
-export type UiIconName = IconName | 'chevron-left' | 'chevron-up' | 'compass' | 'copy' | 'pencil' | 'plus-square' | 'panel-left' | 'more' | 'keyboard' | 'link' | 'north' | 'key' | 'boost' | 'route' | 'bookmark' | 'walk' | 'bike' | 'swap' | 'filter' | 'gear';
+export type UiIconName = IconName | 'chevron-left' | 'chevron-up' | 'compass' | 'copy' | 'pencil' | 'plus-square' | 'panel-left' | 'more' | 'keyboard' | 'link' | 'north' | 'key' | 'boost' | 'route' | 'bookmark' | 'walk' | 'bike' | 'swap' | 'filter' | 'gear' | 'expand' | 'collapse';
 
 const cloud = (y: number) => `M5.5 ${y}a3.25 3.25 0 0 1-.3-6.49 4.75 4.75 0 0 1 9.2-.6 3.55 3.55 0 0 1 .1 7.09z`;
 
 export const ICON_PATHS: Record<UiIconName, string> = {
+  expand: 'M11.5 3.5h5v5M16.5 3.5 11 9M8.5 16.5h-5v-5M3.5 16.5 9 11',
+  collapse: 'M16.5 8.5h-5v-5M11.5 8.5l5-5M3.5 11.5h5v5M8.5 11.5l-5 5',
   route: 'M3.5 5a2 2 0 1 0 4 0 2 2 0 1 0-4 0M7.5 5h4a2.75 2.75 0 0 1 0 5.5h-3a2.75 2.75 0 0 0 0 5.5h4M12.5 16a2 2 0 1 0 4 0 2 2 0 1 0-4 0',
   bookmark: 'M5.5 3.5h9a1 1 0 0 1 1 1v13l-5.5-3.5-5.5 3.5v-13a1 1 0 0 1 1-1z',
   walk: 'M10.75 3.5a1 1 0 1 0 0 .01M8.5 17.5l1.5-5-2-2 1-4 2.25 1.5 2 .5M7 10.5l-1.75 2M10 12.5l2.25 1.25.75 3.75',
@@ -61,6 +63,7 @@ export const ICON_PATHS: Record<UiIconName, string> = {
   settings: 'M3 5.5h6.75M13.25 5.5H17M3 10h2.75M9.25 10H17M3 14.5h8.25M14.75 14.5H17M11.5 3.75a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5zM7.5 8.25a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5zM13 12.75a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5z',
   sliders: 'M3 5.5h2.25M8.75 5.5H17M3 10h8.25M14.75 10H17M3 14.5h3.75M10.25 14.5H17M7 3.75a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5zM13 8.25a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5zM8.5 12.75a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5z',
   locate: 'M10 5.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM10 2v2.5M10 15.5V18M2 10h2.5M15.5 10H18M10 10h.01',
+  navigate: 'M16.5 3.5 3.5 8.75l5.9 2.1 2.1 5.9z',
   plus: 'M10 4.5v11M4.5 10h11',
   minus: 'M4.5 10h11',
   close: 'M5 5l10 10M15 5 5 15',
