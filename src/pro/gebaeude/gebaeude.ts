@@ -30,9 +30,16 @@ interface Built {
   ground: number;
 }
 
+/**
+ * The stage lights (ambient 1.5 + sun 2.2, shared with ships, trees, planes) show a flat surface at about 0.75 of its colour (measured on the
+ * top of buildings in the dark basemap: 0.74-0.76 of the 2.5D colour, which MapLibre shows at ~0.97). The colours are scaled up in linear light
+ * (0.53^-1) so that a building here has the colour of the 2.5D building of the basemap. Vertex colours are floats, values above 1 are fine.
+ */
+const LOOK_GAIN = 1.9;
 const rgb = (hex: number, shade: number): [number, number, number] => {
   const c = new THREE.Color(hex);
-  return [Math.min(1, c.r * shade), Math.min(1, c.g * shade), Math.min(1, c.b * shade)];
+  const k = shade * LOOK_GAIN;
+  return [Math.min(4, c.r * k), Math.min(4, c.g * k), Math.min(4, c.b * k)];
 };
 
 export class GebaeudePart implements StagePart {
