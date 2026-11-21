@@ -1,6 +1,6 @@
 // Which regional basemaps to offer for the current view (pure, so it can be tested).
 import { BASEMAPS, STATIC_REGIONAL_IDS } from '../../map/basemaps';
-import { allGenerated, boundsArea, intersects, type Bounds, type RegionalItem } from '../../map/basemaps/regional';
+import { allGenerated, boundsArea, intersects, isWorldwide, type Bounds, type RegionalItem } from '../../map/basemaps/regional';
 import type { BasemapId } from '../../map/types';
 
 const STATIC_COUNTRY = 'CH';
@@ -50,12 +50,13 @@ export const itemDistanceKm = (c: [number, number], i: RegionalItem): number => 
 /**
  * Regional basemaps touching `view`, nearest to the map centre first (equal distance, e.g. several layers around the
  * centre: smaller area first, then name). `selected` stays in the list even when the view has moved away from it.
+ * Worldwide entries (language styles of OSM-FR) are no regional maps and would be "nearby" everywhere: left out.
  */
 export function regionalFor(view: Bounds | undefined, center: [number, number], selected: BasemapId): RegionalOption[] {
   const all = [...staticRegional(), ...allGenerated()];
   const wide = !view || view[2] - view[0] > MAX_VIEW_SPAN;
   return all
-    .filter((i) => i.id === selected || (!wide && view && (i.parts ?? [i.bounds]).some((b) => intersects(view, b))))
+    .filter((i) => i.id === selected || (!wide && view && !isWorldwide(i.bounds) && (i.parts ?? [i.bounds]).some((b) => intersects(view, b))))
     .map((item) => ({ item, km: itemDistanceKm(center, item) }))
     .sort((a, b) => a.km - b.km || a.item.area - b.item.area || a.item.label.localeCompare(b.item.label, 'de'));
 }

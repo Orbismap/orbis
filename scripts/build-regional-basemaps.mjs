@@ -48,11 +48,13 @@ const src = process.argv[2] ? readFileSync(process.argv[2], 'utf8') : await (awa
 const features = JSON.parse(src).features;
 
 function bbox(geometry) {
-  // an area on both sides of the antimeridian (Alaska with the Aleutians) would become a worldwide box: take its biggest part
+  // Far-flung parts (overseas territories of France, Svalbard/Antarctica of Norway, the Aleutians across the
+  // antimeridian) would blow the box up to half the planet, so the map would be offered all over Europe: take the
+  // biggest part. Real wide countries (Canada, Argentina, USA) are single polygons or have no part that far away.
   if (geometry.type === 'MultiPolygon' && geometry.coordinates.length > 1) {
     const parts = geometry.coordinates.map((c) => bbox({ type: 'Polygon', coordinates: c }));
     const whole = bbox({ type: 'Polygon', coordinates: geometry.coordinates.flat() });
-    if (whole[2] - whole[0] >= 359) return parts.reduce((a, b) => ((b[2] - b[0]) * (b[3] - b[1]) > (a[2] - a[0]) * (a[3] - a[1]) ? b : a));
+    if (whole[2] - whole[0] >= 40 && parts.some((p) => whole[2] - whole[0] > 2 * (p[2] - p[0]))) return parts.reduce((a, b) => ((b[2] - b[0]) * (b[3] - b[1]) > (a[2] - a[0]) * (a[3] - a[1]) ? b : a));
   }
   let w = 180, s = 90, e = -180, n = -90;
   const walk = (c) => {
