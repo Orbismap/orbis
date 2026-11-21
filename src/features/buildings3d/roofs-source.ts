@@ -6,17 +6,21 @@
 // Where a real city model is in view (Plateau, Google 3D tiles) this stays out: the model brings its own.
 import { effect } from '@preact/signals';
 import { osmPmtilesUrl } from '../../data/osmfiles';
-import { coveredIds, flatRing, flatSamples, roofSamples, type FlatBuilding } from '../../data/parsers/roofs-tiles';
+import { coveredIds, flatRing, flatSamples, paintSamples, roofSamples, type FlatBuilding } from '../../data/parsers/roofs-tiles';
 import { buildingsChannel, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
+import { BASEMAPS, GENERIC_BUILDINGS_ID, isStaticBasemap } from '../../map/basemaps';
 import { ensurePmtilesProtocol } from '../../map/pmtiles-protocol';
 import { mapEngine } from '../../state/ui';
+import { activeBasemap, buildingsColoured } from '../../state/view';
 
 /** Below this the 2.5D houses are enough (and one view would hold too many buildings). */
 export const ROOF_MIN_ZOOM = 16;
 const SRC = 'buildings3d-roofs';
 const SCAN_DELAY_MS = 250;
+/** Buildings without a colour in OSM while the layer "3D-Gebäude" is on (the same as that layer's 2.5D buildings). */
+const PLAIN = '#d6dae3';
 
 /** Starts the source; returns the function that stops it. */
 export function startBuildingRoofs(): () => void {
@@ -28,6 +32,15 @@ export function startBuildingRoofs(): () => void {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let published = false;
 
+    /** The building colour of the basemap on show (what its 2.5D buildings are painted in), if it is a plain hex colour. */
+    const baseColour = (): string | undefined => {
+      const b = activeBasemap.value;
+      const id = (isStaticBasemap(b) ? BASEMAPS[b].topLayers?.[0]?.id : undefined) ?? GENERIC_BUILDINGS_ID;
+      try {
+        const c = ml.getPaintProperty(id, 'fill-extrusion-color');
+        return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : undefined;
+      } catch { return undefined; }
+    };
     const clear = () => {
       if (published) { published = false; buildingsChannel.reset(); }
     };
@@ -44,11 +57,13 @@ export function startBuildingRoofs(): () => void {
         const ring = flatRing(f);
         if (typeof f.id === 'number' && ring) flat.push({ id: f.id, ring });
       }
-      const items = [...roofs, ...flatSamples(features, new Set(coveredIds(flat, roofs)))];
+      // standard design: all buildings in the colour of the basemap; coloured (OSM colours) only while the layer "3D-Gebäude" is on
+      const items = paintSamples([...roofs, ...flatSamples(features, new Set(coveredIds(flat, roofs)))], buildingsColoured.peek(), baseColour(), PLAIN);
       published = true;
       buildingsChannel.publish(() => items);
     };
     const schedule = () => { if (timer === undefined) timer = setTimeout(scan, SCAN_DELAY_MS); };
+    const stopLook = effect(() => { buildingsColoured.value; activeBasemap.value; schedule(); });
     const onSource = (e: { sourceId?: string }) => { if (e.sourceId === SRC || e.sourceId === 'ofm') schedule(); };
 
     // the fill is invisible, but a layer keeps the tiles of the source loaded
@@ -62,6 +77,7 @@ export function startBuildingRoofs(): () => void {
     });
     return () => {
       dead = true;
+      stopLook();
       clearTimeout(timer);
       ml.off('sourcedata', onSource as never);
       ml.off('moveend', schedule);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coveredIds, flatSamples, roofSamples } from './roofs-tiles';
+import { coveredIds, flatSamples, paintSamples, roofSamples } from './roofs-tiles';
 
 const square = (x: number, y: number, s = 0.0001): [number, number][] => [[x, y], [x + s, y], [x + s, y + s], [x, y + s], [x, y]];
 const multi = (rings: [number, number][][][]) => ({ type: 'MultiPolygon', coordinates: rings });
@@ -96,5 +96,32 @@ describe('flatSamples', () => {
   it('stops at the cap', () => {
     const fs = Array.from({ length: 6 }, (_, i) => ({ id: i, geometry: poly(8 + i * 0.01, 50), properties: { render_height: 4 } }));
     expect(flatSamples(fs, new Set(), 3)).toHaveLength(3);
+  });
+});
+
+describe('paintSamples', () => {
+  const b = (tags: Record<string, string>) => ({ id: 'x', part: false, rings: [[[8, 50], [8.1, 50], [8.1, 50.1], [8, 50]] as [number, number][]], tags });
+
+  it('standard design: every building in the colour of the basemap, OSM colours and materials dropped', () => {
+    const [s] = paintSamples([b({ building: 'yes', 'building:colour': 'red', 'roof:material': 'slate', 'roof:shape': 'gabled', height: '9' })], false, '#34465f', '#d6dae3');
+    expect(s?.tags).toEqual({ building: 'yes', 'roof:shape': 'gabled', height: '9', 'building:colour': '#34465f', 'roof:colour': '#34465f' });
+  });
+
+  it('standard design without a known basemap colour: only drops the look tags', () => {
+    const [s] = paintSamples([b({ building: 'yes', colour: 'red', 'roof:colour': 'blue' })], false, undefined, '#d6dae3');
+    expect(s?.tags).toEqual({ building: 'yes' });
+  });
+
+  it('coloured: OSM colours stay, buildings without one get the plain colour', () => {
+    const out = paintSamples([b({ building: 'yes', 'building:colour': 'red' }), b({ building: 'yes', 'building:material': 'brick' }), b({ building: 'yes' })], true, '#34465f', '#d6dae3');
+    expect(out[0]?.tags['building:colour']).toBe('red');
+    expect(out[1]?.tags['building:colour']).toBeUndefined();
+    expect(out[2]?.tags['building:colour']).toBe('#d6dae3');
+  });
+
+  it('does not change the input', () => {
+    const input = b({ building: 'yes', colour: 'red' });
+    paintSamples([input], false, '#fff000', '#d6dae3');
+    expect(input.tags).toEqual({ building: 'yes', colour: 'red' });
   });
 });

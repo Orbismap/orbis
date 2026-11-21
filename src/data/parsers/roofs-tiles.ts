@@ -84,6 +84,24 @@ export function coveredIds(flat: readonly FlatBuilding[], roofs: readonly Buildi
   return out;
 }
 
+const LOOK_TAGS = ['building:colour', 'colour', 'building:material', 'material', 'roof:colour', 'roof:material'];
+const hasLook = (t: Record<string, string>) => t['building:colour'] !== undefined || t.colour !== undefined || t['building:material'] !== undefined || t.material !== undefined;
+
+/**
+ * The look of the samples. `coloured` (the layer "3D-Gebäude" is on): the colours OSM knows, and `plain` for buildings without one.
+ * Otherwise (standard design): walls and roofs all in `base`, the building colour of the basemap, whatever OSM says; without a `base` the
+ * model's own defaults apply (colour and material tags are dropped).
+ */
+export function paintSamples(items: readonly BuildingSample[], coloured: boolean, base: string | undefined, plain: string): BuildingSample[] {
+  return items.map((b) => {
+    if (coloured) return hasLook(b.tags) ? b : { ...b, tags: { ...b.tags, 'building:colour': plain } };
+    const tags = { ...b.tags };
+    for (const k of LOOK_TAGS) delete tags[k];
+    if (base) { tags['building:colour'] = base; tags['roof:colour'] = base; }
+    return { ...b, tags };
+  });
+}
+
 /** A building of the 2.5D tiles (OpenFreeMap `building` layer) as the map query returns it. */
 export interface FlatFeature {
   id?: number | string;

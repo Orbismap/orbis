@@ -13,7 +13,7 @@ import { buildingsChannel, setTilesetSource, tilesetsChannel } from '../../ext/c
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../../map/buildings-tilt';
-import { buildingsReplaced } from '../../state/view';
+import { buildingsColoured, buildingsReplaced } from '../../state/view';
 import { defineLayer } from '../define';
 
 const COLOR = '#B9A58C';
@@ -81,6 +81,7 @@ export default defineLayer({
           ml.setPaintProperty(layerId, 'fill-extrusion-opacity', ctx.opacity.value);
         }
         buildingsReplaced.value = on;
+        buildingsColoured.value = on;
         ctx.status({ state: 'ready' });
       }),
       // the Plateau models (Orbis Pro streams them)
@@ -112,6 +113,7 @@ export default defineLayer({
         for (const s of stop) s();
         setTilesetSource(SOURCE, null);
         buildingsReplaced.value = false;
+        buildingsColoured.value = false;
         ctx.map.remove({ layers: [layerId] });
       },
     };

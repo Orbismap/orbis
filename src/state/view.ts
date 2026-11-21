@@ -21,6 +21,8 @@ export const setBuildings3d = (on: boolean) => {
 };
 /** The layer "3D-Gebäude" replaces the 2.5D buildings of the basemap (coloured OSM buildings, or real models in view): they go off whatever the switch says. Written by the layer. */
 export const buildingsReplaced = signal(false);
+/** The layer "3D-Gebäude" (type OSM) is on: the buildings Orbis Pro draws carry the colours of OSM. Otherwise they have the building colour of the basemap. Written by the layer. */
+export const buildingsColoured = signal(false);
 /** Visible bounds and size in px; undefined before the map is ready. */
 export const viewport = signal<Viewport | undefined>(undefined);
 /** Area of the map covered by panels/sheet; the camera keeps targets inside the rest. */
