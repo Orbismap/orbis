@@ -42,7 +42,39 @@ export function roofSamples(features: readonly RoofTileFeature[], max = MAX_ROOF
 }
 
 /** A building of the 2.5D layer (OpenFreeMap): its feature id and its outer ring. */
-export interface FlatBuilding { id: number; ring: [number, number][] }
+export interface FlatBuilding { id: number; ring: [number, number][]; /** where it starts above the ground (m), if known */ base?: number }
+
+const bbox = (ring: readonly P[]) => {
+  let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
+  for (const [x, y] of ring) { if (x < w) w = x; if (x > e) e = x; if (y < s) s = y; if (y > n) n = y; }
+  return { w, s, e, n };
+};
+
+/**
+ * The ids of the 2.5D buildings that a roof sample is the same building as. The tiles share no ids with OpenFreeMap, so two outlines count as
+ * one building when their bounding boxes overlap by at least 70 % of their union (the same OSM building has the same shape) and, if both
+ * know it, they start at about the same height. A building that only lies INSIDE a roof outline is not covered: parts stacked on each other
+ * (the shaft of a tower inside the footprint of its base or sphere) are separate buildings, and dropping them leaves holes.
+ */
+export function coveredIds(flat: readonly FlatBuilding[], roofs: readonly BuildingSample[]): number[] {
+  const boxes = roofs.map((r) => ({ b: bbox(r.rings[0]!), base: Number.parseFloat(r.tags.min_height ?? '') }));
+  const out: number[] = [];
+  for (const f of flat) {
+    if (f.ring.length < 4) continue;
+    const fb = bbox(f.ring);
+    for (const { b, base } of boxes) {
+      const w = Math.min(fb.e, b.e) - Math.max(fb.w, b.w);
+      const h = Math.min(fb.n, b.n) - Math.max(fb.s, b.s);
+      if (w <= 0 || h <= 0) continue;
+      const union = (fb.e - fb.w) * (fb.n - fb.s) + (b.e - b.w) * (b.n - b.s) - w * h;
+      if (union <= 0 || (w * h) / union < 0.7) continue;
+      if (f.base !== undefined && Number.isFinite(base) && Math.abs(f.base - base) > 2) continue;
+      out.push(f.id);
+      break;
+    }
+  }
+  return out;
+}
 
 const inRing = (x: number, y: number, ring: readonly P[]): boolean => {
   let inside = false;
@@ -52,37 +84,6 @@ const inRing = (x: number, y: number, ring: readonly P[]): boolean => {
   }
   return inside;
 };
-const centre = (ring: readonly P[]): P => {
-  let x = 0, y = 0;
-  for (const p of ring) { x += p[0]; y += p[1]; }
-  return [x / ring.length, y / ring.length];
-};
-const bbox = (ring: readonly P[]) => {
-  let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
-  for (const [x, y] of ring) { if (x < w) w = x; if (x > e) e = x; if (y < s) s = y; if (y > n) n = y; }
-  return { w, s, e, n };
-};
-
-/**
- * The ids of the 2.5D buildings that lie where a roof sample is drawn in 3D. The tiles share no ids with OpenFreeMap, so a flat building
- * counts as covered when the middle of its outline lies in a roof's outline (and not in a hole), or the middle of the roof's outline
- * lies in the flat building: the same OSM building drawn twice has the same shape, and either middle may fall outside a concave one.
- */
-export function coveredIds(flat: readonly FlatBuilding[], roofs: readonly BuildingSample[]): number[] {
-  const boxes = roofs.map((r) => ({ r, b: bbox(r.rings[0]!), c: centre(r.rings[0]!) }));
-  const out: number[] = [];
-  for (const f of flat) {
-    if (f.ring.length < 4) continue;
-    const fc = centre(f.ring);
-    const fb = bbox(f.ring);
-    for (const { r, b, c } of boxes) {
-      if (fb.e < b.w || fb.w > b.e || fb.n < b.s || fb.s > b.n) continue;
-      const inRoof = inRing(fc[0], fc[1], r.rings[0]!) && !r.rings.slice(1).some((h) => inRing(fc[0], fc[1], h));
-      if (inRoof || inRing(c[0], c[1], f.ring)) { out.push(f.id); break; }
-    }
-  }
-  return out;
-}
 
 const LOOK_TAGS = ['building:colour', 'colour', 'building:material', 'material', 'roof:colour', 'roof:material'];
 const hasLook = (t: Record<string, string>) => t['building:colour'] !== undefined || t.colour !== undefined || t['building:material'] !== undefined || t.material !== undefined;
@@ -126,6 +127,14 @@ const MAX_FLAT_SAMPLES = 8000;
  */
 export function flatSamples(features: readonly FlatFeature[], skip: ReadonlySet<number | string>, max = MAX_FLAT_SAMPLES): BuildingSample[] {
   const out = new Map<string, BuildingSample>();
+  // OpenFreeMap hides the outline of a building that has parts (`hide_3d`): a building that lies inside such an outline is one of its parts
+  const outlines = features.filter((f) => f.properties?.hide_3d).map((f) => flatRing(f)).filter((r): r is [number, number][] => !!r).map((r) => ({ r, b: bbox(r) }));
+  const isPart = (ring: readonly P[]): boolean => {
+    let x = 0, y = 0;
+    for (const p of ring) { x += p[0]; y += p[1]; }
+    x /= ring.length; y /= ring.length;
+    return outlines.some(({ r, b }) => x >= b.w && x <= b.e && y >= b.s && y <= b.n && inRing(x, y, r));
+  };
   for (const f of features) {
     if (out.size >= max) break;
     if (f.id === undefined || skip.has(f.id) || !f.geometry || f.properties?.hide_3d) continue;
@@ -142,7 +151,7 @@ export function flatSamples(features: readonly FlatFeature[], skip: ReadonlySet<
       const rings = Array.isArray(poly) ? poly.map(ring).filter((r) => r.length >= 4) : [];
       // a building the tile edge cuts comes as one piece per tile with the same id: the first corner tells the pieces apart (and the same piece twice from one)
       const id = rings[0] ? `o${f.id}@${rings[0][0]![0].toFixed(6)},${rings[0][0]![1].toFixed(6)}` : '';
-      if (rings.length && out.size < max && !out.has(id)) out.set(id, { id, part: false, rings, tags });
+      if (rings.length && out.size < max && !out.has(id)) out.set(id, { id, part: isPart(rings[0]!), rings, tags });
     });
   }
   return [...out.values()];

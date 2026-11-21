@@ -47,19 +47,27 @@ describe('roofSamples', () => {
 
 describe('coveredIds', () => {
   const sq = (x: number, y: number, s = 0.0001): [number, number][] => [[x, y], [x + s, y], [x + s, y + s], [x, y + s], [x, y]];
-  const roof = (ring: [number, number][], holes: [number, number][][] = []) => ({ id: 'r', part: false, rings: [ring, ...holes], tags: {} });
+  const roof = (ring: [number, number][], tags: Record<string, string> = {}) => ({ id: 'r', part: false, rings: [ring], tags });
 
   it('covers the flat building of the same shape and leaves the others', () => {
     expect(coveredIds([{ id: 1, ring: sq(8, 50) }, { id: 2, ring: sq(8.01, 50) }], [roof(sq(8, 50))])).toEqual([1]);
   });
 
-  it('covers a flat building inside the roof outline, but not one in a courtyard hole', () => {
-    const r = roof(sq(8, 50, 0.001), [sq(8.0004, 50.0004, 0.0002)]);
-    expect(coveredIds([{ id: 1, ring: sq(8.0001, 50.0001, 0.00005) }, { id: 2, ring: sq(8.00045, 50.00045, 0.00005) }], [r])).toEqual([1]);
+  it('covers a flat outline that is a little different from the roof outline', () => {
+    expect(coveredIds([{ id: 1, ring: sq(8.000002, 50.000002, 0.000098) }], [roof(sq(8, 50))])).toEqual([1]);
   });
 
-  it('covers a larger flat outline that contains a roof part', () => {
-    expect(coveredIds([{ id: 7, ring: sq(8, 50, 0.001) }], [roof(sq(8.0004, 50.0004, 0.0001))])).toEqual([7]);
+  it('does not cover a building that only lies inside the roof outline (a tower shaft in the footprint of its base)', () => {
+    expect(coveredIds([{ id: 1, ring: sq(8.0004, 50.0004, 0.0001) }], [roof(sq(8, 50, 0.001))])).toEqual([]);
+  });
+
+  it('does not cover a larger outline that contains a small roof part', () => {
+    expect(coveredIds([{ id: 7, ring: sq(8, 50, 0.001) }], [roof(sq(8.0004, 50.0004, 0.0001))])).toEqual([]);
+  });
+
+  it('does not cover a part that starts at another height', () => {
+    expect(coveredIds([{ id: 1, ring: sq(8, 50), base: 0 }], [roof(sq(8, 50), { min_height: '30' })])).toEqual([]);
+    expect(coveredIds([{ id: 1, ring: sq(8, 50), base: 29 }], [roof(sq(8, 50), { min_height: '30' })])).toEqual([1]);
   });
 
   it('ignores degenerate rings and no roofs', () => {
@@ -91,6 +99,14 @@ describe('flatSamples', () => {
   it('keeps the pieces of a building that the tile edge cuts, but not the same piece twice', () => {
     const f = (x: number) => ({ id: 9, geometry: poly(x, 50), properties: { render_height: 6 } });
     expect(flatSamples([f(8), f(8.0001), f(8)], new Set())).toHaveLength(2);
+  });
+
+  it('marks a building inside a hidden outline as a part (the shaft of a tower inside its outline), so that Pro keeps it next to other parts', () => {
+    const outline = { id: 1, geometry: { type: 'Polygon', coordinates: [sq(8, 50, 0.001)] }, properties: { hide_3d: true, render_height: 0 } };
+    const shaft = { id: 2, geometry: poly(8.0004, 50.0004), properties: { render_height: 200 } };
+    const other = { id: 3, geometry: poly(8.01, 50), properties: { render_height: 10 } };
+    const out = flatSamples([outline, shaft, other], new Set());
+    expect(out.map((s) => s.part)).toEqual([true, false]);
   });
 
   it('stops at the cap', () => {

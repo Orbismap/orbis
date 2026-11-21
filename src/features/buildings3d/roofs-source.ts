@@ -55,7 +55,7 @@ export function startBuildingRoofs(): () => void {
       const flat: FlatBuilding[] = [];
       for (const f of features) {
         const ring = flatRing(f);
-        if (typeof f.id === 'number' && ring) flat.push({ id: f.id, ring });
+        if (typeof f.id === 'number' && ring) flat.push({ id: f.id, ring, base: Number(f.properties?.render_min_height) || 0 });
       }
       // standard design: all buildings in the colour of the basemap; coloured (OSM colours) only while the layer "3D-Gebäude" is on
       const items = paintSamples([...roofs, ...flatSamples(features, new Set(coveredIds(flat, roofs)))], buildingsColoured.peek(), baseColour(), PLAIN);
