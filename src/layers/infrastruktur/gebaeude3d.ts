@@ -4,7 +4,7 @@
 //            outlines with parts hidden (`hide_3d`), the colour OSM knows (`colour`: building:colour / colour). It replaces the
 //            plain 2.5D buildings of the basemap switch.
 //   plateau  the streamed Plateau city models of Japan (3D Tiles, Orbis Pro draws them); the 2.5D buildings go while one is in view.
-// Roofs and building parts are no type: with Orbis Pro they are always drawn (features/buildings3d/roofs-source.ts).
+// Roofs and building parts are no type: with Orbis Pro the layer (type OSM) draws its buildings with them in the close view (features/buildings3d/roofs-source.ts).
 // The basemap switch "3D-Gebäude" is separate: plain OSM 2.5D buildings and the Cesium 3D tiles on aerial images.
 import { effect, signal } from '@preact/signals';
 import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl';
@@ -13,7 +13,7 @@ import { buildingsChannel, setTilesetSource, tilesetsChannel } from '../../ext/c
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../../map/buildings-tilt';
-import { buildingsColoured, buildingsReplaced } from '../../state/view';
+import { buildingsDetailed, buildingsReplaced } from '../../state/view';
 import { defineLayer } from '../define';
 
 const COLOR = '#B9A58C';
@@ -81,7 +81,7 @@ export default defineLayer({
           ml.setPaintProperty(layerId, 'fill-extrusion-opacity', ctx.opacity.value);
         }
         buildingsReplaced.value = on;
-        buildingsColoured.value = on;
+        buildingsDetailed.value = on;
         ctx.status({ state: 'ready' });
       }),
       // the Plateau models (Orbis Pro streams them)
@@ -113,7 +113,7 @@ export default defineLayer({
         for (const s of stop) s();
         setTilesetSource(SOURCE, null);
         buildingsReplaced.value = false;
-        buildingsColoured.value = false;
+        buildingsDetailed.value = false;
         ctx.map.remove({ layers: [layerId] });
       },
     };
