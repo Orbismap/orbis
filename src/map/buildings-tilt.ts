@@ -35,6 +35,7 @@ export const BUILDING_BASE = tiltExpr(BASE);
  *  outline covers its parts and they never show up at their own height. */
 export const BUILDING_FILTER: ExpressionSpecification = ['!', ['to-boolean', ['get', 'hide_3d']]];
 
+
 interface Binder {
   expression?: { zoomStops?: number[] };
   uniformNames?: string[];

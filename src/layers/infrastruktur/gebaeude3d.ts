@@ -4,15 +4,16 @@
 //            outlines with parts hidden (`hide_3d`), the colour OSM knows (`colour`: building:colour / colour). It replaces the
 //            plain 2.5D buildings of the basemap switch.
 //   plateau  the streamed Plateau city models of Japan (3D Tiles, Orbis Pro draws them); the 2.5D buildings go while one is in view.
+// Roofs and building parts are no type: with Orbis Pro the layer (type OSM) draws its buildings with them in the close view (features/buildings3d/roofs-source.ts).
 // The basemap switch "3D-Gebäude" is separate: plain OSM 2.5D buildings and the Cesium 3D tiles on aerial images.
 import { effect, signal } from '@preact/signals';
 import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl';
 import { loadPlateau, PLATEAU_ATTRIBUTION, type PlateauSample } from '../../data/plateau';
-import { setTilesetSource, tilesetsChannel } from '../../ext/channels';
+import { buildingsChannel, setTilesetSource, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../../map/buildings-tilt';
-import { buildingsReplaced } from '../../state/view';
+import { buildingsDetailed, buildingsReplaced } from '../../state/view';
 import { defineLayer } from '../define';
 
 const COLOR = '#B9A58C';
@@ -28,7 +29,7 @@ const TYPES: { value: Typ; label: string }[] = [
   { value: 'osm', label: 'OSM eingefärbt' },
   { value: 'plateau', label: 'Plateau (Japan)' },
 ];
-const asTyp = (v: unknown): Typ => (v === 'plateau' ? 'plateau' : 'osm');
+const asTyp = (v: unknown): Typ => (v === 'plateau' ? v : 'osm');
 
 export default defineLayer({
   id: 'gebaeude3d',
@@ -42,14 +43,14 @@ export default defineLayer({
   minZoom: 14,
   coverage: 'Welt (OSM), Japan (Plateau)',
   sources: [
-    { name: 'OpenFreeMap / OpenStreetMap-Mitwirkende', url: 'https://openfreemap.org/', license: 'ODbL 1.0' },
+    { name: 'OpenFreeMap / OpenStreetMap-Mitwirkende ', url: 'https://openfreemap.org/', license: 'ODbL 1.0' },
     { name: PLATEAU_ATTRIBUTION, url: 'https://www.mlit.go.jp/plateau/', license: 'CC BY 4.0' },
   ],
   options: [{ id: 'typ', label: 'Typ', type: 'select', default: 'osm', choices: TYPES }],
   legend: (o) => (asTyp(o.typ) === 'plateau'
     ? { type: 'classes', items: [{ color: PLATEAU_COLOR, label: 'Stadtmodell Japan (mit Orbis Pro)', shape: 'square' }] }
     : { type: 'classes', items: [{ color: OSM_COLORED, label: 'Farbe wie in OSM eingetragen', shape: 'square' }, { color: PLAIN, label: 'Keine Farbe in OSM', shape: 'square' }] }),
-  keywords: ['gebäude', '3d', 'haus', 'häuser', 'gebäudeteile', 'building', 'buildings', 'osm', 'farbe', 'plateau', 'japan', 'tokio', 'stadtmodell', 'fotomesh', 'lod'],
+  keywords: ['gebäude', '3d', 'haus', 'häuser', 'gebäudeteile', 'dach', 'dachform', 'satteldach', 'walmdach', 'kuppel', 'roof', 'building:part', 'building', 'buildings', 'osm', 'farbe', 'plateau', 'japan', 'tokio', 'stadtmodell', 'fotomesh', 'lod'],
 
   mount(ctx) {
     const ml = ctx.map.ml;
@@ -75,10 +76,12 @@ export default defineLayer({
       effect(() => {
         const on = typ() === 'osm';
         if (ml.getLayer(layerId)) {
-          ml.setLayoutProperty(layerId, 'visibility', on ? 'visible' : 'none');
+          // with Orbis Pro the detailed buildings (roofs-source.ts) take over from zoom 16: then this layer steps aside too
+          ml.setLayoutProperty(layerId, 'visibility', on && !buildingsChannel.presented.value ? 'visible' : 'none');
           ml.setPaintProperty(layerId, 'fill-extrusion-opacity', ctx.opacity.value);
         }
         buildingsReplaced.value = on;
+        buildingsDetailed.value = on;
         ctx.status({ state: 'ready' });
       }),
       // the Plateau models (Orbis Pro streams them)
@@ -110,6 +113,7 @@ export default defineLayer({
         for (const s of stop) s();
         setTilesetSource(SOURCE, null);
         buildingsReplaced.value = false;
+        buildingsDetailed.value = false;
         ctx.map.remove({ layers: [layerId] });
       },
     };

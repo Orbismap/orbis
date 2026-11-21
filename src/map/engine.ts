@@ -4,6 +4,7 @@ import type { CustomLayerInterface, LayerSpecification, SourceSpecification } fr
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { effect } from '@preact/signals';
 import { throttle } from '../core/scheduler';
+import { buildingsChannel } from '../ext/channels';
 import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
@@ -178,6 +179,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     effect(() => {
       buildings3d.value;
       buildingsReplaced.value;
+      buildingsChannel.presented.value;
       karteMode.value;
       if (loaded) (applyBuildings(), applyTerrain());
     }),
@@ -244,7 +246,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   /** 2.5D buildings: the Orbis basemaps' own, or the generic ones elsewhere; off with the switch, and off on aerial images (the real 3D tiles belong there). */
   function applyBuildings() {
     const shown = isStaticBasemap(basemap) ? basemap : undefined;
-    const on = buildings3d.peek() && !buildingsReplaced.peek() && reliefOn();
+    // with Orbis Pro the detailed buildings (roofs-source.ts) include the plain ones: while they are drawn, the 2.5D buildings step aside
+    const on = buildings3d.peek() && !buildingsReplaced.peek() && reliefOn() && !buildingsChannel.presented.peek();
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) setVis(l.id, on && id === shown);
     setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !hasTiles3d(shown));
   }

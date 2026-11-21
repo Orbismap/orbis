@@ -4,6 +4,7 @@
 import { effect } from '@preact/signals';
 import type { ExtensionHost, FollowRef, OrbisExtension, TracksChannel } from '../ext/types';
 import { BaeumePart } from './baeume/baeume';
+import { GebaeudePart } from './gebaeude/gebaeude';
 import { PlanesPart } from './planes/planes';
 import { ShipsPart } from './ships/ships';
 import { StromnetzPart } from './stromnetz/stromnetz';
@@ -32,6 +33,7 @@ export const extension: OrbisExtension = {
     const ships = new ShipsPart(map, stage, (id) => host.ships.select(id), host.reducedMotion);
     const power = new StromnetzPart(map, stage);
     const trees = new BaeumePart(map, stage);
+    const buildings = new GebaeudePart(map, stage);
     let tilesPresent = false;
     let tilesRelease: (() => void) | null = null;
     let stateKey = '';
@@ -48,6 +50,7 @@ export const extension: OrbisExtension = {
     const follow = new Follow(map, stage, host.reducedMotion, host.holdCamera);
     // below aircraft and ships: the stage asks the part added last first, so an aircraft over a pylon is the one clicked
     stage.add(tiles);
+    stage.add(buildings);
     stage.add(power);
     stage.add(trees);
     stage.add(ships);
@@ -173,6 +176,18 @@ export const extension: OrbisExtension = {
       evaluateTrees();
     });
     evaluateTrees();
+    // Buildings: the layer publishes them from zoom 16 and an empty list below; while they are drawn the basemap's 2.5D houses step aside.
+    let buildingsOn = false;
+    let buildingsRelease: (() => void) | null = null;
+    const stopBuildings = host.buildings.subscribe((items) => {
+      buildings.feed(items);
+      const show = buildings.count > 0;
+      if (show === buildingsOn) return;
+      buildingsOn = show;
+      buildings.setActive(show);
+      if (show) buildingsRelease = host.buildings.present();
+      else { buildingsRelease?.(); buildingsRelease = null; }
+    });
     const stopTiles = host.tilesets.subscribe((items) => tiles.feed(items));
 
     return () => {
@@ -182,10 +197,12 @@ export const extension: OrbisExtension = {
       unbindShips();
       stopPower();
       stopTrees();
+      stopBuildings();
       stopTiles();
       tilesRelease?.();
       powerRelease?.();
       treesRelease?.();
+      buildingsRelease?.();
       follow.dispose();
       host.removeLayer(stage.id);
     };

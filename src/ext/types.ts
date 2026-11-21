@@ -113,6 +113,21 @@ export interface TreeSample {
   genus?: string;
 }
 
+/**
+ * One building or building part as OpenStreetMap maps it (`building=*`, `building:part=*`): its footprint and the tags the
+ * extension needs to model walls and roof (Simple 3D Buildings). The extension works out heights and shapes itself.
+ */
+export interface BuildingSample {
+  /** `w123` (way) or `r456` (relation); a multipolygon with several outer rings gets `r456.1`, `r456.2` … */
+  id: string;
+  /** an OSM `building:part` (no `building` tag): drawn on its own, and it replaces the outline of the building it lies in */
+  part: boolean;
+  /** outer ring first, then holes; [lng, lat], closed or not */
+  rings: [number, number][][];
+  /** the OSM tags that matter for the model (`height`, `roof:shape`, `building:colour` …) */
+  tags: Record<string, string>;
+}
+
 /** One streamed 3D tileset (a city model) the base layer offers; the extension loads and draws it. */
 export interface TilesetSample {
   /** unique within the layer */
@@ -203,6 +218,8 @@ export interface ExtensionHost {
   readonly power: TracksChannel<PowerGridSample>;
   /** Channel for single trees (layer `baeume`). */
   readonly trees: TracksChannel<TreeSample>;
+  /** Channel for building footprints with their roof and height tags (`features/buildings3d/roofs-source.ts`, no layer). */
+  readonly buildings: TracksChannel<BuildingSample>;
   /** Channel for streamed 3D city models (`features/buildings3d/tiles-source.ts`). */
   readonly tilesets: TracksChannel<TilesetSample>;
   /** Tells the base what the tilesets do: loading, errors. */
