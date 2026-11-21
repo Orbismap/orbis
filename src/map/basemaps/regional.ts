@@ -23,7 +23,7 @@ export interface RegionalEntry extends Partial<Member> {
 }
 
 /** What the picker needs of any regional basemap, static (swisstopo) or generated. */
-export interface RegionalItem { id: BasemapId; label: string; country?: string; bounds: Bounds; area: number; /** bounds of the members of a series */ parts?: Bounds[] }
+export interface RegionalItem { id: BasemapId; label: string; country?: string; /** category of the layer (photo, historicphoto, map, elevation …) */ kind?: string; /** highest zoom with tiles (of the best member for a series) */ z1?: number; bounds: Bounds; area: number; /** bounds of the members of a series */ parts?: Bounds[] }
 
 const ID_SET = new Set<string>(REGIONAL_IDS);
 export const isRegionalId = (v: unknown): v is BasemapId => typeof v === 'string' && (ID_SET.has(v) || Object.hasOwn(REGIONAL_ALIASES, v) || Object.hasOwn(REGIONAL_STATIC_ALIASES, v));
@@ -133,6 +133,6 @@ export function intersects(view: Bounds, b: Bounds): boolean {
   return [-360, 0, 360].some((o) => west <= b[2] + o && east >= b[0] + o);
 }
 
-export const toItem = (e: RegionalEntry): RegionalItem => ({ id: e.i as BasemapId, label: entryLabel(e), country: e.c, bounds: e.b, area: boundsArea(e.b), ...(e.m ? { parts: e.m.map((m) => m.b) } : {}) });
+export const toItem = (e: RegionalEntry): RegionalItem => ({ id: e.i as BasemapId, label: entryLabel(e), country: e.c, kind: e.k, z1: Math.max(...membersOf(e).map((m) => m.z1)), bounds: e.b, area: boundsArea(e.b), ...(e.m ? { parts: e.m.map((m) => m.b) } : {}) });
 export const allGenerated = (): RegionalItem[] => (entries ? [...entries.values()].map(toItem) : []);
 export { WORLD };

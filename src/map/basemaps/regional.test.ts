@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { validateStyleMin, type StyleSpecification } from '@maplibre/maplibre-gl-style-spec';
 import { basemapDef, composeStyle, isBasemapId, resolveBasemapId } from '.';
-import { distanceToBoundsKm, haversineKm, itemDistanceKm, regionalFor } from '../../features/basemap/regional-list';
+import { aerialList, bestAerial, distanceToBoundsKm, haversineKm, itemDistanceKm, regionalFor } from '../../features/basemap/regional-list';
 import { basemapCredits } from '../../features/attribution/credits';
 import { validateKarte } from '../../karten/store';
 import { parseHash } from '../../core/url';
 import data from './regional.generated.json';
 import { REGIONAL_ALIASES, REGIONAL_IDS, REGIONAL_STATIC_ALIASES } from './regional.ids.generated';
-import { STACK_CAP, activeMembers, boundsArea, entryLabel, intersects, loadRegional, memberIds, membersOf, regionalDef, type Bounds, type RegionalEntry } from './regional';
+import { STACK_CAP, activeMembers, boundsArea, entryLabel, intersects, isWorldwide, loadRegional, memberIds, membersOf, regionalDef, type Bounds, type RegionalEntry } from './regional';
 
 const entries = data as unknown as RegionalEntry[];
 
@@ -136,6 +136,45 @@ describe('view intersection', () => {
     expect(ids([8, 46.5, 8.5, 47], [8.25, 46.75], 'orbis-dark' as never)).toContain('swissimage');
     expect(ids([13, 53, 14, 54], [13.5, 53.5], 'swissimage' as never)).toContain('swissimage');
     expect(ids([-170, -60, 170, 60], [0, 0], 'orbis-dark' as never)).toEqual([]);
+  });
+  it('picker list: no foreign or worldwide maps in German, French and Swiss cities', async () => {
+    await loadRegional();
+    const near = (c: [number, number], d = 0.15) => regionalFor([c[0] - d, c[1] - d, c[0] + d, c[1] + d], c, 'orbis-dark').map((o) => o.item);
+    const berlin = near([13.4, 52.52]);
+    expect(berlin.map((i) => i.id)).toContain('r-berlin-geoportal-dop20rgb');
+    expect(berlin.map((i) => i.country).filter((c) => c !== 'DE')).toEqual([]);
+    for (const [name, c, country] of [['Muenchen', [11.58, 48.14], 'DE'], ['Frankfurt', [8.68, 50.11], 'DE'], ['Paris', [2.35, 48.86], 'FR']] as const) {
+      const items = near([c[0], c[1]]);
+      expect(items.length, name).toBeGreaterThan(0);
+      expect(items.filter((i) => isWorldwide(i.bounds)), name).toEqual([]);
+      // nothing from a country other than the city's own (CH/FR/AT are allowed next to the border only)
+      expect(items.filter((i) => i.country !== country && items[0] && distanceToBoundsKm([c[0], c[1]], i.bounds) > 0).map((i) => i.id), name).toEqual([]);
+    }
+    expect(near([13.4, 52.52]).some((i) => i.id.startsWith('r-osmfr-'))).toBe(false);
+  });
+  it('no entry spans more than 100 degrees of longitude unless it is one of the big countries', () => {
+    const wide = entries.flatMap((e) => membersOf(e).map((m) => ({ e, m }))).filter(({ m }) => m.b[2] - m.b[0] > 100 && !isWorldwide(m.b));
+    // France (overseas), Norway (Svalbard/Antarctica) and New Zealand (Chatham) must be cut to their main part
+    for (const { e } of wide) expect(['FR', 'NO', 'NZ'].includes(e.c ?? ''), e.i).toBe(false);
+  });
+  it('Satellit recommends the most local current photo covering the centre, and nothing where only far or low-res ones exist', async () => {
+    await loadRegional();
+    const at = (c: [number, number], d = 0.1) => regionalFor([c[0] - d, c[1] - d, c[0] + d, c[1] + d], c, 'satellite');
+    const berlin = bestAerial(at([13.4, 52.52]));
+    expect(berlin?.item.country).toBe('DE');
+    expect(berlin?.item.kind).toBe('photo');
+    expect(berlin?.km).toBe(0);
+    expect(berlin?.item.z1).toBeGreaterThanOrEqual(18);
+    const { best, list } = aerialList(at([13.4, 52.52]), 'satellite');
+    expect(list[0]).toBe(best);
+    expect(list.every((o) => o.item.kind === 'photo' || o.item.id === 'satellite')).toBe(true);
+    // Swiss centre: swisstopo SWISSIMAGE is a photo
+    expect(aerialList(at([8.25, 46.75]), 'satellite').list.map((o) => o.item.id)).toContain('swissimage');
+    // mid-ocean: nothing to recommend
+    expect(bestAerial(at([-30, 30]))).toBeUndefined();
+    // low-res photos are not recommended
+    const low = { item: { id: 'r-x' as never, label: 'x', kind: 'photo', z1: 16, bounds: [0, 0, 1, 1] as Bounds, area: 1 }, km: 0 };
+    expect(bestAerial([low])).toBeUndefined();
   });
   it('picker list is sorted by distance of the centre to the coverage, then area, then name', async () => {
     await loadRegional();

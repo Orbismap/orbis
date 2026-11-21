@@ -1,15 +1,22 @@
 // Which regional basemaps to offer for the current view (pure, so it can be tested).
 import { BASEMAPS, STATIC_REGIONAL_IDS } from '../../map/basemaps';
-import { allGenerated, boundsArea, intersects, type Bounds, type RegionalItem } from '../../map/basemaps/regional';
-import type { BasemapId } from '../../map/types';
+import { allGenerated, boundsArea, intersects, isWorldwide, type Bounds, type RegionalItem } from '../../map/basemaps/regional';
+import type { BasemapId, StaticBasemapId } from '../../map/types';
 
 const STATIC_COUNTRY = 'CH';
+
+const STATIC_KIND: Partial<Record<string, string>> = { swissimage: 'photo', 'imagico-alps': 'photo', swissalti3d: 'elevation', swisssurface3d: 'elevation' };
+
+const staticMaxZoom = (id: StaticBasemapId): number | undefined => {
+  const src = Object.values(BASEMAPS[id].sources)[0];
+  return src && 'maxzoom' in src ? src.maxzoom : undefined;
+};
 
 /** The hand-written regional basemaps as picker items (all are in Switzerland). */
 export const staticRegional = (): RegionalItem[] =>
   STATIC_REGIONAL_IDS.map((id) => {
     const b = BASEMAPS[id].bounds as Bounds;
-    return { id, label: BASEMAPS[id].label, country: STATIC_COUNTRY, bounds: b, area: boundsArea(b) };
+    return { id, label: BASEMAPS[id].label, country: STATIC_COUNTRY, kind: STATIC_KIND[id], z1: staticMaxZoom(id), bounds: b, area: boundsArea(b) };
   });
 
 /** Wider than this (degrees of longitude), a list would be endless: the picker asks to zoom in instead. */
@@ -50,12 +57,34 @@ export const itemDistanceKm = (c: [number, number], i: RegionalItem): number => 
 /**
  * Regional basemaps touching `view`, nearest to the map centre first (equal distance, e.g. several layers around the
  * centre: smaller area first, then name). `selected` stays in the list even when the view has moved away from it.
+ * Worldwide entries (language styles of OSM-FR) are no regional maps and would be "nearby" everywhere: left out.
  */
 export function regionalFor(view: Bounds | undefined, center: [number, number], selected: BasemapId): RegionalOption[] {
   const all = [...staticRegional(), ...allGenerated()];
   const wide = !view || view[2] - view[0] > MAX_VIEW_SPAN;
   return all
-    .filter((i) => i.id === selected || (!wide && view && (i.parts ?? [i.bounds]).some((b) => intersects(view, b))))
+    .filter((i) => i.id === selected || (!wide && view && !isWorldwide(i.bounds) && (i.parts ?? [i.bounds]).some((b) => intersects(view, b))))
     .map((item) => ({ item, km: itemDistanceKm(center, item) }))
     .sort((a, b) => a.km - b.km || a.item.area - b.item.area || a.item.label.localeCompare(b.item.label, 'de'));
+}
+
+/** Current aerial photos only (no historic ones, maps or relief). */
+export const isAerialItem = (i: RegionalItem): boolean => i.kind === 'photo';
+/** An aerial photo is worth recommending from this zoom on: it resolves single buildings (a regional photo that stops at 16 is no better than the global one). */
+export const MIN_RECOMMEND_ZOOM = 18;
+
+/**
+ * The regional aerial photo to recommend in the mode Satellit: a current photo that covers the map centre itself
+ * (distance 0, not just the view), resolves buildings, and is the most local one (smallest area; the list is sorted
+ * that way). Undefined where only the global image is better known (nothing local covers the centre).
+ */
+export function bestAerial(list: RegionalOption[]): RegionalOption | undefined {
+  return list.find((o) => o.km === 0 && isAerialItem(o.item) && (o.item.z1 ?? 0) >= MIN_RECOMMEND_ZOOM);
+}
+
+/** The list for the mode Satellit: aerial photos only, the recommended one first, the others as sorted. */
+export function aerialList(list: RegionalOption[], selected: BasemapId): { best?: RegionalOption; list: RegionalOption[] } {
+  const photos = list.filter((o) => isAerialItem(o.item) || o.item.id === selected);
+  const best = bestAerial(photos);
+  return { best, list: best ? [best, ...photos.filter((o) => o !== best)] : photos };
 }

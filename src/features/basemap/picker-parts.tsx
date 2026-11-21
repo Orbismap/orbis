@@ -16,6 +16,7 @@ import { openKeySettings } from '../boost/open';
 import { KEY_TIP, tilesHint, tilesNeedKey, tilesQuota } from '../buildings3d/tiles-source';
 import { createPreviews, previewImages, type Previews } from './preview';
 import { useRegional, type RegionalState } from './use-regional';
+import { aerialList } from './regional-list';
 import './basemap.css';
 
 /** The map a mode card shows: the Orbis colours the plain maps have (the light ones while a light map is on), a satellite image for Satellit. */
@@ -209,23 +210,26 @@ function ModeShelf({ pv, mode }: { pv: Previews; mode: MapMode }) {
 }
 
 /** Regional maps touching the view, nearest first, as miniatures like the global ones. */
-function Regional({ pv, r }: { pv: Previews; r: RegionalState }) {
+function Regional({ pv, r, aerial }: { pv: Previews; r: RegionalState; aerial: boolean }) {
   const k = activeKarte.value;
-  const hint = r.failed ? 'Regionale Karten konnten nicht geladen werden.' : !r.ready ? 'Lade regionale Karten …' : r.wide ? 'Näher heranzoomen, um regionale Karten zu sehen.' : r.list.length === 0 ? 'Für diesen Ausschnitt gibt es keine regionalen Karten.' : '';
-  if (r.list.length === 0) {
+  // Satellit: only aerial photos, the best one for the map centre first and marked as recommended (never switched to by itself)
+  const shown = aerial ? aerialList(r.list, k.basemap) : { best: undefined, list: r.list };
+  const title = aerial ? 'Regionale Luftbilder' : 'Regionale Karten';
+  const hint = r.failed ? 'Regionale Karten konnten nicht geladen werden.' : !r.ready ? 'Lade regionale Karten …' : r.wide ? 'Näher heranzoomen, um regionale Karten zu sehen.' : shown.list.length === 0 ? (aerial ? 'Für diesen Ausschnitt gibt es keine regionalen Luftbilder.' : 'Für diesen Ausschnitt gibt es keine regionalen Karten.') : '';
+  if (shown.list.length === 0) {
     return (
       <section class="bm-sec" aria-labelledby="bm-regional-title">
-        <h4 class="bm-gtitle" id="bm-regional-title">Regionale Karten</h4>
+        <h4 class="bm-gtitle" id="bm-regional-title">{title}</h4>
         {hint && <p class="bm-hint">{hint}</p>}
       </section>
     );
   }
   return (
     <div onPointerEnter={r.hold} onPointerLeave={r.release} onFocusIn={r.hold} onFocusOut={r.release}>
-      <Shelf id="bm-regional" title="Regionale Karten" rows={1.5} openRows={3.5}>
-        {r.list.map(({ item }) => (
+      <Shelf id="bm-regional" title={title} rows={1.5} openRows={3.5}>
+        {shown.list.map(({ item }) => (
           <Tile
-            key={item.id} id={item.id} name={item.label} title={item.country && !isWorldwide(item.bounds) ? `${item.label} · ${item.country}` : item.label}
+            key={item.id} id={item.id} name={item.label} title={`${item.country && !isWorldwide(item.bounds) ? `${item.label} · ${item.country}` : item.label}${shown.best?.item.id === item.id ? ' (empfohlen: deckt die Kartenmitte ab, hochauflösend)' : ''}`}
             checked={k.basemap === item.id} onPick={() => setBasemap(k.id, item.id)} seen={() => pv.request([item.id], true)}
           />
         ))}
@@ -290,7 +294,7 @@ export function PickerBody({ pv }: { pv: Previews }) {
     <>
       <ModeShelf pv={pv} mode={mode} />
       <div class="bm-div" role="separator" />
-      <Regional pv={pv} r={regional} />
+      <Regional pv={pv} r={regional} aerial={mode === 'luftbild'} />
       <ViewSwitches />
     </>
   );
