@@ -15,46 +15,56 @@ export type { BasemapId, StaticBasemapId } from '../types';
 export type { BasemapDef, LabelVariant } from './types';
 
 /**
- * Global basemaps in picker order. A group without `key` is a category: the picker shows one tab; the first id is its best map. A group with `key` is a provider that needs the user's own key.
+ * The modes of the picker (first row). The first three are the plain maps and differ only in what stands on them:
+ * `daten` is the bare map (no terrain, no buildings), `erkunden` has terrain and 2.5D buildings, `fahren` is for traffic
+ * (for now the same as `daten`; car, public transport, planes, ships come later). `luftbild` is every aerial image.
  */
-export interface BasemapGroup {
-  title: string;
-  /** shorter name for the tab */
-  short?: string;
-  ids: StaticBasemapId[];
-  /** optional subheadings within the group (the ids are the same, in the same order) */
-  sections?: { title: string; ids: StaticBasemapId[] }[];
-  /** id of the key the group needs (providers with the user's own key) */
-  key?: string;
-}
-/**
- * Maps of one provider that differ only by date: the picker shows one tile (label with the years) and, while one of them is active,
- * a slider for the year. `ids` are newest first, `years` run alongside.
- */
-export interface BasemapSeries { label: string; ids: StaticBasemapId[]; years: number[] }
-export const BASEMAP_SERIES: BasemapSeries[] = [
-  { label: 'Sentinel-2', ids: EOX_YEARS.map((y) => `eox-${y}` as const), years: [...EOX_YEARS] },
+export type MapMode = 'daten' | 'erkunden' | 'fahren' | 'luftbild';
+/** The modes that show a plain map (what the user picks; `luftbild` follows from the basemap). */
+export type KarteMode = Exclude<MapMode, 'luftbild'>;
+export const MAP_MODES: { id: MapMode; label: string }[] = [
+  { id: 'daten', label: 'Daten' },
+  { id: 'erkunden', label: 'Erkunden' },
+  { id: 'fahren', label: 'Fahren' },
+  { id: 'luftbild', label: 'Satellit' },
 ];
-export const seriesOf = (id: string): BasemapSeries | undefined => BASEMAP_SERIES.find((s) => (s.ids as string[]).includes(id));
-const withSections = (title: string, sections: NonNullable<BasemapGroup['sections']>): BasemapGroup => ({ title, ids: sections.flatMap((x) => x.ids), sections });
-export const BASEMAP_GROUPS: BasemapGroup[] = [
+export const DEFAULT_KARTE_MODE: KarteMode = 'erkunden';
+
+/** Keyed providers' aerial images (the other keyed maps are plain maps). */
+const KEYED_AERIAL: StaticBasemapId[] = ['mt-satellite', 'mt-hybrid', 'st-satellite', 'mb-satellite', 'mb-hybrid', 'here-satellite', 'here-hybrid'];
+/** Every aerial image (the picker's Satellit list). */
+const AERIAL_SET = new Set<string>([...['satellite', 'esri-clarity', 'bluemarble', 'nachtlichter'], ...EOX_YEARS.map((y) => `eox-${y}`), ...KEYED_AERIAL]);
+/** A provider (or kind) of maps in the picker: the maps stand under its small heading. */
+export interface BasemapGroup { title: string; ids: StaticBasemapId[] }
+/** Keyed providers' maps of one kind (aerial or plain), as groups under the provider's name. */
+const keyedByKind = (aerial: boolean): BasemapGroup[] =>
+  keyedGroups().map((g) => ({ title: g.provider.title, ids: g.ids.filter((id) => AERIAL_SET.has(id) === aerial) as StaticBasemapId[] })).filter((g) => g.ids.length > 0);
+/** Aerial images and satellite mosaics by provider, best first (the first map is what the mode Satellit opens). A series counts once in the picker. */
+export const AERIAL_GROUPS: BasemapGroup[] = [
+  { title: 'Esri', ids: ['satellite', 'esri-clarity'] },
+  { title: 'Sentinel-2 (EOX)', ids: EOX_YEARS.map((y) => `eox-${y}` as const) },
+  { title: 'Weitere', ids: ['bluemarble', 'nachtlichter'] },
+  ...keyedByKind(true),
+];
+export const AERIAL_IDS: StaticBasemapId[] = AERIAL_GROUPS.flatMap((g) => g.ids);
+export const isAerial = (id: string | undefined): boolean => !!id && AERIAL_SET.has(id);
+/** Plain maps by provider, best first: Orbis, Esri, OpenStreetMap, the rest, and the maps of providers with the user's own key. */
+export const KARTE_GROUPS: BasemapGroup[] = [
   { title: 'Orbis', ids: ['orbis-dark', 'orbis-light', 'orbis-karte'] },
-  { title: 'OpenStreetMap', short: 'OSM', ids: ['osm', 'osm-hot', 'osm-fr', 'osm-de', 'wikimedia', 'cyclosm', 'oepnv', 'terrain'] },
-  withSections('Esri', [
-    { title: 'Luftbilder', ids: ['satellite', 'esri-clarity'] },
-    { title: 'Karten', ids: ['esri-streets', 'esri-topo', 'esri-natgeo', 'esri-light-gray', 'esri-dark-gray'] },
-    { title: 'Relief und Meer', ids: ['esri-terrain', 'esri-shaded-relief', 'esri-physical', 'esri-hillshade', 'esri-ocean', 'esri-navigation'] },
-  ]),
-  withSections('Mehr', [
-    { title: 'Sentinel-2 (EOX)', ids: EOX_YEARS.map((y) => `eox-${y}` as const) },
-    { title: 'Weitere', ids: ['bluemarble', 'nachtlichter', 'blank'] },
-  ]),
-  ...keyedGroups().map(({ provider, ids }): BasemapGroup => ({ title: provider.title, ids, key: provider.key })),
+  { title: 'Esri', ids: ['esri-dark-gray', 'esri-light-gray', 'esri-streets', 'esri-topo', 'esri-natgeo', 'esri-navigation', 'esri-terrain', 'esri-shaded-relief', 'esri-physical', 'esri-hillshade', 'esri-ocean'] },
+  { title: 'OpenStreetMap', ids: ['osm', 'osm-hot', 'osm-fr', 'osm-de', 'wikimedia', 'cyclosm', 'oepnv', 'terrain'] },
+  { title: 'Weitere', ids: ['blank'] },
+  ...keyedByKind(false),
 ];
+export const KARTE_IDS: StaticBasemapId[] = KARTE_GROUPS.flatMap((g) => g.ids);
+/** Does the map show terrain and 2.5D buildings? Always on aerial images (the 3D tiles and the camera need the ground there). */
+export const showsRelief = (mode: KarteMode, id: string | undefined): boolean => mode === 'erkunden' || isAerial(id);
+/** Key (id of the user's key) a keyed basemap needs, or undefined for the free ones. */
+export const keyOfBasemap = (id: string): string | undefined => keyedGroups().find((g) => (g.ids as string[]).includes(id))?.provider.key;
 /** Hand-written regional basemaps (offered in the regional list, not in the grid). More come from regional.ts. */
 export const STATIC_REGIONAL_IDS: StaticBasemapId[] = ['swissimage', 'imagico-alps', 'swissalti3d', 'swisssurface3d'];
 /** Every static basemap (all of them are part of the composed style, hidden). */
-export const BASEMAP_IDS: StaticBasemapId[] = [...BASEMAP_GROUPS.flatMap((g) => g.ids), ...STATIC_REGIONAL_IDS];
+export const BASEMAP_IDS: StaticBasemapId[] = [...KARTE_IDS, ...AERIAL_IDS, ...STATIC_REGIONAL_IDS];
 export const DEFAULT_BASEMAP: StaticBasemapId = 'orbis-dark';
 
 export const BASEMAPS: Record<StaticBasemapId, BasemapDef> = {
