@@ -35,9 +35,6 @@ export const BUILDING_BASE = tiltExpr(BASE);
  *  outline covers its parts and they never show up at their own height. */
 export const BUILDING_FILTER: ExpressionSpecification = ['!', ['to-boolean', ['get', 'hide_3d']]];
 
-/** BUILDING_FILTER without the buildings Orbis Pro draws in 3D (roofs, parts) itself: `ids` are the OpenFreeMap feature ids (`['id']`). */
-export const buildingFilter = (hidden: readonly number[]): ExpressionSpecification =>
-  hidden.length ? ['all', BUILDING_FILTER, ['!', ['in', ['id'], ['literal', hidden as number[]]]]] : BUILDING_FILTER;
 
 interface Binder {
   expression?: { zoomStops?: number[] };

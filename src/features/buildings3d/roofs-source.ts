@@ -1,19 +1,19 @@
-// Roofs and building parts: no layer and no setting, they come with Orbis Pro. While Pro runs, the footprints and tags of the view come
-// from our own PMTiles `roofs` (OpenStreetMap, bucket orbis-osm; only buildings and parts with a roof tag, zoom 15 overzoomed) through the
-// buildings channel to Pro, which models walls and roofs (`pro/gebaeude/`). From zoom 16 on the 2.5D buildings of OpenFreeMap that lie
-// under a modelled roof give way (`buildingsCovered`); all other buildings keep their flat extrusion. Without Pro nothing is loaded.
-// Where a real city model is in view (Plateau, Google 3D tiles) the roofs stay out: the model brings its own.
+// Buildings in the close view: no layer and no setting, they come with Orbis Pro. While Pro runs, Orbis' own 3D renderer (`pro/gebaeude/`)
+// draws ALL buildings of the view from zoom 16 on, and the 2.5D buildings of OpenFreeMap step aside (engine.ts, `buildingsChannel.presented`).
+// The samples: the buildings with a roof tag from our PMTiles `roofs` (OpenStreetMap, bucket orbis-osm; zoom 15 overzoomed) with all their
+// tags, plus the other buildings of the OpenFreeMap tiles (flat roof, their height and colour). OpenFreeMap buildings that a roof sample
+// covers are left out, so a building is drawn once. Below zoom 16 nothing is published and the 2.5D buildings stay. Without Pro nothing is loaded.
+// Where a real city model is in view (Plateau, Google 3D tiles) this stays out: the model brings its own.
 import { effect } from '@preact/signals';
 import { osmPmtilesUrl } from '../../data/osmfiles';
-import { coveredIds, roofSamples, type FlatBuilding } from '../../data/parsers/roofs-tiles';
+import { coveredIds, flatRing, flatSamples, roofSamples, type FlatBuilding } from '../../data/parsers/roofs-tiles';
 import { buildingsChannel, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import { ensurePmtilesProtocol } from '../../map/pmtiles-protocol';
 import { mapEngine } from '../../state/ui';
-import { buildingsCovered } from '../../state/view';
 
-/** Below this the 2.5D houses are enough. */
+/** Below this the 2.5D houses are enough (and one view would hold too many buildings). */
 export const ROOF_MIN_ZOOM = 16;
 const SRC = 'buildings3d-roofs';
 const SCAN_DELAY_MS = 250;
@@ -30,26 +30,23 @@ export function startBuildingRoofs(): () => void {
 
     const clear = () => {
       if (published) { published = false; buildingsChannel.reset(); }
-      if (buildingsCovered.peek().length) buildingsCovered.value = [];
     };
     const scan = () => {
       timer = undefined;
       if (dead || !ml.getSource(SRC)) return;
       if (ml.getZoom() < ROOF_MIN_ZOOM) { clear(); return; }
-      // while tiles load the query sees few buildings: publishing that would make the roofs flicker
-      if (!ml.isSourceLoaded(SRC)) return;
-      const items = roofSamples(ml.querySourceFeatures(SRC, { sourceLayer: 'roofs' }));
+      // while tiles load the query sees few buildings: publishing that would make the buildings flicker
+      if (!ml.isSourceLoaded(SRC) || !ml.isSourceLoaded('ofm')) return;
+      const roofs = roofSamples(ml.querySourceFeatures(SRC, { sourceLayer: 'roofs' }));
+      const features = ml.querySourceFeatures('ofm', { sourceLayer: 'building' });
+      const flat: FlatBuilding[] = [];
+      for (const f of features) {
+        const ring = flatRing(f);
+        if (typeof f.id === 'number' && ring) flat.push({ id: f.id, ring });
+      }
+      const items = [...roofs, ...flatSamples(features, new Set(coveredIds(flat, roofs)))];
       published = true;
       buildingsChannel.publish(() => items);
-      const flat: FlatBuilding[] = [];
-      for (const f of ml.querySourceFeatures('ofm', { sourceLayer: 'building' })) {
-        const g = f.geometry;
-        const ring = g.type === 'Polygon' ? g.coordinates[0] : g.type === 'MultiPolygon' ? g.coordinates[0]?.[0] : undefined;
-        if (typeof f.id === 'number' && ring) flat.push({ id: f.id, ring: ring.map((c) => [c[0]!, c[1]!] as [number, number]) });
-      }
-      const ids = coveredIds(flat, items);
-      const old = buildingsCovered.peek();
-      if (ids.length !== old.length || ids.some((id, i) => id !== old[i])) buildingsCovered.value = ids;
     };
     const schedule = () => { if (timer === undefined) timer = setTimeout(scan, SCAN_DELAY_MS); };
     const onSource = (e: { sourceId?: string }) => { if (e.sourceId === SRC || e.sourceId === 'ofm') schedule(); };
@@ -70,7 +67,6 @@ export function startBuildingRoofs(): () => void {
       ml.off('moveend', schedule);
       engine.remove({ layers: [SRC], sources: [SRC] });
       buildingsChannel.reset();
-      buildingsCovered.value = [];
     };
   });
 }

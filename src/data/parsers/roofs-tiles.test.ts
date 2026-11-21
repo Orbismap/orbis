@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coveredIds, roofSamples } from './roofs-tiles';
+import { coveredIds, flatSamples, roofSamples } from './roofs-tiles';
 
 const square = (x: number, y: number, s = 0.0001): [number, number][] => [[x, y], [x + s, y], [x + s, y + s], [x, y + s], [x, y]];
 const multi = (rings: [number, number][][][]) => ({ type: 'MultiPolygon', coordinates: rings });
@@ -65,5 +65,36 @@ describe('coveredIds', () => {
   it('ignores degenerate rings and no roofs', () => {
     expect(coveredIds([{ id: 1, ring: [[8, 50], [8, 50], [8, 50]] }], [roof(sq(8, 50))])).toEqual([]);
     expect(coveredIds([{ id: 1, ring: sq(8, 50) }], [])).toEqual([]);
+  });
+});
+
+describe('flatSamples', () => {
+  const sq = (x: number, y: number, s = 0.0001): [number, number][] => [[x, y], [x + s, y], [x + s, y + s], [x, y + s], [x, y]];
+  const poly = (x: number, y: number) => ({ type: 'Polygon', coordinates: [sq(x, y)] });
+
+  it('turns an OpenFreeMap building into a sample with its height and colour', () => {
+    const [s] = flatSamples([{ id: 5, geometry: poly(8, 50), properties: { render_height: 12, render_min_height: 3, colour: '#b7b1a6' } }], new Set());
+    expect(s?.tags).toEqual({ building: 'yes', height: '12', min_height: '3', 'building:colour': '#b7b1a6' });
+    expect(s?.part).toBe(false);
+  });
+
+  it('leaves out covered buildings and outlines that have parts (hide_3d)', () => {
+    const out = flatSamples([
+      { id: 1, geometry: poly(8, 50), properties: { render_height: 5 } },
+      { id: 2, geometry: poly(8.01, 50), properties: { render_height: 5 } },
+      { id: 3, geometry: poly(8.02, 50), properties: { render_height: 0, hide_3d: true } },
+    ], new Set([1]));
+    expect(out).toHaveLength(1);
+    expect(out[0]?.id.startsWith('o2@')).toBe(true);
+  });
+
+  it('keeps the pieces of a building that the tile edge cuts, but not the same piece twice', () => {
+    const f = (x: number) => ({ id: 9, geometry: poly(x, 50), properties: { render_height: 6 } });
+    expect(flatSamples([f(8), f(8.0001), f(8)], new Set())).toHaveLength(2);
+  });
+
+  it('stops at the cap', () => {
+    const fs = Array.from({ length: 6 }, (_, i) => ({ id: i, geometry: poly(8 + i * 0.01, 50), properties: { render_height: 4 } }));
+    expect(flatSamples(fs, new Set(), 3)).toHaveLength(3);
   });
 });

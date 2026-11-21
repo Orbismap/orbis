@@ -83,3 +83,49 @@ export function coveredIds(flat: readonly FlatBuilding[], roofs: readonly Buildi
   }
   return out;
 }
+
+/** A building of the 2.5D tiles (OpenFreeMap `building` layer) as the map query returns it. */
+export interface FlatFeature {
+  id?: number | string;
+  geometry: { type: string; coordinates?: unknown } | null;
+  properties?: Record<string, unknown> | null;
+}
+
+/** The outer ring of the first polygon of a flat feature (for `coveredIds`), if it has one. */
+export const flatRing = (f: FlatFeature): [number, number][] | undefined => {
+  const c = f.geometry?.coordinates;
+  const r = f.geometry?.type === 'Polygon' ? (c as unknown[])?.[0] : f.geometry?.type === 'MultiPolygon' ? (c as unknown[][])?.[0]?.[0] : undefined;
+  const out = ring(r);
+  return out.length >= 4 ? out : undefined;
+};
+
+const MAX_FLAT_SAMPLES = 8000;
+
+/**
+ * Samples for the plain buildings of the 2.5D tiles that no roof sample replaces: Orbis Pro draws them too (flat roof, the height and
+ * colour OpenFreeMap knows), so that in the close view ONE renderer draws all buildings. The outlines OpenFreeMap hides because they
+ * have parts (`hide_3d`) stay out, like in the 2.5D layer; `skip` holds the ids of the buildings a roof sample covers.
+ */
+export function flatSamples(features: readonly FlatFeature[], skip: ReadonlySet<number | string>, max = MAX_FLAT_SAMPLES): BuildingSample[] {
+  const out = new Map<string, BuildingSample>();
+  for (const f of features) {
+    if (out.size >= max) break;
+    if (f.id === undefined || skip.has(f.id) || !f.geometry || f.properties?.hide_3d) continue;
+    const g = f.geometry;
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' && Array.isArray(g.coordinates) ? g.coordinates : [];
+    const p = f.properties ?? {};
+    const tags: Record<string, string> = { building: 'yes' };
+    const h = Number(p.render_height);
+    const base = Number(p.render_min_height);
+    if (h > 0) tags.height = String(h);
+    if (base > 0) tags.min_height = String(base);
+    if (typeof p.colour === 'string' && p.colour) tags['building:colour'] = p.colour;
+    polys.forEach((poly) => {
+      const rings = Array.isArray(poly) ? poly.map(ring).filter((r) => r.length >= 4) : [];
+      // a building the tile edge cuts comes as one piece per tile with the same id: the first corner tells the pieces apart (and the same piece twice from one)
+      const id = rings[0] ? `o${f.id}@${rings[0][0]![0].toFixed(6)},${rings[0][0]![1].toFixed(6)}` : '';
+      if (rings.length && out.size < max && !out.has(id)) out.set(id, { id, part: false, rings, tags });
+    });
+  }
+  return [...out.values()];
+}

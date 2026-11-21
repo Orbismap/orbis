@@ -9,11 +9,11 @@
 import { effect, signal } from '@preact/signals';
 import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl';
 import { loadPlateau, PLATEAU_ATTRIBUTION, type PlateauSample } from '../../data/plateau';
-import { setTilesetSource, tilesetsChannel } from '../../ext/channels';
+import { buildingsChannel, setTilesetSource, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
-import { BUILDING_BASE, BUILDING_HEIGHT, buildingFilter } from '../../map/buildings-tilt';
-import { buildingsCovered, buildingsReplaced } from '../../state/view';
+import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../../map/buildings-tilt';
+import { buildingsReplaced } from '../../state/view';
 import { defineLayer } from '../define';
 
 const COLOR = '#B9A58C';
@@ -57,7 +57,7 @@ export default defineLayer({
     const typ = () => asTyp(ctx.options.value.typ);
     const layerId = `${ctx.id}.osm`;
     ctx.map.addLayer({
-      id: layerId, type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, filter: buildingFilter(buildingsCovered.peek()),
+      id: layerId, type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER,
       layout: { visibility: 'none', 'fill-extrusion-rounded-corner-distance': 1.5 },
       paint: {
         // `colour` is a hex value or a CSS colour name; the missing ones get the plain building colour
@@ -72,13 +72,12 @@ export default defineLayer({
     const plateau = signal<readonly PlateauSample[]>([]);
     let asked = false;
     const stop = [
-      // the buildings Orbis Pro draws in 3D (roofs) give way here too
-      effect(() => { const f = buildingFilter(buildingsCovered.value); if (ml.getLayer(layerId)) ml.setFilter(layerId, f as never); }),
       // the OSM buildings
       effect(() => {
         const on = typ() === 'osm';
         if (ml.getLayer(layerId)) {
-          ml.setLayoutProperty(layerId, 'visibility', on ? 'visible' : 'none');
+          // with Orbis Pro the detailed buildings (roofs-source.ts) take over from zoom 16: then this layer steps aside too
+          ml.setLayoutProperty(layerId, 'visibility', on && !buildingsChannel.presented.value ? 'visible' : 'none');
           ml.setPaintProperty(layerId, 'fill-extrusion-opacity', ctx.opacity.value);
         }
         buildingsReplaced.value = on;

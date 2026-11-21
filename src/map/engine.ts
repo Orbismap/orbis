@@ -4,13 +4,13 @@ import type { CustomLayerInterface, LayerSpecification, SourceSpecification } fr
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { effect } from '@preact/signals';
 import { throttle } from '../core/scheduler';
+import { buildingsChannel } from '../ext/channels';
 import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { activeBasemap as activeBasemapSignal, buildings3d, buildingsCovered, buildingsReplaced, camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
+import { activeBasemap as activeBasemapSignal, buildings3d, buildingsReplaced, camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, skyFor } from './basemaps';
-import { buildingFilter } from './buildings-tilt';
 import { registerDemTiles } from './dem-protocol';
 import { registerKeyedTiles } from './basemaps/keyed-protocol';
 import { registerPmtilesProtocol } from './pmtiles-protocol';
@@ -179,11 +179,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     effect(() => {
       buildings3d.value;
       buildingsReplaced.value;
+      buildingsChannel.presented.value;
       if (loaded) applyBuildings();
-    }),
-    effect(() => {
-      buildingsCovered.value;
-      if (loaded) applyCovered();
     }),
     effect(() => {
       const p = projectionSignal.value;
@@ -248,17 +245,10 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   /** 2.5D buildings: the Orbis basemaps' own, or the generic ones elsewhere; off with the switch, and off on aerial images (the real 3D tiles belong there). */
   function applyBuildings() {
     const shown = isStaticBasemap(basemap) ? basemap : undefined;
-    const on = buildings3d.peek() && !buildingsReplaced.peek();
+    // with Orbis Pro the detailed buildings (roofs-source.ts) include the plain ones: while they are drawn, the 2.5D buildings step aside
+    const on = buildings3d.peek() && !buildingsReplaced.peek() && !buildingsChannel.presented.peek();
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) setVis(l.id, on && id === shown);
     setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !hasTiles3d(shown));
-    applyCovered();
-  }
-  /** The 2.5D buildings that Orbis Pro draws in 3D give way (filter by the OpenFreeMap id); all other buildings stay. */
-  function applyCovered() {
-    const filter = buildingFilter(buildingsCovered.peek());
-    for (const l of ml.getStyle()?.layers ?? []) {
-      if (l.type === 'fill-extrusion' && l.source === 'ofm' && l['source-layer'] === 'building') ml.setFilter(l.id, filter as never);
-    }
   }
   function applyBasemap() {
     const regional = isStaticBasemap(basemap) ? undefined : regionalDef(basemap);
