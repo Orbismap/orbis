@@ -6,7 +6,9 @@ import * as maplibregl from 'maplibre-gl';
 import type { StyleSpecification } from 'maplibre-gl';
 import { BASEMAPS, TERRAIN_SOURCE, TERRAIN_SPEC } from '../../map/basemaps';
 import { OFM_GLYPHS, OFM_SOURCE } from '../../map/basemaps/vector';
-import type { StaticBasemapId } from '../../map/types';
+import { regionalDef } from '../../map/basemaps/regional';
+import type { BasemapDef } from '../../map/basemaps';
+import type { BasemapId } from '../../map/types';
 import { camera, projection, viewport } from '../../state/view';
 
 /** basemap id -> data URL of its miniature (missing until rendered) */
@@ -16,9 +18,20 @@ export const previewImages = signal<Partial<Record<string, string>>>({});
 const W = 432;
 const H = 288;
 
+/** The definition to render: a static basemap as it is; a regional one with only its background and its newest layer (a series has up to dozens of editions). */
+function previewDef(id: BasemapId): BasemapDef | undefined {
+  if (Object.hasOwn(BASEMAPS, id)) return BASEMAPS[id as keyof typeof BASEMAPS];
+  const d = regionalDef(id);
+  if (!d || d.layers.length < 2) return d;
+  const top = d.layers[d.layers.length - 1]!;
+  const src = (top as { source?: string }).source;
+  return { ...d, layers: [d.layers[0]!, top], sources: src && d.sources[src] ? { [src]: d.sources[src]! } : d.sources };
+}
+
 /** Just this basemap, visible, without labels and slots. */
-function styleFor(id: StaticBasemapId, proj: 'globe' | 'mercator'): StyleSpecification {
-  const def = BASEMAPS[id];
+function styleFor(id: BasemapId, proj: 'globe' | 'mercator'): StyleSpecification {
+  const def = previewDef(id);
+  if (!def) throw new Error(`no definition for ${id}`);
   return {
     version: 8,
     projection: { type: proj },
@@ -32,7 +45,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export interface Previews {
   /** Renders the miniatures that are not there yet; `first` puts them before the ones still waiting. */
-  request(ids: readonly StaticBasemapId[], first?: boolean): void;
+  request(ids: readonly BasemapId[], first?: boolean): void;
   /** Stops and frees the maps. */
   dispose(): void;
 }
@@ -52,15 +65,15 @@ export function createPreviews(): Previews {
   const zoom = Math.max(0, cam.zoom + Math.log2(H / Math.max(H, viewport.peek()?.height ?? 800)));
   let dead = false;
   let lanes = 0;
-  let queue: StaticBasemapId[] = [];
+  let queue: BasemapId[] = [];
   /** the ones that were cut off at SOFT, for a second try when the queue is empty */
-  let late: StaticBasemapId[] = [];
+  let late: BasemapId[] = [];
   let second = false;
   const known = new Set<string>();
   const maps: { ml: maplibregl.Map; host: HTMLDivElement }[] = [];
 
   /** One lane: its own hidden map. Returns true when every tile of the picture had arrived. */
-  const render = async (lane: { ml?: maplibregl.Map; host?: HTMLDivElement }, id: StaticBasemapId, limit: number): Promise<boolean> => {
+  const render = async (lane: { ml?: maplibregl.Map; host?: HTMLDivElement }, id: BasemapId, limit: number): Promise<boolean> => {
     if (!lane.ml) {
       const host = document.createElement('div');
       host.setAttribute('aria-hidden', 'true');

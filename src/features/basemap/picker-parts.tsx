@@ -1,10 +1,13 @@
-import type { ComponentChildren } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { Fragment, type ComponentChildren } from 'preact';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { setBasemap, setLabels, setTerminator } from '../../karten/active';
 import { keySignal } from '../../keys/store';
-import { BASEMAPS, BASEMAP_GROUPS, basemapDef, seriesOf, type BasemapGroup, type BasemapSeries } from '../../map/basemaps';
+import { AERIAL_GROUPS, BASEMAPS, KARTE_GROUPS, MAP_MODES, basemapDef, isAerial, keyOfBasemap, showsRelief, type MapMode } from '../../map/basemaps';
+import { isWorldwide } from '../../map/basemaps/regional';
+import type { BasemapId } from '../../map/types';
 import { activeKarte } from '../../state/session';
-import { buildings3d, projection, setBuildings3d, setProjection } from '../../state/view';
+import { buildings3d, karteMode, projection, setBuildings3d, setProjection } from '../../state/view';
+import { cx } from '../../ui/hooks';
 import { Icon } from '../../ui/icons/Icon';
 import { Segmented } from '../../ui/Segmented';
 import { Switch } from '../../ui/Switch';
@@ -12,239 +15,259 @@ import { tipProps } from '../../ui/tip-state';
 import { openKeySettings } from '../boost/open';
 import { KEY_TIP, tilesHint, tilesNeedKey, tilesQuota } from '../buildings3d/tiles-source';
 import { createPreviews, previewImages, type Previews } from './preview';
-import { RegionalSelect, useRegional } from './RegionalSelect';
+import { useRegional, type RegionalState } from './use-regional';
 import './basemap.css';
 
-export type Id = BasemapGroup['ids'][number];
-/** The tab of the boost section (providers with the user's own key) */
-export const BOOST = 'boost';
-export const CATEGORIES = BASEMAP_GROUPS.filter((g) => !g.key);
-export const KEYED = BASEMAP_GROUPS.filter((g) => g.key);
-/** The Boost tab of the compact popover stands for every provider with a key (the large view lists them one by one). */
-export const isBoostTab = (tab: string | undefined) => tab === BOOST || KEYED.some((g) => g.title === tab);
+/** The map a mode card shows: the Orbis colours the plain maps have (the light ones while a light map is on), a satellite image for Satellit. */
+const modeThumb = (mode: MapMode, current: string): BasemapId => (mode === 'luftbild' ? 'satellite' : current === 'orbis-light' ? 'orbis-light' : 'orbis-dark');
 
-/** What the compact popover and the large view share: the tab, the miniatures (one render map for both) and what they need. */
-export interface PickerState {
-  tab: string;
-  setTab(t: string): void;
-  /** the tab of the active basemap, marked with a dot */
-  activeTab: string | undefined;
-  pv: Previews;
-}
+/** The maps last used in each kind, so a mode switch returns to them (module state: it lives as long as the page). */
+const lastUsed = { karte: 'orbis-dark' as BasemapId, aerial: 'satellite' as BasemapId };
 
-/**
- * State of the picker while it is shown (compact or large). `active` false drops it all, so the next opening starts at the tab of the
- * active map with fresh miniatures; the hand-over between the popover and the large view keeps `active` true and so keeps both.
- */
-export function usePickerState(active: boolean): PickerState | undefined {
-  const k = activeKarte.value;
-  const [chosen, setChosen] = useState<string>();
+/** Miniatures of the picker: one render map for everything shown; it is freed when the picker closes, so the next opening renders fresh ones. */
+export function usePickerState(active: boolean): Previews | undefined {
   const pv = useRef<Previews>();
   if (active && !pv.current) pv.current = createPreviews();
   useEffect(() => {
-    if (active) return;
-    pv.current?.dispose();
-    pv.current = undefined;
-    setChosen(undefined);
+    if (!active) {
+      pv.current?.dispose();
+      pv.current = undefined;
+    }
   }, [active]);
   useEffect(() => () => pv.current?.dispose(), []);
-  if (!active || !pv.current) return undefined;
-  // the tab of the active map: its category or, for a provider with a key, that provider
-  const activeTab = [...CATEGORIES, ...KEYED].find((g) => g.ids.includes(k.basemap as never))?.title;
-  return { tab: chosen ?? activeTab ?? CATEGORIES[0]!.title, setTab: setChosen, activeTab, pv: pv.current };
+  return active ? pv.current : undefined;
 }
 
-/** Renders what the shown tab and the active map need (the maps of a tab when it opens, the year of a series). */
-export function usePickerRequests(s: PickerState): void {
-  const k = activeKarte.value;
-  const group = CATEGORIES.find((g) => g.title === s.tab);
-  const keyed = KEYED.find((g) => g.title === s.tab);
-  const has = !!keySignal(keyed?.key ?? '').value;
-  useEffect(() => { if (group) s.pv.request(tileIds(group.ids), true); }, [group]);
-  useEffect(() => { if (keyed && has) s.pv.request(keyed.ids, true); }, [keyed, has]);
-  useEffect(() => { if (seriesOf(k.basemap)) s.pv.request([k.basemap as Id], true); }, [k.basemap]);
+/** Mode shown: Satellit while an aerial image is on, else the mode picked for the plain maps. */
+const modeOf = (basemap: string): MapMode => (isAerial(basemap) ? 'luftbild' : karteMode.value);
+
+/** Switches the mode: the plain modes keep the map when it is a plain one, Satellit opens the last aerial image (and back again). */
+function pickMode(mode: MapMode): void {
+  const k = activeKarte.peek();
+  if (isAerial(k.basemap)) lastUsed.aerial = k.basemap;
+  else lastUsed.karte = k.basemap;
+  if (mode === 'luftbild') {
+    if (!isAerial(k.basemap)) setBasemap(k.id, lastUsed.aerial);
+    return;
+  }
+  karteMode.value = mode;
+  if (isAerial(k.basemap)) setBasemap(k.id, lastUsed.karte);
 }
 
-/** The tab content: the maps of a category or of one provider with a key, or (compact Boost tab) all providers with a key. */
-export function TabPanel({ s }: { s: PickerState }) {
-  const k = activeKarte.value;
-  const group = CATEGORIES.find((g) => g.title === s.tab);
-  const keyed = KEYED.find((g) => g.title === s.tab);
-  const pick = (id: Id) => setBasemap(k.id, id);
-  return (
-    <div key={s.tab} class="bm-panel" role="tabpanel" aria-labelledby={`bm-tab-${s.tab}`}>
-      {group ? <Maps g={group} current={k.basemap} onPick={pick} /> : keyed ? <KeyedMaps g={keyed} current={k.basemap} onPick={pick} /> : <KeyedList groups={KEYED} current={k.basemap} onPick={pick} pv={s.pv} />}
-    </div>
-  );
-}
-
-/** One provider with its own key as a tab of its own: the key state, then its maps like any other category (off until the key is in). */
-export function KeyedMaps({ g, current, onPick }: { g: BasemapGroup; current: string; onPick: (id: Id) => void }) {
-  const has = !!keySignal(g.key!).value;
-  return (
-    <div class="bm-maps">
-      <p class="bm-kintro">
-        <span class="bm-pill">Boost</span>
-        <span>{has ? 'Dein Schlüssel ist eingetragen.' : `Mit deinem eigenen kostenlosen Schlüssel von ${g.title}.`}</span>
-      </p>
-      {!has && (
-        <button type="button" class="bm-kadd" onClick={() => openKeySettings(g.key!)}>
-          <Icon name="key" size={14} /> Schlüssel eintragen
-        </button>
-      )}
-      <div class="bm-grid" role="radiogroup" aria-label={g.title}>
-        {g.ids.map((id) => <Tile key={id} id={id} name={shortLabel(BASEMAPS[id].label, g.title)} checked={current === id} locked={!has && current !== id} onPick={() => onPick(id)} />)}
-      </div>
-    </div>
-  );
-}
-
-/** Labels, 3D buildings and day/night of the active Karte. */
-export function ViewSwitches() {
-  const k = activeKarte.value;
-  const own = !!basemapDef(k.basemap).ownLabels;
-  return (
-    <div class="bm-switches">
-      <Switch label="Beschriftung" checked={k.labels && !own} disabled={own} onChange={(v) => setLabels(k.id, v)} />
-      {own && <p class="bm-hint">Diese Karte bringt ihre eigene Beschriftung mit.</p>}
-      <div class="bm-switch-wrap">
-        <Switch label="3D-Gebäude" checked={buildings3d.value} onChange={setBuildings3d} />
-        {tilesNeedKey.value && (
-          <button type="button" class="bm-key" aria-label="Cesium-Token eintragen" {...tipProps(KEY_TIP, undefined, 'top')} onClick={() => openKeySettings('cesiumion')}>
-            <Icon name="key" size={14} />
-          </button>
-        )}
-      </div>
-      {tilesHint.value && <p class="bm-hint">{tilesHint.value}</p>}
-      {tilesQuota.value && <Quota used={tilesQuota.value.used} limit={tilesQuota.value.limit} />}
-      <Switch label="Tag und Nacht" checked={k.terminator} onChange={(v) => setTerminator(k.id, v)} />
-    </div>
-  );
-}
-
-/** Scroll area whose height follows its content smoothly (up to a limit), so changing tabs does not make the popover jump. */
-export function Fit({ children }: { children: ComponentChildren }) {
-  const inner = useRef<HTMLDivElement>(null);
-  const [h, setH] = useState<number>();
+/** Calls `seen` once, when the element first becomes visible (not while it is cut off by a folded grid or scrolled out). */
+function useSeen<T extends Element>(seen: (() => void) | undefined) {
+  const ref = useRef<T>(null);
   useEffect(() => {
-    const el = inner.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setH(el.offsetHeight));
-    ro.observe(el);
-    return () => ro.disconnect();
+    const el = ref.current;
+    if (!el || !seen) return;
+    if (typeof IntersectionObserver === 'undefined') return seen();
+    const io = new IntersectionObserver((e) => { if (e.some((x) => x.isIntersecting)) (seen(), io.disconnect()); });
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
-  return (
-    <div class="bm-scroll" style={h === undefined ? undefined : { height: `${h}px` }}>
-      <div ref={inner}>{children}</div>
-    </div>
-  );
+  return ref;
 }
-
-/** The label without the provider's name in front ("Esri Topografie" under the tab Esri is "Topografie"). */
-export const shortLabel = (label: string, title: string) => (label.startsWith(`${title} `) ? label.slice(title.length + 1) : label);
 
 /** The miniature of a basemap: its plain colour until the render is there, then the image fades in. */
-export function Tile({ id, fallback, name, checked, onPick, locked }: { id: Id; /** shown until the miniature of `id` is there */ fallback?: Id; name: string; checked: boolean; onPick: () => void; locked?: boolean }) {
+export function Tile({ id, fallback, name, title, checked, onPick, locked, seen, col }: {
+  id: BasemapId;
+  /** shown until the miniature of `id` is there */
+  fallback?: BasemapId;
+  name: string;
+  title?: string;
+  checked: boolean;
+  onPick: () => void;
+  /** needs a key that is not in yet: the tile is dimmed and opens the key settings instead */
+  locked?: boolean;
+  /** called once when the tile is first visible: renders its miniature */
+  seen?: () => void;
+  /** grid column the tile starts in (the first tile of a group that does not start at the left) */
+  col?: number;
+}) {
+  const ref = useSeen<HTMLButtonElement>(seen);
   const img = previewImages.value[id] ?? (fallback ? previewImages.value[fallback] : undefined);
   return (
-    <button type="button" role="radio" aria-checked={checked} disabled={locked} class="bm-opt" onClick={onPick}>
-      <span class="bm-thumb" style={{ background: BASEMAPS[id].background }}>
+    <button ref={ref} type="button" role="radio" aria-checked={checked} class={cx('bm-opt', locked && 'is-locked')} style={col ? { gridColumnStart: col } : undefined} title={title} onClick={onPick}>
+      <span class="bm-thumb" style={{ background: basemapDef(id).background }}>
         {img && <img src={img} alt="" decoding="async" draggable={false} />}
+        {locked && <span class="bm-lock" aria-hidden="true"><Icon name="key" size={12} /></span>}
       </span>
       <span class="bm-name">{name}</span>
     </button>
   );
 }
 
-/** The ids that get a tile: a series counts once, with its newest map. */
-export const tileIds = (ids: readonly Id[]): Id[] => ids.filter((id) => { const s = seriesOf(id); return !s || s.ids[0] === id; });
+/** The label without the provider's name in front ("Esri Topografie" under the heading Esri is "Topografie"). */
+const shortLabel = (label: string, title: string) => {
+  const name = title.replace(/ \(.*\)$/, ''); // "Sentinel-2 (EOX)" -> "Sentinel-2"
+  return label.startsWith(`${name} `) ? label.slice(name.length + 1) : label;
+};
 
-/** All maps of a category as a grid of miniatures, with subheadings where the category has sections. */
-export function Maps({ g, current, onPick }: { g: BasemapGroup; current: string; onPick: (id: Id) => void }) {
-  const sections = g.sections ?? [{ title: '', ids: g.ids }];
+/**
+ * A titled list of tiles in a box of fixed height that always scrolls. "Mehr anzeigen" only makes the box taller (and "Weniger anzeigen" shorter again).
+ * Folded it ends in the middle of a row, with a fade. Tiles render their miniature once they are scrolled into view.
+ */
+function Shelf({ id, title, children, rows, openRows }: {
+  id: string;
+  title: string;
+  children: ComponentChildren;
+  /** rows in view while folded / unfolded (a fraction ends in the middle of a row) */
+  rows: number;
+  openRows: number;
+}) {
+  const inner = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [m, setM] = useState<{ row: number; gap: number; full: number }>();
+  useLayoutEffect(() => {
+    const el = inner.current;
+    if (!el) return;
+    const measure = () => {
+      const grid = el.firstElementChild as HTMLElement | null;
+      const row = (grid?.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0;
+      setM({ row, gap: parseFloat(getComputedStyle(grid ?? el).rowGap) || 0, full: el.offsetHeight });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const height = (n: number) => (m ? Math.round(m.row * n + m.gap * Math.floor(n)) : undefined);
+  const folded = height(rows);
+  const unfolded = height(openRows);
+  const folds = !!m && !!folded && m.full > folded + 6;
+  const h = m && folded && unfolded ? Math.min(m.full, open ? unfolded : folded) : undefined;
   return (
-    <div class="bm-maps" role="radiogroup" aria-label={g.title}>
-      {sections.map((x) => {
-        const tiles = tileIds(x.ids);
-        const series = [...new Set(tiles.map((id) => seriesOf(id)).filter((s): s is BasemapSeries => !!s))];
+    <section class="bm-sec" aria-labelledby={`${id}-title`}>
+      <h4 class="bm-gtitle" id={`${id}-title`}>{title}</h4>
+      <div class="bm-list" data-fade={folds || undefined} style={h === undefined ? undefined : { height: `${h}px` }}>
+        <div ref={inner}>
+          <div class="bm-grid" role="radiogroup" aria-labelledby={`${id}-title`}>{children}</div>
+        </div>
+      </div>
+      {folds && (
+        <button type="button" class="bm-more" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {open ? 'Weniger anzeigen' : 'Mehr anzeigen'}
+        </button>
+      )}
+    </section>
+  );
+}
+
+/** Tiles per row of the list */
+const COLS = 4;
+/** Groups that follow each other share a row while their tiles together fit in it (1+1, 1+3, 2+2 ...); a bigger group takes rows of its own. */
+function packGroups<T extends { ids: readonly unknown[] }>(groups: readonly T[]): T[][] {
+  const rows: T[][] = [];
+  let n = 0;
+  for (const g of groups) {
+    const last = rows[rows.length - 1];
+    if (last && n + g.ids.length <= COLS && g.ids.length < COLS) {
+      last.push(g);
+      n += g.ids.length;
+    } else {
+      rows.push([g]);
+      n = g.ids.length < COLS ? g.ids.length : COLS; // a group of four or more fills its rows, nothing joins it
+    }
+  }
+  return rows;
+}
+
+/** The list of the modes: the four modes first, then the maps of the shown mode (the plain maps for Daten, Erkunden and Fahren, the aerial images for Satellit). */
+function ModeShelf({ pv, mode }: { pv: Previews; mode: MapMode }) {
+  const k = activeKarte.value;
+  const groups = mode === 'luftbild' ? AERIAL_GROUPS : KARTE_GROUPS;
+  const pick = (id: BasemapId) => {
+    lastUsed[isAerial(id) ? 'aerial' : 'karte'] = id;
+    setBasemap(k.id, id);
+  };
+  return (
+    // a new mode starts folded again
+    <Shelf key={mode} id="bm-modes" title="Kartenmodi" rows={1.75} openRows={3.5}>
+      {MAP_MODES.map((m) => {
+        const id = modeThumb(m.id, k.basemap);
+        return <Tile key={m.id} id={id} name={m.label} checked={mode === m.id} onPick={() => pickMode(m.id)} seen={() => pv.request([id], true)} />;
+      })}
+      {packGroups(groups).map((row) => {
+        // groups that share a row: the first ones follow each other from the left, the last one stands at the right edge (free columns between them)
+        const start = row.map((g, i) => (row.length === 1 ? 1 : i === row.length - 1 ? COLS - g.ids.length + 1 : 1 + row.slice(0, i).reduce((n, x) => n + x.ids.length, 0)));
         return (
-          <section key={x.title} aria-label={x.title || g.title}>
-            {x.title && <h4 class="bm-gtitle">{x.title}</h4>}
-            <div class="bm-grid">
-              {tiles.map((id) => {
-                const s = seriesOf(id);
-                if (!s) return <Tile key={id} id={id} name={shortLabel(BASEMAPS[id].label, g.title)} checked={current === id} onPick={() => onPick(id)} />;
-                const on = (s.ids as string[]).includes(current);
-                // the tile shows the year in use, else the newest; clicking it opens the series at the newest year
-                return <Tile key={id} id={on ? (current as Id) : id} fallback={id} name={`${s.label} ${Math.min(...s.years)}–${Math.max(...s.years)}`} checked={on} onPick={() => !on && onPick(id)} />;
-              })}
-            </div>
-            {series.map((s) => <YearSlider key={s.label} s={s} current={current} onPick={onPick} />)}
-          </section>
+          // all headings of a row first, then all its tiles; the first heading starts in column 1, so a row begins on a new line
+          // (not in the free cells after the last tile of the group before)
+          <Fragment key={row[0]!.title}>
+            {row.map((g, i) => <h5 key={g.title} class="bm-sub" style={{ gridColumn: row.length === 1 ? '1 / -1' : `${start[i]} / ${i === row.length - 1 ? COLS + 1 : start[i + 1]!}` }}>{g.title}</h5>)}
+            {row.flatMap((g, i) => g.ids.map((id, n) => {
+              const key = keyOfBasemap(id);
+              const locked = !!key && !keySignal(key).value && k.basemap !== id;
+              const seen = locked ? undefined : () => pv.request([id], true);
+              return <Tile key={id} id={id} col={n === 0 && row.length > 1 ? start[i] : undefined} name={shortLabel(BASEMAPS[id as keyof typeof BASEMAPS].label, g.title)} checked={k.basemap === id} locked={locked} title={locked ? 'Eigenen Schlüssel eintragen' : undefined} onPick={() => (locked ? openKeySettings(key!) : pick(id))} seen={seen} />;
+            }))}
+          </Fragment>
         );
       })}
-    </div>
+    </Shelf>
   );
 }
 
-/** The year of a series, from oldest (left) to newest (right); unfolds while one of the series' maps is active. */
-export function YearSlider({ s, current, onPick }: { s: BasemapSeries; current: string; onPick: (id: Id) => void }) {
-  const on = (s.ids as string[]).includes(current);
-  const asc = s.ids.map((id, i) => ({ id, year: s.years[i]! })).reverse();
-  const at = Math.max(0, asc.findIndex((m) => m.id === current));
+/** Regional maps touching the view, nearest first, as miniatures like the global ones. */
+function Regional({ pv, r }: { pv: Previews; r: RegionalState }) {
+  const k = activeKarte.value;
+  const hint = r.failed ? 'Regionale Karten konnten nicht geladen werden.' : !r.ready ? 'Lade regionale Karten …' : r.wide ? 'Näher heranzoomen, um regionale Karten zu sehen.' : r.list.length === 0 ? 'Für diesen Ausschnitt gibt es keine regionalen Karten.' : '';
+  if (r.list.length === 0) {
+    return (
+      <section class="bm-sec" aria-labelledby="bm-regional-title">
+        <h4 class="bm-gtitle" id="bm-regional-title">Regionale Karten</h4>
+        {hint && <p class="bm-hint">{hint}</p>}
+      </section>
+    );
+  }
   return (
-    <div class="bm-fold" data-open={on || undefined} aria-hidden={!on}>
-      <div class="bm-fold-in">
-        <div class="bm-slider">
-          <input
-            type="range" min={0} max={asc.length - 1} step={1} value={at} tabIndex={on ? 0 : -1}
-            aria-label={`${s.label}: Jahr`} aria-valuetext={String(asc[at]!.year)}
-            onInput={(e) => onPick(asc[Number((e.currentTarget as HTMLInputElement).value)]!.id)}
+    <div onPointerEnter={r.hold} onPointerLeave={r.release} onFocusIn={r.hold} onFocusOut={r.release}>
+      <Shelf id="bm-regional" title="Regionale Karten" rows={1.5} openRows={3.5}>
+        {r.list.map(({ item }) => (
+          <Tile
+            key={item.id} id={item.id} name={item.label} title={item.country && !isWorldwide(item.bounds) ? `${item.label} · ${item.country}` : item.label}
+            checked={k.basemap === item.id} onPick={() => setBasemap(k.id, item.id)} seen={() => pv.request([item.id], true)}
           />
-          <div class="bm-slider-years">
-            <span>{asc[0]!.year}</span>
-            <strong>{asc[at]!.year}</strong>
-            <span>{asc[asc.length - 1]!.year}</span>
-          </div>
-        </div>
-      </div>
+        ))}
+      </Shelf>
     </div>
   );
 }
 
-/** The Boost tab: providers that need the user's own key. Their maps show as miniatures once the key is in. */
-export function KeyedList({ groups, current, onPick, pv }: { groups: BasemapGroup[]; current: string; onPick: (id: Id) => void; pv: Previews }) {
+/** Globe or flat map, labels, 3D buildings and day/night of the active Karte. */
+export function ViewSwitches() {
+  const k = activeKarte.value;
+  const own = !!basemapDef(k.basemap).ownLabels;
+  const globe = projection.value === 'globe';
   return (
-    <div class="bm-keyed">
-      <p class="bm-kintro"><span class="bm-pill">Boost</span> Mit deinem eigenen kostenlosen Schlüssel des Anbieters.</p>
-      {groups.map((g) => <KeyedGroup key={g.title} g={g} current={current} onPick={onPick} pv={pv} />)}
-    </div>
-  );
-}
-
-export function KeyedGroup({ g, current, onPick, pv }: { g: BasemapGroup; current: string; onPick: (id: Id) => void; pv: Previews }) {
-  const has = !!keySignal(g.key!).value;
-  const [open, setOpen] = useState(() => g.ids.includes(current as never));
-  useEffect(() => { if (open && has) pv.request(g.ids, true); }, [open, has]);
-  return (
-    <div class="bm-kgroup">
-      <button type="button" class="bm-fold-head" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span class="bm-fold-title">{g.title}</span>
-        <span class="bm-kstate" data-on={has || undefined}>{has ? 'Schlüssel eingetragen' : 'Schlüssel fehlt'}</span>
-        <Icon name="chevron-up" size={14} class="bm-chev" />
-      </button>
-      <div class="bm-fold" data-open={open || undefined} aria-hidden={!open}>
-        <div class="bm-fold-in">
-          {!has && (
-            <button type="button" class="bm-kadd" tabIndex={open ? 0 : -1} onClick={() => openKeySettings(g.key!)}>
-              <Icon name="key" size={14} /> Schlüssel eintragen
-            </button>
-          )}
-          <div class="bm-grid bm-kgrid" role="radiogroup" aria-label={g.title}>
-            {g.ids.map((id) => <Tile key={id} id={id} name={shortLabel(BASEMAPS[id].label, g.title)} checked={current === id} locked={!has && current !== id} onPick={() => onPick(id)} />)}
+    <div class="bm-switches">
+      <Segmented
+        block
+        aria-label="Ansicht"
+        value={globe ? 'globe' : 'mercator'}
+        options={[
+          { value: 'globe', label: 'Globus' },
+          { value: 'mercator', label: 'Karte' },
+        ]}
+        onChange={(v) => setProjection(v)}
+      />
+      <Switch label="Beschriftung" checked={k.labels && !own} disabled={own} onChange={(v) => setLabels(k.id, v)} />
+      {own && <p class="bm-hint">Diese Karte bringt ihre eigene Beschriftung mit.</p>}
+      {showsRelief(karteMode.value, k.basemap) && (
+        <>
+          <div class="bm-switch-wrap">
+            <Switch label="3D-Gebäude" checked={buildings3d.value} onChange={setBuildings3d} />
+            {tilesNeedKey.value && (
+              <button type="button" class="bm-key" aria-label="Cesium-Token eintragen" {...tipProps(KEY_TIP, undefined, 'top')} onClick={() => openKeySettings('cesiumion')}>
+                <Icon name="key" size={14} />
+              </button>
+            )}
           </div>
-        </div>
-      </div>
+          {tilesHint.value && <p class="bm-hint">{tilesHint.value}</p>}
+          {tilesQuota.value && <Quota used={tilesQuota.value.used} limit={tilesQuota.value.limit} />}
+        </>
+      )}
+      <Switch label="Tag und Nacht" checked={k.terminator} onChange={(v) => setTerminator(k.id, v)} />
     </div>
   );
 }
@@ -259,42 +282,15 @@ export function Quota({ used, limit }: { used: number; limit: number }) {
   );
 }
 
-/** Popover content (also the first picture of the large view while it grows). Mounted only while shown, so the regional data loads on demand. */
-export function PickerBody({ s, onExpand }: { s: PickerState; onExpand(): void }) {
-  const globe = projection.value === 'globe';
+/** Popover content; mounted only while shown, so the regional data loads on demand. */
+export function PickerBody({ pv }: { pv: Previews }) {
   const regional = useRegional();
-  usePickerRequests(s);
+  const mode = modeOf(activeKarte.value.basemap);
   return (
     <>
-      <div class="bm-top">
-        <Segmented
-          block
-          aria-label="Ansicht"
-          value={globe ? 'globe' : 'mercator'}
-          options={[
-            { value: 'globe', label: 'Globus' },
-            { value: 'mercator', label: 'Karte' },
-          ]}
-          onChange={(v) => setProjection(v)}
-        />
-        <button type="button" class="bm-expand" aria-label="Große Ansicht" onClick={onExpand} {...tipProps('Große Ansicht', undefined, 'top')}>
-          <Icon name="expand" size={16} />
-        </button>
-      </div>
-      <div class="bm-tabs" role="tablist" aria-label="Kartenanbieter">
-        {CATEGORIES.map((g) => (
-          <button key={g.title} type="button" role="tab" id={`bm-tab-${g.title}`} aria-selected={s.tab === g.title} class="bm-tab" data-active={s.activeTab === g.title || undefined} onClick={() => s.setTab(g.title)}>
-            {g.short ?? g.title}
-          </button>
-        ))}
-        <button type="button" role="tab" id="bm-tab-boost" aria-selected={isBoostTab(s.tab)} aria-label="Mit eigenem Schlüssel (Boost)" class="bm-tab bm-tab-boost" data-active={isBoostTab(s.activeTab) || undefined} onClick={() => s.setTab(BOOST)} {...tipProps('Mit eigenem Schlüssel (Boost)', undefined, 'top')}>
-          <Icon name="boost" size={14} />
-        </button>
-      </div>
-      <Fit>
-        <TabPanel s={s} />
-      </Fit>
-      <RegionalSelect r={regional} />
+      <ModeShelf pv={pv} mode={mode} />
+      <div class="bm-div" role="separator" />
+      <Regional pv={pv} r={regional} />
       <ViewSwitches />
     </>
   );
