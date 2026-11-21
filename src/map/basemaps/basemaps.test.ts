@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BASEMAPS, BASEMAP_GROUPS, BASEMAP_IDS, DEFAULT_BASEMAP, isBasemapId } from '.';
+import { AERIAL_IDS, BASEMAPS, BASEMAP_IDS, KARTE_IDS, DEFAULT_BASEMAP, isBasemapId } from '.';
 import { BASEMAP_CREDITS } from '../../features/attribution/credits';
 import { parseHash } from '../../core/url';
 
@@ -17,7 +17,9 @@ describe('basemap registry', () => {
       for (const l of BASEMAPS[id].layers) expect(l.id.startsWith(`bm-${id}-`)).toBe(true);
       expect(parseHash(`#/?b=${id}`).basemap).toBe(id);
     }
-    expect(BASEMAP_GROUPS.every((g) => g.ids.length > 0)).toBe(true);
+    // every global map is in exactly one of the two lists the picker shows
+    expect(KARTE_IDS.filter((id) => AERIAL_IDS.includes(id))).toEqual([]);
+    expect(new Set([...KARTE_IDS, ...AERIAL_IDS]).size).toBe(KARTE_IDS.length + AERIAL_IDS.length);
   });
   it('regional basemaps carry bounds, keyless tile URLs only', () => {
     for (const id of ['swissimage', 'swissalti3d', 'swisssurface3d', 'imagico-alps'] as const) {

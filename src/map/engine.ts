@@ -8,8 +8,8 @@ import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { activeBasemap as activeBasemapSignal, buildings3d, buildingsReplaced, camera, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
-import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, skyFor } from './basemaps';
+import { activeBasemap as activeBasemapSignal, buildings3d, buildingsReplaced, camera, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
+import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, showsRelief, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { registerKeyedTiles } from './basemaps/keyed-protocol';
 import { registerPmtilesProtocol } from './pmtiles-protocol';
@@ -68,8 +68,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   let labels = init.labels ?? true;
   let terminatorMode: 'off' | 'auto' = init.terminator === false ? 'off' : 'auto';
   let loaded = false;
-  /** 3D terrain: on for every basemap. No switch. (On the aerial images at true scale and only as the camera's height reference: the 3D tiles are laid over it, see StagePart.coversMap.) */
-  let terrainOn = true;
+  /** Terrain and 2.5D buildings follow the mode of the picker (Daten: off; Erkunden: on) and are always on for aerial images. (On those at true scale and only as the camera's height reference: the 3D tiles are laid over it, see StagePart.coversMap.) */
+  const reliefOn = () => showsRelief(karteMode.peek(), basemap);
   registerDemTiles();
   registerKeyedTiles();
   registerPmtilesProtocol(); // the Orbis Karte overlay (PMTiles) is part of the basemap style
@@ -81,7 +81,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   const cam = clampCamera(camera.peek());
   const ml = new maplibregl.Map({
     container,
-    style: composeStyle({ basemap, labels, terminator: terminatorMode === 'auto', projection: projectionSignal.peek(), buildings: buildings3d.peek() }),
+    style: composeStyle({ basemap, labels, terminator: terminatorMode === 'auto', projection: projectionSignal.peek(), buildings: buildings3d.peek() && reliefOn() }),
     center: [cam.lng, cam.lat],
     zoom: cam.zoom,
     bearing: cam.bearing,
@@ -178,7 +178,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     effect(() => {
       buildings3d.value;
       buildingsReplaced.value;
-      if (loaded) applyBuildings();
+      karteMode.value;
+      if (loaded) (applyBuildings(), applyTerrain());
     }),
     effect(() => {
       const p = projectionSignal.value;
@@ -243,7 +244,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   /** 2.5D buildings: the Orbis basemaps' own, or the generic ones elsewhere; off with the switch, and off on aerial images (the real 3D tiles belong there). */
   function applyBuildings() {
     const shown = isStaticBasemap(basemap) ? basemap : undefined;
-    const on = buildings3d.peek() && !buildingsReplaced.peek();
+    const on = buildings3d.peek() && !buildingsReplaced.peek() && reliefOn();
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) setVis(l.id, on && id === shown);
     setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !hasTiles3d(shown));
   }
@@ -277,14 +278,14 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   let shadeNow = 0;
   const SHADE_FLAT = 1;
   const shadeTarget = () => {
-    if (!terrainOn || !(basemap === 'orbis-dark' || basemap === 'orbis-light')) return 0;
+    if (!reliefOn() || !(basemap === 'orbis-dark' || basemap === 'orbis-light')) return 0;
     return terrainTarget() > 0 ? 1 : SHADE_FLAT;
   };
   /** The 3D tiles of the aerial images are true to scale (sea level, see tiles3d/geoid): no exaggeration under them, so the camera's height agrees with theirs. */
   const TILES_TERRAIN_EXAGGERATION = 1;
   const terrainTarget = () => {
     const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
-    return terrainOn && !(flatOrbis && (projectionSignal.peek() !== 'globe' || (TERRAIN_ZOOM_FADE && ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS))) ? (hasTiles3d(basemap) ? TILES_TERRAIN_EXAGGERATION : TERRAIN_EXAGGERATION) : 0;
+    return reliefOn() && !(flatOrbis && (projectionSignal.peek() !== 'globe' || (TERRAIN_ZOOM_FADE && ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS))) ? (hasTiles3d(basemap) ? TILES_TERRAIN_EXAGGERATION : TERRAIN_EXAGGERATION) : 0;
   };
   /**
    * Changes the exaggeration of the running terrain in place. `map.setTerrain` would rebuild the whole terrain every

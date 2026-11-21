@@ -1,6 +1,7 @@
 // Camera state. map/engine.ts writes it (throttled, ~10 Hz) and applies changes made from outside.
 import { signal } from '@preact/signals';
 import type { BBox } from '../core/geo';
+import { DEFAULT_KARTE_MODE, type KarteMode } from '../map/basemaps';
 
 export interface CameraState { lng: number; lat: number; zoom: number; bearing: number; pitch: number }
 export type Projection = 'globe' | 'mercator';
@@ -11,7 +12,6 @@ export const DEFAULT_CAMERA: CameraState = { lng: 10, lat: 30, zoom: 1.6, bearin
 
 export const camera = signal<CameraState>({ ...DEFAULT_CAMERA });
 export const projection = signal<Projection>('globe');
-/** 3D terrain (real elevation model); on by default. Not persisted. */
 /** The basemap on show (set by the map engine). */
 export const activeBasemap = signal<string>('');
 /** The switch "3D-Gebäude" of the basemap popover: plain OSM 2.5D buildings, and the Cesium 3D tiles on aerial images (Orbis Pro). Plateau and the coloured OSM buildings belong to the layer "3D-Gebäude". Not persisted. */
@@ -19,6 +19,11 @@ export const buildings3d = signal(true);
 export const setBuildings3d = (on: boolean) => {
   buildings3d.value = on;
 };
+/**
+ * Mode of the plain maps in the basemap picker: Daten (bare map), Erkunden (terrain and 2.5D buildings), Fahren (traffic; for now like Daten).
+ * Aerial images always show the relief, whatever the mode is. Not persisted.
+ */
+export const karteMode = signal<KarteMode>(DEFAULT_KARTE_MODE);
 /** The layer "3D-Gebäude" replaces the 2.5D buildings of the basemap (coloured OSM buildings, or real models in view): they go off whatever the switch says. Written by the layer. */
 export const buildingsReplaced = signal(false);
 /** Visible bounds and size in px; undefined before the map is ready. */
