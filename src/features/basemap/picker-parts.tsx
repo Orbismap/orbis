@@ -19,8 +19,13 @@ import { useRegional, type RegionalState } from './use-regional';
 import { aerialList } from './regional-list';
 import './basemap.css';
 
-/** The map a mode card shows: the Orbis colours the plain maps have (the light ones while a light map is on), a satellite image for Satellit. */
-const modeThumb = (mode: MapMode, current: string): BasemapId => (mode === 'luftbild' ? 'satellite' : current === 'orbis-light' ? 'orbis-light' : 'orbis-dark');
+/** The single map of the modes that do not offer a list yet: Erkunden has the Orbis Karte, Fahren the dark one. */
+const MODE_BASEMAP: Partial<Record<MapMode, BasemapId>> = { erkunden: 'orbis-karte', fahren: 'orbis-fahren' };
+const MODE_BASEMAP_IDS = new Set<string>(Object.values(MODE_BASEMAP) as string[]);
+
+/** The map a mode card shows: its own map for Erkunden and Fahren, a satellite image for Satellit, the Orbis colours for Daten. */
+const modeThumb = (mode: MapMode, current: string): BasemapId =>
+  mode === 'luftbild' ? 'satellite' : MODE_BASEMAP[mode] ?? (current === 'orbis-light' ? 'orbis-light' : 'orbis-dark');
 
 /** The maps last used in each kind, so a mode switch returns to them (module state: it lives as long as the page). */
 const lastUsed = { karte: 'orbis-dark' as BasemapId, aerial: 'satellite' as BasemapId };
@@ -42,17 +47,23 @@ export function usePickerState(active: boolean): Previews | undefined {
 /** Mode shown: Satellit while an aerial image is on, else the mode picked for the plain maps. */
 const modeOf = (basemap: string): MapMode => (isAerial(basemap) ? 'luftbild' : karteMode.value);
 
-/** Switches the mode: the plain modes keep the map when it is a plain one, Satellit opens the last aerial image (and back again). */
+/** Switches the mode: Erkunden and Fahren activate their own map, Daten keeps the current one, Satellit opens the last aerial image (and back again). */
 function pickMode(mode: MapMode): void {
   const k = activeKarte.peek();
   if (isAerial(k.basemap)) lastUsed.aerial = k.basemap;
-  else lastUsed.karte = k.basemap;
+  else if (!MODE_BASEMAP_IDS.has(k.basemap)) lastUsed.karte = k.basemap;
   if (mode === 'luftbild') {
     if (!isAerial(k.basemap)) setBasemap(k.id, lastUsed.aerial);
     return;
   }
   karteMode.value = mode;
-  if (isAerial(k.basemap)) setBasemap(k.id, lastUsed.karte);
+  const own = MODE_BASEMAP[mode];
+  if (own) {
+    if (k.basemap !== own) setBasemap(k.id, own);
+    return;
+  }
+  // Daten takes a map of its own back: a mode map in `b=` would send a reload to that mode again.
+  if (isAerial(k.basemap) || MODE_BASEMAP_IDS.has(k.basemap)) setBasemap(k.id, lastUsed.karte);
 }
 
 /** Calls `seen` once, when the element first becomes visible (not while it is cut off by a folded grid or scrolled out). */
@@ -173,12 +184,14 @@ function packGroups<T extends { ids: readonly unknown[] }>(groups: readonly T[])
   return rows;
 }
 
-/** The list of the modes: the four modes first, then the maps of the shown mode (the plain maps for Daten, Erkunden and Fahren, the aerial images for Satellit). */
+/** The list of the modes: the four modes first, then the maps of the shown mode. Only Daten offers the full plain map list; Erkunden and Fahren show their own single map until they get their own lists. */
 function ModeShelf({ pv, mode }: { pv: Previews; mode: MapMode }) {
   const k = activeKarte.value;
-  const groups = mode === 'luftbild' ? AERIAL_GROUPS : KARTE_GROUPS;
+  const single = MODE_BASEMAP[mode];
+  const groups = single ? [] : mode === 'luftbild' ? AERIAL_GROUPS : KARTE_GROUPS;
   const pick = (id: BasemapId) => {
-    lastUsed[isAerial(id) ? 'aerial' : 'karte'] = id;
+    if (isAerial(id)) lastUsed.aerial = id;
+    else if (!MODE_BASEMAP_IDS.has(id)) lastUsed.karte = id;
     setBasemap(k.id, id);
   };
   return (
@@ -188,7 +201,12 @@ function ModeShelf({ pv, mode }: { pv: Previews; mode: MapMode }) {
         const id = modeThumb(m.id, k.basemap);
         return <Tile key={m.id} id={id} name={m.label} checked={mode === m.id} onPick={() => pickMode(m.id)} seen={() => pv.request([id], true)} />;
       })}
-      {packGroups(groups).map((row) => {
+      {single ? (
+        <>
+          <h5 class="bm-sub" style={{ gridColumn: '1 / -1' }}>Karte für {mode === 'erkunden' ? 'Erkunden' : 'Fahren'}</h5>
+          <Tile id={single} name={basemapDef(single).label} checked={k.basemap === single} onPick={() => pick(single)} seen={() => pv.request([single], true)} />
+        </>
+      ) : packGroups(groups).map((row) => {
         // groups that share a row: the first ones follow each other from the left, the last one stands at the right edge (free columns between them)
         const start = row.map((g, i) => (row.length === 1 ? 1 : i === row.length - 1 ? COLS - g.ids.length + 1 : 1 + row.slice(0, i).reduce((n, x) => n + x.ids.length, 0)));
         return (
@@ -295,7 +313,7 @@ export function PickerBody({ pv }: { pv: Previews }) {
     <>
       <ModeShelf pv={pv} mode={mode} />
       <div class="bm-div" role="separator" />
-      <Regional pv={pv} r={regional} aerial={mode === 'luftbild'} />
+      {(mode === 'daten' || mode === 'luftbild') && <Regional pv={pv} r={regional} aerial={mode === 'luftbild'} />}
       <ViewSwitches />
     </>
   );

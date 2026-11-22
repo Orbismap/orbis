@@ -8,6 +8,7 @@ import { scopeEngine, type ScopeRecord } from '../map/scope';
 import type { MapEngine, SlotId } from '../map/types';
 import { clearLayerSession, activeKarte, setFeed, setLayerStatus, setLegend, activeKarteId } from '../state/session';
 import { inspector, selectCard, selectPlace } from '../state/selection';
+import { karteMode } from '../state/view';
 import { isMobile } from '../state/ui';
 import { time, timeSources } from '../state/time';
 import { guardOf } from '../karten/standard';
@@ -16,6 +17,8 @@ import { getLayer } from './registry';
 import type { InspectCard, LayerContext, LayerDef, LayerHandle, LayerStatus, OptionSpec, OptionValues } from './types';
 
 const SLOTS: SlotId[] = ['field', 'raster', 'areas', 'lines', 'points', 'labels', 'top'];
+/** Drawn with the Erkunden basemap (like its POIs), without becoming active layers or entering the link. */
+const ERKUNDEN_LAYERS = ['baeume', 'strassenmarkierungen'];
 
 export const defaultOptions = (specs: OptionSpec[] = []): OptionValues => Object.fromEntries(specs.map((s) => [s.id, s.default]));
 
@@ -178,10 +181,11 @@ export function startRuntime(engine: MapEngine): () => void {
     return out;
   };
 
-  // 1. mount/unmount to match the visible layers of the active Karte
+  // 1. mount/unmount to match the visible layers of the active Karte, plus the Erkunden basemap's own layers
   stops.push(
     effect(() => {
       const k = activeKarte.value;
+      const erkunden = karteMode.value === 'erkunden';
       const wanted: string[] = [];
       const exclusive = new Set<string>();
       const confirmed = settings.value.confirmedWarnings;
@@ -209,6 +213,9 @@ export function startRuntime(engine: MapEngine): () => void {
         }
         wanted.push(l.id);
       }
+      // Like the POIs of the basemap: on in the background while Erkunden is shown, never in `l=`.
+      // If the layer is switched on as a layer itself it is already in `wanted` and mounted once only.
+      if (erkunden) for (const id of ERKUNDEN_LAYERS) if (!wanted.includes(id) && getLayer(id)) wanted.push(id);
       timeSources.value = wanted.map((id) => getLayer(id)!.time).filter((t): t is NonNullable<typeof t> => !!t);
       untracked(() => {
         for (const id of [...mounted.keys()]) if (!wanted.includes(id)) unmount(id);

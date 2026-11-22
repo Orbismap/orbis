@@ -20,6 +20,7 @@ const KEYED_CREDITS = Object.fromEntries(KEYED_ENTRIES.map((e) => [e.id, [{ name
 
 export const BASEMAP_CREDITS: Record<StaticBasemapId, Credit[]> = {
   'orbis-dark': [OFM, OMT, OSM],
+  'orbis-fahren': [OFM, OMT, OSM],
   'orbis-light': [OFM, OMT, OSM],
   'orbis-karte': [OFM, OMT, OSM, { name: 'Mapterhorn (Reliefschattierung)', url: 'https://mapterhorn.com/attribution/', license: 'Höhendaten' }, { name: 'Mapzen Terrain Tiles (Meerestiefe: GEBCO, ETOPO1)', url: 'https://registry.opendata.aws/terrain-tiles/', license: 'frei nutzbar, Quellenangabe' }],
   satellite: [{ name: 'Esri World Imagery (Maxar, Earthstar Geographics)', url: 'https://www.esri.com/', license: 'Esri Nutzungsbedingungen' }, OFM, OSM],

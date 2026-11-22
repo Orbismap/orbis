@@ -1,6 +1,6 @@
-// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&m=<name>,<icon>,<color>[,<basemap>]&t=<iso>&g=1&s=0&f=flug:<hex>|schiff:<mmsi>&p=
+// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&b=<basemap>&m=<name>,<icon>,<color>[,<basemap>]&t=<iso>&g=1&s=0&f=flug:<hex>|schiff:<mmsi>&p=
 // (k = the Karte shown while its detail menu is open; l = the active layers; s=0 = main sidebar collapsed;
-//  b= (basemap) is only read, from older links, and never written)
+//  b = the basemap on show, round-trips; the picker mode is not part of the link)
 // p=<lat>,<lng>,<name>,<region>[,<kind>]
 // (p = a searched place; name, region and kind are percent-encoded, so their commas do not split)
 import type { FollowRef } from '../ext/types';
@@ -66,7 +66,8 @@ export function parseHash(hash: string): UrlState {
     }
   }
   const b = q.get('b');
-  if (b && /^[a-z0-9-]{1,32}$/.test(b)) out.basemap = b;
+  // ids may be long regional ones and aliases (`>`), they are validated by the caller
+  if (b && /^[a-z0-9->]{1,80}$/.test(b)) out.basemap = b;
   const t = q.get('t');
   if (t) {
     const ms = Date.parse(t);
@@ -106,6 +107,7 @@ export function serializeHash(s: UrlState): string {
   if (s.karte) q.push(`k=${encodeURIComponent(s.karte)}`);
   if (s.shared) q.push(`m=${[s.shared.name, s.shared.icon, s.shared.color.replace('#', ''), ...(s.shared.basemap ? [s.shared.basemap] : [])].map(encodeURIComponent).join(',')}`);
   if (s.layers) q.push(`l=${s.layers.map(encodeURIComponent).join(',')}`);
+  if (s.basemap) q.push(`b=${encodeURIComponent(s.basemap)}`);
   if (s.time !== undefined) q.push(`t=${new Date(s.time).toISOString().slice(0, 16)}Z`);
   if (s.globe !== undefined) q.push(`g=${s.globe ? 1 : 0}`);
   if (s.sidebar === false) q.push('s=0');

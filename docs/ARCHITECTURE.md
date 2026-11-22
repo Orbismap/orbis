@@ -162,7 +162,7 @@ die Ebene angelegt hat (für Umsortierung und Aufräumen nach fehlgeschlagenem `
 
 **Grundkarten** (`map/basemaps/`): `orbis-dark`, `orbis-light` (eigene Stile auf OpenFreeMap-Vektorkacheln,
 Farben aus den Design-Tokens, bewusst ruhig, damit Daten tragen; ab Zoom 13.5 2,5D-Gebäude als `fill-extrusion` mit `fill-extrusion-rounded-corner-distance` (Layout, ab maplibre-gl 6.2) aus Quelllayer `building`, `render_height`/`render_min_height`), `satellite` (Esri World Imagery + eigene
-Beschriftung), `terrain` (OpenTopoMap), `bluemarble` (NASA GIBS). Der Stil enthält *alle* Grundkarten und
+Beschriftung), `terrain` (OpenTopoMap), `bluemarble` (NASA GIBS), dazu `orbis-karte` (Erkunden) und `orbis-fahren` (Fahren, Look wie `orbis-dark`) als eigene Karten der Modi – sie stehen nicht in der Daten-Liste. Der Stil enthält *alle* Grundkarten und
 Beschriftungsvarianten gleichzeitig (unsichtbar bis auf die gewählte), der Wechsel schaltet nur `visibility`. Es gibt
 kein `setStyle`, daher gehen weder Quellen noch Layer, Custom-Layer oder Bilder beim Wechsel verloren.
 
@@ -350,7 +350,7 @@ export interface Karte {
 
 ### Karten: Ansichten und eigene Karten
 
-`karten/active.ts` hält die Wahrheit: `activeIds` (geordnete Liste der aktiven Ebenen, obenauf zuerst; localStorage `active-layers`, Link `l=`) und `layerPrefs` (Deckkraft/Optionen je Ebene, nur lokal). Die gezeigte Karte (`activeKarte`) wird abgeleitet: die Standardkarte, deren „Universum“ (Standardebenen plus alle Ebenen ihrer Themen) die meisten aktiven Ebenen enthält (bei Gleichstand die geöffnete); liegt eine aktive Ebene in keiner Standardkarte, ist es die ungespeicherte Karte (`scratch`, „Als Karte sichern“ legt daraus eine eigene an). `browsedKarte` ist die im Menü geöffnete Karte (Standardkarte = Katalog mit Schaltern, nicht bearbeitbar); Grundkarte, Ortsnamen und Tag-Nacht-Linie gelten für Standard- und ungespeicherte Karte nur für die Sitzung. Nur eine geöffnete eigene Karte hat ihre eigene Ebenenliste (an Ort und Stelle geändert, sofort persistiert; `activeIds` spiegelt sie). UI: `features/karten-bar/actions.tsx` (`KartenPopover`, `KartenChangeRow` für die ungespeicherte Karte), gemeinsam für Desktop und Mobil. Der Link kennt nur `l=` (ältere `k=`/`b=` werden gelesen, nie geschrieben).
+`karten/active.ts` hält die Wahrheit: `activeIds` (geordnete Liste der aktiven Ebenen, obenauf zuerst; localStorage `active-layers`, Link `l=`) und `layerPrefs` (Deckkraft/Optionen je Ebene, nur lokal). Die gezeigte Karte (`activeKarte`) wird abgeleitet: die Standardkarte, deren „Universum“ (Standardebenen plus alle Ebenen ihrer Themen) die meisten aktiven Ebenen enthält (bei Gleichstand die geöffnete); liegt eine aktive Ebene in keiner Standardkarte, ist es die ungespeicherte Karte (`scratch`, „Als Karte sichern“ legt daraus eine eigene an). `browsedKarte` ist die im Menü geöffnete Karte (Standardkarte = Katalog mit Schaltern, nicht bearbeitbar); Grundkarte, Ortsnamen und Tag-Nacht-Linie gelten für Standard- und ungespeicherte Karte nur für die Sitzung. Nur eine geöffnete eigene Karte hat ihre eigene Ebenenliste (an Ort und Stelle geändert, sofort persistiert; `activeIds` spiegelt sie). UI: `features/karten-bar/actions.tsx` (`KartenPopover`, `KartenChangeRow` für die ungespeicherte Karte), gemeinsam für Desktop und Mobil. Im Modus Erkunden laufen die Ebenen `baeume` und `strassenmarkierungen` als Hintergrundebenen mit (wie die POIs der Grundkarte): `layers/runtime` mountet sie zusätzlich, ohne sie in die aktiven Ebenen oder in `l=` zu schreiben. Der Link kennt `l=` und `b=` (gezeigte Grundkarte); `k=` aus alten Links wird noch gelesen. Der Kartenmodus (Daten/Erkunden/Fahren/Satellit) ist nicht im Link, wird beim Laden aber aus `b=` abgeleitet: `orbis-karte` → Erkunden, `orbis-fahren` → Fahren, Luftbilder → Satellit, alle anderen → Daten. Weicht `b=` nicht von der Grundkarte der Karte ab, bleibt sie deren Standard und folgt weiteren Ebenenwechseln.
 
 ## Zustand (`src/state`)
 
@@ -364,9 +364,11 @@ Breakpoint), `settings` (Einheiten, Thema, Bewegung, Schlüssel).
 - Signale, die von Ebenen aus Effekten heraus geschrieben werden (`setLayerStatus` …), lesen intern mit `peek()`,
   sonst entstünde ein Zyklus.
 - Persistenz: `core/storage` (localStorage, versioniert, jede geladene Struktur wird validiert).
-- URL: `#/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&t=<iso>&g=1` – `core/url` liest beim
-  Start und schreibt gedrosselt (`replaceState`, `state/url-sync.ts`). `t` entfällt im Live-Modus, `g=1` Globus,
-  `g=0` Mercator. `f=flug:<hex>` / `f=schiff:<mmsi>`: das verfolgte Flugzeug oder Schiff (Orbis Pro, Follow-Kamera). Die
+- URL: `#/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&b=<basemap>&t=<iso>&g=1` –
+  `core/url` liest beim Start und schreibt gedrosselt (`replaceState`, `state/url-sync.ts`). `b=` ist die gezeigte
+  Grundkarte und wird beim Laden wiederhergestellt; der Picker-Modus steht nicht im Link, ergibt sich aber aus `b=`. `t` entfällt im Live-Modus,
+  `g=1` Globus, `g=0` Mercator. `f=flug:<hex>` / `f=schiff:<mmsi>`: das
+  verfolgte Flugzeug oder Schiff (Orbis Pro, Follow-Kamera). Die
   Erweiterung meldet es über `host.follow.report`, die URL fragt es über `host.follow.wanted` an; beim Laden wartet die
   Erweiterung bis zu 90 s, bis das Objekt in den Daten ist, wählt es dann aus und folgt ihm.
 

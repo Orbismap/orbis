@@ -3,15 +3,15 @@ import { effect, batch } from '@preact/signals';
 import { throttle } from '../core/scheduler';
 import { followCurrent, followWanted } from '../ext/channels';
 import { parseHash, serializeHash, type UrlState } from '../core/url';
-import { activeIds, openKarte, setActiveIds, setActiveKarte, setBasemap } from '../karten/active';
+import { activeIds, clearBasemap, openKarte, setActiveIds, setActiveKarte, setBasemap } from '../karten/active';
 import { importKarte } from '../karten/store';
-import { resolveBasemapId } from '../map/basemaps';
+import { modeForBasemap, resolveBasemapId } from '../map/basemaps';
 import { activeKarte, browsedKarte } from './session';
 import { detailOpen } from './hud';
 import { place, selectPlace } from './selection';
 import { isMobile, leftPanelOpen } from './ui';
 import { live, setTime, time } from './time';
-import { camera, projection, setCamera, setProjection } from './view';
+import { camera, karteMode, projection, setCamera, setProjection } from './view';
 
 export function applyUrlState(u: UrlState): void {
   batch(() => {
@@ -26,9 +26,16 @@ export function applyUrlState(u: UrlState): void {
     if (u.view) setCamera({ lng: u.view.lng, lat: u.view.lat, zoom: u.view.zoom, bearing: u.view.bearing ?? 0, pitch: u.view.pitch ?? 0 });
     if (u.globe !== undefined) setProjection(u.globe ? 'globe' : 'mercator');
     if (u.sidebar !== undefined) leftPanelOpen.value = u.sidebar;
-    // a basemap in a link is taken for this session only
+    // The link carries the basemap on show. Pin it for this session only when it differs from the
+    // Karte's own default; otherwise the default keeps following the active layers after a reload.
     const wanted = u.shared ? undefined : resolveBasemapId(u.basemap);
-    if (wanted) setBasemap(activeKarte.peek().id, wanted);
+    if (wanted) {
+      clearBasemap(); // what the Karte itself shows is the baseline for the link
+      if (wanted !== activeKarte.peek().basemap) setBasemap(activeKarte.peek().id, wanted);
+    }
+    // The mode is not in the URL: derive it from the basemap, so a reload lands in the right category.
+    const mode = modeForBasemap(activeKarte.peek().basemap);
+    if (mode !== 'luftbild') karteMode.value = mode;
     if (u.time !== undefined) setTime(u.time);
     // a new object each time: the same object asked for again starts the follow again
     followWanted.value = u.follow ? { ...u.follow } : null;
@@ -47,6 +54,7 @@ export function currentUrlState(): UrlState {
     // While the Karte's detail menu is open, that Karte is part of the visible state.
     karte: detailOpen.value ? browsedKarte.value.id : undefined,
     layers: layers.length ? layers : undefined,
+    basemap: activeKarte.value.basemap,
     time: live.value ? undefined : time.value,
     globe: projection.value === 'globe',
     sidebar: leftPanelOpen.value ? undefined : false,

@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { activeIds, activeKarte, setActiveIds, setLayerVisible, SCRATCH_ID } from '../karten/active';
+import { activeIds, activeKarte, setActiveIds, setBasemap, setLayerVisible, SCRATCH_ID } from '../karten/active';
 import { parseHash, serializeHash } from '../core/url';
 import { detailOpen } from './hud';
+import { karteMode } from './view';
 import { leftPanelOpen } from './ui';
 import { applyUrlState, currentUrlState } from './url-sync';
 
-beforeEach(() => { detailOpen.value = false; leftPanelOpen.value = true; });
+beforeEach(() => {
+  detailOpen.value = false;
+  leftPanelOpen.value = true;
+  setActiveIds([]);
+  // a known starting point for the session-only basemap choice
+  applyUrlState(parseHash('#/?b=orbis-dark'));
+});
 
 describe('url layers', () => {
   it('sets the active layers; the standard Karte follows from them', () => {
@@ -26,12 +33,12 @@ describe('url layers', () => {
     expect(activeIds.value).toContain('radar');
     expect(activeKarte.value.id).toBe('wetter');
   });
-  it('writes only the active layers, no Karte and no basemap while the detail menu is closed', () => {
+  it('writes the active layers and the shown basemap, no Karte while the detail menu is closed', () => {
     setActiveIds(['erdbeben', 'radar']);
     const u = currentUrlState();
     expect(u.layers).toEqual(['erdbeben', 'radar']);
     expect(u.karte).toBeUndefined();
-    expect(u.basemap).toBeUndefined();
+    expect(u.basemap).toBe(activeKarte.value.basemap);
     setActiveIds([]);
     expect(currentUrlState().layers).toBeUndefined();
   });
@@ -61,6 +68,39 @@ describe('url layers', () => {
     expect(serializeHash(currentUrlState())).toContain('s=0');
     leftPanelOpen.value = true;
     expect(currentUrlState().sidebar).toBeUndefined();
+  });
+});
+
+describe('url basemap', () => {
+  it('writes the basemap on show into the hash, including the Karte default', () => {
+    setActiveIds(['meerestemperatur']); // Erde & Meer brings its own satellite basemap
+    expect(activeKarte.value.basemap).toBe('satellite');
+    expect(serializeHash(currentUrlState())).toContain('b=satellite');
+
+    setBasemap(activeKarte.value.id, 'orbis-light');
+    const hash = serializeHash(currentUrlState());
+    expect(hash).toContain('b=orbis-light');
+    expect(parseHash(hash).basemap).toBe('orbis-light');
+  });
+  it('restores a chosen basemap from a link', () => {
+    setActiveIds([]);
+    applyUrlState(parseHash('#/?b=orbis-light'));
+    expect(activeKarte.value.basemap).toBe('orbis-light');
+  });
+  it('does not pin a link basemap that is the Karte default, so layers still switch it', () => {
+    setActiveIds([]);
+    applyUrlState(parseHash('#/?b=orbis-dark'));
+    expect(activeKarte.value.basemap).toBe('orbis-dark');
+    setActiveIds(['meerestemperatur']);
+    expect(activeKarte.value.basemap).toBe('satellite');
+  });
+  it('lands in the right picker category after a reload, derived from b=', () => {
+    setActiveIds([]);
+    for (const [basemap, mode] of [['orbis-karte', 'erkunden'], ['orbis-fahren', 'fahren'], ['osm', 'daten']] as const) {
+      applyUrlState(parseHash(`#/?b=${basemap}`));
+      expect(activeKarte.value.basemap).toBe(basemap);
+      expect(karteMode.value).toBe(mode);
+    }
   });
 });
 

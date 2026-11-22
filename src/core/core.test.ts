@@ -118,8 +118,8 @@ describe('url', () => {
     expect(h).toBe('#/@52.52,13.405,5.25z,30b,45p?l=erdbeben,seekabel&t=2026-11-10T12:00Z&g=1');
     expect(parseHash(h)).toEqual(s);
   });
-  it('writes k= but not b=, and reads both from older links', () => {
-    expect(serializeHash({ karte: 'wetter', basemap: 'satellite', globe: false })).toBe('#/?k=wetter&g=0');
+  it('writes k= and b=, and reads both from older links', () => {
+    expect(serializeHash({ karte: 'wetter', basemap: 'satellite', globe: false })).toBe('#/?k=wetter&b=satellite&g=0');
     expect(parseHash('#/?k=wetter&b=satellite')).toEqual({ karte: 'wetter', basemap: 'satellite' });
     expect(parseHash('#/?b=a<b').basemap).toBeUndefined();
   });
