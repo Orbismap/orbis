@@ -65,6 +65,10 @@ const tierLimit: Ex = ['step', ['zoom'], 0, ...TIER_ZOOM.flatMap((z, i) => [z, i
 const colorOf: Ex = ['match', ['get', 'class'], ...POI_GROUPS.flatMap((g) => [g.classes, g.color]), POI_OTHER.color] as unknown as Ex;
 const iconOf: Ex = ['match', ['get', 'class'], ...POI_GROUPS.flatMap((g) => [g.classes, g.icon]), POI_OTHER.icon] as unknown as Ex;
 
+/** The kind of a place for people: its subclass (or class), "ice_cream" -> "Ice cream". */
+export const poiKind = (p: { class?: unknown; subclass?: unknown }): string =>
+  String(p.subclass && p.subclass !== p.class ? p.subclass : p.class ?? '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
 export const poiGroupOf = (cls: unknown): PoiGroup | undefined => POI_GROUPS.find((g) => g.classes.includes(String(cls)));
 
 /** Which places show: named ones of the tiers the zoom has reached, narrowed to the chosen groups (`groups`: option value of the layer, undefined = all). */

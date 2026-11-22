@@ -17,7 +17,7 @@ import { registerPmtilesProtocol } from './pmtiles-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
 import { landmarkMask } from '../data/landmarks';
 import { startPoiHeights, type PoiHeights } from './poi-heights';
-import { POI_ICON_NAMES, POI_LAYER_ID, poiDotsId, poiFilter, poiOccluded } from './poi';
+import { POI_ICON_NAMES, POI_LAYER_ID, poiDotsId, poiFilter, poiKind, poiOccluded } from './poi';
 import { ensureIcons } from '../render/icons';
 import { activeMembers, loadRegional, memberIds, membersOf, regionalDef, regionalEntry, regionalReady, type Bounds } from './basemaps/regional';
 import { clampCamera, ENGINE_MAX_PITCH, flyToTarget, locate as locateImpl } from './camera';
@@ -130,6 +130,17 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       if (!isMobile.peek()) setProbe(at);
     },
   );
+  // the places of the basemap and the badges of the 3D landmarks (pro, layer id of pro/landmarks/badges.ts) open the detail menu, like a searched place
+  picking.add([POI_LAYER_ID, poiDotsId(POI_LAYER_ID), 'landmark-badges'], {
+    click(f) {
+      if (f.geometry.type !== 'Point') return;
+      const [lng, lat] = f.geometry.coordinates as [number, number];
+      const p = (f.properties ?? {}) as { name?: string; id?: string; class?: string; subclass?: string };
+      const landmark = f.layer.id === 'landmark-badges';
+      const kind = landmark ? 'Wahrzeichen' : poiKind(p);
+      selectPlace({ id: `${landmark ? 'lm' : 'poi'}:${p.id ?? `${lng.toFixed(5)},${lat.toFixed(5)}`}`, title: String(p.name ?? kind), subtitle: kind, lng, lat, category: kind });
+    },
+  });
 
   const resolveReady = () => {
     loaded = true;

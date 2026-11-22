@@ -4,12 +4,11 @@
 import { effect } from '@preact/signals';
 import type { InspectCard } from '../types';
 import { defineLayer } from '../define';
-import { POI_GROUPS as GROUPS, POI_OTHER, poiFilter, poiDotsId, poiGroupOf, poiLayers, poiOpacity } from '../../map/poi';
+import { POI_GROUPS as GROUPS, POI_OTHER, poiFilter, poiDotsId, poiGroupOf, poiKind, poiLayers, poiOpacity } from '../../map/poi';
 import { landmarkMask } from '../../data/landmarks';
 import { poiLayerOn } from '../../state/view';
 
 const OTHER = POI_OTHER.color;
-const labelOf = (v: unknown): string => String(v ?? '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
 export default defineLayer({
   id: 'orte',
@@ -42,7 +41,7 @@ export default defineLayer({
       click(f) {
         const p = (f.properties ?? {}) as Record<string, unknown>;
         const group = poiGroupOf(p.class);
-        const kind = labelOf(p.subclass && p.subclass !== p.class ? p.subclass : p.class);
+        const kind = poiKind(p);
         const card: InspectCard = {
           title: String(p['name:latin'] ?? p.name ?? kind),
           subtitle: kind,
