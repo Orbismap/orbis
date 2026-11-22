@@ -71,17 +71,3 @@ export function replaceBuildingTile(bytes: Uint8Array, tile: TileCoordinate, foo
   out.name = 'building';
   return fromVectorTileJs({ layers: { building: out } } as never);
 }
-
-/** Is the point inside the outline (any polygon, minus its holes)? */
-export function inFootprint(lng: number, lat: number, g: MultiPolygon): boolean {
-  const inRing = (ring: Pair[]) => {
-    let inside = false;
-    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-      const [xi, yi] = ring[i]!;
-      const [xj, yj] = ring[j]!;
-      if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
-    }
-    return inside;
-  };
-  return g.some((poly) => inRing(poly[0]!) && !poly.slice(1).some(inRing));
-}

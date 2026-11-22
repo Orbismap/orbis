@@ -172,3 +172,17 @@ export function maskOf(items: readonly LandmarkSample[], shapes: Record<string, 
 /** Is a point inside one of the boxes? */
 export const inBoxes = (lng: number, lat: number, boxes: LandmarkMask['boxes']) =>
   boxes.some(([w, s, e, n]) => lng >= w && lng <= e && lat >= s && lat <= n);
+
+/** Is the point inside the outline (any polygon, minus its holes)? */
+export function inFootprint(lng: number, lat: number, g: MultiPolygon): boolean {
+  const inRing = (ring: [number, number][]) => {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i]!;
+      const [xj, yj] = ring[j]!;
+      if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  return g.some((poly) => inRing(poly[0]!) && !poly.slice(1).some(inRing));
+}

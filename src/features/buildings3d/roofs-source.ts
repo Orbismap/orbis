@@ -8,8 +8,7 @@
 import { effect } from '@preact/signals';
 import { osmPmtilesUrl } from '../../data/osmfiles';
 import { coveredIds, flatRing, flatSamples, paintSamples, roofSamples, type FlatBuilding } from '../../data/parsers/roofs-tiles';
-import { landmarkMask, type LandmarkMask } from '../../data/landmarks';
-import { inFootprint } from '../../map/landmark-geometry';
+import { inFootprint, landmarkMask, type LandmarkMask } from '../../data/landmarks';
 import { buildingSource } from '../../map/landmark-buildings';
 import { buildingsChannel, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';

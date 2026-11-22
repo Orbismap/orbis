@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { VectorTile } from '@mapbox/vector-tile';
 import { GeoJSONWrapper, fromVectorTileJs, type Feature } from '@maplibre/vt-pbf';
 import { PbfReader } from 'pbf';
-import { inFootprint, replaceBuildingTile, tilePoint } from '../map/landmark-geometry';
+import { replaceBuildingTile, tilePoint } from '../map/landmark-geometry';
 import { replacedByLandmark } from '../features/buildings3d/roofs-source';
-import { inBoxes, maskOf, ofmId, parseLandmarks, tileOf, tilesInView } from './landmarks';
+import { inBoxes, inFootprint, maskOf, ofmId, parseLandmarks, tileOf, tilesInView } from './landmarks';
 
 const ESB = {
   id: 'empire-state-building',
