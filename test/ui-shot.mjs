@@ -60,7 +60,7 @@ const steps = {
   'catalog-key': async () => { await page.getByRole('button', { name: 'Ebene hinzufügen' }).last().click(); await sleep(300); await page.keyboard.type('schlüssel'); await sleep(300); },
   keys: async () => { await page.keyboard.press('Shift+?'); await sleep(400); },
   basemap: async () => { await page.getByRole('button', { name: 'Grundkarte' }).click(); await sleep(400); },
-  attribution: async () => { await page.getByRole('button', { name: 'Quellen' }).click(); await sleep(400); },
+  attribution: async () => { await sleep(400); },
   'sheet-half': async () => { await page.getByRole('button', { name: 'Leiste vergrößern' }).click(); await sleep(900); },
   'sheet-full': async () => { const b = page.getByRole('button', { name: 'Leiste vergrößern' }); await b.click(); await sleep(700); await page.getByRole('button', { name: 'Leiste vergrößern' }).click(); await sleep(900); },
   'sheet-catalog': async () => { await page.getByRole('button', { name: 'Leiste vergrößern' }).click(); await sleep(600); await page.getByRole('button', { name: 'Hinzufügen' }).click(); await sleep(1000); },

@@ -1,33 +1,84 @@
 @layer features {
   .attr {
     position: relative;
-  }
-  .attr-btn {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 4px;
-    height: 22px;
-    padding: 0 8px 0 6px;
-    border-radius: var(--r-round);
-    background: var(--panel-bg);
-    backdrop-filter: var(--panel-blur);
-    -webkit-backdrop-filter: var(--panel-blur);
-    border: var(--panel-border);
-    color: var(--text-2);
-    font-size: var(--fs-axis);
-    font-weight: 500;
+    gap: 6px;
   }
-  .attr-btn[aria-expanded='true'] {
-    color: var(--text-1);
+  .attr-line {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: baseline;
+    gap: 0 4px;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: min(92vw, 960px);
+    padding: 0 2px;
+    border-radius: 4px;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--text-3) !important;
+    font-size: 9px;
+    line-height: 1.25;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .attr-line::-webkit-scrollbar {
+    display: none;
+  }
+  .attr-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+  .attr-sep {
+    color: var(--text-3);
+    opacity: 0.55;
+    margin: 0 1px;
+  }
+  .attr-line a {
+    color: var(--text-2) !important;
+    text-decoration: none;
   }
   @media (hover: hover) {
-    .attr-btn:hover {
+    .attr-line a:hover {
+      text-decoration: underline;
       color: var(--text-1);
     }
   }
+  .attr-license {
+    color: var(--text-3);
+    opacity: 0.85;
+  }
+  [data-bp='mobile'] .attr-line {
+    font-size: 9px;
+    padding: 2px 6px;
+    max-width: min(96vw, 720px);
+  }
+  /* info button */
+  .attr-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: var(--r-round);
+    color: var(--text-2);
+  }
   [data-bp='mobile'] .attr-btn {
+    width: 28px;
     height: 28px;
   }
+  /* popover */
   .attr-pop {
     width: 300px;
     padding: var(--s-3);

@@ -34,7 +34,7 @@
   /* ---- tier 2: control glass (capsules, round buttons) ---- */
   .iconbtn-solid,
   .iconbtn-round,
-  .attr-btn,
+  .attr-line,
   .msearch,
   .cap,
   .compass-round {
@@ -71,7 +71,7 @@
   .tooltip { background-color: var(--ink-1); background-image: none; }
     .iconbtn-solid,
   .iconbtn-round,
-  .attr-btn,
+  .attr-line,
   .msearch,
   .cap,
   .compass-round { background-color: color-mix(in srgb, var(--ink-1) 94%, var(--text-1)); background-image: none; }
@@ -87,7 +87,7 @@
   .tooltip { background-color: color-mix(in srgb, var(--ink-1) 98%, transparent); background-image: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
     .iconbtn-solid,
   .iconbtn-round,
-  .attr-btn,
+  .attr-line,
   .msearch,
   .cap,
   .compass-round { background-color: color-mix(in srgb, var(--ink-1) 96%, var(--text-1)); background-image: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -102,7 +102,7 @@
   .legend:not(.legend-compact),
   .tooltip, .iconbtn-solid,
   .iconbtn-round,
-  .attr-btn,
+  .attr-line,
   .msearch,
   .cap,
   .compass-round { background-color: var(--ink-1); background-image: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: inset 0 0 0 1px var(--text-3); }
