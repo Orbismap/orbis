@@ -20,7 +20,11 @@ export const FLAT_SHARE = 0.1;
 const MAX_Z = 24;
 /** The vector source the building layers read: the OpenFreeMap tiles as 256 px tiles, so that buildings come from the zoom-14 tiles (see basemaps/vector.ts). */
 export const OFM_BUILDINGS_SOURCE_ID = 'ofm-buildings';
-const SOURCE = OFM_BUILDINGS_SOURCE_ID;
+/** The cut source the building layers are moved to while a 3D landmark is near (see landmark-buildings.ts). Its
+ *  tiles carry the binders we patch, so discovery has to look here as well: once the layers move, the original
+ *  source has no tiles left and a binder found only there would never turn up. */
+export const MASKED_BUILDINGS_SOURCE_ID = 'ofm-landmarks';
+const SOURCES = [OFM_BUILDINGS_SOURCE_ID, MASKED_BUILDINGS_SOURCE_ID];
 
 /**
  * Makes the map take a vector source for 256 px tiles, so that it asks for the tiles one zoom level higher: from zoom 13.5 on the zoom-14 tiles, which
@@ -121,55 +125,69 @@ const extrusionIds = (ml: MlMap) => (ml.getStyle().layers ?? []).filter((l) => l
 
 type Found = 'patched' | 'wait' | 'missing';
 function discover(ml: MlMap): Found {
-  const tm = (ml.style as unknown as { tileManagers?: Record<string, TileManager> }).tileManagers?.[SOURCE];
-  if (!tm) return 'missing';
   ids ??= extrusionIds(ml);
+  const managers = (ml.style as unknown as { tileManagers?: Record<string, TileManager> }).tileManagers;
   let sawBucket = false;
-  for (const key of tm.getIds()) {
-    const tile = tm.getTileByID(key);
-    if (!tile) continue;
-    for (const id of ids) {
-      const config = tile.getBucket({ id })?.programConfigurations?.get(id);
-      if (!config) continue;
-      sawBucket = true;
-      for (const prop of ['fill-extrusion-height', 'fill-extrusion-base']) {
-        const b = config.binders?.[prop];
-        if (isComposite(b) && isOurs(b)) { patch(Object.getPrototypeOf(b) as Binder); return 'patched'; }
+  for (const src of SOURCES) {
+    const tm = managers?.[src];
+    if (!tm) continue;
+    for (const key of tm.getIds()) {
+      const tile = tm.getTileByID(key);
+      if (!tile) continue;
+      for (const id of ids) {
+        const config = tile.getBucket({ id })?.programConfigurations?.get(id);
+        if (!config) continue;
+        sawBucket = true;
+        for (const prop of ['fill-extrusion-height', 'fill-extrusion-base']) {
+          const b = config.binders?.[prop];
+          if (isComposite(b) && isOurs(b)) { patch(Object.getPrototypeOf(b) as Binder); return 'patched'; }
+        }
       }
     }
   }
   return sawBucket ? 'missing' : 'wait';
 }
 
+/** Layers mounted after a fallback (e.g. "3D-Gebäude" from a link) would otherwise keep the zoom-scaled height and stand ~zoom times too tall. */
+const staticApplied = new Set<string>();
+function applyStaticHeights(ml: MlMap) {
+  for (const id of extrusionIds(ml)) {
+    if (staticApplied.has(id)) continue;
+    staticApplied.add(id);
+    ml.setPaintProperty(id, 'fill-extrusion-height', HEIGHT);
+    ml.setPaintProperty(id, 'fill-extrusion-base', BASE);
+  }
+}
+
 function fallback(ml: MlMap) {
   if (fellBack) return;
   fellBack = true;
   console.warn('[buildings-tilt] MapLibre internals not found, buildings use static real heights');
-  for (const id of extrusionIds(ml)) {
-    ml.setPaintProperty(id, 'fill-extrusion-height', HEIGHT);
-    ml.setPaintProperty(id, 'fill-extrusion-base', BASE);
-  }
+  applyStaticHeights(ml);
 }
 
 /** Hooks the tilt-driven building height into this map. Returns a disposer. */
 export function installBuildingsTilt(ml: MlMap): () => void {
   activeMap = ml;
   const check = () => {
-    if (patched || fellBack) return;
+    if (patched) return;
     try {
-      const r = discover(ml);
-      if (r === 'missing') fallback(ml);
+      if (fellBack) applyStaticHeights(ml);
+      else if (discover(ml) === 'missing') fallback(ml);
     } catch { fallback(ml); }
   };
-  // fires when a tile's buckets arrive on the main thread, i.e. before the frame that first draws them
+  // fires when a tile's buckets arrive on the main thread, i.e. before the frame that first draws them;
+  // styledata catches building layers added later (links, layer switch) and layers moved to the cut source
   ml.on('sourcedata', check);
   ml.on('idle', check);
+  ml.on('styledata', check);
   // a bucket can arrive between events; without the patch the composite expression draws the raw z*H heights (many times
   // a house's own height), so keep looking until a binder is there or the static fallback is in place
   const retry = setInterval(() => { if (patched || fellBack) { clearInterval(retry); return; } check(); }, 250);
   return () => {
     ml.off('sourcedata', check);
     ml.off('idle', check);
+    ml.off('styledata', check);
     clearInterval(retry);
     if (activeMap === ml) activeMap = undefined;
   };
