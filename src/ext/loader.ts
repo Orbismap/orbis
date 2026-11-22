@@ -9,6 +9,7 @@ import { effect } from '@preact/signals';
 import { mapEngine } from '../state/ui';
 import { projection } from '../state/view';
 import { reducedMotion } from '../state/settings';
+import { buildingHeightFactor } from '../map/buildings-tilt';
 import type { MapEngine } from '../map/types';
 import { buildingsChannel, followCurrent, followWanted, landmarksChannel, powerChannel, shipsChannel, tilesetsChannel, tilesetsState, tracksChannel, treesChannel } from './channels';
 import { proEnabled } from './licence';
@@ -49,6 +50,7 @@ function makeHost(engine: MapEngine): ExtensionHost {
     tilesets: tilesetsChannel,
     reportTilesets: (state) => { tilesetsState.value = state; },
     holdCamera: () => engine.holdCamera(),
+    buildingHeightFactor: () => buildingHeightFactor(engine.ml),
     reducedMotion,
     follow: { wanted: followWanted, report: (ref) => { followCurrent.value = ref; } },
   };

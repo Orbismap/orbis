@@ -35,7 +35,7 @@ export const extension: OrbisExtension = {
     const power = new StromnetzPart(map, stage);
     const trees = new BaeumePart(map, stage);
     const buildings = new GebaeudePart(map, stage);
-    const landmarks = new LandmarksPart(map, stage);
+    const landmarks = new LandmarksPart(map, stage, host.buildingHeightFactor);
     let tilesPresent = false;
     let tilesRelease: (() => void) | null = null;
     let stateKey = '';

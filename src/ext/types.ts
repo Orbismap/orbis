@@ -252,6 +252,8 @@ export interface ExtensionHost {
    * that centre elevation); called without, it only lets go and the base's own rebound brings it back.
    */
   holdCamera(): (ease?: { elevation: number }) => void;
+  /** Share of their real height that buildings have at the camera's tilt now (the 2.5D buildings use it too): 0.1 from above, 1 when tilted. */
+  buildingHeightFactor(): number;
   /** True when the user wants less motion (setting or OS). */
   reducedMotion(): boolean;
   /**

@@ -20,6 +20,8 @@ const MAX_LOADING = 4;
 const MAX_CACHED = 48;
 /** the terrain under a model counts as changed from this much (m) */
 const TERRAIN_STEP_M = 0.5;
+/** a model is never flatter than this many metres (the 2.5D buildings keep 3 m as well) */
+const MIN_HEIGHT_M = 3;
 /** a model this far outside of the screen (share of the view) is not drawn */
 const VIEW_MARGIN = 0.25;
 
@@ -80,8 +82,9 @@ export class LandmarksPart implements StagePart {
   private active = false;
   private drawn = 0;
   private matrix = new THREE.Matrix4();
+  private squash = new THREE.Matrix4();
 
-  constructor(private map: MlMap, private stage: Stage) {
+  constructor(private map: MlMap, private stage: Stage, private heightFactor: () => number = () => 1) {
     this.object.visible = false;
   }
 
@@ -193,6 +196,7 @@ export class LandmarksPart implements StagePart {
     const padLon = (b.getEast() - b.getWest()) * VIEW_MARGIN;
     const padLat = (b.getNorth() - b.getSouth()) * VIEW_MARGIN;
     let drawn = 0;
+    const flat = this.heightFactor();
     for (const e of this.entries.values()) {
       const s = e.sample;
       const lon = s.lng + 360 * Math.round((centre.lng - s.lng) / 360);
@@ -200,7 +204,10 @@ export class LandmarksPart implements StagePart {
       if (out || !e.filled || frame.occluded(lon, s.lat, e.ground)) { e.root.visible = false; continue; }
       // the file has its bearing and scale baked in: placed unturned, at true size
       frame.place(this.matrix, lon, s.lat, e.ground + s.elevationM);
-      e.root.matrix.multiplyMatrices(this.matrix, TO_STAGE);
+      // seen from above the model is flatter, like the 2.5D buildings: one factor on its height (steps keep their proportions),
+      // but never below MIN_HEIGHT_M. The file's y is up.
+      const up = s.heightM > 0 ? Math.max(flat, Math.min(1, MIN_HEIGHT_M / s.heightM)) : flat;
+      e.root.matrix.multiplyMatrices(this.matrix, TO_STAGE).multiply(this.squash.makeScale(1, up, 1));
       e.root.matrixWorldNeedsUpdate = true;
       e.root.visible = true;
       drawn++;

@@ -1,5 +1,7 @@
-// 2.5D buildings whose height follows the camera TILT instead of the zoom: MIN_HEIGHT_M metres at pitch 0
-// (not fully flat, so the 3D terrain does not poke through the roofs), real height + MIN_HEIGHT_M at TILT_FULL_DEG.
+// 2.5D buildings whose height follows the camera TILT instead of the zoom: FLAT_SHARE of their real height at pitch 0, the full
+// height from TILT_FULL_DEG on, in between linear. One simple factor for all heights (walls, parts, steps of a roof), so the shape
+// stays the same, only flatter. On top MIN_HEIGHT_M metres at every pitch (not fully flat, so the 3D terrain does not poke through the roofs).
+// The 3D landmark models use the same factor (`buildingHeightFactor`, handed to the extension by the host).
 // MapLibre has no `pitch` expression, and changing a data-driven paint property (setPaintProperty / global state) reloads the
 // tiles in the worker, which is no option per frame. So we use the composite (zoom + feature) paint binder instead:
 //   - the style expression is linear in zoom: z -> z * H (see tiltExpr), so a bucket parsed at tile zoom Z stores
@@ -11,13 +13,19 @@
 // If they are not found as expected, both layers fall back to static real heights (never the huge unpatched ones).
 import type { ExpressionSpecification, Map as MlMap } from 'maplibre-gl';
 
-export const TILT_FULL_DEG = 55;
+/** From this camera tilt on, buildings have their full height. */
+export const TILT_FULL_DEG = 30;
+/** Share of the real height buildings keep when the map is seen from straight above (0.1: 90 % flatter). */
+export const FLAT_SHARE = 0.1;
 const MAX_Z = 24;
 const SOURCE = 'ofm';
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
-/** Share of the real height shown at a pitch (degrees). */
-export const tiltFactor = (pitchDeg: number) => clamp01(pitchDeg / TILT_FULL_DEG);
+/** Share of the real height shown at a pitch (degrees): FLAT_SHARE at 0°, 1 from TILT_FULL_DEG on. */
+export const tiltFactor = (pitchDeg: number) => FLAT_SHARE + (1 - FLAT_SHARE) * clamp01(pitchDeg / TILT_FULL_DEG);
+
+/** The same for the map now (1 when nothing is hooked): what a 3D model's height is scaled by. */
+export const buildingHeightFactor = (ml: MlMap) => tiltFactor(ml.getPitch());
 
 const HEIGHT: ExpressionSpecification = ['coalesce', ['to-number', ['get', 'render_height']], 9];
 const BASE: ExpressionSpecification = ['coalesce', ['to-number', ['get', 'render_min_height']], 0];
