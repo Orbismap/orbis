@@ -3,7 +3,7 @@
 // so that data layers carry the picture.
 import type { ExpressionSpecification, LayerSpecification, SourceSpecification } from 'maplibre-gl';
 import type { BasemapDef, LabelVariant } from './types';
-import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../buildings-tilt';
+import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT, OFM_BUILDINGS_SOURCE_ID } from '../buildings-tilt';
 import { karteLabelLayers } from './karte-labels';
 
 export const OFM_URL = 'https://tiles.openfreemap.org/planet';
@@ -12,6 +12,13 @@ export const OFM_ATTRIBUTION =
   '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
 
 export const OFM_SOURCE: SourceSpecification = { type: 'vector', url: OFM_URL, attribution: OFM_ATTRIBUTION };
+/**
+ * The same tiles for the buildings only, treated as 256 px tiles (`useDetailedBuildingTiles`: a vector source takes no `tileSize` in its spec): the map then asks for tiles one zoom level higher, so from zoom 13.5 on it gets the
+ * zoom-14 tiles. OpenFreeMap's zoom-13 tiles hold the buildings as one block without heights (no `render_height`): with them the buildings
+ * would jump from flat to real between zoom 13.9 and 14.1.
+ */
+export { OFM_BUILDINGS_SOURCE_ID };
+export const OFM_BUILDINGS_SOURCE: SourceSpecification = { ...OFM_SOURCE };
 
 export const FONT_REGULAR = ['Noto Sans Regular'];
 export const FONT_BOLD = ['Noto Sans Bold'];
@@ -103,7 +110,7 @@ export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
   const topLayers: LayerSpecification[] = [
     {
       // 2.5D buildings (OpenMapTiles `building`: render_height / render_min_height, metres); height follows the pitch, see buildings-tilt.ts. Rounded corners need maplibre-gl >= 6.2.
-      id: id('building'), type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER, layout: { ...hidden, 'fill-extrusion-rounded-corner-distance': 1.5 },
+      id: id('building'), type: 'fill-extrusion', source: OFM_BUILDINGS_SOURCE_ID, 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER, layout: { ...hidden, 'fill-extrusion-rounded-corner-distance': 1.5 },
       paint: {
         'fill-extrusion-color': c.building,
         'fill-extrusion-height': BUILDING_HEIGHT,

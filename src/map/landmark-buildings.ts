@@ -7,16 +7,17 @@ import type { Map as MlMap, VectorTileSource } from 'maplibre-gl';
 import { EMPTY_MASK, landmarkMask, type LandmarkMask } from '../data/landmarks';
 import type { Footprint } from './landmark-geometry';
 import { signal } from '@preact/signals';
+import { OFM_BUILDINGS_SOURCE_ID, useDetailedBuildingTiles } from './buildings-tilt';
 
 export const MASKED_SOURCE = 'ofm-landmarks';
 const PROTOCOL = 'orbis-landmark-buildings';
-const BASE_SOURCE = 'ofm';
+const BASE_SOURCE = OFM_BUILDINGS_SOURCE_ID;
 /** an invisible layer on the cut source: a source only loads tiles for a visible layer, and the building layers may all be hidden (Pro draws the buildings, features/buildings3d/roofs-source.ts reads the tiles) */
 const KEEP_LAYER = 'ofm-landmarks-keep';
 const SETTLE_MS = 150;
 
 /** The source the building layers read now: `ofm`, or the cut one while landmarks are in view (for readers of the building features). */
-export const buildingSource = signal(BASE_SOURCE);
+export const buildingSource = signal<string>(BASE_SOURCE);
 
 let protocolReady = false;
 let revision = 0;
@@ -94,6 +95,7 @@ export function watchLandmarkBuildings(ml: MlMap): () => void {
     const src = ml.getSource(MASKED_SOURCE) as VectorTileSource | undefined;
     if (src) src.setTiles([tilesUrl()]);
     else ml.addSource(MASKED_SOURCE, { type: 'vector', tiles: [tilesUrl()], minzoom: base.minzoom ?? 0, maxzoom: base.maxzoom ?? 14 });
+    useDetailedBuildingTiles(ml, MASKED_SOURCE);
     if (!ml.getLayer(KEEP_LAYER)) ml.addLayer({ id: KEEP_LAYER, type: 'fill', source: MASKED_SOURCE, 'source-layer': 'building', minzoom: 12, paint: { 'fill-opacity': 0 } });
     if (!active) { active = true; moveLayers(ml, BASE_SOURCE, MASKED_SOURCE); buildingSource.value = MASKED_SOURCE; }
     return true;

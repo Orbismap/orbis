@@ -18,7 +18,19 @@ export const TILT_FULL_DEG = 30;
 /** Share of the real height buildings keep when the map is seen from straight above (0.1: 90 % flatter). */
 export const FLAT_SHARE = 0.1;
 const MAX_Z = 24;
-const SOURCE = 'ofm';
+/** The vector source the building layers read: the OpenFreeMap tiles as 256 px tiles, so that buildings come from the zoom-14 tiles (see basemaps/vector.ts). */
+export const OFM_BUILDINGS_SOURCE_ID = 'ofm-buildings';
+const SOURCE = OFM_BUILDINGS_SOURCE_ID;
+
+/**
+ * Makes the map take a vector source for 256 px tiles, so that it asks for the tiles one zoom level higher: from zoom 13.5 on the zoom-14 tiles, which
+ * hold the buildings with heights (the zoom-13 ones hold one block without). A vector source's tile size is fixed at 512 in its spec, but the
+ * tile manager reads it from the source object each time.
+ */
+export function useDetailedBuildingTiles(ml: MlMap, id: string = OFM_BUILDINGS_SOURCE_ID): void {
+  const source = ml.getSource(id) as unknown as { tileSize?: number } | undefined;
+  if (source) source.tileSize = 256;
+}
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 /** Share of the real height shown at a pitch (degrees): FLAT_SHARE at 0°, 1 from TILT_FULL_DEG on. */

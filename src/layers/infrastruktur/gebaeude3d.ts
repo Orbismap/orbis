@@ -12,7 +12,7 @@ import { loadPlateau, PLATEAU_ATTRIBUTION, type PlateauSample } from '../../data
 import { buildingsChannel, setTilesetSource, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
-import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../../map/buildings-tilt';
+import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT, OFM_BUILDINGS_SOURCE_ID } from '../../map/buildings-tilt';
 import { buildingColour, buildingsColoured, buildingsDetailed, buildingsLayerOn, buildingsReplaced } from '../../state/view';
 import { defineLayer } from '../define';
 
@@ -65,7 +65,7 @@ export default defineLayer({
     const coloured = () => ctx.options.value.farben !== false;
     const layerId = `${ctx.id}.osm`;
     ctx.map.addLayer({
-      id: layerId, type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER,
+      id: layerId, type: 'fill-extrusion', source: OFM_BUILDINGS_SOURCE_ID, 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER,
       layout: { visibility: 'none', 'fill-extrusion-rounded-corner-distance': 1.5 },
       paint: {
         // `colour` is a hex value or a CSS colour name; the missing ones get the plain building colour

@@ -22,7 +22,7 @@ import { pokeCameraFrame } from './frame';
 import { createPicking } from './picking';
 import { beforeIdFor } from './slots';
 import { createTerminator } from './terminator';
-import { installBuildingsTilt, tiltFactor } from './buildings-tilt';
+import { installBuildingsTilt, tiltFactor, useDetailedBuildingTiles } from './buildings-tilt';
 import { installGlobeTerrainFix } from './globe-terrain-fix';
 import type { BasemapId, CameraTarget, MapEngine, PickHandler, SlotId } from './types';
 
@@ -125,6 +125,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
 
   const resolveReady = () => {
     loaded = true;
+    useDetailedBuildingTiles(ml);
     if (ml.getProjection()?.type !== projectionSignal.peek()) ml.setProjection({ type: projectionSignal.peek() });
     applyBasemap();
     terminator.setMode(terminatorMode);

@@ -96,7 +96,7 @@ export function startBuildingRoofs(): () => void {
     const stopSource = buildingSource.subscribe(schedule);
     const stopColour = buildingsColoured.subscribe(schedule);
     const stopBase = buildingColour.subscribe(schedule);
-    const onSource = (e: { sourceId?: string }) => { if (e.sourceId === SRC || e.sourceId === 'ofm' || e.sourceId === buildingSource.peek()) schedule(); };
+    const onSource = (e: { sourceId?: string }) => { if (e.sourceId === SRC || e.sourceId === buildingSource.peek()) schedule(); };
 
     // the fill is invisible, but a layer keeps the tiles of the source loaded
     void Promise.all([ensurePmtilesProtocol(), osmPmtilesUrl('roofs'), engine.ready]).then(([, url]) => {
