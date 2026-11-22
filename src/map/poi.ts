@@ -75,7 +75,7 @@ export const POI_CATEGORIES: PoiCategory[] = [
 
   // Verkehr
   { id: 'airport', label: 'Flughafen', group: 'verkehr', glyph: 'flight', tier: 1, color: '#5AC8FA', keys: ['airport', 'aerodrome', 'helipad'] },
-  { id: 'station', label: 'Bahnhof', group: 'verkehr', glyph: 'train', tier: 1, color: '#007AFF', keys: ['railway', 'station', 'train_station', 'halt'] },
+  { id: 'station', label: 'Bahnhof', group: 'verkehr', glyph: 'train', tier: 2, color: '#007AFF', keys: ['railway', 'station', 'train_station', 'halt'] },
   { id: 'subway', label: 'U-Bahn', group: 'verkehr', glyph: 'subway', tier: 2, color: '#007AFF', keys: ['subway', 'subway_entrance'] },
   { id: 'tram', label: 'Straßenbahn', group: 'verkehr', glyph: 'tram', tier: 3, color: '#007AFF', keys: ['tram', 'tram_stop'] },
   { id: 'bus', label: 'Bus', group: 'verkehr', glyph: 'directions_bus', tier: 3, color: '#007AFF', keys: ['bus', 'bus_station', 'bus_stop'] },
@@ -174,16 +174,18 @@ const colorOf: Ex = ['coalesce', ['get', 'color'], POI_OTHER.color] as unknown a
 
 /** Importance of a kind of place: 1 = seen from far away, 5 = only when you stand in the street. Each category carries its tier;
  *  the zoom it appears at is TIER_ZOOM. OpenMapTiles' `rank` can lift a well-known place (a landmark, a big station) higher. */
-/** The zoom at which tier 1, 2, ... 5 appears. Dots show one tier earlier than the full badge (see poiLayers). */
-const TIER_ZOOM = [12, 13.5, 15, 16, 17];
+/** The zoom at which tier 1, 2, ... 5 appears: landmarks first, the full mix of shops and restaurants at street level.
+ *  Plain dots start later still (see poiLayers). */
+const TIER_ZOOM = [12, 13, 14, 15.5, 17];
 
 const SMALL_PRINT_SET = new Set(SMALL_PRINT);
 
-/** The tier of a place: category tier, lifted by prominence (low rank = famous landmark/station). */
+/** The tier of a place: category tier, lifted by prominence (low rank = famous landmark). Transport never gets the boost:
+ *  stations must not be the only kind left at the first badge zoom. */
 export function poiTier(cat: PoiCategory, rank: unknown): number {
+  if (cat.group === 'verkehr') return cat.tier;
   const r = Number(rank);
-  if (Number.isFinite(r) && r <= 1) return 1;
-  if (Number.isFinite(r) && r <= 3) return Math.min(cat.tier, 2);
+  if (Number.isFinite(r) && r <= 1) return Math.min(cat.tier, 2);
   return cat.tier;
 }
 
@@ -268,9 +270,10 @@ export function poiLayers(id: string, visible = true): LayerSpecification[] {
       'text-halo-width': 1.6,
     },
   } as LayerSpecification;
-  // Where the zoom has no room for badge and name (they collide, or the place is one tier ahead) there is a small plain dot: the badge sits on top of it
+  // Where a badge does not fit (collision), a small plain dot still marks the place. Apple shows those only at street
+  // level and only for a few — no `ahead`, no early zoom, so the city does not fill up with hundreds of tiny points.
   const dots = {
-    id: poiDotsId(id), type: 'symbol', source: POI_GEO_SOURCE, minzoom: 11, filter: poiFilter(undefined, 1),
+    id: poiDotsId(id), type: 'symbol', source: POI_GEO_SOURCE, minzoom: 14, filter: poiFilter(undefined, 0),
     layout: {
       visibility: visible ? 'visible' : 'none',
       'icon-image': 'dot',

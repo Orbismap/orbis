@@ -64,4 +64,20 @@ describe('POI categories', () => {
     const all = poiFilter() as unknown[];
     expect(all.length).toBe(essen.length - 1);
   });
+
+  it('never leaves stations alone at the first badge zoom', async () => {
+    const { poiTier, poiLayers } = await import('./poi');
+    const station = POI_CATEGORIES.find((c) => c.id === 'station')!;
+    expect(station.tier).toBeGreaterThan(1);
+    expect(poiTier(station, 1)).toBe(station.tier); // no prominence boost for transport
+    // the first badge tier is a mix of landmark kinds, not only transport
+    const first = POI_CATEGORIES.filter((c) => c.tier === 1);
+    expect(first.some((c) => c.id === 'station')).toBe(false);
+    expect(new Set(first.map((c) => c.group)).size).toBeGreaterThan(2);
+
+    // plain dots start at street level and are not shown ahead of the badges
+    const [dots] = poiLayers('test');
+    expect((dots as { minzoom?: number }).minzoom).toBeGreaterThanOrEqual(14);
+    expect(JSON.stringify((dots as { filter?: unknown }).filter)).toBe(JSON.stringify(poiFilter(undefined, 0)));
+  });
 });
