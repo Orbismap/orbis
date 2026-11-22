@@ -62,6 +62,13 @@ function setNight(m: THREE.Material, on: boolean) {
   lambert.needsUpdate = true;
 }
 
+/**
+ * Depth: a model is drawn as if it were DEPTH_BIAS_M metres nearer to the camera. The map's terrain is only a metre or two exact (more
+ * on a steep hill, and a DEM holds the bridges as ground), so what stands or hangs close to the ground would be clipped by it. A
+ * hill that really stands in front, by more than that, still hides the model. Flat map only: on the globe the depth is not the map's.
+ */
+const DEPTH_BIAS_M = 10;
+
 interface Drape {
   /** west, south, east, north of the footprint box in metres from the anchor (x east, y north) */
   uBox: { value: THREE.Vector4 };
@@ -69,6 +76,8 @@ interface Drape {
   uLifts: { value: Float32Array };
   /** the squash of the model's height (the lift is not squashed with it) */
   uUp: { value: number };
+  /** the depth shift towards the camera, in view depth units (clip w; shared by all landmarks, set every frame) */
+  uShift: { value: number };
 }
 
 interface Entry {
@@ -92,8 +101,9 @@ function drape(material: THREE.Material, d: Drape) {
     shader.uniforms.uBox = d.uBox;
     shader.uniforms.uLifts = d.uLifts;
     shader.uniforms.uUp = d.uUp;
+    shader.uniforms.uShift = d.uShift;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\nuniform vec4 uBox;\nuniform float uLifts[${GRID * GRID}];\nuniform float uUp;`)
+      .replace('#include <common>', `#include <common>\nuniform vec4 uBox;\nuniform float uLifts[${GRID * GRID}];\nuniform float uUp;\nuniform float uShift;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
       {
         // the file's frame: x east, y up, z south
@@ -103,6 +113,12 @@ function drape(material: THREE.Material, d: Drape) {
         int i = c.y * ${GRID} + c.x;
         float lift = mix(mix(uLifts[i], uLifts[i + 1], f.x), mix(uLifts[i + ${GRID}], uLifts[i + ${GRID + 1}], f.x), f.y);
         transformed.y += lift * (1.0 - smoothstep(${DRAPE_FROM_M}.0, ${DRAPE_TO_M}.0, position.y)) / uUp;
+      }`)
+      // the perspective depth is z = a * w + b (b = projectionMatrix[3][2]): the same point with the view depth w - uShift
+      .replace('#include <project_vertex>', `#include <project_vertex>
+      if (uShift > 0.0) {
+        float b = projectionMatrix[3][2];
+        gl_Position.z = gl_Position.z - b + b * gl_Position.w / max(gl_Position.w - uShift, 1e-9);
       }`);
   };
   material.customProgramCacheKey = () => 'landmark-drape';
@@ -161,6 +177,7 @@ export class LandmarksPart implements StagePart {
   private drawn = 0;
   private matrix = new THREE.Matrix4();
   private squash = new THREE.Matrix4();
+  private shift = { value: 0 };
   /** the basemap is dark: the windows are lit */
   private night = false;
   private stopDark?: () => void;
@@ -200,7 +217,7 @@ export class LandmarksPart implements StagePart {
       const kx = M_PER_DEG_LNG * Math.cos((sample.lat * Math.PI) / 180);
       const entry: Entry = {
         sample, root, ground: 0, filled: false, materials: [],
-        drape: { uBox: { value: new THREE.Vector4((w - sample.lng) * kx, (so - sample.lat) * M_PER_DEG_LAT, (e - sample.lng) * kx, (n - sample.lat) * M_PER_DEG_LAT) }, uLifts: { value: new Float32Array(GRID * GRID) }, uUp: { value: 1 } },
+        drape: { uShift: this.shift, uBox: { value: new THREE.Vector4((w - sample.lng) * kx, (so - sample.lat) * M_PER_DEG_LAT, (e - sample.lng) * kx, (n - sample.lat) * M_PER_DEG_LAT) }, uLifts: { value: new Float32Array(GRID * GRID) }, uUp: { value: 1 } },
       };
       this.readGround(entry);
       next.set(sample.id, entry);
@@ -316,6 +333,7 @@ export class LandmarksPart implements StagePart {
     const padLat = (b.getNorth() - b.getSouth()) * VIEW_MARGIN;
     let drawn = 0;
     const flat = this.heightFactor();
+    this.shift.value = frame.globe ? 0 : frame.depthOf(DEPTH_BIAS_M, centre.lat);
     for (const e of this.entries.values()) {
       const s = e.sample;
       const lon = s.lng + 360 * Math.round((centre.lng - s.lng) / 360);
