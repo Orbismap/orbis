@@ -254,6 +254,36 @@
   }
 }
 
+/* Handoff from Orbis Wetter: morph its compact map into this one. Both pages opt in; see
+   https://github.com/Orbismap/orbis-wetter/blob/main/docs/HANDOFF.md */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+.map.wx-map-host {
+  view-transition-name: wx-map;
+}
+.wx-return {
+  position: absolute;
+  top: 68px;
+  right: 12px;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-mouse);
+  padding: 0 12px;
+  border: 1px solid var(--g-rim);
+  border-radius: var(--r-input);
+  background: var(--g-panel);
+  -webkit-backdrop-filter: var(--g-blur-panel);
+  backdrop-filter: var(--g-blur-panel);
+  box-shadow: var(--g-shadow);
+  color: var(--text-1);
+  font-size: var(--fs-small);
+  text-decoration: none;
+}
+
 @layer features {
   /* desktop: the tab bar slides in from above over the info text, which fades out underneath */
   .ltabs:has(.ltabs-info) {
