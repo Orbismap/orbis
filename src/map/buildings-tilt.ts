@@ -32,6 +32,29 @@ export function useDetailedBuildingTiles(ml: MlMap, id: string = OFM_BUILDINGS_S
   if (source) source.tileSize = 256;
 }
 
+/** The zoom the 2.5D buildings start at (the `minzoom` of their layers). */
+export const BUILDING_MIN_ZOOM = 13.5;
+/**
+ * A tilted view is finer near the camera than at its centre: at 65° the bottom of the screen is about 0.75 of a zoom level ahead of the centre,
+ * while every zoom rule of the style (layer minzoom, `['zoom']`) counts the centre's zoom. This is the share of that lead the rules are given:
+ * none up to 30° of tilt, 0.6 from 65° on, in steps of 0.1 so that the layers are not laid out again for every degree of a tilt gesture.
+ */
+export const pitchZoomBonus = (pitchDeg: number) => Math.round(Math.max(0, Math.min(1, (pitchDeg - 30) / 35)) * 6) / 10;
+/** The buildings start earlier by at most this much: below 13 the map has no zoom-14 tiles, the only ones with heights (see useDetailedBuildingTiles). */
+const MAX_BUILDING_BONUS = 0.5;
+
+/** Lets the 2.5D building layers start at a lower zoom the more the view is tilted (see pitchZoomBonus). Only changes what differs. */
+export function applyBuildingZoom(ml: MlMap) {
+  const min = BUILDING_MIN_ZOOM - Math.min(MAX_BUILDING_BONUS, pitchZoomBonus(ml.getPitch()));
+  for (const l of ml.getStyle().layers ?? []) {
+    const sl = l as { id: string; type: string; minzoom?: number; maxzoom?: number; 'source-layer'?: string };
+    if (sl.type !== 'fill-extrusion' || sl['source-layer'] !== 'building' || sl.minzoom === undefined) continue;
+    // only the layers that start where the buildings start (the others are not ours to move)
+    if (sl.minzoom > BUILDING_MIN_ZOOM + 1e-6 || sl.minzoom < BUILDING_MIN_ZOOM - MAX_BUILDING_BONUS - 1e-6 || Math.abs(sl.minzoom - min) < 1e-6) continue;
+    ml.setLayerZoomRange(sl.id, min, sl.maxzoom ?? 24);
+  }
+}
+
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 /** Share of the real height shown at a pitch (degrees): FLAT_SHARE at 0°, 1 from TILT_FULL_DEG on. */
 export const tiltFactor = (pitchDeg: number) => FLAT_SHARE + (1 - FLAT_SHARE) * clamp01(pitchDeg / TILT_FULL_DEG);

@@ -182,14 +182,19 @@ export const extension: OrbisExtension = {
     // Buildings: the layer publishes them from zoom 13.5 and an empty list below; while they are drawn the basemap's 2.5D houses step aside.
     let buildingsOn = false;
     let buildingsRelease: (() => void) | null = null;
-    const stopBuildings = host.buildings.subscribe((items) => {
-      buildings.feed(items);
-      const show = buildings.count > 0;
+    // `ready`: the first list is modelled (it is done in slices); the 2.5D houses step aside then, and come back only when the list is empty.
+    const evaluateBuildings = () => {
+      const show = buildings.ready;
       if (show === buildingsOn) return;
       buildingsOn = show;
       buildings.setActive(show);
       if (show) buildingsRelease = host.buildings.present();
       else { buildingsRelease?.(); buildingsRelease = null; }
+    };
+    buildings.onChange = evaluateBuildings;
+    const stopBuildings = host.buildings.subscribe((items) => {
+      buildings.feed(items);
+      evaluateBuildings();
     });
     // Landmarks: published from zoom 13 by the base (no layer), an empty list below. They are drawn above the buildings: the model has priority.
     const stopLandmarks = host.landmarks.subscribe((items) => {

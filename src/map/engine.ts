@@ -26,7 +26,7 @@ import { pokeCameraFrame } from './frame';
 import { createPicking } from './picking';
 import { beforeIdFor } from './slots';
 import { createTerminator } from './terminator';
-import { installBuildingsTilt, tiltFactor, useDetailedBuildingTiles } from './buildings-tilt';
+import { applyBuildingZoom, installBuildingsTilt, tiltFactor, useDetailedBuildingTiles } from './buildings-tilt';
 import { installGlobeTerrainFix } from './globe-terrain-fix';
 import type { BasemapId, CameraTarget, MapEngine, PickHandler, SlotId } from './types';
 
@@ -99,6 +99,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     minZoom: 0.5,
     maxZoom: 19,
     fadeDuration: 150,
+    // tiles that leave the view stay in memory (default: what the viewport needs): turning around a point or a short pan back loads nothing again
+    maxTileCacheSize: 300,
     dragRotate: true,
     pitchWithRotate: true,
     renderWorldCopies: true,
@@ -289,6 +291,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     const on = buildings3d.peek() && !buildingsReplaced.peek() && reliefOn() && !buildingsChannel.presented.peek();
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) setVis(l.id, on && id === shown);
     setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !hasTiles3d(shown));
+    applyBuildingZoom(ml);
   }
   function applyPoi() {
     const look = isStaticBasemap(basemap) ? BASEMAPS[basemap] : undefined;
@@ -407,7 +410,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     terrainRaf = requestAnimationFrame(step);
   }
   ml.on('zoom', () => loaded && applyTerrain());
-  ml.on('pitch', () => loaded && applyTerrain());
+  ml.on('pitch', () => { if (!loaded) return; applyTerrain(); applyBuildingZoom(ml); });
 
   // ---- slots ----------------------------------------------------------------
   const place = (spec: LayerSpecification | CustomLayerInterface, slot: SlotId) => {

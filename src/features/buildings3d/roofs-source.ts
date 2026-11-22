@@ -14,6 +14,7 @@ import { buildingsChannel, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import { ensurePmtilesProtocol } from '../../map/pmtiles-protocol';
+import { boxInside, reachBox, type Box } from '../../map/view-reach';
 import { mapEngine } from '../../state/ui';
 import { buildingColour, buildingsColoured, buildingsDetailed } from '../../state/view';
 
@@ -21,6 +22,17 @@ import { buildingColour, buildingsColoured, buildingsDetailed } from '../../stat
 export const ROOF_MIN_ZOOM = 13.5;
 const SRC = 'buildings3d-roofs';
 const SCAN_DELAY_MS = 250;
+/** While tiles load, a pass waits for them to be in; at most this long (ms): a steep view loads for a long time, and the buildings of the nearby tiles are no reason to stay without. */
+const MAX_WAIT_MS = 1500;
+/** buildings outside the view by this share of its reach are left out */
+const MARGIN = 0.25;
+
+const hash = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
+const centre = (ring: readonly (readonly [number, number])[]): [number, number] => {
+  let x = 0, y = 0;
+  for (const p of ring) { x += p[0]; y += p[1]; }
+  return [x / ring.length, y / ring.length];
+};
 
 /**
  * Is this building one that a landmark model stands in for? The middle of its outline lies in the landmark's replaced outline, or,
@@ -64,34 +76,60 @@ export function startBuildingRoofs(): () => void {
     let dead = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let published = false;
+    let waitingSince = 0;
+    let lastSig = '';
+    /** what the last publish covered: a view inside it, with nothing new, needs no new list */
+    let covered: Box | undefined;
 
     const clear = () => {
-      if (published) { published = false; buildingsChannel.reset(); }
+      if (published) { published = false; lastSig = ''; covered = undefined; buildingsChannel.reset(); }
     };
     const scan = () => {
       timer = undefined;
       if (dead || !ml.getSource(SRC)) return;
       if (ml.getZoom() < ROOF_MIN_ZOOM) { clear(); return; }
-      // while tiles load the query sees few buildings: publishing that would make the buildings flicker
-      if (!ml.isSourceLoaded(SRC) || !ml.isSourceLoaded(buildingSource.peek())) return;
-      const roofs = roofSamples(ml.querySourceFeatures(SRC, { sourceLayer: 'roofs' }));
+      // while tiles load the query sees few buildings: publishing that would make the buildings flicker (but not for ever, see MAX_WAIT_MS)
+      const now = performance.now();
+      if (!ml.isSourceLoaded(SRC) || !ml.isSourceLoaded(buildingSource.peek())) {
+        waitingSince ||= now;
+        if (now - waitingSince < MAX_WAIT_MS) { schedule(); return; }
+      }
+      waitingSince = 0;
+      // only the ground that counts (map/view-reach.ts): at a steep tilt the loaded tiles reach the horizon, and a mesh of far houses costs frames for a few pixels
+      const view = reachBox(ml);
+      const padW = (view[2] - view[0]) * MARGIN, padH = (view[3] - view[1]) * MARGIN;
+      const box: Box = [view[0] - padW, view[1] - padH, view[2] + padW, view[3] + padH];
+      const near = (c: readonly [number, number]) => c[0] >= box[0] && c[0] <= box[2] && c[1] >= box[1] && c[1] <= box[3];
+      const roofs = roofSamples(ml.querySourceFeatures(SRC, { sourceLayer: 'roofs' })).filter((b) => b.rings[0] && near(centre(b.rings[0])));
       const features = ml.querySourceFeatures(buildingSource.peek(), { sourceLayer: 'building' });
       const flat: FlatBuilding[] = [];
+      const flatNear: typeof features = [];
       for (const f of features) {
         const ring = flatRing(f);
-        if (typeof f.id === 'number' && ring) flat.push({ id: f.id, ring, base: Number(f.properties?.render_min_height) || 0 });
+        if (!ring || !near(centre(ring))) continue;
+        flatNear.push(f);
+        if (typeof f.id === 'number') flat.push({ id: f.id, ring, base: Number(f.properties?.render_min_height) || 0 });
       }
       // a 3D landmark model has priority: the buildings it stands in for are not drawn
       const mask = landmarkMask.peek();
-      const items = paintSamples([...roofs, ...flatSamples(features, new Set(coveredIds(flat, roofs)))], buildingColour.peek()).filter((b) => !replacedByLandmark(b, mask));
+      const items = paintSamples([...roofs, ...flatSamples(flatNear, new Set(coveredIds(flat, roofs)))], buildingColour.peek()).filter((b) => !replacedByLandmark(b, mask));
       // the id carries what the colours depend on, so a model made with other colours is not reused
       const coloured = buildingsColoured.peek();
       const base = buildingColour.peek();
       const shown = (coloured ? items : uncoloured(items, base)).map((b) => ({ ...b, id: `${b.id}~${base}${coloured ? 'c' : 'p'}` }));
+      // the same buildings as the last time (a pan inside what was covered, a tile that brought nothing): the model keeps what it has
+      let sum = 0;
+      for (const b of shown) sum = (sum + hash(b.id)) >>> 0;
+      const sig = `${shown.length}:${sum}`;
+      if (published && sig === lastSig) return;
+      lastSig = sig;
+      covered = box;
       published = true;
       buildingsChannel.publish(() => shown);
     };
     const schedule = () => { if (timer === undefined) timer = setTimeout(scan, SCAN_DELAY_MS); };
+    // a move inside the ground the last list covered asks for nothing; one that leaves it, or a tile that arrives, does
+    const onMoveEnd = () => { if (!covered || !boxInside(covered, reachBox(ml))) schedule(); };
     const stopMask = landmarkMask.subscribe(schedule);
     const stopSource = buildingSource.subscribe(schedule);
     const stopColour = buildingsColoured.subscribe(schedule);
@@ -104,7 +142,7 @@ export function startBuildingRoofs(): () => void {
       engine.addSource(SRC, { type: 'vector', url: `pmtiles://${url}`, attribution: '© OpenStreetMap-Mitwirkende' });
       engine.addLayer({ id: SRC, type: 'fill', source: SRC, 'source-layer': 'roofs', minzoom: ROOF_MIN_ZOOM - 1, paint: { 'fill-opacity': 0 } }, 'areas');
       ml.on('sourcedata', onSource as never);
-      ml.on('moveend', schedule);
+      ml.on('moveend', onMoveEnd);
       schedule();
     });
     return () => {
@@ -115,7 +153,7 @@ export function startBuildingRoofs(): () => void {
       stopBase();
       clearTimeout(timer);
       ml.off('sourcedata', onSource as never);
-      ml.off('moveend', schedule);
+      ml.off('moveend', onMoveEnd);
       engine.remove({ layers: [SRC], sources: [SRC] });
       buildingsChannel.reset();
     };
