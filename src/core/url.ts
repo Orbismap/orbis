@@ -1,5 +1,6 @@
-// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?l=<id>,<id>…&m=<name>,<icon>,<color>[,<basemap>]&t=<iso>&g=1&f=flug:<hex>|schiff:<mmsi>&p=
-// (l = the active layers; k= (a standard Karte) and b= (basemap) are only read, from older links, and never written)
+// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&m=<name>,<icon>,<color>[,<basemap>]&t=<iso>&g=1&s=0&f=flug:<hex>|schiff:<mmsi>&p=
+// (k = the Karte shown while its detail menu is open; l = the active layers; s=0 = main sidebar collapsed;
+//  b= (basemap) is only read, from older links, and never written)
 // p=<lat>,<lng>,<name>,<region>[,<kind>]
 // (p = a searched place; name, region and kind are percent-encoded, so their commas do not split)
 import type { FollowRef } from '../ext/types';
@@ -17,6 +18,8 @@ export interface UrlState {
   time?: number;
   /** true = globe (g=1), false = mercator (g=0), undefined = default. */
   globe?: boolean;
+  /** false = main sidebar collapsed (s=0); undefined/true = open (the default, never written). */
+  sidebar?: boolean;
   /** Followed aircraft or ship (f=flug:<hex> / f=schiff:<mmsi>). */
   follow?: FollowRef;
   /** Searched place shown in the detail menu. */
@@ -85,6 +88,9 @@ export function parseHash(hash: string): UrlState {
   const g = q.get('g');
   if (g === '1') out.globe = true;
   else if (g === '0') out.globe = false;
+  const s = q.get('s');
+  if (s === '0') out.sidebar = false;
+  else if (s === '1') out.sidebar = true;
   return out;
 }
 
@@ -97,10 +103,12 @@ export function serializeHash(s: UrlState): string {
     if (v.pitch) path += `,${Math.round(v.pitch)}p`;
   }
   const q: string[] = [];
+  if (s.karte) q.push(`k=${encodeURIComponent(s.karte)}`);
   if (s.shared) q.push(`m=${[s.shared.name, s.shared.icon, s.shared.color.replace('#', ''), ...(s.shared.basemap ? [s.shared.basemap] : [])].map(encodeURIComponent).join(',')}`);
   if (s.layers) q.push(`l=${s.layers.map(encodeURIComponent).join(',')}`);
   if (s.time !== undefined) q.push(`t=${new Date(s.time).toISOString().slice(0, 16)}Z`);
   if (s.globe !== undefined) q.push(`g=${s.globe ? 1 : 0}`);
+  if (s.sidebar === false) q.push('s=0');
   if (s.follow) q.push(`f=${s.follow.kind}:${encodeURIComponent(s.follow.id)}`);
   if (s.place) q.push(`p=${[round(s.place.lat, 5), round(s.place.lng, 5), encodeURIComponent(s.place.title), encodeURIComponent(s.place.subtitle), ...(s.place.kind ? [encodeURIComponent(s.place.kind)] : [])].join(',')}`);
   return `#/${path}${q.length ? `?${q.join('&')}` : ''}`;

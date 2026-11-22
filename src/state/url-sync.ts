@@ -6,20 +6,26 @@ import { parseHash, serializeHash, type UrlState } from '../core/url';
 import { activeIds, openKarte, setActiveIds, setActiveKarte, setBasemap } from '../karten/active';
 import { importKarte } from '../karten/store';
 import { resolveBasemapId } from '../map/basemaps';
-import { activeKarte } from './session';
+import { activeKarte, browsedKarte } from './session';
+import { detailOpen } from './hud';
 import { place, selectPlace } from './selection';
-import { isMobile } from './ui';
+import { isMobile, leftPanelOpen } from './ui';
 import { live, setTime, time } from './time';
 import { camera, projection, setCamera, setProjection } from './view';
 
 export function applyUrlState(u: UrlState): void {
   batch(() => {
-    // The link only says which layers are on; the Karte follows from them. An old link with `k=` and no layers opens that standard Karte.
+    // A link can carry the Karte and the layers together: open the Karte, then apply the link's
+    // layers on top of it (so both survive the next serialize instead of `k=` being dropped).
     if (u.shared && u.layers) setActiveKarte(importKarte({ ...u.shared, layers: u.layers }));
-    else if (u.layers) setActiveIds(u.layers);
-    else if (u.karte) openKarte(u.karte);
+    else if (u.karte) {
+      openKarte(u.karte);
+      detailOpen.value = true; // the detail menu belongs to the Karte named in the link
+      if (u.layers) setActiveIds(u.layers);
+    } else if (u.layers) setActiveIds(u.layers);
     if (u.view) setCamera({ lng: u.view.lng, lat: u.view.lat, zoom: u.view.zoom, bearing: u.view.bearing ?? 0, pitch: u.view.pitch ?? 0 });
     if (u.globe !== undefined) setProjection(u.globe ? 'globe' : 'mercator');
+    if (u.sidebar !== undefined) leftPanelOpen.value = u.sidebar;
     // a basemap in a link is taken for this session only
     const wanted = u.shared ? undefined : resolveBasemapId(u.basemap);
     if (wanted) setBasemap(activeKarte.peek().id, wanted);
@@ -38,9 +44,12 @@ export function currentUrlState(): UrlState {
   const layers = activeIds.value;
   return {
     view: { lat: c.lat, lng: c.lng, zoom: c.zoom, bearing: c.bearing, pitch: c.pitch },
+    // While the Karte's detail menu is open, that Karte is part of the visible state.
+    karte: detailOpen.value ? browsedKarte.value.id : undefined,
     layers: layers.length ? layers : undefined,
     time: live.value ? undefined : time.value,
     globe: projection.value === 'globe',
+    sidebar: leftPanelOpen.value ? undefined : false,
     follow: followCurrent.value ?? undefined,
     place: place.value ? { lat: place.value.lat, lng: place.value.lng, title: place.value.title, subtitle: place.value.subtitle, kind: place.value.kind } : undefined,
   };
