@@ -27,12 +27,58 @@ const VIEW_MARGIN = 0.25;
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 
+/** The ground is read on a GRID × GRID net over the footprint's box; the model is lifted over the slope by it (see `drape`). */
+const GRID = 5;
+/** the lift of the ground fades out between these heights above the base (m): the feet follow the slope, the tower stays upright */
+const DRAPE_FROM_M = 10;
+const DRAPE_TO_M = 80;
+const M_PER_DEG_LAT = 110_574;
+const M_PER_DEG_LNG = 111_320;
+
+interface Drape {
+  /** west, south, east, north of the footprint box in metres from the anchor (x east, y north) */
+  uBox: { value: THREE.Vector4 };
+  /** the ground above the lowest point, GRID × GRID, rows from the south */
+  uLifts: { value: Float32Array };
+  /** the squash of the model's height (the lift is not squashed with it) */
+  uUp: { value: number };
+}
+
 interface Entry {
   sample: LandmarkSample;
   root: THREE.Group;
   /** lowest terrain under the footprint (m) */
   ground: number;
   filled: boolean;
+  drape: Drape;
+  /** materials this entry owns (a copy per landmark: their uniforms differ) */
+  materials: THREE.Material[];
+}
+
+/**
+ * Lifts the model's lower parts over a sloping terrain. The map's terrain is not flat under a footprint, and a model that stands on its
+ * lowest point would sink into the ground on the high side (a plaza, the feet of a tower). The vertex shader adds the ground's height above
+ * that lowest point (bilinear over the net), faded out with the height above the base. Without terrain all lifts are 0.
+ */
+function drape(material: THREE.Material, d: Drape) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uBox = d.uBox;
+    shader.uniforms.uLifts = d.uLifts;
+    shader.uniforms.uUp = d.uUp;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\nuniform vec4 uBox;\nuniform float uLifts[${GRID * GRID}];\nuniform float uUp;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+      {
+        // the file's frame: x east, y up, z south
+        vec2 g = clamp((vec2(position.x, -position.z) - uBox.xy) / max(uBox.zw - uBox.xy, vec2(0.001)), 0.0, 1.0) * ${GRID - 1}.0;
+        ivec2 c = ivec2(min(floor(g), vec2(${GRID - 2}.0)));
+        vec2 f = g - vec2(c);
+        int i = c.y * ${GRID} + c.x;
+        float lift = mix(mix(uLifts[i], uLifts[i + 1], f.x), mix(uLifts[i + ${GRID}], uLifts[i + ${GRID + 1}], f.x), f.y);
+        transformed.y += lift * (1.0 - smoothstep(${DRAPE_FROM_M}.0, ${DRAPE_TO_M}.0, position.y)) / uUp;
+      }`);
+  };
+  material.customProgramCacheKey = () => 'landmark-drape';
 }
 
 /** The stage lights models with Lambert materials: the file's PBR materials (palette colours, no textures) become plain ones. */
@@ -112,10 +158,21 @@ export class LandmarksPart implements StagePart {
       const root = new THREE.Group();
       root.matrixAutoUpdate = false;
       root.visible = false;
-      next.set(sample.id, { sample, root, ground: this.groundOf(sample), filled: false });
+      const [w, so, e, n] = sample.bounds;
+      const kx = M_PER_DEG_LNG * Math.cos((sample.lat * Math.PI) / 180);
+      const entry: Entry = {
+        sample, root, ground: 0, filled: false, materials: [],
+        drape: { uBox: { value: new THREE.Vector4((w - sample.lng) * kx, (so - sample.lat) * M_PER_DEG_LAT, (e - sample.lng) * kx, (n - sample.lat) * M_PER_DEG_LAT) }, uLifts: { value: new Float32Array(GRID * GRID) }, uUp: { value: 1 } },
+      };
+      this.readGround(entry);
+      next.set(sample.id, entry);
       this.object.add(root);
     }
-    for (const [id, e] of this.entries) if (next.get(id) !== e) this.object.remove(e.root);
+    for (const [id, e] of this.entries) {
+      if (next.get(id) === e) continue;
+      this.object.remove(e.root);
+      for (const m of e.materials) m.dispose();
+    }
     this.entries = next;
     this.fill();
     this.stage.wake();
@@ -125,25 +182,39 @@ export class LandmarksPart implements StagePart {
     return { landmarks: this.entries.size, landmarksDrawn: this.drawn };
   }
 
-  /** Lowest terrain under the footprint: the corners of its box and the anchor. */
-  private groundOf(s: LandmarkSample): number {
-    const [w, so, e, n] = s.bounds;
+  /**
+   * Reads the terrain on a net over the footprint: the lowest point is where the model stands, the rest becomes the lifts of the drape.
+   * Returns true when something moved by more than TERRAIN_STEP_M (tiles of the terrain arrive after the models).
+   */
+  private readGround(e: Entry): boolean {
+    const [w, so, ea, n] = e.sample.bounds;
+    const h = new Float32Array(GRID * GRID);
     let low = Infinity;
-    for (const [lng, lat] of [[s.lng, s.lat], [w, so], [e, so], [w, n], [e, n]] as const) {
-      const h = this.map.queryTerrainElevation({ lng, lat });
-      if (typeof h === 'number' && Number.isFinite(h)) low = Math.min(low, h);
+    let any = false;
+    for (let j = 0; j < GRID; j++) {
+      for (let i = 0; i < GRID; i++) {
+        const v = this.map.queryTerrainElevation({ lng: w + ((ea - w) * i) / (GRID - 1), lat: so + ((n - so) * j) / (GRID - 1) });
+        const ok = typeof v === 'number' && Number.isFinite(v);
+        h[j * GRID + i] = ok ? v : NaN;
+        if (ok) { low = Math.min(low, v); any = true; }
+      }
     }
-    return Number.isFinite(low) ? low : 0;
+    const base = any ? low : 0;
+    const lifts = e.drape.uLifts.value;
+    let moved = Math.abs(base - e.ground) > TERRAIN_STEP_M;
+    for (let i = 0; i < lifts.length; i++) {
+      const lift = Number.isNaN(h[i]!) ? 0 : h[i]! - base;
+      if (Math.abs(lift - lifts[i]!) > TERRAIN_STEP_M) moved = true;
+      lifts[i] = lift;
+    }
+    e.ground = base;
+    return moved;
   }
 
   /** Terrain tiles arrive after the models: when the ground under one changed, it moves with it. */
   private onIdle = () => {
     let changed = false;
-    for (const e of this.entries.values()) {
-      const h = this.groundOf(e.sample);
-      if (Math.abs(h - e.ground) > TERRAIN_STEP_M) changed = true;
-      e.ground = h;
-    }
+    for (const e of this.entries.values()) if (this.readGround(e)) changed = true;
     if (changed) this.stage.wake();
   };
 
@@ -154,7 +225,15 @@ export class LandmarksPart implements StagePart {
       const url = e.sample.url;
       const model = this.models.get(url);
       if (model) {
-        e.root.add(model.clone());
+        // a copy of the materials per landmark: the drape's uniforms are its own
+        const copy = model.clone();
+        copy.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          const own = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((m) => { const c = m.clone(); drape(c, e.drape); e.materials.push(c); return c; });
+          mesh.material = Array.isArray(mesh.material) ? own : own[0]!;
+        });
+        e.root.add(copy);
         e.filled = true;
         // a model that is drawn is the newest of the cache
         this.models.delete(url);
@@ -211,6 +290,7 @@ export class LandmarksPart implements StagePart {
       // seen from above the model is flatter, like the 2.5D buildings: one factor on its height (steps keep their proportions),
       // but never below MIN_HEIGHT_M. The file's y is up.
       const up = s.heightM > 0 ? Math.max(flat, Math.min(1, MIN_HEIGHT_M / s.heightM)) : flat;
+      e.drape.uUp.value = up;
       e.root.matrix.multiplyMatrices(this.matrix, TO_STAGE).multiply(this.squash.makeScale(1, up, 1));
       e.root.matrixWorldNeedsUpdate = true;
       e.root.visible = true;
@@ -222,6 +302,7 @@ export class LandmarksPart implements StagePart {
 
   dispose() {
     this.map.off('idle', this.onIdle);
+    for (const e of this.entries.values()) for (const m of e.materials) m.dispose();
     for (const m of this.models.values()) if (m) disposeModel(m);
     this.models.clear();
     this.entries.clear();
