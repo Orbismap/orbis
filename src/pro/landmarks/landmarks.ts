@@ -205,7 +205,9 @@ export class LandmarksPart implements StagePart {
       const out = lon < b.getWest() - padLon || lon > b.getEast() + padLon || s.lat < b.getSouth() - padLat || s.lat > b.getNorth() + padLat;
       if (out || !e.filled || frame.occluded(lon, s.lat, e.ground)) { e.root.visible = false; continue; }
       // the file has its bearing and scale baked in: placed unturned, at true size
-      frame.place(this.matrix, lon, s.lat, e.ground + s.elevationM);
+      // flattened, the model is lifted by up to MIN_HEIGHT_M, like the 2.5D buildings (their height is MIN_HEIGHT_M + the share): the map's
+      // terrain is only a metre or two exact, and under a model a few decimetres high it would cover the feet of it
+      frame.place(this.matrix, lon, s.lat, e.ground + s.elevationM + MIN_HEIGHT_M * (1 - flat));
       // seen from above the model is flatter, like the 2.5D buildings: one factor on its height (steps keep their proportions),
       // but never below MIN_HEIGHT_M. The file's y is up.
       const up = s.heightM > 0 ? Math.max(flat, Math.min(1, MIN_HEIGHT_M / s.heightM)) : flat;
