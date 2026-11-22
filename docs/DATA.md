@@ -137,6 +137,7 @@ Quelle: [alexwohlbruck/landmarks](https://github.com/alexwohlbruck/landmarks) (W
 - **Abruf** (`data/landmarks.ts`): `api/v1/latest.json` → Katalog (wenige kB, mit den belegten z12-Kacheln) → je Kachel in Sicht ein JSON mit den
   Wahrzeichen → je Modell eine GLB (niedrige Stufe, 50-300 kB, nach Inhalts-Hash unveränderlich). Alles mit CORS `*`, direkt von der
   Projektseite; `VITE_LANDMARKS_BASE` stellt auf eine eigene Kopie um.
+- **Wann** (`landmarksWanted`): mit der Ebene „3D-Gebäude“ auf jeder Grundkarte, sonst nur auf den Karten mit 2.5D-Häusern (Modus „Erkunden“, Gebäude-Schalter an). Nicht bei „Daten“, „Fahren" und auf Luftbildern: dort nur über die Ebene.
 - **Vorrang** (`features/landmarks/source.ts`): ab Zoom 13,5 (wie die 2.5D-Häuser, das `minZoom` des Modells zählt nicht) zeichnet Pro jedes Modell in Sicht, unabhängig von Ebenen und
   Dachdaten. Die GLBs tragen Ausrichtung und Maßstab schon in sich (nicht noch einmal drehen oder skalieren), Achsen X Ost / Y oben / Z Süd.
 - **Gebäude ausschneiden** (`map/landmark-buildings.ts`, `map/landmark-geometry.ts`, wie im Landmarks-Demo): OpenFreeMap fasst Nachbargebäude zu

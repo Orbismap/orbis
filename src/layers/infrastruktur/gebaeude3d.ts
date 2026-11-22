@@ -13,7 +13,7 @@ import { buildingsChannel, setTilesetSource, tilesetsChannel } from '../../ext/c
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../../map/buildings-tilt';
-import { buildingColour, buildingsColoured, buildingsDetailed, buildingsReplaced } from '../../state/view';
+import { buildingColour, buildingsColoured, buildingsDetailed, buildingsLayerOn, buildingsReplaced } from '../../state/view';
 import { defineLayer } from '../define';
 
 const COLOR = '#B9A58C';
@@ -60,6 +60,7 @@ export default defineLayer({
 
   mount(ctx) {
     const ml = ctx.map.ml;
+    buildingsLayerOn.value = true;
     const typ = () => asTyp(ctx.options.value.typ);
     const coloured = () => ctx.options.value.farben !== false;
     const layerId = `${ctx.id}.osm`;
@@ -125,6 +126,7 @@ export default defineLayer({
         buildingsReplaced.value = false;
         buildingsDetailed.value = false;
         buildingsColoured.value = true;
+        buildingsLayerOn.value = false;
         ctx.map.remove({ layers: [layerId] });
       },
     };

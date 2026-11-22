@@ -3,7 +3,7 @@
 // priority: the OSM buildings it stands in for are left out of the 2.5D map (map/landmark-mask.ts) and of the detailed Pro
 // buildings (features/buildings3d/roofs-source.ts). This file is the base's side: it finds the landmarks near the view, hands
 // the extension the samples and the mask, and sets the credit line in the corner of the map.
-import { effect } from '@preact/signals';
+import { computed, effect } from '@preact/signals';
 import type { LayerSpecification } from 'maplibre-gl';
 import { EMPTY_MASK, LANDMARKS_CREDIT, LANDMARKS_REPO, landmarkMask, landmarksShown, loadCatalogue, loadFootprints, loadTile, maskOf, tilesInView } from '../../data/landmarks';
 import { landmarksChannel } from '../../ext/channels';
@@ -11,7 +11,9 @@ import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import type { LandmarkSample } from '../../ext/types';
 import { watchLandmarkBuildings } from '../../map/landmark-buildings';
+import { isAerial } from '../../map/basemaps';
 import { mapEngine } from '../../state/ui';
+import { activeBasemap, buildings3d, buildingsLayerOn, karteMode } from '../../state/view';
 
 /** Every landmark is drawn from here on, whatever minZoom the dataset gives it: the zoom the 2.5D buildings start at. */
 export const LANDMARK_MIN_ZOOM = 13.5;
@@ -20,11 +22,18 @@ const SCAN_DELAY_MS = 200;
 const MARGIN = 0.3;
 const CREDIT_SRC = 'landmarks-attribution';
 
+/**
+ * Landmarks belong where the buildings are: with the layer "3D-Gebäude" (any basemap), or on the plain maps that show 2.5D buildings
+ * (mode "Erkunden" with the buildings switch on). Not on "Daten" or "Fahren", and not on aerial images (their own 3D tiles): there only
+ * the layer brings them.
+ */
+export const landmarksWanted = computed(() => buildingsLayerOn.value || (buildings3d.value && karteMode.value === 'erkunden' && !isAerial(activeBasemap.value)));
+
 /** Starts the source; returns the function that stops it. */
 export function startLandmarks(): () => void {
   return effect(() => {
     const engine = mapEngine.value;
-    if (!engine || !proAvailable || !proEnabled.value) return;
+    if (!engine || !proAvailable || !proEnabled.value || !landmarksWanted.value) return;
     const ml = engine.ml;
     let dead = false;
     let timer: ReturnType<typeof setTimeout> | undefined;

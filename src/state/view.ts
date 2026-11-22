@@ -32,6 +32,8 @@ export const mapDark = signal(false);
 export const buildingsDetailed = signal(false);
 /** The layer "3D-Gebäude" draws its buildings in the colours OSM knows (option "Eingefärbt"); off: all in one plain colour, 2.5D and with Orbis Pro. Written by the layer. */
 export const buildingsColoured = signal(true);
+/** The layer "3D-Gebäude" is switched on (any type). Written by the layer. */
+export const buildingsLayerOn = signal(false);
 /** The colour the 2.5D buildings of the shown basemap have (dark on the dark map, light on the light one): buildings without a colour of their own get it, also with Orbis Pro. Written by the map engine. */
 export const buildingColour = signal('#d6dae3');
 /** Visible bounds and size in px; undefined before the map is ready. */
