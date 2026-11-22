@@ -30,6 +30,8 @@ export const buildingsReplaced = signal(false);
 export const mapDark = signal(false);
 /** The layer "3D-Gebäude" (type OSM) is on: with Orbis Pro its buildings are drawn by Orbis' own 3D renderer in the close view (features/buildings3d/roofs-source.ts), with roofs and the colours of OSM. Written by the layer. */
 export const buildingsDetailed = signal(false);
+/** The layer "3D-Gebäude" draws its buildings in the colours OSM knows (option "Eingefärbt"); off: all in one plain colour, 2.5D and with Orbis Pro. Written by the layer. */
+export const buildingsColoured = signal(true);
 /** Visible bounds and size in px; undefined before the map is ready. */
 export const viewport = signal<Viewport | undefined>(undefined);
 /** Area of the map covered by panels/sheet; the camera keeps targets inside the rest. */

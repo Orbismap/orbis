@@ -11,6 +11,8 @@ import { signal } from '@preact/signals';
 export const MASKED_SOURCE = 'ofm-landmarks';
 const PROTOCOL = 'orbis-landmark-buildings';
 const BASE_SOURCE = 'ofm';
+/** an invisible layer on the cut source: a source only loads tiles for a visible layer, and the building layers may all be hidden (Pro draws the buildings, features/buildings3d/roofs-source.ts reads the tiles) */
+const KEEP_LAYER = 'ofm-landmarks-keep';
 const SETTLE_MS = 150;
 
 /** The source the building layers read now: `ofm`, or the cut one while landmarks are in view (for readers of the building features). */
@@ -61,9 +63,9 @@ const isBuilding = (l: { type: string; source?: string; 'source-layer'?: string 
 function moveLayers(ml: MlMap, from: string, to: string) {
   const layers = ml.getStyle().layers ?? [];
   layers.forEach((l, i) => {
-    if (!isBuilding(l as never, from)) return;
+    if (l.id === KEEP_LAYER || !isBuilding(l as never, from)) return;
     const spec = { ...structuredClone(l), source: to } as typeof l;
-    const before = layers.slice(i + 1).find((n) => !isBuilding(n as never, from))?.id;
+    const before = layers.slice(i + 1).find((n) => n.id !== KEEP_LAYER && !isBuilding(n as never, from))?.id;
     ml.removeLayer(l.id);
     ml.addLayer(spec, before);
   });
@@ -92,6 +94,7 @@ export function watchLandmarkBuildings(ml: MlMap): () => void {
     const src = ml.getSource(MASKED_SOURCE) as VectorTileSource | undefined;
     if (src) src.setTiles([tilesUrl()]);
     else ml.addSource(MASKED_SOURCE, { type: 'vector', tiles: [tilesUrl()], minzoom: base.minzoom ?? 0, maxzoom: base.maxzoom ?? 14 });
+    if (!ml.getLayer(KEEP_LAYER)) ml.addLayer({ id: KEEP_LAYER, type: 'fill', source: MASKED_SOURCE, 'source-layer': 'building', minzoom: 12, paint: { 'fill-opacity': 0 } });
     if (!active) { active = true; moveLayers(ml, BASE_SOURCE, MASKED_SOURCE); buildingSource.value = MASKED_SOURCE; }
     return true;
   };
@@ -100,6 +103,7 @@ export function watchLandmarkBuildings(ml: MlMap): () => void {
     active = false;
     moveLayers(ml, MASKED_SOURCE, BASE_SOURCE);
     buildingSource.value = BASE_SOURCE;
+    if (ml.getLayer(KEEP_LAYER)) ml.removeLayer(KEEP_LAYER);
     if (ml.getSource(MASKED_SOURCE)) ml.removeSource(MASKED_SOURCE);
   };
   const apply = () => {

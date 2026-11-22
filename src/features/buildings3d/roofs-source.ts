@@ -15,7 +15,7 @@ import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import { ensurePmtilesProtocol } from '../../map/pmtiles-protocol';
 import { mapEngine } from '../../state/ui';
-import { buildingsDetailed } from '../../state/view';
+import { buildingsColoured, buildingsDetailed } from '../../state/view';
 
 /** The same zoom the 2.5D buildings start at (`minzoom` 13.5 of their layers). The roof tiles hold data from zoom 15, below that only the OpenFreeMap buildings count; the sample caps keep a wide view small. */
 export const ROOF_MIN_ZOOM = 13.5;
@@ -40,6 +40,20 @@ export function replacedByLandmark(b: { rings: [number, number][][] }, mask: Lan
     if (lng < w || lng > e || lat < s || lat > n) return false;
     const shape = mask.footprints[i]?.geometry;
     return shape && shape.length ? inFootprint(lng, lat, shape) : true;
+  });
+}
+
+/** Colour and material tags OSM gives a building: dropped when the layer is set to "not coloured". */
+const LOOK_TAGS = ['building:colour', 'colour', 'roof:colour', 'building:material', 'material', 'roof:material'];
+
+/** All buildings in the one plain colour, walls and roofs: no OSM colour, no material. The id changes, so a model made before is not reused. */
+export function uncoloured<T extends { id: string; tags: Record<string, string> }>(items: readonly T[], plain: string): T[] {
+  return items.map((b) => {
+    const tags = { ...b.tags };
+    for (const k of LOOK_TAGS) delete tags[k];
+    tags['building:colour'] = plain;
+    tags['roof:colour'] = plain;
+    return { ...b, id: `${b.id}~`, tags };
   });
 }
 
@@ -72,12 +86,14 @@ export function startBuildingRoofs(): () => void {
       // a 3D landmark model has priority: the buildings it stands in for are not drawn
       const mask = landmarkMask.peek();
       const items = paintSamples([...roofs, ...flatSamples(features, new Set(coveredIds(flat, roofs)))], PLAIN).filter((b) => !replacedByLandmark(b, mask));
+      const shown = buildingsColoured.peek() ? items : uncoloured(items, PLAIN);
       published = true;
-      buildingsChannel.publish(() => items);
+      buildingsChannel.publish(() => shown);
     };
     const schedule = () => { if (timer === undefined) timer = setTimeout(scan, SCAN_DELAY_MS); };
     const stopMask = landmarkMask.subscribe(schedule);
     const stopSource = buildingSource.subscribe(schedule);
+    const stopColour = buildingsColoured.subscribe(schedule);
     const onSource = (e: { sourceId?: string }) => { if (e.sourceId === SRC || e.sourceId === 'ofm' || e.sourceId === buildingSource.peek()) schedule(); };
 
     // the fill is invisible, but a layer keeps the tiles of the source loaded
@@ -93,6 +109,7 @@ export function startBuildingRoofs(): () => void {
       dead = true;
       stopMask();
       stopSource();
+      stopColour();
       clearTimeout(timer);
       ml.off('sourcedata', onSource as never);
       ml.off('moveend', schedule);
