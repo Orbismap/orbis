@@ -28,11 +28,13 @@ const VIEW_MARGIN = 0.25;
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 
-/** The ground is read on a GRID × GRID net over the footprint's box; the model is lifted over the slope by it (see `drape`). */
+/** A coarse GRID × GRID net over the footprint finds the lowest ground (where the model stands) and notices when the terrain changes. */
 const GRID = 5;
-/** the lift of the ground fades out between these heights above the base (m): the feet follow the slope, the tower stays upright */
-const DRAPE_FROM_M = 10;
-const DRAPE_TO_M = 80;
+/** the dense net the shader clamps against: one cell about this many metres, at most MAX_CELLS along an axis */
+const CELL_M = 15;
+const MAX_CELLS = 128;
+/** a model's points are kept this far above the ground (m) */
+const CLEARANCE_M = 0.3;
 const M_PER_DEG_LAT = 110_574;
 const M_PER_DEG_LNG = 111_320;
 
@@ -65,8 +67,12 @@ function setNight(m: THREE.Material, on: boolean) {
 interface Drape {
   /** west, south, east, north of the footprint box in metres from the anchor (x east, y north) */
   uBox: { value: THREE.Vector4 };
-  /** the ground above the lowest point, GRID × GRID, rows from the south */
-  uLifts: { value: Float32Array };
+  /** the ground above the lowest point (m), one value per cell of the dense net, rows from the south (the texture `data` is the source of) */
+  uTerrain: { value: THREE.DataTexture };
+  /** the height the model is lifted by in the world, the flattened ones (metres) */
+  uLift: { value: number };
+  /** cells of the net: east, north */
+  uGrid: { value: THREE.Vector2 };
   /** the squash of the model's height (the lift is not squashed with it) */
   uUp: { value: number };
 }
@@ -78,31 +84,41 @@ interface Entry {
   ground: number;
   filled: boolean;
   drape: Drape;
+  /** the ground heights of the dense net, relative to `ground` */
+  heights: Float32Array;
+  /** the coarse net of the last read, to notice changes */
+  coarse: Float32Array;
   /** materials this entry owns (a copy per landmark: their uniforms differ) */
   materials: THREE.Material[];
 }
 
 /**
- * Lifts the model's lower parts over a sloping terrain. The map's terrain is not flat under a footprint, and a model that stands on its
- * lowest point would sink into the ground on the high side (a plaza, the feet of a tower). The vertex shader adds the ground's height above
- * that lowest point (bilinear over the net), faded out with the height above the base. Without terrain all lifts are 0.
+ * Keeps the model above the terrain. The map's terrain is not flat under a footprint and only a metre or two exact; a model that stands on its
+ * lowest point would sink into the ground where the terrain is higher (a plaza, the feet of a tower, the ends of a bridge). The vertex shader
+ * reads the ground height at each point's own place from a net over the footprint (bilinear) and never lets the point go below it. A hill that
+ * stands in front of the model still hides it: only what is under the ground at its own place is lifted. Without terrain the net is 0.
  */
 function drape(material: THREE.Material, d: Drape) {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uBox = d.uBox;
-    shader.uniforms.uLifts = d.uLifts;
+    shader.uniforms.uTerrain = d.uTerrain;
+    shader.uniforms.uGrid = d.uGrid;
     shader.uniforms.uUp = d.uUp;
+    shader.uniforms.uLift = d.uLift;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\nuniform vec4 uBox;\nuniform float uLifts[${GRID * GRID}];\nuniform float uUp;`)
+      .replace('#include <common>', '#include <common>\nuniform vec4 uBox;\nuniform sampler2D uTerrain;\nuniform vec2 uGrid;\nuniform float uUp;\nuniform float uLift;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
       {
-        // the file's frame: x east, y up, z south
-        vec2 g = clamp((vec2(position.x, -position.z) - uBox.xy) / max(uBox.zw - uBox.xy, vec2(0.001)), 0.0, 1.0) * ${GRID - 1}.0;
-        ivec2 c = ivec2(min(floor(g), vec2(${GRID - 2}.0)));
-        vec2 f = g - vec2(c);
-        int i = c.y * ${GRID} + c.x;
-        float lift = mix(mix(uLifts[i], uLifts[i + 1], f.x), mix(uLifts[i + ${GRID}], uLifts[i + ${GRID + 1}], f.x), f.y);
-        transformed.y += lift * (1.0 - smoothstep(${DRAPE_FROM_M}.0, ${DRAPE_TO_M}.0, position.y)) / uUp;
+        // the file's frame: x east, y up, z south; the ground at this point's place, bilinear over the net (the texture is nearest-filtered)
+        vec2 g = clamp((vec2(position.x, -position.z) - uBox.xy) / max(uBox.zw - uBox.xy, vec2(0.001)), 0.0, 1.0) * (uGrid - 1.0);
+        vec2 i0 = floor(g);
+        vec2 f = g - i0;
+        vec2 i1 = min(i0 + 1.0, uGrid - 1.0);
+        float h = mix(
+          mix(texture2D(uTerrain, (vec2(i0.x, i0.y) + 0.5) / uGrid).r, texture2D(uTerrain, (vec2(i1.x, i0.y) + 0.5) / uGrid).r, f.x),
+          mix(texture2D(uTerrain, (vec2(i0.x, i1.y) + 0.5) / uGrid).r, texture2D(uTerrain, (vec2(i1.x, i1.y) + 0.5) / uGrid).r, f.x), f.y);
+        // world height of a point = base + lift + y * uUp: never below the ground (+ a little)
+        transformed.y = max(transformed.y, (h + ${CLEARANCE_M.toFixed(2)} - uLift) / uUp);
       }`);
   };
   material.customProgramCacheKey = () => 'landmark-drape';
@@ -198,9 +214,18 @@ export class LandmarksPart implements StagePart {
       root.visible = false;
       const [w, so, e, n] = sample.bounds;
       const kx = M_PER_DEG_LNG * Math.cos((sample.lat * Math.PI) / 180);
+      const widthM = (e - w) * kx;
+      const lengthM = (n - so) * M_PER_DEG_LAT;
+      const nx = Math.min(MAX_CELLS, Math.max(4, Math.ceil(widthM / CELL_M) + 1));
+      const ny = Math.min(MAX_CELLS, Math.max(4, Math.ceil(lengthM / CELL_M) + 1));
+      const heights = new Float32Array(nx * ny);
+      const tex = new THREE.DataTexture(heights, nx, ny, THREE.RedFormat, THREE.FloatType);
+      tex.minFilter = THREE.NearestFilter;
+      tex.magFilter = THREE.NearestFilter;
+      tex.needsUpdate = true;
       const entry: Entry = {
-        sample, root, ground: 0, filled: false, materials: [],
-        drape: { uBox: { value: new THREE.Vector4((w - sample.lng) * kx, (so - sample.lat) * M_PER_DEG_LAT, (e - sample.lng) * kx, (n - sample.lat) * M_PER_DEG_LAT) }, uLifts: { value: new Float32Array(GRID * GRID) }, uUp: { value: 1 } },
+        sample, root, ground: 0, filled: false, materials: [], heights, coarse: new Float32Array(GRID * GRID),
+        drape: { uBox: { value: new THREE.Vector4((w - sample.lng) * kx, (so - sample.lat) * M_PER_DEG_LAT, (e - sample.lng) * kx, (n - sample.lat) * M_PER_DEG_LAT) }, uTerrain: { value: tex }, uGrid: { value: new THREE.Vector2(nx, ny) }, uLift: { value: 0 }, uUp: { value: 1 } },
       };
       this.readGround(entry);
       next.set(sample.id, entry);
@@ -210,6 +235,7 @@ export class LandmarksPart implements StagePart {
       if (next.get(id) === e) continue;
       this.object.remove(e.root);
       for (const m of e.materials) m.dispose();
+      e.drape.uTerrain.value.dispose();
     }
     this.entries = next;
     this.fill();
@@ -221,8 +247,8 @@ export class LandmarksPart implements StagePart {
   }
 
   /**
-   * Reads the terrain on a net over the footprint: the lowest point is where the model stands, the rest becomes the lifts of the drape.
-   * Returns true when something moved by more than TERRAIN_STEP_M (tiles of the terrain arrive after the models).
+   * Reads the terrain: a coarse net finds the lowest point (where the model stands) and whether anything moved; then the dense net the shader
+   * clamps against. Returns true when something moved by more than TERRAIN_STEP_M (tiles of the terrain arrive after the models).
    */
   private readGround(e: Entry): boolean {
     const [w, so, ea, n] = e.sample.bounds;
@@ -238,15 +264,28 @@ export class LandmarksPart implements StagePart {
       }
     }
     const base = any ? low : 0;
-    const lifts = e.drape.uLifts.value;
     let moved = Math.abs(base - e.ground) > TERRAIN_STEP_M;
-    for (let i = 0; i < lifts.length; i++) {
-      const lift = Number.isNaN(h[i]!) ? 0 : h[i]! - base;
-      if (Math.abs(lift - lifts[i]!) > TERRAIN_STEP_M) moved = true;
-      lifts[i] = lift;
+    for (let i = 0; i < h.length; i++) {
+      const v = Number.isNaN(h[i]!) ? 0 : h[i]!;
+      if (Math.abs(v - e.coarse[i]!) > TERRAIN_STEP_M) moved = true;
+      e.coarse[i] = v;
     }
     e.ground = base;
+    if (moved && any) this.readDense(e);
     return moved;
+  }
+
+  /** The dense net: the ground height above the base at every cell (0 where the terrain is not loaded yet). */
+  private readDense(e: Entry) {
+    const [w, so, ea, n] = e.sample.bounds;
+    const { x: nx, y: ny } = e.drape.uGrid.value;
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        const v = this.map.queryTerrainElevation({ lng: w + ((ea - w) * i) / (nx - 1), lat: so + ((n - so) * j) / (ny - 1) });
+        e.heights[j * nx + i] = typeof v === 'number' && Number.isFinite(v) ? Math.max(0, v - e.ground) : 0;
+      }
+    }
+    e.drape.uTerrain.value.needsUpdate = true;
   }
 
   /** Terrain tiles arrive after the models: when the ground under one changed, it moves with it. */
@@ -332,6 +371,7 @@ export class LandmarksPart implements StagePart {
       // but never below MIN_HEIGHT_M. The file's y is up.
       const up = s.heightM > 0 ? Math.max(flat, Math.min(1, MIN_HEIGHT_M / s.heightM)) : flat;
       e.drape.uUp.value = up;
+      e.drape.uLift.value = MIN_HEIGHT_M * (1 - flat) + s.elevationM;
       e.root.matrix.multiplyMatrices(this.matrix, TO_STAGE).multiply(this.squash.makeScale(1, up, 1));
       e.root.matrixWorldNeedsUpdate = true;
       e.root.visible = true;
@@ -344,7 +384,7 @@ export class LandmarksPart implements StagePart {
   dispose() {
     this.stopDark?.();
     this.map.off('idle', this.onIdle);
-    for (const e of this.entries.values()) for (const m of e.materials) m.dispose();
+    for (const e of this.entries.values()) { for (const m of e.materials) m.dispose(); e.drape.uTerrain.value.dispose(); }
     for (const m of this.models.values()) if (m) disposeModel(m);
     this.models.clear();
     this.entries.clear();
