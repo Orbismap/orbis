@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Map as MlMap } from 'maplibre-gl';
+import { effect, type ReadonlySignal } from '@preact/signals';
 import type { LandmarkSample } from '../../ext/types';
 
 // The badges of the 3D landmarks on the map, like the pictures of famous buildings in Apple Maps: a big round marker with the building in
@@ -79,11 +80,12 @@ function picture(model: THREE.Object3D): ImageData | undefined {
 export class LandmarkBadges {
   private items: readonly LandmarkSample[] = [];
   private done = new Set<string>();
+  private stopLabels?: () => void;
 
   /** the share of its height the model is drawn at (flatter seen from above, like the 2.5D buildings) */
   private lastShare = -1;
 
-  constructor(private map: MlMap, private heightFactor: () => number = () => 1) {
+  constructor(private map: MlMap, private heightFactor: () => number = () => 1, labelsVisible?: ReadonlySignal<boolean>) {
     map.addSource(SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
       id: LAYER, type: 'symbol', source: SOURCE, minzoom: 12,
@@ -104,6 +106,11 @@ export class LandmarkBadges {
       },
       paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10, 15, 24, 0.95)', 'text-halo-width': 1.6 },
     }, 'slot:top'); // above the places (slot labels): a landmark wins a collision against a café
+    // a badge is a place label: on the bare "Daten" map with only the buildings layer it has no business being there
+    if (labelsVisible) this.stopLabels = effect(() => {
+      const show = labelsVisible.value;
+      if (map.getLayer(LAYER)) map.setLayoutProperty(LAYER, 'visibility', show ? 'visible' : 'none');
+    });
     map.on('pitch', this.follow);
     this.follow();
   }
@@ -145,6 +152,7 @@ export class LandmarkBadges {
   }
 
   dispose() {
+    this.stopLabels?.();
     this.map.off('pitch', this.follow);
     if (this.map.getLayer(LAYER)) this.map.removeLayer(LAYER);
     if (this.map.getSource(SOURCE)) this.map.removeSource(SOURCE);

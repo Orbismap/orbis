@@ -1,6 +1,6 @@
 // MapEngine on MapLibre GL JS 6. Everything outside map/ and render/ talks to this, not to MapLibre.
 import * as maplibregl from 'maplibre-gl';
-import type { CustomLayerInterface, LayerSpecification, SourceSpecification } from 'maplibre-gl';
+import type { CustomLayerInterface, ExpressionSpecification, LayerSpecification, SourceSpecification } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { effect } from '@preact/signals';
 import { throttle } from '../core/scheduler';
@@ -9,7 +9,7 @@ import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { activeBasemap as activeBasemapSignal, buildings3d, poiBasemap, poiLayerOn, buildingColour, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
+import { activeBasemap as activeBasemapSignal, buildings3d, poiBasemap, poiLayerOn, poiLabelsVisible, buildingColour, buildingsColoured, buildingsLayerOn, buildingsPlainWanted, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, buildingColourOf, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, isAerial, showsRelief, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { registerKeyedTiles } from './basemaps/keyed-protocol';
@@ -160,15 +160,28 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     writeCamera();
   };
   const ready = new Promise<void>((resolve) => {
-    const finish = () => { try { resolveReady(); } catch (e) { console.error('ready resolveReady error', e); } resolve(); };
-    if (ml.isStyleLoaded()) { finish(); return; }
     let done = false;
-    const wrap = () => { if (done) return; done = true; finish(); };
-    ml.once('style.load', wrap);
-    ml.once('load', wrap);
-    // fallback: poll
-    const iv = setInterval(() => { if (ml.isStyleLoaded()) { clearInterval(iv); wrap(); } }, 100);
-    setTimeout(() => { clearInterval(iv); wrap(); }, 5000);
+    let iv: ReturnType<typeof setInterval> | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Everything resolveReady does (setProjection, applyBasemap, addLayer) needs a fully loaded style: getStyle() is
+    // undefined until then, and resolving early made the layers and Pro mount against a half style (and left the
+    // tilt height patch uninstalled, which draws the 2.5D houses at their raw z*H height at high zoom).
+    function finish() {
+      if (done || !ml.isStyleLoaded()) return;
+      done = true;
+      if (iv !== undefined) clearInterval(iv);
+      if (timer !== undefined) clearTimeout(timer);
+      ml.off('load', check);
+      try { resolveReady(); } catch (e) { console.error('ready resolveReady error', e); }
+      resolve();
+    }
+    function check() { if (ml.isStyleLoaded()) finish(); }
+    // defer even when the style is already there: the rest of createMapEngine (terrain state, effects) must be set up first
+    if (ml.isStyleLoaded()) { queueMicrotask(finish); return; }
+    ml.on('load', check);
+    iv = setInterval(check, 50);
+    // last resort for a source that never loads: never resolve against a half style
+    timer = setTimeout(() => { if (ml.isStyleLoaded()) finish(); else console.error('[map] style did not load in time'); }, 30_000);
   });
 
   // ---- camera <-> state/view ------------------------------------------------
@@ -208,6 +221,9 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     effect(() => {
       buildings3d.value;
       buildingsReplaced.value;
+      buildingsPlainWanted.value;
+      buildingsLayerOn.value;
+      buildingsColoured.value;
       buildingsChannel.presented.value;
       karteMode.value;
       if (loaded) (applyBuildings(), applyTerrain());
@@ -285,14 +301,25 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   ml.on('moveend', () => {
     if (loaded && dynamic && membersOf(regionalEntry(dynamic.id)!).length > 1) syncDynamic(dynamic.id);
   });
-  /** 2.5D buildings: the Orbis basemaps' own, or the generic ones elsewhere; off with the switch, and off on aerial images (the real 3D tiles belong there). */
+  let lastBuildingPaint: string | undefined;
+  /** 2.5D buildings: the Orbis basemaps' own, or the generic ones elsewhere; off with the switch, and off on aerial images (the real 3D tiles belong there). The layer's type "Gebäude" asks for them even where the Karte mode would hide them. */
   function applyBuildings() {
     const shown = isStaticBasemap(basemap) ? basemap : undefined;
     // with Orbis Pro the detailed buildings (roofs-source.ts) include the plain ones: while they are drawn, the 2.5D buildings step aside
     buildingColour.value = buildingColourOf(shown);
-    const on = buildings3d.peek() && !buildingsReplaced.peek() && reliefOn() && !buildingsChannel.presented.peek();
+    const on = buildings3d.peek() && !buildingsReplaced.peek() && (reliefOn() || buildingsPlainWanted.peek()) && !buildingsChannel.presented.peek();
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) setVis(l.id, on && id === shown);
     setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !hasTiles3d(shown));
+    // while the layer is on, its "Eingefärbt" switch covers the basemap's 2.5D houses too: OSM colours when on, its plain colour when off
+    const colour: string | ExpressionSpecification = buildingsLayerOn.peek() && buildingsColoured.peek()
+      ? ['coalesce', ['get', 'colour'], buildingColour.value]
+      : buildingColour.value;
+    const paint = JSON.stringify(colour);
+    if (paint !== lastBuildingPaint) {
+      lastBuildingPaint = paint;
+      for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) if (ml.getLayer(l.id)) ml.setPaintProperty(l.id, 'fill-extrusion-color', colour);
+      if (ml.getLayer(GENERIC_BUILDINGS_ID)) ml.setPaintProperty(GENERIC_BUILDINGS_ID, 'fill-extrusion-color', colour);
+    }
     applyBuildingZoom(ml);
   }
   function applyPoi() {
@@ -300,6 +327,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     const on = poiWanted() && labels && !look?.ownLabels;
     setVis(POI_LAYER_ID, on);
     setVis(poiDotsId(POI_LAYER_ID), on);
+    // a landmark's own badge is a place label too: without POIs (e.g. the bare "Daten" map) the model stands alone
+    poiLabelsVisible.value = on || poiLayerOn.peek();
     poiHeights?.refresh();
   }
   function applyBasemap() {

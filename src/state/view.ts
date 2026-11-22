@@ -20,6 +20,8 @@ export const buildings3d = signal(true);
 export const poiBasemap = signal(true);
 /** The layer "Orte und Läden" is on: it draws the places itself (with its filter), the basemap's own step aside. Written by the layer. */
 export const poiLayerOn = signal(false);
+/** Place labels are on (basemap POIs in "Erkunden" or the layer "Orte und Läden"): the Pro landmark badges follow this. Written by the map engine. */
+export const poiLabelsVisible = signal(false);
 export const setBuildings3d = (on: boolean) => {
   buildings3d.value = on;
 };
@@ -35,9 +37,11 @@ export const mapDark = signal(false);
 /** The layer "3D-Gebäude" (type OSM) is on: with Orbis Pro its buildings are drawn by Orbis' own 3D renderer in the close view (features/buildings3d/roofs-source.ts), with roofs and the colours of OSM. Written by the layer. */
 export const buildingsDetailed = signal(false);
 /** The layer "3D-Gebäude" draws its buildings in the colours OSM knows (option "Eingefärbt"); off: all in one plain colour, 2.5D and with Orbis Pro. Written by the layer. */
-export const buildingsColoured = signal(true);
+export const buildingsColoured = signal(false);
 /** The layer "3D-Gebäude" is switched on (any type). Written by the layer. */
 export const buildingsLayerOn = signal(false);
+/** The layer's type "Gebäude" wants the basemap's plain 2.5D buildings even where the Karte mode (Daten/Fahren) hides them. Written by the layer. */
+export const buildingsPlainWanted = signal(false);
 /** The colour the 2.5D buildings of the shown basemap have (dark on the dark map, light on the light one): buildings without a colour of their own get it, also with Orbis Pro. Written by the map engine. */
 export const buildingColour = signal('#d6dae3');
 /** Visible bounds and size in px; undefined before the map is ready. */

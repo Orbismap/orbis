@@ -7,7 +7,7 @@
 import { markerLayerId } from '../map/slots';
 import { effect } from '@preact/signals';
 import { mapEngine } from '../state/ui';
-import { mapDark, projection } from '../state/view';
+import { mapDark, poiLabelsVisible, projection } from '../state/view';
 import { reducedMotion } from '../state/settings';
 import { buildingHeightFactor } from '../map/buildings-tilt';
 import type { MapEngine } from '../map/types';
@@ -52,6 +52,7 @@ function makeHost(engine: MapEngine): ExtensionHost {
     reportTilesets: (state) => { tilesetsState.value = state; },
     holdCamera: () => engine.holdCamera(),
     buildingHeightFactor: () => buildingHeightFactor(engine.ml),
+    landmarkLabels: poiLabelsVisible,
     reducedMotion,
     follow: { wanted: followWanted, report: (ref) => { followCurrent.value = ref; } },
   };
