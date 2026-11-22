@@ -76,7 +76,7 @@ export default defineLayer({
       effect(() => {
         const on = typ() === 'osm';
         if (ml.getLayer(layerId)) {
-          // with Orbis Pro the detailed buildings (roofs-source.ts) take over from zoom 16: then this layer steps aside too
+          // with Orbis Pro the detailed buildings (roofs-source.ts) take over from zoom 13.5: then this layer steps aside too
           ml.setLayoutProperty(layerId, 'visibility', on && !buildingsChannel.presented.value ? 'visible' : 'none');
           ml.setPaintProperty(layerId, 'fill-extrusion-opacity', ctx.opacity.value);
         }

@@ -13,8 +13,8 @@ import type { LandmarkSample } from '../../ext/types';
 import { watchLandmarkBuildings } from '../../map/landmark-buildings';
 import { mapEngine } from '../../state/ui';
 
-/** The lowest minZoom of the dataset: nothing is asked for below. */
-export const LANDMARK_MIN_ZOOM = 13;
+/** Every landmark is drawn from here on, whatever minZoom the dataset gives it: the zoom the 2.5D buildings start at. */
+export const LANDMARK_MIN_ZOOM = 13.5;
 const SCAN_DELAY_MS = 200;
 /** Landmarks this far outside of the view (share of the view) are kept ready. */
 const MARGIN = 0.3;
@@ -58,7 +58,7 @@ export function startLandmarks(): () => void {
         const seen = new Set<string>();
         const items: LandmarkSample[] = [];
         for (const l of lists.flat()) {
-          if (seen.has(l.id) || l.minZoom > zoom) continue;
+          if (seen.has(l.id)) continue;
           const [bw, bs, be, bn] = l.bounds;
           if (be < w || bw > e || bn < s || bs > n) continue;
           seen.add(l.id);

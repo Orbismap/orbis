@@ -179,7 +179,7 @@ export const extension: OrbisExtension = {
       evaluateTrees();
     });
     evaluateTrees();
-    // Buildings: the layer publishes them from zoom 16 and an empty list below; while they are drawn the basemap's 2.5D houses step aside.
+    // Buildings: the layer publishes them from zoom 13.5 and an empty list below; while they are drawn the basemap's 2.5D houses step aside.
     let buildingsOn = false;
     let buildingsRelease: (() => void) | null = null;
     const stopBuildings = host.buildings.subscribe((items) => {

@@ -1,9 +1,9 @@
 // Buildings of the layer "3D-Gebäude" (type OSM) in the close view: no setting of their own, they come with Orbis Pro. While the layer is on and Pro
-// runs, Orbis' own 3D renderer (`pro/gebaeude/`) draws ALL buildings of the view from zoom 16 on, and the 2.5D buildings step aside
+// runs, Orbis' own 3D renderer (`pro/gebaeude/`) draws ALL buildings of the view from zoom 13.5 on (where the 2.5D buildings start), and the 2.5D buildings step aside
 // (engine.ts, `buildingsChannel.presented`). Without the layer the basemap shows only its 2.5D buildings.
 // The samples: the buildings with a roof tag from our PMTiles `roofs` (OpenStreetMap, bucket orbis-osm; zoom 15 overzoomed) with all their
 // tags, plus the other buildings of the OpenFreeMap tiles (flat roof, their height and colour). OpenFreeMap buildings that a roof sample
-// is the same building as are left out, so a building is drawn once. Below zoom 16 nothing is published and the 2.5D buildings stay.
+// is the same building as are left out, so a building is drawn once. Below zoom 13.5 nothing is published and the 2.5D buildings stay.
 // Where a real city model is in view (Plateau, Google 3D tiles) this stays out: the model brings its own.
 import { effect } from '@preact/signals';
 import { osmPmtilesUrl } from '../../data/osmfiles';
@@ -17,8 +17,8 @@ import { ensurePmtilesProtocol } from '../../map/pmtiles-protocol';
 import { mapEngine } from '../../state/ui';
 import { buildingsDetailed } from '../../state/view';
 
-/** Below this the 2.5D houses are enough (and one view would hold too many buildings). */
-export const ROOF_MIN_ZOOM = 16;
+/** The same zoom the 2.5D buildings start at (`minzoom` 13.5 of their layers). The roof tiles hold data from zoom 15, below that only the OpenFreeMap buildings count; the sample caps keep a wide view small. */
+export const ROOF_MIN_ZOOM = 13.5;
 const SRC = 'buildings3d-roofs';
 const SCAN_DELAY_MS = 250;
 /** Buildings without a colour in OSM (the same as in that layer's 2.5D buildings). */
