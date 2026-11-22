@@ -213,12 +213,6 @@ export class GeoFrame {
     return (w / this.pxDistance) * (unitM / this.unitPx);
   }
 
-  /** A distance in metres along the line of sight as a difference of view depth (clip w), flat map; what a depth shift of that many metres is. */
-  depthOf(metres: number, lat: number): number {
-    const unitM = this.globe ? EARTH_RADIUS_M : CIRCUMFERENCE_M * Math.cos(rad(Math.max(-MAX_MERCATOR_LAT, Math.min(MAX_MERCATOR_LAT, lat))));
-    return (metres / unitM) * this.unitPx;
-  }
-
   /** The view depth (clip w) of the map centre: what a perspective size is measured against. */
   get centreDepth(): number {
     return Math.abs(this.clip(this.lng, this.lat, 0).w);
