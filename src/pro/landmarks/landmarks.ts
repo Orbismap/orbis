@@ -33,6 +33,12 @@ const GRID = 5;
 /** the dense net the shader clamps against: one cell about this many metres, at most MAX_CELLS along an axis */
 const CELL_M = 15;
 const MAX_CELLS = 128;
+/**
+ * A bridge is lifted by this much (m) instead of following the terrain: the terrain model (DEM) holds a bridge as a ridge of its own, so
+ * "never below the ground" would follow the ridge's ragged edge and tear the deck, and the deck would still lie in it. Raised, it stands
+ * clear of the ridge.
+ */
+const BRIDGE_LIFT_M = 6;
 /** a model's points are kept this far above the ground (m) */
 const CLEARANCE_M = 0.3;
 const M_PER_DEG_LAT = 110_574;
@@ -271,7 +277,8 @@ export class LandmarksPart implements StagePart {
       e.coarse[i] = v;
     }
     e.ground = base;
-    if (moved && any) this.readDense(e);
+    // a bridge is not clamped to the terrain (see BRIDGE_LIFT_M): its net stays 0
+    if (moved && any && e.sample.kind !== 'bridge') this.readDense(e);
     return moved;
   }
 
@@ -366,7 +373,7 @@ export class LandmarksPart implements StagePart {
       // the file has its bearing and scale baked in: placed unturned, at true size
       // flattened, the model is lifted by up to MIN_HEIGHT_M, like the 2.5D buildings (their height is MIN_HEIGHT_M + the share): the map's
       // terrain is only a metre or two exact, and under a model a few decimetres high it would cover the feet of it
-      frame.place(this.matrix, lon, s.lat, e.ground + s.elevationM + MIN_HEIGHT_M * (1 - flat));
+      frame.place(this.matrix, lon, s.lat, e.ground + s.elevationM + MIN_HEIGHT_M * (1 - flat) + (s.kind === 'bridge' ? BRIDGE_LIFT_M : 0));
       // seen from above the model is flatter, like the 2.5D buildings: one factor on its height (steps keep their proportions),
       // but never below MIN_HEIGHT_M. The file's y is up.
       const up = s.heightM > 0 ? Math.max(flat, Math.min(1, MIN_HEIGHT_M / s.heightM)) : flat;
