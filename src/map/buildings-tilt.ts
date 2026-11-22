@@ -46,7 +46,9 @@ const MAX_BUILDING_BONUS = 0.5;
 /** Lets the 2.5D building layers start at a lower zoom the more the view is tilted (see pitchZoomBonus). Only changes what differs. */
 export function applyBuildingZoom(ml: MlMap) {
   const min = BUILDING_MIN_ZOOM - Math.min(MAX_BUILDING_BONUS, pitchZoomBonus(ml.getPitch()));
-  for (const l of ml.getStyle().layers ?? []) {
+  const style = ml.getStyle();
+  if (!style) return;
+  for (const l of style.layers ?? []) {
     const sl = l as { id: string; type: string; minzoom?: number; maxzoom?: number; 'source-layer'?: string };
     if (sl.type !== 'fill-extrusion' || sl['source-layer'] !== 'building' || sl.minzoom === undefined) continue;
     // only the layers that start where the buildings start (the others are not ours to move)
@@ -161,7 +163,16 @@ export function installBuildingsTilt(ml: MlMap): () => void {
   };
   // fires when a tile's buckets arrive on the main thread, i.e. before the frame that first draws them
   ml.on('sourcedata', check);
-  return () => { ml.off('sourcedata', check); if (activeMap === ml) activeMap = undefined; };
+  ml.on('idle', check);
+  // a bucket can arrive between events; without the patch the composite expression draws the raw z*H heights (many times
+  // a house's own height), so keep looking until a binder is there or the static fallback is in place
+  const retry = setInterval(() => { if (patched || fellBack) { clearInterval(retry); return; } check(); }, 250);
+  return () => {
+    ml.off('sourcedata', check);
+    ml.off('idle', check);
+    clearInterval(retry);
+    if (activeMap === ml) activeMap = undefined;
+  };
 }
 
 /** Test/debug hook: whether the patch is active, and the factor last handed to the shader. */

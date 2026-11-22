@@ -160,15 +160,28 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     writeCamera();
   };
   const ready = new Promise<void>((resolve) => {
-    const finish = () => { try { resolveReady(); } catch (e) { console.error('ready resolveReady error', e); } resolve(); };
-    if (ml.isStyleLoaded()) { finish(); return; }
     let done = false;
-    const wrap = () => { if (done) return; done = true; finish(); };
-    ml.once('style.load', wrap);
-    ml.once('load', wrap);
-    // fallback: poll
-    const iv = setInterval(() => { if (ml.isStyleLoaded()) { clearInterval(iv); wrap(); } }, 100);
-    setTimeout(() => { clearInterval(iv); wrap(); }, 5000);
+    let iv: ReturnType<typeof setInterval> | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Everything resolveReady does (setProjection, applyBasemap, addLayer) needs a fully loaded style: getStyle() is
+    // undefined until then, and resolving early made the layers and Pro mount against a half style (and left the
+    // tilt height patch uninstalled, which draws the 2.5D houses at their raw z*H height at high zoom).
+    function finish() {
+      if (done || !ml.isStyleLoaded()) return;
+      done = true;
+      if (iv !== undefined) clearInterval(iv);
+      if (timer !== undefined) clearTimeout(timer);
+      ml.off('load', check);
+      try { resolveReady(); } catch (e) { console.error('ready resolveReady error', e); }
+      resolve();
+    }
+    function check() { if (ml.isStyleLoaded()) finish(); }
+    // defer even when the style is already there: the rest of createMapEngine (terrain state, effects) must be set up first
+    if (ml.isStyleLoaded()) { queueMicrotask(finish); return; }
+    ml.on('load', check);
+    iv = setInterval(check, 50);
+    // last resort for a source that never loads: never resolve against a half style
+    timer = setTimeout(() => { if (ml.isStyleLoaded()) finish(); else console.error('[map] style did not load in time'); }, 30_000);
   });
 
   // ---- camera <-> state/view ------------------------------------------------
