@@ -17,8 +17,9 @@ import { registerPmtilesProtocol } from './pmtiles-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
 import { landmarkMask } from '../data/landmarks';
 import { startPoiHeights, type PoiHeights } from './poi-heights';
-import { POI_ICON_NAMES, POI_LAYER_ID, poiDotsId, poiFilter, poiKind, poiOccluded } from './poi';
+import { POI_ICON_SPECS, POI_LAYER_ID, poiDotsId, poiFilter, poiKind, poiOccluded } from './poi';
 import { ensureIcons } from '../render/icons';
+import { ensurePoiIcons } from '../render/poi-icons';
 import { activeMembers, loadRegional, memberIds, membersOf, regionalDef, regionalEntry, regionalReady, type Bounds } from './basemaps/regional';
 import { clampCamera, ENGINE_MAX_PITCH, flyToTarget, locate as locateImpl } from './camera';
 import { attachCameraLimits } from './limits';
@@ -106,7 +107,8 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     renderWorldCopies: true,
   });
   ml.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
-  ensureIcons(ml, POI_ICON_NAMES);
+  ensureIcons(ml);
+  ensurePoiIcons(ml, POI_ICON_SPECS);
   if (import.meta.env?.DEV) ml.on('error', (e) => console.warn('[map]', e.error?.message ?? e));
 
   const disposeBuildingsTilt = installBuildingsTilt(ml);

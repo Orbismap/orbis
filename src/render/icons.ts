@@ -26,19 +26,6 @@ const star = (): Draw => (g) => {
 };
 
 
-/** A round badge with `cut` (a path) taken out of it, and `fill` drawn back into the hole (windows, handles): a coloured disc with a symbol in it. */
-const badge = (cut: Draw, back?: Draw): Draw => (g) => {
-  g.beginPath();
-  g.arc(0.5, 0.5, 0.5, 0, Math.PI * 2);
-  g.fill();
-  g.globalCompositeOperation = 'destination-out';
-  g.beginPath();
-  cut(g);
-  g.fill();
-  g.globalCompositeOperation = 'source-over';
-  back?.(g);
-};
-
 export const SHAPES = {
   dot: (g) => {
     g.beginPath();
@@ -206,63 +193,6 @@ export const SHAPES = {
     g.arc(0.5, 0.16, 0.06, 0, Math.PI * 2);
     g.fill();
   },
-  // Map points of interest (map/poi.ts): a round badge with the symbol cut out, so it takes the colour of the group
-  'poi-essen': badge((g) => {
-    for (const x of [0.3, 0.375, 0.45]) g.rect(x, 0.26, 0.04, 0.2);
-    g.rect(0.3, 0.42, 0.19, 0.08);
-    g.rect(0.375, 0.46, 0.04, 0.28);
-    g.moveTo(0.56, 0.26);
-    g.quadraticCurveTo(0.7, 0.3, 0.66, 0.54);
-    g.lineTo(0.6, 0.54);
-    g.lineTo(0.6, 0.74);
-    g.lineTo(0.56, 0.74);
-    g.closePath();
-  }),
-  'poi-einkaufen': badge((g) => {
-    g.moveTo(0.3, 0.42);
-    g.lineTo(0.7, 0.42);
-    g.lineTo(0.74, 0.74);
-    g.lineTo(0.26, 0.74);
-    g.closePath();
-    g.moveTo(0.62, 0.42); // handle: a thin arch over the bag
-    g.arc(0.5, 0.42, 0.12, 0, Math.PI, true);
-    g.lineTo(0.43, 0.42);
-    g.arc(0.5, 0.42, 0.07, Math.PI, 0, false);
-    g.closePath();
-  }),
-  'poi-kultur': badge((g) => {
-    for (let i = 0; i < 10; i++) {
-      const r = i % 2 ? 0.1 : 0.27;
-      const a = (Math.PI / 5) * i - Math.PI / 2;
-      g[i ? 'lineTo' : 'moveTo'](0.5 + r * Math.cos(a), 0.53 + r * Math.sin(a));
-    }
-    g.closePath();
-  }),
-  'poi-unterkunft': badge((g) => {
-    g.rect(0.26, 0.3, 0.05, 0.4);
-    g.rect(0.26, 0.54, 0.48, 0.08);
-    g.rect(0.43, 0.42, 0.31, 0.1);
-    g.rect(0.69, 0.54, 0.05, 0.16);
-  }),
-  'poi-verkehr': badge((g) => {
-    g.rect(0.29, 0.26, 0.42, 0.38);
-    g.moveTo(0.34, 0.7);
-    g.arc(0.38, 0.7, 0.05, 0, Math.PI * 2);
-    g.moveTo(0.67, 0.7);
-    g.arc(0.62, 0.7, 0.05, 0, Math.PI * 2);
-  }, (g) => g.fillRect(0.34, 0.31, 0.32, 0.13)),
-  'poi-gesundheit': badge((g) => {
-    g.rect(0.43, 0.26, 0.14, 0.48);
-    g.rect(0.26, 0.43, 0.48, 0.14);
-  }),
-  'poi-freizeit': badge((g) => {
-    g.moveTo(0.7, 0.4);
-    g.arc(0.5, 0.4, 0.2, 0, Math.PI * 2);
-    g.rect(0.46, 0.56, 0.08, 0.2);
-  }),
-  'poi-sonst': badge((g) => {
-    g.arc(0.5, 0.5, 0.14, 0, Math.PI * 2);
-  }),
 } satisfies Record<string, Draw>;
 
 export type IconShape = keyof typeof SHAPES;

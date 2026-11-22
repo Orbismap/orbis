@@ -40,7 +40,7 @@ export default defineLayer({
     const off = ctx.map.onPick([places], {
       click(f) {
         const p = (f.properties ?? {}) as Record<string, unknown>;
-        const group = poiGroupOf(p.class);
+        const group = poiGroupOf(p);
         const kind = poiKind(p);
         const card: InspectCard = {
           title: String(p['name:latin'] ?? p.name ?? kind),
