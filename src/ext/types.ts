@@ -254,6 +254,8 @@ export interface ExtensionHost {
   holdCamera(): (ease?: { elevation: number }) => void;
   /** Share of their real height that buildings have at the camera's tilt now (the 2.5D buildings use it too): 0.1 from above, 1 when tilted. */
   buildingHeightFactor(): number;
+  /** True while the basemap is a dark one: models light their windows, lamps and signs then. */
+  readonly mapDark: ReadonlySignal<boolean>;
   /** True when the user wants less motion (setting or OS). */
   reducedMotion(): boolean;
   /**

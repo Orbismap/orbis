@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { Map as MlMap } from 'maplibre-gl';
+import type { ReadonlySignal } from '@preact/signals';
 import type { LandmarkSample } from '../../ext/types';
 import type { GeoFrame } from '../world3d/frame';
 import type { Stage, StagePart } from '../world3d/stage';
@@ -34,6 +35,32 @@ const DRAPE_FROM_M = 10;
 const DRAPE_TO_M = 80;
 const M_PER_DEG_LAT = 110_574;
 const M_PER_DEG_LNG = 111_320;
+
+/**
+ * The lights of a model at night, by the material's name like in the dataset (tools/render.ts there): `window*` and `entrance` glow warm,
+ * `lamp*` pale, `neon*` in their own colour. The glow is emissive, so the stage's light does not change it; the base colour goes dark.
+ */
+const GLOW: [RegExp, (base: THREE.Color) => THREE.Color][] = [
+  [/^(window|entrance)/, () => new THREE.Color().setRGB(1, 0.72, 0.4, THREE.LinearSRGBColorSpace)],
+  [/^lamp/, () => new THREE.Color().setRGB(1, 0.8, 0.55, THREE.LinearSRGBColorSpace)],
+  [/^neon/, (c) => new THREE.Color().setRGB(Math.min(1, c.r * 1.3 + 0.04), Math.min(1, c.g * 1.3 + 0.04), Math.min(1, c.b * 1.3 + 0.04), THREE.LinearSRGBColorSpace)],
+];
+function setNight(m: THREE.Material, on: boolean) {
+  const lambert = m as THREE.MeshLambertMaterial;
+  const glow = GLOW.find(([re]) => re.test(m.name))?.[1];
+  if (!glow || !lambert.emissive) return;
+  const saved = (m.userData.day ??= { color: lambert.color.clone(), emissive: lambert.emissive.clone(), intensity: lambert.emissiveIntensity }) as { color: THREE.Color; emissive: THREE.Color; intensity: number };
+  if (on) {
+    lambert.emissive.copy(glow(saved.color));
+    lambert.emissiveIntensity = 1;
+    lambert.color.copy(saved.color).multiplyScalar(0.25);
+  } else {
+    lambert.emissive.copy(saved.emissive);
+    lambert.emissiveIntensity = saved.intensity;
+    lambert.color.copy(saved.color);
+  }
+  lambert.needsUpdate = true;
+}
 
 interface Drape {
   /** west, south, east, north of the footprint box in metres from the anchor (x east, y north) */
@@ -91,6 +118,7 @@ function toLambert(model: THREE.Object3D) {
     const convert = (m: THREE.Material): THREE.Material => {
       const s = m as THREE.MeshStandardMaterial;
       const out = new THREE.MeshLambertMaterial({
+        name: s.name,
         color: s.color ?? 0xffffff,
         map: s.map ?? null,
         vertexColors: !!mesh.geometry.getAttribute('color'),
@@ -131,9 +159,17 @@ export class LandmarksPart implements StagePart {
   private drawn = 0;
   private matrix = new THREE.Matrix4();
   private squash = new THREE.Matrix4();
+  /** the basemap is dark: the windows are lit */
+  private night = false;
+  private stopDark?: () => void;
 
-  constructor(private map: MlMap, private stage: Stage, private heightFactor: () => number = () => 1) {
+  constructor(private map: MlMap, private stage: Stage, private heightFactor: () => number = () => 1, dark?: ReadonlySignal<boolean>) {
     this.object.visible = false;
+    this.stopDark = dark?.subscribe((on) => {
+      this.night = on;
+      for (const e of this.entries.values()) for (const m of e.materials) setNight(m, on);
+      this.stage.wake();
+    });
   }
 
   get count() {
@@ -230,7 +266,7 @@ export class LandmarksPart implements StagePart {
         copy.traverse((o) => {
           const mesh = o as THREE.Mesh;
           if (!mesh.isMesh) return;
-          const own = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((m) => { const c = m.clone(); drape(c, e.drape); e.materials.push(c); return c; });
+          const own = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((m) => { const c = m.clone(); drape(c, e.drape); setNight(c, this.night); e.materials.push(c); return c; });
           mesh.material = Array.isArray(mesh.material) ? own : own[0]!;
         });
         e.root.add(copy);
@@ -301,6 +337,7 @@ export class LandmarksPart implements StagePart {
   }
 
   dispose() {
+    this.stopDark?.();
     this.map.off('idle', this.onIdle);
     for (const e of this.entries.values()) for (const m of e.materials) m.dispose();
     for (const m of this.models.values()) if (m) disposeModel(m);

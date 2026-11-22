@@ -7,7 +7,7 @@
 import { markerLayerId } from '../map/slots';
 import { effect } from '@preact/signals';
 import { mapEngine } from '../state/ui';
-import { projection } from '../state/view';
+import { mapDark, projection } from '../state/view';
 import { reducedMotion } from '../state/settings';
 import { buildingHeightFactor } from '../map/buildings-tilt';
 import type { MapEngine } from '../map/types';
@@ -41,6 +41,7 @@ function makeHost(engine: MapEngine): ExtensionHost {
       if (at >= 0 && next) ml.moveLayer(id, next.id);
     },
     projection,
+    mapDark,
     tracks: tracksChannel,
     ships: shipsChannel,
     power: powerChannel,

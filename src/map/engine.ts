@@ -9,7 +9,7 @@ import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { activeBasemap as activeBasemapSignal, buildings3d, buildingsReplaced, camera, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
+import { activeBasemap as activeBasemapSignal, buildings3d, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, showsRelief, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { registerKeyedTiles } from './basemaps/keyed-protocol';
@@ -260,6 +260,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].layers) setVis(l.id, id === shown);
     applyBuildings();
     const look = regional ?? BASEMAPS[shown ?? DEFAULT_BASEMAP];
+    mapDark.value = look.theme === 'dark';
     for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) setVis(l.id, labels && !look.ownLabels && v === look.labelVariant);
     container.style.background = look.background;
     ml.setSky(skyFor(look.theme));
