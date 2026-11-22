@@ -6,6 +6,7 @@ import type { ReadonlySignal } from '@preact/signals';
 import type { LandmarkSample } from '../../ext/types';
 import type { GeoFrame } from '../world3d/frame';
 import type { Stage, StagePart } from '../world3d/stage';
+import { exaggeration } from '../world3d/terrain';
 
 // 3D landmarks: the low-poly GLB models of the Landmarks dataset (CC0), each standing where its OpenStreetMap building is. The base
 // finds the landmarks near the view and hides the buildings they replace (features/landmarks/source.ts); this part loads the models
@@ -69,6 +70,8 @@ interface Drape {
   uBox: { value: THREE.Vector4 };
   /** the ground above the lowest point (m), one value per cell of the dense net, rows from the south (the texture `data` is the source of) */
   uTerrain: { value: THREE.DataTexture };
+  /** the terrain's exaggeration of the moment: the net holds real heights */
+  uEx: { value: number };
   /** the height the model is lifted by in the world, the flattened ones (metres) */
   uLift: { value: number };
   /** cells of the net: east, north */
@@ -105,8 +108,9 @@ function drape(material: THREE.Material, d: Drape) {
     shader.uniforms.uGrid = d.uGrid;
     shader.uniforms.uUp = d.uUp;
     shader.uniforms.uLift = d.uLift;
+    shader.uniforms.uEx = d.uEx;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform vec4 uBox;\nuniform sampler2D uTerrain;\nuniform vec2 uGrid;\nuniform float uUp;\nuniform float uLift;')
+      .replace('#include <common>', '#include <common>\nuniform vec4 uBox;\nuniform sampler2D uTerrain;\nuniform vec2 uGrid;\nuniform float uUp;\nuniform float uLift;\nuniform float uEx;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
       {
         // the file's frame: x east, y up, z south; the ground at this point's place, bilinear over the net (the texture is nearest-filtered)
@@ -118,7 +122,7 @@ function drape(material: THREE.Material, d: Drape) {
           mix(texture2D(uTerrain, (vec2(i0.x, i0.y) + 0.5) / uGrid).r, texture2D(uTerrain, (vec2(i1.x, i0.y) + 0.5) / uGrid).r, f.x),
           mix(texture2D(uTerrain, (vec2(i0.x, i1.y) + 0.5) / uGrid).r, texture2D(uTerrain, (vec2(i1.x, i1.y) + 0.5) / uGrid).r, f.x), f.y);
         // world height of a point = base + lift + y * uUp: never below the ground (+ a little)
-        transformed.y = max(transformed.y, (h + ${CLEARANCE_M.toFixed(2)} - uLift) / uUp);
+        transformed.y = max(transformed.y, (h * uEx + ${CLEARANCE_M.toFixed(2)} - uLift) / uUp);
       }`);
   };
   material.customProgramCacheKey = () => 'landmark-drape';
@@ -225,7 +229,7 @@ export class LandmarksPart implements StagePart {
       tex.needsUpdate = true;
       const entry: Entry = {
         sample, root, ground: 0, filled: false, materials: [], heights, coarse: new Float32Array(GRID * GRID),
-        drape: { uBox: { value: new THREE.Vector4((w - sample.lng) * kx, (so - sample.lat) * M_PER_DEG_LAT, (e - sample.lng) * kx, (n - sample.lat) * M_PER_DEG_LAT) }, uTerrain: { value: tex }, uGrid: { value: new THREE.Vector2(nx, ny) }, uLift: { value: 0 }, uUp: { value: 1 } },
+        drape: { uBox: { value: new THREE.Vector4((w - sample.lng) * kx, (so - sample.lat) * M_PER_DEG_LAT, (e - sample.lng) * kx, (n - sample.lat) * M_PER_DEG_LAT) }, uTerrain: { value: tex }, uGrid: { value: new THREE.Vector2(nx, ny) }, uLift: { value: 0 }, uEx: { value: 1 }, uUp: { value: 1 } },
       };
       this.readGround(entry);
       next.set(sample.id, entry);
@@ -257,8 +261,9 @@ export class LandmarksPart implements StagePart {
     let any = false;
     for (let j = 0; j < GRID; j++) {
       for (let i = 0; i < GRID; i++) {
-        const v = this.map.queryTerrainElevation({ lng: w + ((ea - w) * i) / (GRID - 1), lat: so + ((n - so) * j) / (GRID - 1) });
-        const ok = typeof v === 'number' && Number.isFinite(v);
+        // real heights (without the terrain's exaggeration): the shader and the placement multiply by the exaggeration of the moment
+        const v = this.realGround(w + ((ea - w) * i) / (GRID - 1), so + ((n - so) * j) / (GRID - 1));
+        const ok = v !== undefined;
         h[j * GRID + i] = ok ? v : NaN;
         if (ok) { low = Math.min(low, v); any = true; }
       }
@@ -275,14 +280,21 @@ export class LandmarksPart implements StagePart {
     return moved;
   }
 
+  /** The real terrain height at a place (m, without exaggeration); undefined while there is no terrain there (yet). */
+  private realGround(lng: number, lat: number): number | undefined {
+    const ex = exaggeration(this.map);
+    const h = ex > 0.05 ? this.map.queryTerrainElevation({ lng, lat }) : undefined;
+    return typeof h === 'number' && Number.isFinite(h) ? h / ex : undefined;
+  }
+
   /** The dense net: the ground height above the base at every cell (0 where the terrain is not loaded yet). */
   private readDense(e: Entry) {
     const [w, so, ea, n] = e.sample.bounds;
     const { x: nx, y: ny } = e.drape.uGrid.value;
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
-        const v = this.map.queryTerrainElevation({ lng: w + ((ea - w) * i) / (nx - 1), lat: so + ((n - so) * j) / (ny - 1) });
-        e.heights[j * nx + i] = typeof v === 'number' && Number.isFinite(v) ? Math.max(0, v - e.ground) : 0;
+        const v = this.realGround(w + ((ea - w) * i) / (nx - 1), so + ((n - so) * j) / (ny - 1));
+        e.heights[j * nx + i] = v !== undefined ? Math.max(0, v - e.ground) : 0;
       }
     }
     e.drape.uTerrain.value.needsUpdate = true;
@@ -355,6 +367,7 @@ export class LandmarksPart implements StagePart {
     const padLat = (b.getNorth() - b.getSouth()) * VIEW_MARGIN;
     let drawn = 0;
     const flat = this.heightFactor();
+    const ex = exaggeration(this.map);
     for (const e of this.entries.values()) {
       const s = e.sample;
       const lon = s.lng + 360 * Math.round((centre.lng - s.lng) / 360);
@@ -362,15 +375,16 @@ export class LandmarksPart implements StagePart {
       const shift = lon - s.lng;
       const [bw, bs, be, bn] = s.bounds;
       const out = be + shift < b.getWest() - padLon || bw + shift > b.getEast() + padLon || bn < b.getSouth() - padLat || bs > b.getNorth() + padLat;
-      if (out || !e.filled || frame.occluded(lon, s.lat, e.ground)) { e.root.visible = false; continue; }
+      if (out || !e.filled || frame.occluded(lon, s.lat, e.ground * ex)) { e.root.visible = false; continue; }
       // the file has its bearing and scale baked in: placed unturned, at true size
       // flattened, the model is lifted by up to MIN_HEIGHT_M, like the 2.5D buildings (their height is MIN_HEIGHT_M + the share): the map's
       // terrain is only a metre or two exact, and under a model a few decimetres high it would cover the feet of it
-      frame.place(this.matrix, lon, s.lat, e.ground + s.elevationM + MIN_HEIGHT_M * (1 - flat));
+      frame.place(this.matrix, lon, s.lat, e.ground * ex + s.elevationM + MIN_HEIGHT_M * (1 - flat));
       // seen from above the model is flatter, like the 2.5D buildings: one factor on its height (steps keep their proportions),
       // but never below MIN_HEIGHT_M. The file's y is up.
       const up = s.heightM > 0 ? Math.max(flat, Math.min(1, MIN_HEIGHT_M / s.heightM)) : flat;
       e.drape.uUp.value = up;
+      e.drape.uEx.value = ex;
       e.drape.uLift.value = MIN_HEIGHT_M * (1 - flat) + s.elevationM;
       e.root.matrix.multiplyMatrices(this.matrix, TO_STAGE).multiply(this.squash.makeScale(1, up, 1));
       e.root.matrixWorldNeedsUpdate = true;

@@ -4,6 +4,7 @@ import type { BuildingSample } from '../../ext/types';
 import { unit } from '../baeume/baeume';
 import type { GeoFrame } from '../world3d/frame';
 import type { Stage, StagePart } from '../world3d/stage';
+import { exaggeration, groundAt } from '../world3d/terrain';
 import { roofColour, wallColour } from './colours';
 import { withoutSplitOutlines } from './outlines';
 import { buildBuilding, roofShapeOf, type Pt } from './roofs';
@@ -45,7 +46,7 @@ const rgb = (hex: number, shade: number): [number, number, number] => {
 
 /** Roofs and walls are as high as MapLibre's 2.5D buildings at this tilt: a share of the height (host.buildingHeightFactor) and, flattened, up to MIN_HEIGHT_M lifted. */
 const MIN_HEIGHT_M = 3;
-interface HeightUniforms { uF: { value: number }; uL: { value: number } }
+interface HeightUniforms { uF: { value: number }; uL: { value: number }; uEx: { value: number } }
 /**
  * Vertex shader: z = ground + lift + height * share, the ground (attribute `ground`, the terrain under the building) is not scaled. The
  * normals stay those of the real shape. The mesh holds the heights above the ground, so a change of the tilt costs no rebuild.
@@ -54,9 +55,10 @@ function heightPatch(material: THREE.Material, u: HeightUniforms) {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uF = u.uF;
     shader.uniforms.uL = u.uL;
+    shader.uniforms.uEx = u.uEx;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float ground;\nuniform float uF;\nuniform float uL;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\n      transformed.z = ground + uL + position.z * uF;');
+      .replace('#include <common>', '#include <common>\nattribute float ground;\nuniform float uF;\nuniform float uL;\nuniform float uEx;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n      transformed.z = ground * uEx + uL + position.z * uF;');
   };
   material.customProgramCacheKey = () => 'buildings-height';
 }
@@ -75,7 +77,7 @@ export class GebaeudePart implements StagePart {
   private drawn = false;
 
   /** the height of every building follows the camera's tilt like the 2.5D buildings of the basemap (host.buildingHeightFactor): see `heightPatch` */
-  private height: HeightUniforms = { uF: { value: 1 }, uL: { value: 0 } };
+  private height: HeightUniforms = { uF: { value: 1 }, uL: { value: 0 }, uEx: { value: 1 } };
 
   constructor(private map: MlMap, private stage: Stage, private heightFactor: () => number = () => 1) {
     const material = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, side: THREE.DoubleSide });
@@ -154,10 +156,9 @@ export class GebaeudePart implements StagePart {
     };
   }
 
-  /** Terrain height at a place (m); 0 without 3D terrain or before its tile has arrived. */
+  /** The real terrain height at a place (m, without exaggeration); the shader applies the exaggeration of the moment. */
   private terrainAt(lng: number, lat: number): number {
-    const h = this.map.queryTerrainElevation({ lng, lat });
-    return typeof h === 'number' && Number.isFinite(h) ? h : 0;
+    return groundAt(this.map, lng, lat);
   }
 
   /** Terrain tiles arrive after the buildings: when the ground under them changed, they move with it. */
@@ -211,6 +212,7 @@ export class GebaeudePart implements StagePart {
     this.mesh.visible = true;
     const f = this.heightFactor();
     this.height.uF.value = f;
+    this.height.uEx.value = exaggeration(this.map);
     this.height.uL.value = MIN_HEIGHT_M * (1 - f);
     // x east, y north, z up in metres, origin of the mesh = the first footprint's first corner
     frame.place(this.matrix, lng + 360 * Math.round((this.map.getCenter().lng - lng) / 360), lat, 0);
