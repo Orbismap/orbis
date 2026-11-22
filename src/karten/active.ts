@@ -216,6 +216,12 @@ export function setBasemap(karteId: string, basemap: BasemapId): void {
   if (isOwn(karteId)) editKarte(karteId, (k) => ({ ...k, basemap }));
   else viewOverride.value = { ...viewOverride.peek(), basemap };
 }
+/** Drops a session basemap choice again, so the Karte's own default applies (e.g. for a link carrying that default). */
+export function clearBasemap(): void {
+  if (viewOverride.peek().basemap === undefined) return;
+  const { basemap: _basemap, ...rest } = viewOverride.peek();
+  viewOverride.value = rest;
+}
 export function setLabels(karteId: string, labels: boolean): void {
   if (isOwn(karteId)) editKarte(karteId, (k) => ({ ...k, labels }));
   else viewOverride.value = { ...viewOverride.peek(), labels };

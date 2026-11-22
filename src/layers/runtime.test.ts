@@ -131,6 +131,38 @@ describe('runtime', () => {
     stop();
   });
 
+  it('mounts the Erkunden background layers without activating them or writing l=', async () => {
+    const store = await import('../karten/store');
+    const active = await import('../karten/active');
+    const session = await import('../state/session');
+    const view = await import('../state/view');
+    const { currentUrlState } = await import('../state/url-sync');
+    const { serializeHash } = await import('../core/url');
+    const { startRuntime } = await import('./runtime');
+    fakes.baeume = mk('baeume');
+    fakes.strassenmarkierungen = mk('strassenmarkierungen');
+    store.customKarten.value = [testKarte('t', [])];
+    session.setActiveKarte('t');
+    view.karteMode.value = 'daten';
+    const stop = startRuntime(engine() as never);
+    await tick();
+    expect(calls).not.toContain('mount:baeume');
+
+    view.karteMode.value = 'erkunden';
+    await tick();
+    expect(calls).toContain('mount:baeume');
+    expect(calls).toContain('mount:strassenmarkierungen');
+    expect(active.activeIds.value).toEqual([]);
+    expect(serializeHash(currentUrlState())).not.toContain('l=');
+
+    view.karteMode.value = 'fahren';
+    await tick();
+    expect(calls).toContain('destroy:baeume');
+    expect(calls).toContain('destroy:strassenmarkierungen');
+    stop();
+    view.karteMode.value = 'erkunden';
+  });
+
   it('probeAt collects the probes of mounted layers', async () => {
     const store = await import('../karten/store');
     const session = await import('../state/session');

@@ -3,6 +3,7 @@
 // so that data layers carry the picture.
 import type { ExpressionSpecification, LayerSpecification, SourceSpecification } from 'maplibre-gl';
 import type { BasemapDef, LabelVariant } from './types';
+import type { BasemapId } from '../types';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT, OFM_BUILDINGS_SOURCE_ID } from '../buildings-tilt';
 import { karteLabelLayers } from './karte-labels';
 
@@ -45,9 +46,11 @@ const PALETTE: Record<'dark' | 'light', Palette> = {
 
 const hidden = { visibility: 'none' as const };
 
-export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
+/** `as` gives a mode its own basemap id (and layer ids) while it reuses the look of the plain Orbis map. */
+export function vectorBasemap(theme: 'dark' | 'light', as?: { id: BasemapId; label: string }): BasemapDef {
   const c = PALETTE[theme];
-  const id = (s: string) => `bm-orbis-${theme}-${s}`;
+  const key = as?.id ?? `orbis-${theme}`;
+  const id = (s: string) => `bm-${key}-${s}`;
   const roadWidth = (base: number): ExpressionSpecification => ['interpolate', ['exponential', 1.5], ['zoom'], 5, base * 0.3, 10, base, 16, base * 6];
   const roadLayout = { ...hidden, 'line-cap': 'round' as const, 'line-join': 'round' as const };
   const minorClasses = ['literal', ['secondary', 'tertiary', 'minor', 'street']] as ExpressionSpecification;
@@ -121,8 +124,8 @@ export function vectorBasemap(theme: 'dark' | 'light'): BasemapDef {
     },
   ];
   return {
-    id: theme === 'dark' ? 'orbis-dark' : 'orbis-light',
-    label: theme === 'dark' ? 'Orbis dunkel' : 'Orbis hell',
+    id: key,
+    label: as?.label ?? (theme === 'dark' ? 'Orbis dunkel' : 'Orbis hell'),
     sources: {},
     layers,
     topLayers,

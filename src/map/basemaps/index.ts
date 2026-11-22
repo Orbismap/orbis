@@ -51,13 +51,18 @@ export const AERIAL_IDS: StaticBasemapId[] = AERIAL_GROUPS.flatMap((g) => g.ids)
 export const isAerial = (id: string | undefined): boolean => !!id && AERIAL_SET.has(id);
 /** Plain maps by provider, best first: Orbis, Esri, OpenStreetMap, the rest, and the maps of providers with the user's own key. */
 export const KARTE_GROUPS: BasemapGroup[] = [
-  { title: 'Orbis', ids: ['orbis-dark', 'orbis-light', 'orbis-karte'] },
+  { title: 'Orbis', ids: ['orbis-dark', 'orbis-light'] },
   { title: 'Esri', ids: ['esri-dark-gray', 'esri-light-gray', 'esri-streets', 'esri-topo', 'esri-natgeo', 'esri-navigation', 'esri-terrain', 'esri-shaded-relief', 'esri-physical', 'esri-hillshade', 'esri-ocean'] },
   { title: 'OpenStreetMap', ids: ['osm', 'osm-hot', 'osm-fr', 'osm-de', 'wikimedia', 'cyclosm', 'oepnv', 'terrain'] },
   { title: 'Weitere', ids: ['blank'] },
   ...keyedByKind(false),
 ];
 export const KARTE_IDS: StaticBasemapId[] = KARTE_GROUPS.flatMap((g) => g.ids);
+/** The single maps of the modes that have no list in Daten: Erkunden has its Orbis Karte, Fahren its own dark map. */
+export const MODE_IDS: StaticBasemapId[] = ['orbis-karte', 'orbis-fahren'];
+/** Picker mode a basemap belongs to; the mode itself is not in the URL, so a reload derives it from `b=`. */
+export const modeForBasemap = (id: string | undefined): MapMode =>
+  isAerial(id) ? 'luftbild' : id === 'orbis-karte' ? 'erkunden' : id === 'orbis-fahren' ? 'fahren' : 'daten';
 /** Does the map show terrain and 2.5D buildings? Always on aerial images (the 3D tiles and the camera need the ground there). */
 export const showsRelief = (mode: KarteMode, id: string | undefined): boolean => mode === 'erkunden' || isAerial(id);
 /** Key (id of the user's key) a keyed basemap needs, or undefined for the free ones. */
@@ -65,13 +70,14 @@ export const keyOfBasemap = (id: string): string | undefined => keyedGroups().fi
 /** Hand-written regional basemaps (offered in the regional list, not in the grid). More come from regional.ts. */
 export const STATIC_REGIONAL_IDS: StaticBasemapId[] = ['swissimage', 'imagico-alps', 'swissalti3d', 'swisssurface3d'];
 /** Every static basemap (all of them are part of the composed style, hidden). */
-export const BASEMAP_IDS: StaticBasemapId[] = [...KARTE_IDS, ...AERIAL_IDS, ...STATIC_REGIONAL_IDS];
+export const BASEMAP_IDS: StaticBasemapId[] = [...KARTE_IDS, ...AERIAL_IDS, ...MODE_IDS, ...STATIC_REGIONAL_IDS];
 export const DEFAULT_BASEMAP: StaticBasemapId = 'orbis-dark';
 
 export const BASEMAPS: Record<StaticBasemapId, BasemapDef> = {
   'orbis-dark': vectorBasemap('dark'),
   'orbis-light': vectorBasemap('light'),
   'orbis-karte': karteBasemap(),
+  'orbis-fahren': vectorBasemap('dark', { id: 'orbis-fahren', label: 'Orbis Fahren' }),
   satellite: satellite(),
   'esri-clarity': esriClarity(),
   swissimage: swissimage(),
