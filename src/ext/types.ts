@@ -128,6 +128,29 @@ export interface BuildingSample {
   tags: Record<string, string>;
 }
 
+/** One 3D landmark model (a low-poly GLB that stands in for the OpenStreetMap building(s) at its place). */
+export interface LandmarkSample {
+  id: string;
+  name: string;
+  lng: number;
+  lat: number;
+  /** degrees clockwise from north that the model's north is turned to */
+  bearing: number;
+  scale: number;
+  /** metres up (positive) or down from the lowest ground under the footprint */
+  elevationM: number;
+  /** the model is drawn from this zoom on */
+  minZoom: number;
+  /** height of the model in metres, 0 when unknown */
+  heightM: number;
+  /** absolute URL of the GLB (metres; X east, Y up, Z south) */
+  url: string;
+  /** [west, south, east, north] of its footprint */
+  bounds: [number, number, number, number];
+  /** feature ids these buildings have in the OpenFreeMap tiles (the base hides them, the model has priority) */
+  osmIds: number[];
+}
+
 /** One streamed 3D tileset (a city model) the base layer offers; the extension loads and draws it. */
 export interface TilesetSample {
   /** unique within the layer */
@@ -220,6 +243,8 @@ export interface ExtensionHost {
   readonly trees: TracksChannel<TreeSample>;
   /** Channel for building footprints with their roof and height tags (`features/buildings3d/roofs-source.ts`, no layer). */
   readonly buildings: TracksChannel<BuildingSample>;
+  /** Channel for 3D landmark models (`features/landmarks/source.ts`, no layer: they are always drawn, in front of OSM buildings). */
+  readonly landmarks: TracksChannel<LandmarkSample>;
   /** Channel for streamed 3D city models (`features/buildings3d/tiles-source.ts`). */
   readonly tilesets: TracksChannel<TilesetSample>;
   /** Tells the base what the tilesets do: loading, errors. */

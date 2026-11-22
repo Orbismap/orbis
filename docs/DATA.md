@@ -124,3 +124,19 @@ Orte/min, ein Tageszähler in `localStorage` stoppt bei 8 000, bei 429 gibt es 1
   (24 × 14 = 336 Orte, 4 Abrufe à 100 Orte), direkt aus dem Browser (CORS offen), 3 h Zwischenspeicher in `localStorage`, gemeinsamer Tageszähler und
   Pacing mit den Ozean-Ebenen (`render/ocean/budget.ts`). Pflichtsatz: „Generated using Copernicus Atmosphere Monitoring Service information 2026“ steht in
   der Lizenzangabe der Ebene. Klassen: EEA-Grenzwerte wie bei Open-Meteo; Pollen in Körnern/m³ (nur Europa, saisonabhängig, außerhalb der Saison 0).
+
+## 3D-Wahrzeichen (kein Layer, mit Orbis Pro immer an)
+
+Quelle: [alexwohlbruck/landmarks](https://github.com/alexwohlbruck/landmarks) (Website `landmarks.barrelman.dev`), rund 2.000 Low-Poly-Modelle
+(Empire State Building, Eiffelturm, Brücken, Stadien …), vor allem USA, dazu London, Moskau, Mexiko-Stadt u. a.
+
+- **Lizenz**: Modelle, Generatoren und Code CC0 1.0 (Datei `LICENSE`; `NOTICE`: je Modell kann der Katalogeintrag eine andere Lizenz nennen).
+  Standorte und die ersetzten OSM-Elemente stammen aus OpenStreetMap, ODbL 1.0, © OpenStreetMap-Mitwirkende. Wir übernehmen nur Modelle mit
+  `artisticLicense: CC0-1.0` (`parseLandmarks`). Der Hinweis „3D-Wahrzeichen: Landmarks von Alex Wohlbruck und Claude (CC0)“ steht in der
+  Kartenecke und unter „Quellen“, solange Modelle gezeichnet werden (Pflicht ist er bei CC0 nicht, wir nennen die Urheber trotzdem).
+- **Abruf** (`data/landmarks.ts`): `api/v1/latest.json` → Katalog (wenige kB, mit den belegten z12-Kacheln) → je Kachel in Sicht ein JSON mit den
+  Wahrzeichen → je Modell eine GLB (niedrige Stufe, 50-300 kB, nach Inhalts-Hash unveränderlich). Alles mit CORS `*`, direkt von der
+  Projektseite; `VITE_LANDMARKS_BASE` stellt auf eine eigene Kopie um.
+- **Vorrang** (`features/landmarks/source.ts`): ab Zoom 13 (Modell-`minZoom`) zeichnet Pro jedes Modell in Sicht, unabhängig von Ebenen und
+  Dachdaten. Die OSM-Gebäude, die es ersetzt, fallen weg: in den 2.5D-Ebenen per Feature-Id (`map/landmark-mask.ts`; OpenFreeMap-Id = OSM-Id × 10
+  + 2 für Way, + 3 für Relation), in Pros Detailgebäuden per Id oder Lage im Footprint-Kasten (`roofs-source.ts`).

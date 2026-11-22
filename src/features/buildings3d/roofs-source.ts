@@ -8,6 +8,7 @@
 import { effect } from '@preact/signals';
 import { osmPmtilesUrl } from '../../data/osmfiles';
 import { coveredIds, flatRing, flatSamples, paintSamples, roofSamples, type FlatBuilding } from '../../data/parsers/roofs-tiles';
+import { inBoxes, landmarkMask } from '../../data/landmarks';
 import { buildingsChannel, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
@@ -21,6 +22,20 @@ const SRC = 'buildings3d-roofs';
 const SCAN_DELAY_MS = 250;
 /** Buildings without a colour in OSM (the same as in that layer's 2.5D buildings). */
 const PLAIN = '#d6dae3';
+
+/**
+ * Is this building one that a landmark model stands in for? Samples from the OpenFreeMap tiles carry its feature id (`o<id>@…`),
+ * those from the roof tiles no id at all: they count when their first corner lies in the model's footprint box.
+ */
+export function replacedByLandmark(b: { id: string; rings: [number, number][][] }, mask: { ids: ReadonlySet<number>; boxes: Parameters<typeof inBoxes>[2] }): boolean {
+  if (!mask.boxes.length) return false;
+  if (b.id.startsWith('o')) {
+    const id = Number(b.id.slice(1).split('@')[0]);
+    if (mask.ids.has(id)) return true;
+  }
+  const p = b.rings[0]?.[0];
+  return !!p && inBoxes(p[0], p[1], mask.boxes);
+}
 
 /** Starts the source; returns the function that stops it. */
 export function startBuildingRoofs(): () => void {
@@ -48,11 +63,14 @@ export function startBuildingRoofs(): () => void {
         const ring = flatRing(f);
         if (typeof f.id === 'number' && ring) flat.push({ id: f.id, ring, base: Number(f.properties?.render_min_height) || 0 });
       }
-      const items = paintSamples([...roofs, ...flatSamples(features, new Set(coveredIds(flat, roofs)))], PLAIN);
+      // a 3D landmark model has priority: the buildings it stands in for are not drawn
+      const mask = landmarkMask.peek();
+      const items = paintSamples([...roofs, ...flatSamples(features, new Set(coveredIds(flat, roofs)))], PLAIN).filter((b) => !replacedByLandmark(b, mask));
       published = true;
       buildingsChannel.publish(() => items);
     };
     const schedule = () => { if (timer === undefined) timer = setTimeout(scan, SCAN_DELAY_MS); };
+    const stopMask = landmarkMask.subscribe(schedule);
     const onSource = (e: { sourceId?: string }) => { if (e.sourceId === SRC || e.sourceId === 'ofm') schedule(); };
 
     // the fill is invisible, but a layer keeps the tiles of the source loaded
@@ -66,6 +84,7 @@ export function startBuildingRoofs(): () => void {
     });
     return () => {
       dead = true;
+      stopMask();
       clearTimeout(timer);
       ml.off('sourcedata', onSource as never);
       ml.off('moveend', schedule);
