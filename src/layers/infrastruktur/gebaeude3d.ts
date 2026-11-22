@@ -12,8 +12,8 @@ import { loadPlateau, PLATEAU_ATTRIBUTION, type PlateauSample } from '../../data
 import { buildingsChannel, setTilesetSource, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
-import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../../map/buildings-tilt';
-import { buildingsDetailed, buildingsReplaced } from '../../state/view';
+import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT, OFM_BUILDINGS_SOURCE_ID } from '../../map/buildings-tilt';
+import { buildingColour, buildingsColoured, buildingsDetailed, buildingsLayerOn, buildingsReplaced } from '../../state/view';
 import { defineLayer } from '../define';
 
 const COLOR = '#B9A58C';
@@ -26,7 +26,7 @@ const CREDIT = 'gebaeude3d-plateau-attribution';
 
 type Typ = 'osm' | 'plateau';
 const TYPES: { value: Typ; label: string }[] = [
-  { value: 'osm', label: 'OSM eingefärbt' },
+  { value: 'osm', label: 'OSM Dächer' },
   { value: 'plateau', label: 'Plateau (Japan)' },
 ];
 const asTyp = (v: unknown): Typ => (v === 'plateau' ? v : 'osm');
@@ -46,18 +46,26 @@ export default defineLayer({
     { name: 'OpenFreeMap / OpenStreetMap-Mitwirkende ', url: 'https://openfreemap.org/', license: 'ODbL 1.0' },
     { name: PLATEAU_ATTRIBUTION, url: 'https://www.mlit.go.jp/plateau/', license: 'CC BY 4.0' },
   ],
-  options: [{ id: 'typ', label: 'Typ', type: 'select', default: 'osm', choices: TYPES }],
+  options: [
+    { id: 'typ', label: 'Typ', type: 'select', default: 'osm', choices: TYPES },
+    // for the OSM buildings, 2.5D and with Orbis Pro alike: the colour OSM knows, or all in one plain colour
+    { id: 'farben', label: 'Eingefärbt (Farben aus OSM)', type: 'toggle', default: true },
+  ],
   legend: (o) => (asTyp(o.typ) === 'plateau'
     ? { type: 'classes', items: [{ color: PLATEAU_COLOR, label: 'Stadtmodell Japan (mit Orbis Pro)', shape: 'square' }] }
-    : { type: 'classes', items: [{ color: OSM_COLORED, label: 'Farbe wie in OSM eingetragen', shape: 'square' }, { color: PLAIN, label: 'Keine Farbe in OSM', shape: 'square' }] }),
+    : o.farben === false
+      ? { type: 'classes', items: [{ color: PLAIN, label: 'Alle Gebäude einfarbig', shape: 'square' }] }
+      : { type: 'classes', items: [{ color: OSM_COLORED, label: 'Farbe wie in OSM eingetragen', shape: 'square' }, { color: PLAIN, label: 'Keine Farbe in OSM', shape: 'square' }] }),
   keywords: ['gebäude', '3d', 'haus', 'häuser', 'gebäudeteile', 'dach', 'dachform', 'satteldach', 'walmdach', 'kuppel', 'roof', 'building:part', 'building', 'buildings', 'osm', 'farbe', 'plateau', 'japan', 'tokio', 'stadtmodell', 'fotomesh', 'lod'],
 
   mount(ctx) {
     const ml = ctx.map.ml;
+    buildingsLayerOn.value = true;
     const typ = () => asTyp(ctx.options.value.typ);
+    const coloured = () => ctx.options.value.farben !== false;
     const layerId = `${ctx.id}.osm`;
     ctx.map.addLayer({
-      id: layerId, type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER,
+      id: layerId, type: 'fill-extrusion', source: OFM_BUILDINGS_SOURCE_ID, 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER,
       layout: { visibility: 'none', 'fill-extrusion-rounded-corner-distance': 1.5 },
       paint: {
         // `colour` is a hex value or a CSS colour name; the missing ones get the plain building colour
@@ -76,12 +84,15 @@ export default defineLayer({
       effect(() => {
         const on = typ() === 'osm';
         if (ml.getLayer(layerId)) {
-          // with Orbis Pro the detailed buildings (roofs-source.ts) take over from zoom 16: then this layer steps aside too
+          // with Orbis Pro the detailed buildings (roofs-source.ts) take over from zoom 13.5: then this layer steps aside too
           ml.setLayoutProperty(layerId, 'visibility', on && !buildingsChannel.presented.value ? 'visible' : 'none');
           ml.setPaintProperty(layerId, 'fill-extrusion-opacity', ctx.opacity.value);
+          // `colour` is a hex value or a CSS colour name; the others (and all, without the option) get the colour of the basemap's 2.5D buildings
+          ml.setPaintProperty(layerId, 'fill-extrusion-color', (coloured() ? ['coalesce', ['get', 'colour'], buildingColour.value] : buildingColour.value) as ExpressionSpecification);
         }
         buildingsReplaced.value = on;
         buildingsDetailed.value = on;
+        buildingsColoured.value = coloured();
         ctx.status({ state: 'ready' });
       }),
       // the Plateau models (Orbis Pro streams them)
@@ -114,6 +125,8 @@ export default defineLayer({
         setTilesetSource(SOURCE, null);
         buildingsReplaced.value = false;
         buildingsDetailed.value = false;
+        buildingsColoured.value = true;
+        buildingsLayerOn.value = false;
         ctx.map.remove({ layers: [layerId] });
       },
     };

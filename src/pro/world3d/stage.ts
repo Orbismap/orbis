@@ -53,6 +53,19 @@ export interface ClickGate {
   retarget(part: StagePart, id: string): void;
 }
 
+// Light and shadow. The sun stands in the south-south-west (210°, like the light of the map's 2.5D buildings), 50° high (seen from the usual camera, looking north, it lights the south walls and
+// the roof slopes that face south, the others stay darker: that is what shows the structure of a roof). The flat map gets real shadows
+// (one shadow map around the map centre, cast and received by what sets `castShadow` / `receiveShadow`: buildings, landmark models), so
+// steps and ridges throw shadows on the roofs and walls behind them. The ground is the map's own and receives none. The globe keeps the
+// light from the camera's side (no fixed sun fits a sphere) and has no shadows.
+/** where the sun is, as a direction in render space (x east, y SOUTH, z up) */
+const SUN_DIR = new THREE.Vector3(-0.32, 0.55, 0.77);
+const AMBIENT = 1.0;
+const SUN = 2.7;
+const SHADOW_MAP = 2048;
+/** the shadow map covers this many metres at most around the map centre (a half side) */
+const SHADOW_MAX_M = 1200;
+
 /** how often the cursor looks for something below it (ms): when the mouse moves, and when only the objects do */
 const HOVER_MOVE_MS = 40;
 const HOVER_FRAME_MS = 120;
@@ -92,7 +105,7 @@ export class Stage implements CustomLayerInterface {
   private target?: THREE.WebGLRenderTarget;
   private scene = new THREE.Scene();
   private camera = new THREE.Camera();
-  private sun = new THREE.DirectionalLight(0xffffff, 2.2);
+  private sun = new THREE.DirectionalLight(0xffffff, SUN);
   private overlay = new THREE.Scene();
   private overlayMat = new THREE.ShaderMaterial({
     vertexShader: COMPOSITE_VERTEX,
@@ -119,7 +132,10 @@ export class Stage implements CustomLayerInterface {
 
   /** `place(true)`: below the data layers, `place(false)`: on top of the points slot. Given by the host (it knows the layer stack). */
   constructor(private map: MlMap, private place: (belowData: boolean) => void = () => {}) {
-    this.scene.add(new THREE.AmbientLight(0xffffff, 1.5), this.sun);
+    this.scene.add(new THREE.AmbientLight(0xffffff, AMBIENT), this.sun, this.sun.target);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
+    this.sun.shadow.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
     this.earth.renderOrder = -1;
     this.earth.frustumCulled = false;
     this.scene.add(this.earth);
@@ -157,6 +173,8 @@ export class Stage implements CustomLayerInterface {
   onAdd(map: MlMap, gl: WebGL2RenderingContext) {
     this.renderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
     this.renderer.autoClear = false;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     map.on('mousemove', this.onMouseMove);
     map.on('mouseout', this.onMouseOut);
     map.on('click', this.onClick);
@@ -214,8 +232,11 @@ export class Stage implements CustomLayerInterface {
     this.earth.visible = frame.t >= 1;
     this.earth.position.set(-frame.origin[0], -frame.origin[1], -frame.origin[2]);
     // the light comes from the camera's side: on a sphere no fixed direction lights all models
-    if (frame.globe) this.sun.position.set(frame.camera[0] - frame.origin[0], frame.camera[1] - frame.origin[1], frame.camera[2] - frame.origin[2]);
-    else this.sun.position.set(0.4, -0.6, 1);
+    if (frame.globe) {
+      this.sun.castShadow = false;
+      this.sun.position.set(frame.camera[0] - frame.origin[0], frame.camera[1] - frame.origin[1], frame.camera[2] - frame.origin[2]);
+    }
+    else this.aimSun(frame);
 
     // three.js and MapLibre each cache GL state: three starts from scratch, MapLibre resets its own after custom layers
     renderer.resetState();
@@ -234,6 +255,28 @@ export class Stage implements CustomLayerInterface {
       renderer.setRenderTarget(null);
       renderer.render(this.scene, this.camera);
     }
+  }
+
+  /**
+   * The sun of the flat map and its shadow map: a box around the map centre that is as wide as the view (at most SHADOW_MAX_M), seen from
+   * the sun. The render space is mercator, `k` render units to the metre, so the shadow camera is worked out in metres and scaled by k.
+   */
+  private aimSun(frame: GeoFrame) {
+    const k = frame.basis(this.map.getCenter().lng, this.map.getCenter().lat).up[2];
+    const half = Math.min(SHADOW_MAX_M, Math.max(60, (frame.centreMetresPerPixel * Math.max(frame.width, frame.height)) * 0.6));
+    const dist = half * 1.2;
+    this.sun.position.copy(SUN_DIR).normalize().multiplyScalar(dist * k);
+    this.sun.target.position.set(0, 0, 0);
+    this.sun.target.updateMatrixWorld();
+    const cam = this.sun.shadow.camera as THREE.OrthographicCamera;
+    cam.left = -half * k; cam.right = half * k; cam.top = half * k; cam.bottom = -half * k;
+    cam.near = 0.5 * k;
+    cam.far = (dist + half * 1.5) * k;
+    cam.updateProjectionMatrix();
+    // a texel is 2 * half / SHADOW_MAP metres; the surface is moved back by about one and a half of them against the stripes of self-shadowing
+    this.sun.shadow.normalBias = ((2 * half) / SHADOW_MAP) * 1.5 * k;
+    this.sun.shadow.bias = -0.00005;
+    this.sun.castShadow = true;
   }
 
   /**

@@ -21,7 +21,7 @@ export interface Settings {
 }
 
 const VERSION = 1;
-export const DEFAULT_SETTINGS: Settings = { units: { ...DEFAULT_UNITS }, theme: 'dark', motion: 'auto', keys: {}, confirmedWarnings: [], pro: false, debug: false };
+export const DEFAULT_SETTINGS: Settings = { units: { ...DEFAULT_UNITS }, theme: 'dark', motion: 'auto', keys: {}, confirmedWarnings: [], pro: true, debug: false };
 
 const pick = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(v as T) ? (v as T) : fallback);
 
@@ -43,7 +43,7 @@ export function validateSettings(raw: unknown): Settings | undefined {
     motion: pick(r.motion, ['auto', 'reduce', 'full'], 'auto'),
     keys,
     confirmedWarnings: Array.isArray(r.confirmedWarnings) ? r.confirmedWarnings.filter((x): x is string => typeof x === 'string') : [],
-    pro: r.pro === true,
+    pro: r.pro !== false,
     debug: r.debug === true,
   };
 }

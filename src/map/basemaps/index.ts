@@ -9,7 +9,7 @@ import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../buildings-ti
 import { DEM_NATIVE_ZOOM, DEM_TILES } from '../dem-protocol';
 import { karteBasemap } from './karte';
 import { keyedBasemaps, keyedGroups, type KeyedBasemapId } from './keyed';
-import { LABEL_VARIANTS, OFM_GLYPHS, OFM_SOURCE, labelLayers, vectorBasemap } from './vector';
+import { LABEL_VARIANTS, OFM_BUILDINGS_SOURCE, OFM_BUILDINGS_SOURCE_ID, OFM_GLYPHS, OFM_SOURCE, labelLayers, vectorBasemap } from './vector';
 
 export type { BasemapId, StaticBasemapId } from '../types';
 export type { BasemapDef, LabelVariant } from './types';
@@ -163,7 +163,7 @@ export interface StyleOptions { basemap: BasemapId; labels: boolean; terminator:
 export const GENERIC_BUILDINGS_ID = 'bm-buildings';
 const GENERIC_BUILDINGS_COLOR = '#d6dae3';
 const genericBuildings = (visible: boolean): LayerSpecification => ({
-  id: GENERIC_BUILDINGS_ID, type: 'fill-extrusion', source: 'ofm', 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER,
+  id: GENERIC_BUILDINGS_ID, type: 'fill-extrusion', source: OFM_BUILDINGS_SOURCE_ID, 'source-layer': 'building', minzoom: 13.5, filter: BUILDING_FILTER,
   layout: { visibility: visible ? 'visible' : 'none', 'fill-extrusion-rounded-corner-distance': 1.5 },
   paint: {
     'fill-extrusion-color': GENERIC_BUILDINGS_COLOR,
@@ -175,6 +175,14 @@ const genericBuildings = (visible: boolean): LayerSpecification => ({
 } as LayerSpecification);
 /** Aerial images: the real 3D buildings (streamed 3D tiles, Orbis Pro) belong here, not the 2.5D ones. */
 export const hasTiles3d = (id: string | undefined): boolean => id === 'satellite' || id === 'esri-clarity';
+/** The colour of the 2.5D buildings a basemap shows: its own, or the generic one. */
+export function buildingColourOf(id: string | undefined): string {
+  if (hasOwnBuildings(id)) {
+    const c = (BASEMAPS[id as keyof typeof BASEMAPS]?.topLayers?.[0] as { paint?: Record<string, unknown> } | undefined)?.paint?.['fill-extrusion-color'];
+    if (typeof c === 'string') return c;
+  }
+  return GENERIC_BUILDINGS_COLOR;
+}
 /** Does this basemap draw 2.5D buildings of its own? */
 export const hasOwnBuildings = (id: string | undefined): boolean => !!id && id.startsWith('orbis-');
 
@@ -186,6 +194,7 @@ export const hasOwnBuildings = (id: string | undefined): boolean => !!id && id.s
 export function composeStyle(o: StyleOptions): StyleSpecification {
   const sources: Record<string, SourceSpecification> = {
     ofm: OFM_SOURCE,
+    [OFM_BUILDINGS_SOURCE_ID]: OFM_BUILDINGS_SOURCE,
     [TERRAIN_SOURCE]: TERRAIN_SPEC,
     [HILLSHADE_SOURCE]: hillshadeSpec(),
   };

@@ -9,8 +9,8 @@ import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { activeBasemap as activeBasemapSignal, buildings3d, buildingsReplaced, camera, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
-import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, showsRelief, skyFor } from './basemaps';
+import { activeBasemap as activeBasemapSignal, buildings3d, buildingColour, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
+import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, buildingColourOf, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, isAerial, showsRelief, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { registerKeyedTiles } from './basemaps/keyed-protocol';
 import { registerPmtilesProtocol } from './pmtiles-protocol';
@@ -22,7 +22,7 @@ import { pokeCameraFrame } from './frame';
 import { createPicking } from './picking';
 import { beforeIdFor } from './slots';
 import { createTerminator } from './terminator';
-import { installBuildingsTilt } from './buildings-tilt';
+import { installBuildingsTilt, tiltFactor, useDetailedBuildingTiles } from './buildings-tilt';
 import { installGlobeTerrainFix } from './globe-terrain-fix';
 import type { BasemapId, CameraTarget, MapEngine, PickHandler, SlotId } from './types';
 
@@ -125,6 +125,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
 
   const resolveReady = () => {
     loaded = true;
+    useDetailedBuildingTiles(ml);
     if (ml.getProjection()?.type !== projectionSignal.peek()) ml.setProjection({ type: projectionSignal.peek() });
     applyBasemap();
     terminator.setMode(terminatorMode);
@@ -247,6 +248,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   function applyBuildings() {
     const shown = isStaticBasemap(basemap) ? basemap : undefined;
     // with Orbis Pro the detailed buildings (roofs-source.ts) include the plain ones: while they are drawn, the 2.5D buildings step aside
+    buildingColour.value = buildingColourOf(shown);
     const on = buildings3d.peek() && !buildingsReplaced.peek() && reliefOn() && !buildingsChannel.presented.peek();
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) setVis(l.id, on && id === shown);
     setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !hasTiles3d(shown));
@@ -260,6 +262,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].layers) setVis(l.id, id === shown);
     applyBuildings();
     const look = regional ?? BASEMAPS[shown ?? DEFAULT_BASEMAP];
+    mapDark.value = look.theme === 'dark';
     for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) setVis(l.id, labels && !look.ownLabels && v === look.labelVariant);
     container.style.background = look.background;
     ml.setSky(skyFor(look.theme));
@@ -286,10 +289,17 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   };
   /** The 3D tiles of the aerial images are true to scale (sea level, see tiles3d/geoid): no exaggeration under them, so the camera's height agrees with theirs. */
   const TILES_TERRAIN_EXAGGERATION = 1;
-  const terrainTarget = () => {
+  /** The terrain without the tilt: what the basemap and the mode ask for. */
+  const terrainBase = () => {
     const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
     return reliefOn() && !(flatOrbis && (projectionSignal.peek() !== 'globe' || (TERRAIN_ZOOM_FADE && ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS))) ? (hasTiles3d(basemap) ? TILES_TERRAIN_EXAGGERATION : TERRAIN_EXAGGERATION) : 0;
   };
+  /**
+   * On the Erkunden map the terrain flattens seen from above, with the same share as the buildings (buildings-tilt.ts: 10 % at 0°, full from
+   * 30°): the terrain follows the camera's tilt continuously (pitch events), so it moves smoothly. Aerial images stay true to scale.
+   */
+  const tiltK = () => (karteMode.peek() === 'erkunden' && !isAerial(basemap) ? tiltFactor(ml.getPitch()) : 1);
+  const terrainTarget = () => terrainBase() * tiltK();
   /**
    * Changes the exaggeration of the running terrain in place. `map.setTerrain` would rebuild the whole terrain every
    * frame (tiles reload, the camera re-solves its centre against a half-loaded terrain), which makes the view jump up
@@ -312,10 +322,27 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     setVis(HILLSHADE_LAYER, shadeNow > 0.001);
     if (ml.getLayer(HILLSHADE_LAYER)) ml.setPaintProperty(HILLSHADE_LAYER, 'hillshade-exaggeration', HILLSHADE_STRENGTH * shadeNow);
   }
+  /** the terrain without the tilt that the last tween went to; and whether a tween is running */
+  let terrainBaseGoal = -1;
+  let tweening = false;
   function applyTerrain() {
-    const to = terrainTarget();
+    const base = terrainBase();
+    const to = base * tiltK();
     const shadeTo = shadeTarget();
+    // only the tilt changed: follow it at once (the pitch changes smoothly itself), no tween
+    if (base === terrainBaseGoal && !tweening) {
+      if (to !== terrainGoal || shadeTo !== shadeGoal) {
+        terrainGoal = to;
+        shadeGoal = shadeTo;
+        terrainNow = to;
+        shadeNow = shadeTo;
+        paintTerrain();
+      }
+      return;
+    }
     if (to === terrainGoal && shadeTo === shadeGoal) return;
+    terrainBaseGoal = base;
+    tweening = true;
     terrainGoal = to;
     shadeGoal = shadeTo;
     cancelAnimationFrame(terrainRaf);
@@ -330,10 +357,12 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       shadeNow = shadeFrom + (shadeTo - shadeFrom) * e;
       paintTerrain();
       if (k < 1) terrainRaf = requestAnimationFrame(step);
+      else { tweening = false; applyTerrain(); }
     };
     terrainRaf = requestAnimationFrame(step);
   }
   ml.on('zoom', () => loaded && applyTerrain());
+  ml.on('pitch', () => loaded && applyTerrain());
 
   // ---- slots ----------------------------------------------------------------
   const place = (spec: LayerSpecification | CustomLayerInterface, slot: SlotId) => {

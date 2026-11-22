@@ -4,6 +4,7 @@ import type { BuildingSample } from '../../ext/types';
 import { unit } from '../baeume/baeume';
 import type { GeoFrame } from '../world3d/frame';
 import type { Stage, StagePart } from '../world3d/stage';
+import { exaggeration, groundAt } from '../world3d/terrain';
 import { roofColour, wallColour } from './colours';
 import { withoutSplitOutlines } from './outlines';
 import { buildBuilding, roofShapeOf, type Pt } from './roofs';
@@ -31,16 +32,39 @@ interface Built {
 }
 
 /**
- * The stage lights (ambient 1.5 + sun 2.2, shared with ships, trees, planes) show a flat surface at about 0.75 of its colour (measured on the
- * top of buildings in the dark basemap: 0.74-0.76 of the 2.5D colour, which MapLibre shows at ~0.97). The colours are scaled up in linear light
- * (0.53^-1) so that a building here has the colour of the 2.5D building of the basemap. Vertex colours are floats, values above 1 are fine.
+ * The stage lights (ambient 1.0 + a sun in the south-west, shared with ships, trees, planes) show a flat roof at about 0.68 of its colour (it was
+ * 0.75 under the old light from the north-east; measured then on the top of buildings in the dark basemap against the 2.5D colour, which
+ * MapLibre shows at ~0.97). The colours are scaled up so that a building here has about the colour of the 2.5D building of the basemap; the
+ * sunlit slopes go a little above it, the shaded ones below, which is what shows the shape. Vertex colours are floats, values above 1 are fine.
  */
-const LOOK_GAIN = 1.9;
+const LOOK_GAIN = 2.1;
 const rgb = (hex: number, shade: number): [number, number, number] => {
   const c = new THREE.Color(hex);
   const k = shade * LOOK_GAIN;
   return [Math.min(4, c.r * k), Math.min(4, c.g * k), Math.min(4, c.b * k)];
 };
+
+/** Roofs and walls are as high as MapLibre's 2.5D buildings at this tilt: a share of the height (host.buildingHeightFactor) and, flattened, up to MIN_HEIGHT_M lifted. */
+const MIN_HEIGHT_M = 3;
+interface HeightUniforms { uF: { value: number }; uL: { value: number }; uEx: { value: number } }
+/**
+ * Vertex shader: z = ground + lift + height * share, the ground (attribute `ground`, the terrain under the building) is not scaled. The
+ * normals stay those of the real shape. The mesh holds the heights above the ground, so a change of the tilt costs no rebuild.
+ */
+function heightPatch(material: THREE.Material, u: HeightUniforms) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uF = u.uF;
+    shader.uniforms.uL = u.uL;
+    shader.uniforms.uEx = u.uEx;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float ground;\nuniform float uF;\nuniform float uL;\nuniform float uEx;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n      transformed.z = ground * uEx + uL + position.z * uF;');
+  };
+  material.customProgramCacheKey = () => 'buildings-height';
+}
+
+/** the lowest share of its colour a wall has at the foot (MapLibre: mix(0.7, 0.98, 0.5) with a light intensity of 0.5) */
+const WALL_GRADIENT_MIN = 0.84;
 
 export class GebaeudePart implements StagePart {
   readonly object = new THREE.Group();
@@ -52,11 +76,22 @@ export class GebaeudePart implements StagePart {
   private triangles = 0;
   private drawn = false;
 
-  constructor(private map: MlMap, private stage: Stage) {
+  /** the height of every building follows the camera's tilt like the 2.5D buildings of the basemap (host.buildingHeightFactor): see `heightPatch` */
+  private height: HeightUniforms = { uF: { value: 1 }, uL: { value: 0 }, uEx: { value: 1 } };
+
+  constructor(private map: MlMap, private stage: Stage, private heightFactor: () => number = () => 1) {
     const material = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, side: THREE.DoubleSide });
+    heightPatch(material, this.height);
+    // the shadows follow the same heights
+    const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+    heightPatch(depth, this.height);
     this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
+    this.mesh.customDepthMaterial = depth;
     this.mesh.matrixAutoUpdate = false;
     this.mesh.frustumCulled = false;
+    // roofs and walls throw shadows on each other: that shows the steps and ridges of a roof (the stage lights, world3d/stage.ts)
+    this.mesh.castShadow = true;
+    this.mesh.receiveShadow = true;
     this.object.add(this.mesh);
     this.object.visible = false;
   }
@@ -121,10 +156,9 @@ export class GebaeudePart implements StagePart {
     };
   }
 
-  /** Terrain height at a place (m); 0 without 3D terrain or before its tile has arrived. */
+  /** The real terrain height at a place (m, without exaggeration); the shader applies the exaggeration of the moment. */
   private terrainAt(lng: number, lat: number): number {
-    const h = this.map.queryTerrainElevation({ lng, lat });
-    return typeof h === 'number' && Number.isFinite(h) ? h : 0;
+    return groundAt(this.map, lng, lat);
   }
 
   /** Terrain tiles arrive after the buildings: when the ground under them changed, they move with it. */
@@ -138,24 +172,33 @@ export class GebaeudePart implements StagePart {
     if (changed) { this.rebuild(); this.stage.wake(); }
   };
 
-  /** All buildings into one geometry; flat shading, so no vertex is shared. */
+  /** All buildings into one geometry; flat shading, so no vertex is shared. z holds the height above the ground, the ground is an attribute of its own. */
   private rebuild() {
     let floats = 0;
     for (const b of this.cache.values()) floats += b.walls.length + b.roof.length;
-    const pos = new Float32Array(floats), col = new Float32Array(floats);
+    const pos = new Float32Array(floats), col = new Float32Array(floats), ground = new Float32Array(floats / 3);
     let at = 0;
-    const put = (src: Float32Array, c: [number, number, number], z: number) => {
+    const put = (src: Float32Array, c: [number, number, number], z: number, top: number, gradient: boolean) => {
       for (let i = 0; i < src.length; i += 3) {
-        pos[at] = src[i]!; pos[at + 1] = src[i + 1]!; pos[at + 2] = src[i + 2]! + z;
-        col[at] = c[0]; col[at + 1] = c[1]; col[at + 2] = c[2];
+        pos[at] = src[i]!; pos[at + 1] = src[i + 1]!; pos[at + 2] = src[i + 2]!;
+        // MapLibre's vertical gradient of the 2.5D walls: darker at the foot, the less so the lower the building
+        const g = gradient && top > 0 ? Math.min(1, Math.max(WALL_GRADIENT_MIN, (src[i + 2]! / top) * Math.sqrt(top / 150))) : 1;
+        col[at] = c[0] * g; col[at + 1] = c[1] * g; col[at + 2] = c[2] * g;
+        ground[at / 3] = z;
         at += 3;
       }
     };
-    for (const b of this.cache.values()) { put(b.walls, b.wallRgb, b.ground); put(b.roof, b.roofRgb, b.ground); }
+    for (const b of this.cache.values()) {
+      let top = 0;
+      for (let i = 2; i < b.walls.length; i += 3) top = Math.max(top, b.walls[i]!);
+      put(b.walls, b.wallRgb, b.ground, top, true);
+      put(b.roof, b.roofRgb, b.ground, top, false);
+    }
     this.mesh.geometry.dispose();
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('ground', new THREE.BufferAttribute(ground, 1));
     g.computeVertexNormals();
     this.mesh.geometry = g;
     this.triangles = floats / 9;
@@ -167,6 +210,10 @@ export class GebaeudePart implements StagePart {
     const [lng, lat] = this.origin;
     if (frame.occluded(lng, lat, 0)) { this.mesh.visible = false; return false; }
     this.mesh.visible = true;
+    const f = this.heightFactor();
+    this.height.uF.value = f;
+    this.height.uEx.value = exaggeration(this.map);
+    this.height.uL.value = MIN_HEIGHT_M * (1 - f);
     // x east, y north, z up in metres, origin of the mesh = the first footprint's first corner
     frame.place(this.matrix, lng + 360 * Math.round((this.map.getCenter().lng - lng) / 360), lat, 0);
     this.mesh.matrix.copy(this.matrix);

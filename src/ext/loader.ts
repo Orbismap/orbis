@@ -7,10 +7,11 @@
 import { markerLayerId } from '../map/slots';
 import { effect } from '@preact/signals';
 import { mapEngine } from '../state/ui';
-import { projection } from '../state/view';
+import { mapDark, projection } from '../state/view';
 import { reducedMotion } from '../state/settings';
+import { buildingHeightFactor } from '../map/buildings-tilt';
 import type { MapEngine } from '../map/types';
-import { buildingsChannel, followCurrent, followWanted, powerChannel, shipsChannel, tilesetsChannel, tilesetsState, tracksChannel, treesChannel } from './channels';
+import { buildingsChannel, followCurrent, followWanted, landmarksChannel, powerChannel, shipsChannel, tilesetsChannel, tilesetsState, tracksChannel, treesChannel } from './channels';
 import { proEnabled } from './licence';
 import type { ExtensionHost, OrbisExtension } from './types';
 
@@ -40,14 +41,17 @@ function makeHost(engine: MapEngine): ExtensionHost {
       if (at >= 0 && next) ml.moveLayer(id, next.id);
     },
     projection,
+    mapDark,
     tracks: tracksChannel,
     ships: shipsChannel,
     power: powerChannel,
     trees: treesChannel,
     buildings: buildingsChannel,
+    landmarks: landmarksChannel,
     tilesets: tilesetsChannel,
     reportTilesets: (state) => { tilesetsState.value = state; },
     holdCamera: () => engine.holdCamera(),
+    buildingHeightFactor: () => buildingHeightFactor(engine.ml),
     reducedMotion,
     follow: { wanted: followWanted, report: (ref) => { followCurrent.value = ref; } },
   };

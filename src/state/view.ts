@@ -26,8 +26,16 @@ export const setBuildings3d = (on: boolean) => {
 export const karteMode = signal<KarteMode>(DEFAULT_KARTE_MODE);
 /** The layer "3D-Gebäude" replaces the 2.5D buildings of the basemap (coloured OSM buildings, or real models in view): they go off whatever the switch says. Written by the layer. */
 export const buildingsReplaced = signal(false);
+/** The basemap shown is a dark one (its `theme`): 3D landmarks light their windows then. Written by the map engine. */
+export const mapDark = signal(false);
 /** The layer "3D-Gebäude" (type OSM) is on: with Orbis Pro its buildings are drawn by Orbis' own 3D renderer in the close view (features/buildings3d/roofs-source.ts), with roofs and the colours of OSM. Written by the layer. */
 export const buildingsDetailed = signal(false);
+/** The layer "3D-Gebäude" draws its buildings in the colours OSM knows (option "Eingefärbt"); off: all in one plain colour, 2.5D and with Orbis Pro. Written by the layer. */
+export const buildingsColoured = signal(true);
+/** The layer "3D-Gebäude" is switched on (any type). Written by the layer. */
+export const buildingsLayerOn = signal(false);
+/** The colour the 2.5D buildings of the shown basemap have (dark on the dark map, light on the light one): buildings without a colour of their own get it, also with Orbis Pro. Written by the map engine. */
+export const buildingColour = signal('#d6dae3');
 /** Visible bounds and size in px; undefined before the map is ready. */
 export const viewport = signal<Viewport | undefined>(undefined);
 /** Area of the map covered by panels/sheet; the camera keeps targets inside the rest. */

@@ -5,6 +5,7 @@ import { effect } from '@preact/signals';
 import type { ExtensionHost, FollowRef, OrbisExtension, TracksChannel } from '../ext/types';
 import { BaeumePart } from './baeume/baeume';
 import { GebaeudePart } from './gebaeude/gebaeude';
+import { LandmarksPart } from './landmarks/landmarks';
 import { PlanesPart } from './planes/planes';
 import { ShipsPart } from './ships/ships';
 import { StromnetzPart } from './stromnetz/stromnetz';
@@ -33,7 +34,8 @@ export const extension: OrbisExtension = {
     const ships = new ShipsPart(map, stage, (id) => host.ships.select(id), host.reducedMotion);
     const power = new StromnetzPart(map, stage);
     const trees = new BaeumePart(map, stage);
-    const buildings = new GebaeudePart(map, stage);
+    const buildings = new GebaeudePart(map, stage, host.buildingHeightFactor);
+    const landmarks = new LandmarksPart(map, stage, host.buildingHeightFactor, host.mapDark);
     let tilesPresent = false;
     let tilesRelease: (() => void) | null = null;
     let stateKey = '';
@@ -51,6 +53,7 @@ export const extension: OrbisExtension = {
     // below aircraft and ships: the stage asks the part added last first, so an aircraft over a pylon is the one clicked
     stage.add(tiles);
     stage.add(buildings);
+    stage.add(landmarks);
     stage.add(power);
     stage.add(trees);
     stage.add(ships);
@@ -176,7 +179,7 @@ export const extension: OrbisExtension = {
       evaluateTrees();
     });
     evaluateTrees();
-    // Buildings: the layer publishes them from zoom 16 and an empty list below; while they are drawn the basemap's 2.5D houses step aside.
+    // Buildings: the layer publishes them from zoom 13.5 and an empty list below; while they are drawn the basemap's 2.5D houses step aside.
     let buildingsOn = false;
     let buildingsRelease: (() => void) | null = null;
     const stopBuildings = host.buildings.subscribe((items) => {
@@ -188,6 +191,11 @@ export const extension: OrbisExtension = {
       if (show) buildingsRelease = host.buildings.present();
       else { buildingsRelease?.(); buildingsRelease = null; }
     });
+    // Landmarks: published from zoom 13 by the base (no layer), an empty list below. They are drawn above the buildings: the model has priority.
+    const stopLandmarks = host.landmarks.subscribe((items) => {
+      landmarks.feed(items);
+      landmarks.setActive(items.length > 0);
+    });
     const stopTiles = host.tilesets.subscribe((items) => tiles.feed(items));
 
     return () => {
@@ -198,6 +206,7 @@ export const extension: OrbisExtension = {
       stopPower();
       stopTrees();
       stopBuildings();
+      stopLandmarks();
       stopTiles();
       tilesRelease?.();
       powerRelease?.();

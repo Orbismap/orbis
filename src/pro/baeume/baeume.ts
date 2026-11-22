@@ -4,6 +4,7 @@ import type { TreeSample } from '../../ext/types';
 import type { GeoFrame } from '../world3d/frame';
 import { GeoInstances } from '../world3d/instances';
 import type { Stage, StagePart } from '../world3d/stage';
+import { exaggeration, groundAt } from '../world3d/terrain';
 import { TREE_H, modelKey, treeGeometries, treeMaterial, type TreeShape } from './models';
 
 // 3D trees: a smooth model at every tree position of the channel (shape from the leaf type and the tree's id, height from the
@@ -128,10 +129,9 @@ export class BaeumePart implements StagePart {
     return { trees: this.trees.length, treesDrawn: this.drawn };
   }
 
-  /** Terrain height at a place (m); 0 without 3D terrain or before its tile has arrived. */
+  /** The real terrain height at a place (m, without exaggeration); the exaggeration of the moment is applied when drawing. */
   private terrainAt(lng: number, lat: number): number {
-    const h = this.map.queryTerrainElevation({ lng, lat });
-    return typeof h === 'number' && Number.isFinite(h) ? h : 0;
+    return groundAt(this.map, lng, lat);
   }
 
   /** Terrain tiles arrive after the trees: when the ground under them changed, they move with it. */
@@ -152,13 +152,14 @@ export class BaeumePart implements StagePart {
     const padLon = (b.getEast() - b.getWest()) * VIEW_MARGIN;
     const padLat = (b.getNorth() - b.getSouth()) * VIEW_MARGIN;
     const trees = this.trees;
+    const ex = exaggeration(this.map);
     this.models.start(frame, trees.length);
     let drawn = 0;
     for (let i = 0; i < trees.length; i++) {
       const t = trees[i]!;
       const lon = t.lng + 360 * Math.round((centre.lng - t.lng) / 360);
       if (lon < b.getWest() - padLon || lon > b.getEast() + padLon || t.lat < b.getSouth() - padLat || t.lat > b.getNorth() + padLat) continue;
-      const ground = this.ground[i] ?? 0;
+      const ground = (this.ground[i] ?? 0) * ex;
       if (frame.occluded(lon, t.lat, ground)) continue;
       const p = this.placed[i]!;
       const detail = (TREE_H * p.scale) / frame.metresPerPixel(lon, t.lat, ground) >= HIGH_DETAIL_PX ? 'hoch' : 'niedrig';
