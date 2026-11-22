@@ -42,6 +42,8 @@ export const buildingsColoured = signal(false);
 export const buildingsLayerOn = signal(false);
 /** The layer's type "Gebäude" wants the basemap's plain 2.5D buildings even where the Karte mode (Daten/Fahren) hides them. Written by the layer. */
 export const buildingsPlainWanted = signal(false);
+/** The layer "Gelände" is on: it forces the terrain height map on, whatever the basemap mode asks for. Written by the layer. */
+export const terrainLayerOn = signal(false);
 /** The colour the 2.5D buildings of the shown basemap have (dark on the dark map, light on the light one): buildings without a colour of their own get it, also with Orbis Pro. Written by the map engine. */
 export const buildingColour = signal('#d6dae3');
 /** Visible bounds and size in px; undefined before the map is ready. */
