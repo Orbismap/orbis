@@ -9,7 +9,7 @@ import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { activeBasemap as activeBasemapSignal, buildings3d, poiBasemap, poiLayerOn, poiLabelsVisible, buildingColour, buildingsColoured, buildingsLayerOn, buildingsPlainWanted, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
+import { activeBasemap as activeBasemapSignal, buildings3d, poiBasemap, poiLayerOn, poiLabelsVisible, buildingColour, buildingsColoured, buildingsLayerOn, buildingsPlainWanted, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, terrainLayerOn, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, buildingColourOf, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, isAerial, showsRelief, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { registerKeyedTiles } from './basemaps/keyed-protocol';
@@ -226,6 +226,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       buildingsColoured.value;
       buildingsChannel.presented.value;
       karteMode.value;
+      terrainLayerOn.value;
       if (loaded) (applyBuildings(), applyTerrain());
     }),
     effect(() => {
@@ -368,16 +369,18 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   };
   /** The 3D tiles of the aerial images are true to scale (sea level, see tiles3d/geoid): no exaggeration under them, so the camera's height agrees with theirs. */
   const TILES_TERRAIN_EXAGGERATION = 1;
-  /** The terrain without the tilt: what the basemap and the mode ask for. */
+  /** The terrain without the tilt: what the basemap and the mode ask for, or forced on by the layer "Gelände". */
   const terrainBase = () => {
+    const exaggeration = hasTiles3d(basemap) ? TILES_TERRAIN_EXAGGERATION : TERRAIN_EXAGGERATION;
+    if (terrainLayerOn.peek()) return exaggeration;
     const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
-    return reliefOn() && !(flatOrbis && (projectionSignal.peek() !== 'globe' || (TERRAIN_ZOOM_FADE && ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS))) ? (hasTiles3d(basemap) ? TILES_TERRAIN_EXAGGERATION : TERRAIN_EXAGGERATION) : 0;
+    return reliefOn() && !(flatOrbis && (projectionSignal.peek() !== 'globe' || (TERRAIN_ZOOM_FADE && ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS))) ? exaggeration : 0;
   };
   /**
    * On the Erkunden map the terrain flattens seen from above, with the same share as the buildings (buildings-tilt.ts: 10 % at 0°, full from
    * 30°): the terrain follows the camera's tilt continuously (pitch events), so it moves smoothly. Aerial images stay true to scale.
    */
-  const tiltK = () => (karteMode.peek() === 'erkunden' && !isAerial(basemap) ? tiltFactor(ml.getPitch()) : 1);
+  const tiltK = () => (terrainLayerOn.peek() || karteMode.peek() !== 'erkunden' || isAerial(basemap) ? 1 : tiltFactor(ml.getPitch()));
   const terrainTarget = () => terrainBase() * tiltK();
   /**
    * Changes the exaggeration of the running terrain in place. `map.setTerrain` would rebuild the whole terrain every

@@ -45,7 +45,7 @@ const THEMES: Record<string, KarteTheme[]> = {
   ],
   erde: [
     T('oberflaeche', 'Oberfläche', 'leaf', ['satellitenbild', 'vegetation', 'baeume', 'landbedeckung', 'schneedecke', 'bodentemperatur', 'aerosole', 'nachtlichter']),
-    T('untergrund', 'Untergrund', 'mountain', ['geologie', 'plattengrenzen', 'erdbeben', 'vulkane']),
+    T('untergrund', 'Untergrund', 'mountain', ['geologie', 'plattengrenzen', 'gelaende', 'erdbeben', 'vulkane']),
     T('meer', 'Meer', 'wave', ['meerestemperatur', 'meeresstroemung', 'seegang', 'meerestiefe', 'meereis', 'chlorophyll']),
     T('gewaesser', 'Küste und Gewässer', 'drop', ['fluesse', 'pegel', 'gezeiten', 'bojen', 'schiffsrouten']),
   ],
@@ -88,7 +88,7 @@ const DEFS: Karte[] = [
   },
   {
     id: 'erde', name: 'Erde & Meer', icon: 'globe', color: '#8FDCFF', builtin: true, basemap: 'satellite', labels: true, terminator: true,
-    layers: [on('meerestemperatur', 0.85), on('plattengrenzen', 0.9), off('satellitenbild'), off('vegetation', 0.8), off('schneedecke', 0.85), off('bodentemperatur', 0.8), off('aerosole', 0.8), off('landbedeckung', 0.75), off('geologie', 0.65), off('meereis'), off('chlorophyll', 0.85), off('meerestiefe', 0.8), off('meeresstroemung', 0.9), off('seegang', 0.85), off('fluesse'), off('schiffsrouten', 0.8), off('bojen'), off('pegel'), off('gezeiten'), off('nachtlichter'), off('vulkane'), off('erdbeben')],
+    layers: [on('meerestemperatur', 0.85), on('plattengrenzen', 0.9), off('satellitenbild'), off('vegetation', 0.8), off('schneedecke', 0.85), off('bodentemperatur', 0.8), off('aerosole', 0.8), off('landbedeckung', 0.75), off('geologie', 0.65), off('gelaende'), off('meereis'), off('chlorophyll', 0.85), off('meerestiefe', 0.8), off('meeresstroemung', 0.9), off('seegang', 0.85), off('fluesse'), off('schiffsrouten', 0.8), off('bojen'), off('pegel'), off('gezeiten'), off('nachtlichter'), off('vulkane'), off('erdbeben')],
   },
   {
     id: 'gesellschaft', name: 'Gesellschaft', icon: 'vote', color: '#C0A0FF', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,
