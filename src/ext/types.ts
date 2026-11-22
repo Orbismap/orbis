@@ -138,8 +138,6 @@ export interface LandmarkSample {
   elevationM: number;
   /** the model is drawn from this zoom on */
   minZoom: number;
-  /** `bridge`, `tower` … as the dataset types it; bridges hang over the water and the terrain model holds them as a ridge */
-  kind: string;
   /** height of the model in metres, 0 when unknown */
   heightM: number;
   /** absolute URL of the GLB (metres; X east, Y up, Z south; its bearing and scale are already baked in, it is placed as it is) */

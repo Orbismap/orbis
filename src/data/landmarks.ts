@@ -55,7 +55,6 @@ interface RawAsset {
   anchor?: [number, number];
   minZoom?: number;
   height?: number;
-  type?: string;
   elevation?: number;
   bounds?: [number, number, number, number];
   osm?: RawOsm | null;
@@ -96,7 +95,6 @@ export function parseLandmarks(json: unknown, base = LANDMARKS_BASE): LandmarkSa
       lng,
       lat,
       elevationM: num(a.elevation, 0),
-      kind: a.type ?? 'landmark',
       minZoom: num(a.minZoom, 15),
       heightM: num(a.height, 0),
       url: url.startsWith('http') ? url : base + url,
