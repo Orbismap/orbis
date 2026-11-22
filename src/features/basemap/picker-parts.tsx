@@ -6,7 +6,7 @@ import { AERIAL_GROUPS, BASEMAPS, KARTE_GROUPS, MAP_MODES, basemapDef, isAerial,
 import { isWorldwide } from '../../map/basemaps/regional';
 import type { BasemapId } from '../../map/types';
 import { activeKarte } from '../../state/session';
-import { buildings3d, karteMode, projection, setBuildings3d, setProjection } from '../../state/view';
+import { buildings3d, karteMode, poiBasemap, projection, setBuildings3d, setProjection } from '../../state/view';
 import { cx } from '../../ui/hooks';
 import { Icon } from '../../ui/icons/Icon';
 import { Segmented } from '../../ui/Segmented';
@@ -257,6 +257,7 @@ export function ViewSwitches() {
       />
       <Switch label="Beschriftung" checked={k.labels && !own} disabled={own} onChange={(v) => setLabels(k.id, v)} />
       {own && <p class="bm-hint">Diese Karte bringt ihre eigene Beschriftung mit.</p>}
+      {karteMode.value === 'erkunden' && !isAerial(k.basemap) && !own && <Switch label="Orte und Läden" checked={poiBasemap.value} onChange={(v) => (poiBasemap.value = v)} />}
       {showsRelief(karteMode.value, k.basemap) && (
         <>
           <div class="bm-switch-wrap">
