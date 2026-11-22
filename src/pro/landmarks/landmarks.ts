@@ -187,9 +187,9 @@ export class LandmarksPart implements StagePart {
   private stopDark?: () => void;
   private badges: LandmarkBadges;
 
-  constructor(private map: MlMap, private stage: Stage, private heightFactor: () => number = () => 1, dark?: ReadonlySignal<boolean>) {
+  constructor(private map: MlMap, private stage: Stage, private heightFactor: () => number = () => 1, dark?: ReadonlySignal<boolean>, labelsVisible?: ReadonlySignal<boolean>) {
     this.object.visible = false;
-    this.badges = new LandmarkBadges(map, heightFactor);
+    this.badges = new LandmarkBadges(map, heightFactor, labelsVisible);
     this.stopDark = dark?.subscribe((on) => {
       this.night = on;
       for (const e of this.entries.values()) for (const m of e.materials) setNight(m, on);

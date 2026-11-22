@@ -256,6 +256,8 @@ export interface ExtensionHost {
   buildingHeightFactor(): number;
   /** True while the basemap is a dark one: models light their windows, lamps and signs then. */
   readonly mapDark: ReadonlySignal<boolean>;
+  /** True while map place labels are on (basemap POIs or the "Orte und Läden" layer): the landmark badges follow it. */
+  readonly landmarkLabels: ReadonlySignal<boolean>;
   /** True when the user wants less motion (setting or OS). */
   reducedMotion(): boolean;
   /**

@@ -1,5 +1,6 @@
-// "3D-Gebäude": the collection point for everything 3D-building-like (OSM buildings with their colours now; photo mesh, LOD models
-// and more later). The option "Typ" picks what is shown:
+// "3D-Gebäude": the collection point for everything 3D-building-like (the plain houses and landmark models, OSM buildings with their
+// colours, photo mesh, LOD models and more later). The option "Typ" picks what is shown:
+//   normal   the plain houses: the basemap's 2.5D buildings and, with Orbis Pro, our own landmark models. Nothing is replaced here.
 //   osm      OSM buildings from the OpenFreeMap tiles (source `ofm`, shared with the basemap): building parts at their own height,
 //            outlines with parts hidden (`hide_3d`), the colour OSM knows (`colour`: building:colour / colour). It replaces the
 //            plain 2.5D buildings of the basemap switch.
@@ -13,7 +14,7 @@ import { buildingsChannel, setTilesetSource, tilesetsChannel } from '../../ext/c
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT, OFM_BUILDINGS_SOURCE_ID } from '../../map/buildings-tilt';
-import { buildingColour, buildingsColoured, buildingsDetailed, buildingsLayerOn, buildingsReplaced } from '../../state/view';
+import { buildingColour, buildingsColoured, buildingsDetailed, buildingsLayerOn, buildingsPlainWanted, buildingsReplaced } from '../../state/view';
 import { defineLayer } from '../define';
 
 const COLOR = '#B9A58C';
@@ -24,38 +25,46 @@ const PLATEAU_COLOR = '#7FA6C9';
 const SOURCE = 'plateau';
 const CREDIT = 'gebaeude3d-plateau-attribution';
 
-type Typ = 'osm' | 'plateau';
+type Typ = 'normal' | 'osm' | 'plateau';
 const TYPES: { value: Typ; label: string }[] = [
+  { value: 'normal', label: 'Gebäude' },
   { value: 'osm', label: 'OSM Dächer' },
   { value: 'plateau', label: 'Plateau (Japan)' },
 ];
-const asTyp = (v: unknown): Typ => (v === 'plateau' ? v : 'osm');
+const asTyp = (v: unknown): Typ => (v === 'osm' || v === 'plateau' ? v : 'normal');
 
 export default defineLayer({
   id: 'gebaeude3d',
   category: 'infrastruktur',
   title: '3D-Gebäude',
-  summary: 'Gebäude in 3D mit Gebäudeteilen: OSM mit ihren Farben, Japan als Stadtmodell (Plateau)',
+  summary: 'Gebäude in 3D: die normalen Häuser der Karte mit Wahrzeichen als Modellen, OSM-Dächer mit ihren Farben oder Japan als Stadtmodell (Plateau)',
   icon: 'building',
   color: COLOR,
   form: 'areas',
   cadence: 'static',
   minZoom: 14,
-  coverage: 'Welt (OSM), Japan (Plateau)',
+  coverage: 'Welt (2.5D/OSM), Japan (Plateau)',
   sources: [
     { name: 'OpenFreeMap / OpenStreetMap-Mitwirkende ', url: 'https://openfreemap.org/', license: 'ODbL 1.0' },
     { name: PLATEAU_ATTRIBUTION, url: 'https://www.mlit.go.jp/plateau/', license: 'CC BY 4.0' },
   ],
   options: [
-    { id: 'typ', label: 'Typ', type: 'select', default: 'osm', choices: TYPES },
+    { id: 'typ', label: 'Typ', type: 'select', default: 'normal', choices: TYPES },
     // for the OSM buildings, 2.5D and with Orbis Pro alike: the colour OSM knows, or all in one plain colour
-    { id: 'farben', label: 'Eingefärbt (Farben aus OSM)', type: 'toggle', default: true },
+    { id: 'farben', label: 'Eingefärbt (Farben aus OSM)', type: 'toggle', default: false },
   ],
-  legend: (o) => (asTyp(o.typ) === 'plateau'
-    ? { type: 'classes', items: [{ color: PLATEAU_COLOR, label: 'Stadtmodell Japan (mit Orbis Pro)', shape: 'square' }] }
-    : o.farben === false
-      ? { type: 'classes', items: [{ color: PLAIN, label: 'Alle Gebäude einfarbig', shape: 'square' }] }
-      : { type: 'classes', items: [{ color: OSM_COLORED, label: 'Farbe wie in OSM eingetragen', shape: 'square' }, { color: PLAIN, label: 'Keine Farbe in OSM', shape: 'square' }] }),
+  legend: (o) => (asTyp(o.typ) === 'normal'
+    ? { type: 'classes', items: [
+        o.farben === false
+          ? { color: PLAIN, label: 'Häuser der Karte (2.5D, einfarbig)', shape: 'square' as const }
+          : { color: OSM_COLORED, label: 'Häuser der Karte (2.5D, Farbe aus OSM)', shape: 'square' as const },
+        { color: COLOR, label: 'Wahrzeichen als 3D-Modell (mit Orbis Pro)', shape: 'square' },
+      ] }
+    : asTyp(o.typ) === 'plateau'
+      ? { type: 'classes', items: [{ color: PLATEAU_COLOR, label: 'Stadtmodell Japan (mit Orbis Pro)', shape: 'square' }] }
+      : o.farben === false
+        ? { type: 'classes', items: [{ color: PLAIN, label: 'Alle Gebäude einfarbig', shape: 'square' }] }
+        : { type: 'classes', items: [{ color: OSM_COLORED, label: 'Farbe wie in OSM eingetragen', shape: 'square' }, { color: PLAIN, label: 'Keine Farbe in OSM', shape: 'square' }] }),
   keywords: ['gebäude', '3d', 'haus', 'häuser', 'gebäudeteile', 'dach', 'dachform', 'satteldach', 'walmdach', 'kuppel', 'roof', 'building:part', 'building', 'buildings', 'osm', 'farbe', 'plateau', 'japan', 'tokio', 'stadtmodell', 'fotomesh', 'lod'],
 
   mount(ctx) {
@@ -93,6 +102,7 @@ export default defineLayer({
         buildingsReplaced.value = on;
         buildingsDetailed.value = on;
         buildingsColoured.value = coloured();
+        buildingsPlainWanted.value = typ() === 'normal';
         ctx.status({ state: 'ready' });
       }),
       // the Plateau models (Orbis Pro streams them)
@@ -125,7 +135,8 @@ export default defineLayer({
         setTilesetSource(SOURCE, null);
         buildingsReplaced.value = false;
         buildingsDetailed.value = false;
-        buildingsColoured.value = true;
+        buildingsColoured.value = false;
+        buildingsPlainWanted.value = false;
         buildingsLayerOn.value = false;
         ctx.map.remove({ layers: [layerId] });
       },
