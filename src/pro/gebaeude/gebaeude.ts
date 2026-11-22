@@ -31,11 +31,12 @@ interface Built {
 }
 
 /**
- * The stage lights (ambient 1.5 + sun 2.2, shared with ships, trees, planes) show a flat surface at about 0.75 of its colour (measured on the
- * top of buildings in the dark basemap: 0.74-0.76 of the 2.5D colour, which MapLibre shows at ~0.97). The colours are scaled up in linear light
- * (0.53^-1) so that a building here has the colour of the 2.5D building of the basemap. Vertex colours are floats, values above 1 are fine.
+ * The stage lights (ambient 1.0 + a sun in the south-west, shared with ships, trees, planes) show a flat roof at about 0.68 of its colour (it was
+ * 0.75 under the old light from the north-east; measured then on the top of buildings in the dark basemap against the 2.5D colour, which
+ * MapLibre shows at ~0.97). The colours are scaled up so that a building here has about the colour of the 2.5D building of the basemap; the
+ * sunlit slopes go a little above it, the shaded ones below, which is what shows the shape. Vertex colours are floats, values above 1 are fine.
  */
-const LOOK_GAIN = 1.9;
+const LOOK_GAIN = 2.1;
 const rgb = (hex: number, shade: number): [number, number, number] => {
   const c = new THREE.Color(hex);
   const k = shade * LOOK_GAIN;
@@ -57,6 +58,9 @@ export class GebaeudePart implements StagePart {
     this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
     this.mesh.matrixAutoUpdate = false;
     this.mesh.frustumCulled = false;
+    // roofs and walls throw shadows on each other: that shows the steps and ridges of a roof (the stage lights, world3d/stage.ts)
+    this.mesh.castShadow = true;
+    this.mesh.receiveShadow = true;
     this.object.add(this.mesh);
     this.object.visible = false;
   }

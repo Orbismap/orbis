@@ -40,6 +40,8 @@ function toLambert(model: THREE.Object3D) {
   model.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
     const convert = (m: THREE.Material): THREE.Material => {
       const s = m as THREE.MeshStandardMaterial;
       const out = new THREE.MeshLambertMaterial({
