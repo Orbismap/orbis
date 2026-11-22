@@ -8,9 +8,9 @@ import type { Map as MlMap, VectorTileSource } from 'maplibre-gl';
 import { EMPTY_MASK, landmarkMask, type LandmarkMask } from '../data/landmarks';
 import type { Footprint } from './landmark-geometry';
 import { signal } from '@preact/signals';
-import { OFM_BUILDINGS_SOURCE_ID, useDetailedBuildingTiles } from './buildings-tilt';
+import { MASKED_BUILDINGS_SOURCE_ID, OFM_BUILDINGS_SOURCE_ID, useDetailedBuildingTiles } from './buildings-tilt';
 
-export const MASKED_SOURCE = 'ofm-landmarks';
+export const MASKED_SOURCE = MASKED_BUILDINGS_SOURCE_ID;
 const PROTOCOL = 'orbis-landmark-buildings';
 const BASE_SOURCE = OFM_BUILDINGS_SOURCE_ID;
 /** an invisible layer on the cut source: a source only loads tiles for a visible layer, and the building layers may all be hidden (Pro draws the buildings, features/buildings3d/roofs-source.ts reads the tiles) */
