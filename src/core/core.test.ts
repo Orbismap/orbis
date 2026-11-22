@@ -118,10 +118,16 @@ describe('url', () => {
     expect(h).toBe('#/@52.52,13.405,5.25z,30b,45p?l=erdbeben,seekabel&t=2026-11-10T12:00Z&g=1');
     expect(parseHash(h)).toEqual(s);
   });
-  it('reads k= and b= of older links but never writes them', () => {
-    expect(serializeHash({ karte: 'wetter', basemap: 'satellite', globe: false })).toBe('#/?g=0');
+  it('writes k= but not b=, and reads both from older links', () => {
+    expect(serializeHash({ karte: 'wetter', basemap: 'satellite', globe: false })).toBe('#/?k=wetter&g=0');
     expect(parseHash('#/?k=wetter&b=satellite')).toEqual({ karte: 'wetter', basemap: 'satellite' });
     expect(parseHash('#/?b=a<b').basemap).toBeUndefined();
+  });
+  it('round-trips the collapsed sidebar, without writing the default open state', () => {
+    expect(parseHash('#/?s=0').sidebar).toBe(false);
+    expect(parseHash('#/?s=1').sidebar).toBe(true);
+    expect(serializeHash({ sidebar: false })).toBe('#/?s=0');
+    expect(serializeHash({ sidebar: true })).toBe('#/');
   });
   it('round-trips a shared own Karte', () => {
     const s = { layers: ['erdbeben'], shared: { name: 'Mein, Wetter', icon: 'cloud', color: '#72C8F0', basemap: 'satellite' } };

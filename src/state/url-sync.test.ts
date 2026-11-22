@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { activeIds, activeKarte, setActiveIds, setLayerVisible, SCRATCH_ID } from '../karten/active';
-import { parseHash } from '../core/url';
+import { parseHash, serializeHash } from '../core/url';
+import { detailOpen } from './hud';
+import { leftPanelOpen } from './ui';
 import { applyUrlState, currentUrlState } from './url-sync';
+
+beforeEach(() => { detailOpen.value = false; leftPanelOpen.value = true; });
 
 describe('url layers', () => {
   it('sets the active layers; the standard Karte follows from them', () => {
@@ -22,7 +26,7 @@ describe('url layers', () => {
     expect(activeIds.value).toContain('radar');
     expect(activeKarte.value.id).toBe('wetter');
   });
-  it('writes only the active layers, no Karte and no basemap', () => {
+  it('writes only the active layers, no Karte and no basemap while the detail menu is closed', () => {
     setActiveIds(['erdbeben', 'radar']);
     const u = currentUrlState();
     expect(u.layers).toEqual(['erdbeben', 'radar']);
@@ -30,6 +34,33 @@ describe('url layers', () => {
     expect(u.basemap).toBeUndefined();
     setActiveIds([]);
     expect(currentUrlState().layers).toBeUndefined();
+  });
+  it('keeps k= and l= together when both are in the link', () => {
+    applyUrlState(parseHash('#/@53.75,11.47,6z?k=wetter&l=niederschlag&g=0'));
+    expect(activeIds.value).toEqual(['niederschlag']);
+    expect(detailOpen.value).toBe(true);
+    const u = currentUrlState();
+    expect(u.karte).toBe('wetter');
+    expect(u.layers).toEqual(['niederschlag']);
+    const hash = serializeHash(u);
+    expect(hash).toContain('k=wetter');
+    expect(hash).toContain('l=niederschlag');
+    expect(hash.indexOf('k=wetter')).toBeLessThan(hash.indexOf('l=niederschlag'));
+  });
+  it('writes the browsed Karte while its detail menu is open, and drops it when closed', () => {
+    setActiveIds(['radar']);
+    detailOpen.value = true;
+    expect(currentUrlState().karte).toBe('wetter');
+    detailOpen.value = false;
+    expect(currentUrlState().karte).toBeUndefined();
+  });
+  it('applies and keeps the collapsed sidebar', () => {
+    applyUrlState(parseHash('#/?s=0'));
+    expect(leftPanelOpen.value).toBe(false);
+    expect(currentUrlState().sidebar).toBe(false);
+    expect(serializeHash(currentUrlState())).toContain('s=0');
+    leftPanelOpen.value = true;
+    expect(currentUrlState().sidebar).toBeUndefined();
   });
 });
 
