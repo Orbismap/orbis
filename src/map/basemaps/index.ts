@@ -175,6 +175,14 @@ const genericBuildings = (visible: boolean): LayerSpecification => ({
 } as LayerSpecification);
 /** Aerial images: the real 3D buildings (streamed 3D tiles, Orbis Pro) belong here, not the 2.5D ones. */
 export const hasTiles3d = (id: string | undefined): boolean => id === 'satellite' || id === 'esri-clarity';
+/** The colour of the 2.5D buildings a basemap shows: its own, or the generic one. */
+export function buildingColourOf(id: string | undefined): string {
+  if (hasOwnBuildings(id)) {
+    const c = (BASEMAPS[id as keyof typeof BASEMAPS]?.topLayers?.[0] as { paint?: Record<string, unknown> } | undefined)?.paint?.['fill-extrusion-color'];
+    if (typeof c === 'string') return c;
+  }
+  return GENERIC_BUILDINGS_COLOR;
+}
 /** Does this basemap draw 2.5D buildings of its own? */
 export const hasOwnBuildings = (id: string | undefined): boolean => !!id && id.startsWith('orbis-');
 

@@ -9,8 +9,8 @@ import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { activeBasemap as activeBasemapSignal, buildings3d, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
-import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, showsRelief, skyFor } from './basemaps';
+import { activeBasemap as activeBasemapSignal, buildings3d, buildingColour, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
+import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, buildingColourOf, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, showsRelief, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { registerKeyedTiles } from './basemaps/keyed-protocol';
 import { registerPmtilesProtocol } from './pmtiles-protocol';
@@ -247,6 +247,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   function applyBuildings() {
     const shown = isStaticBasemap(basemap) ? basemap : undefined;
     // with Orbis Pro the detailed buildings (roofs-source.ts) include the plain ones: while they are drawn, the 2.5D buildings step aside
+    buildingColour.value = buildingColourOf(shown);
     const on = buildings3d.peek() && !buildingsReplaced.peek() && reliefOn() && !buildingsChannel.presented.peek();
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) setVis(l.id, on && id === shown);
     setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !hasTiles3d(shown));

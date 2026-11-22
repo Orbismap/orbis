@@ -34,7 +34,7 @@ export const extension: OrbisExtension = {
     const ships = new ShipsPart(map, stage, (id) => host.ships.select(id), host.reducedMotion);
     const power = new StromnetzPart(map, stage);
     const trees = new BaeumePart(map, stage);
-    const buildings = new GebaeudePart(map, stage);
+    const buildings = new GebaeudePart(map, stage, host.buildingHeightFactor);
     const landmarks = new LandmarksPart(map, stage, host.buildingHeightFactor, host.mapDark);
     let tilesPresent = false;
     let tilesRelease: (() => void) | null = null;

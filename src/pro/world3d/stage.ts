@@ -53,13 +53,13 @@ export interface ClickGate {
   retarget(part: StagePart, id: string): void;
 }
 
-// Light and shadow. The sun stands in the south-west, 46° high (seen from the usual camera, looking north, it lights the south walls and
+// Light and shadow. The sun stands in the south-south-west (210°, like the light of the map's 2.5D buildings), 50° high (seen from the usual camera, looking north, it lights the south walls and
 // the roof slopes that face south, the others stay darker: that is what shows the structure of a roof). The flat map gets real shadows
 // (one shadow map around the map centre, cast and received by what sets `castShadow` / `receiveShadow`: buildings, landmark models), so
 // steps and ridges throw shadows on the roofs and walls behind them. The ground is the map's own and receives none. The globe keeps the
 // light from the camera's side (no fixed sun fits a sphere) and has no shadows.
 /** where the sun is, as a direction in render space (x east, y SOUTH, z up) */
-const SUN_DIR = new THREE.Vector3(-0.49, 0.49, 0.72);
+const SUN_DIR = new THREE.Vector3(-0.32, 0.55, 0.77);
 const AMBIENT = 1.0;
 const SUN = 2.7;
 const SHADOW_MAP = 2048;

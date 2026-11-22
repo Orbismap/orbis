@@ -13,7 +13,7 @@ import { buildingsChannel, setTilesetSource, tilesetsChannel } from '../../ext/c
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../../map/buildings-tilt';
-import { buildingsColoured, buildingsDetailed, buildingsReplaced } from '../../state/view';
+import { buildingColour, buildingsColoured, buildingsDetailed, buildingsReplaced } from '../../state/view';
 import { defineLayer } from '../define';
 
 const COLOR = '#B9A58C';
@@ -86,8 +86,8 @@ export default defineLayer({
           // with Orbis Pro the detailed buildings (roofs-source.ts) take over from zoom 13.5: then this layer steps aside too
           ml.setLayoutProperty(layerId, 'visibility', on && !buildingsChannel.presented.value ? 'visible' : 'none');
           ml.setPaintProperty(layerId, 'fill-extrusion-opacity', ctx.opacity.value);
-          // `colour` is a hex value or a CSS colour name; without the option all buildings get the plain colour
-          ml.setPaintProperty(layerId, 'fill-extrusion-color', (coloured() ? ['coalesce', ['get', 'colour'], PLAIN] : PLAIN) as ExpressionSpecification);
+          // `colour` is a hex value or a CSS colour name; the others (and all, without the option) get the colour of the basemap's 2.5D buildings
+          ml.setPaintProperty(layerId, 'fill-extrusion-color', (coloured() ? ['coalesce', ['get', 'colour'], buildingColour.value] : buildingColour.value) as ExpressionSpecification);
         }
         buildingsReplaced.value = on;
         buildingsDetailed.value = on;
