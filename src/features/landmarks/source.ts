@@ -5,12 +5,12 @@
 // the extension the samples and the mask, and sets the credit line in the corner of the map.
 import { effect } from '@preact/signals';
 import type { LayerSpecification } from 'maplibre-gl';
-import { LANDMARKS_CREDIT, LANDMARKS_REPO, landmarkMask, landmarksShown, loadCatalogue, loadTile, maskOf, tilesInView } from '../../data/landmarks';
+import { EMPTY_MASK, LANDMARKS_CREDIT, LANDMARKS_REPO, landmarkMask, landmarksShown, loadCatalogue, loadFootprints, loadTile, maskOf, tilesInView } from '../../data/landmarks';
 import { landmarksChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
 import type { LandmarkSample } from '../../ext/types';
-import { watchLandmarkMask } from '../../map/landmark-mask';
+import { watchLandmarkBuildings } from '../../map/landmark-buildings';
 import { mapEngine } from '../../state/ui';
 
 /** The lowest minZoom of the dataset: nothing is asked for below. */
@@ -31,11 +31,14 @@ export function startLandmarks(): () => void {
     let key = '';
     let run = 0;
 
-    const set = (items: LandmarkSample[]) => {
+    const set = async (items: LandmarkSample[], my: number) => {
       const next = items.map((l) => l.id).sort().join('|');
       if (next === key) return;
+      // the outlines first (once, the dataset's footprint file): the model and the cut buildings appear together
+      const shapes = items.length ? await loadFootprints().catch(() => ({})) : {};
+      if (dead || my !== run) return;
       key = next;
-      landmarkMask.value = maskOf(items);
+      landmarkMask.value = items.length ? maskOf(items, shapes) : EMPTY_MASK;
       landmarksShown.value = items.length > 0;
       landmarksChannel.publish(() => items);
     };
@@ -43,7 +46,7 @@ export function startLandmarks(): () => void {
       timer = undefined;
       const my = ++run;
       const zoom = ml.getZoom();
-      if (zoom < LANDMARK_MIN_ZOOM) { set([]); return; }
+      if (zoom < LANDMARK_MIN_ZOOM) { await set([], my); return; }
       const b = ml.getBounds();
       const padLng = (b.getEast() - b.getWest()) * MARGIN;
       const padLat = (b.getNorth() - b.getSouth()) * MARGIN;
@@ -61,7 +64,7 @@ export function startLandmarks(): () => void {
           seen.add(l.id);
           items.push(l);
         }
-        set(items);
+        await set(items, my);
       } catch {
         // offline or the dataset is down: the OSM buildings simply stay
       }
@@ -86,7 +89,7 @@ export function startLandmarks(): () => void {
     let stopMask: (() => void) | undefined;
     void engine.ready.then(() => {
       if (dead) return;
-      stopMask = watchLandmarkMask(ml);
+      stopMask = watchLandmarkBuildings(ml);
       ml.on('moveend', schedule);
       ml.on('zoomend', schedule);
       schedule();
@@ -100,7 +103,7 @@ export function startLandmarks(): () => void {
       stopCredit();
       stopMask?.();
       key = '';
-      landmarkMask.value = maskOf([]);
+      landmarkMask.value = EMPTY_MASK;
       landmarksShown.value = false;
       landmarksChannel.reset();
     };

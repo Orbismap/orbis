@@ -198,7 +198,8 @@ export class LandmarksPart implements StagePart {
       const lon = s.lng + 360 * Math.round((centre.lng - s.lng) / 360);
       const out = lon < b.getWest() - padLon || lon > b.getEast() + padLon || s.lat < b.getSouth() - padLat || s.lat > b.getNorth() + padLat;
       if (out || !e.filled || frame.occluded(lon, s.lat, e.ground)) { e.root.visible = false; continue; }
-      frame.place(this.matrix, lon, s.lat, e.ground + s.elevationM, s.bearing, s.scale);
+      // the file has its bearing and scale baked in: placed unturned, at true size
+      frame.place(this.matrix, lon, s.lat, e.ground + s.elevationM);
       e.root.matrix.multiplyMatrices(this.matrix, TO_STAGE);
       e.root.matrixWorldNeedsUpdate = true;
       e.root.visible = true;

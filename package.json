@@ -17,9 +17,13 @@
   "packageManager": "pnpm@10.29.1",
   "dependencies": {
     "3d-tiles-renderer": "^0.5.4",
+    "@mapbox/vector-tile": "^3.0.0",
+    "@maplibre/vt-pbf": "^4.3.3",
     "@preact/signals": "^2.11.4",
     "maplibre-gl": "^6.17.0",
+    "pbf": "^5.2.0",
     "pmtiles": "^4.5.0",
+    "polygon-clipping": "^0.15.7",
     "preact": "^10.29.8",
     "satellite.js": "^7.1.0",
     "three": "0.183.2"

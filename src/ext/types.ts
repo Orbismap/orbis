@@ -134,16 +134,13 @@ export interface LandmarkSample {
   name: string;
   lng: number;
   lat: number;
-  /** degrees clockwise from north that the model's north is turned to */
-  bearing: number;
-  scale: number;
   /** metres up (positive) or down from the lowest ground under the footprint */
   elevationM: number;
   /** the model is drawn from this zoom on */
   minZoom: number;
   /** height of the model in metres, 0 when unknown */
   heightM: number;
-  /** absolute URL of the GLB (metres; X east, Y up, Z south) */
+  /** absolute URL of the GLB (metres; X east, Y up, Z south; its bearing and scale are already baked in, it is placed as it is) */
   url: string;
   /** [west, south, east, north] of its footprint */
   bounds: [number, number, number, number];

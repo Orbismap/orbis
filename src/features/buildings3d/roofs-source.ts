@@ -8,7 +8,9 @@
 import { effect } from '@preact/signals';
 import { osmPmtilesUrl } from '../../data/osmfiles';
 import { coveredIds, flatRing, flatSamples, paintSamples, roofSamples, type FlatBuilding } from '../../data/parsers/roofs-tiles';
-import { inBoxes, landmarkMask } from '../../data/landmarks';
+import { landmarkMask, type LandmarkMask } from '../../data/landmarks';
+import { inFootprint } from '../../map/landmark-geometry';
+import { buildingSource } from '../../map/landmark-buildings';
 import { buildingsChannel, tilesetsChannel } from '../../ext/channels';
 import { proEnabled } from '../../ext/licence';
 import { proAvailable } from '../../ext/loader';
@@ -24,17 +26,22 @@ const SCAN_DELAY_MS = 250;
 const PLAIN = '#d6dae3';
 
 /**
- * Is this building one that a landmark model stands in for? Samples from the OpenFreeMap tiles carry its feature id (`o<id>@…`),
- * those from the roof tiles no id at all: they count when their first corner lies in the model's footprint box.
+ * Is this building one that a landmark model stands in for? The middle of its outline lies in the landmark's replaced outline, or,
+ * where the dataset has none, in its footprint box. (The buildings of the OpenFreeMap tiles are already cut; this is for the roof tiles.)
  */
-export function replacedByLandmark(b: { id: string; rings: [number, number][][] }, mask: { ids: ReadonlySet<number>; boxes: Parameters<typeof inBoxes>[2] }): boolean {
+export function replacedByLandmark(b: { rings: [number, number][][] }, mask: LandmarkMask): boolean {
   if (!mask.boxes.length) return false;
-  if (b.id.startsWith('o')) {
-    const id = Number(b.id.slice(1).split('@')[0]);
-    if (mask.ids.has(id)) return true;
-  }
-  const p = b.rings[0]?.[0];
-  return !!p && inBoxes(p[0], p[1], mask.boxes);
+  const ring = b.rings[0];
+  if (!ring?.length) return false;
+  let x = 0, y = 0;
+  for (const p of ring) { x += p[0]; y += p[1]; }
+  const [lng, lat] = [x / ring.length, y / ring.length];
+  return mask.boxes.some((box, i) => {
+    const [w, s, e, n] = box;
+    if (lng < w || lng > e || lat < s || lat > n) return false;
+    const shape = mask.footprints[i]?.geometry;
+    return shape && shape.length ? inFootprint(lng, lat, shape) : true;
+  });
 }
 
 /** Starts the source; returns the function that stops it. */
@@ -55,9 +62,9 @@ export function startBuildingRoofs(): () => void {
       if (dead || !ml.getSource(SRC)) return;
       if (ml.getZoom() < ROOF_MIN_ZOOM) { clear(); return; }
       // while tiles load the query sees few buildings: publishing that would make the buildings flicker
-      if (!ml.isSourceLoaded(SRC) || !ml.isSourceLoaded('ofm')) return;
+      if (!ml.isSourceLoaded(SRC) || !ml.isSourceLoaded(buildingSource.peek())) return;
       const roofs = roofSamples(ml.querySourceFeatures(SRC, { sourceLayer: 'roofs' }));
-      const features = ml.querySourceFeatures('ofm', { sourceLayer: 'building' });
+      const features = ml.querySourceFeatures(buildingSource.peek(), { sourceLayer: 'building' });
       const flat: FlatBuilding[] = [];
       for (const f of features) {
         const ring = flatRing(f);
@@ -71,7 +78,8 @@ export function startBuildingRoofs(): () => void {
     };
     const schedule = () => { if (timer === undefined) timer = setTimeout(scan, SCAN_DELAY_MS); };
     const stopMask = landmarkMask.subscribe(schedule);
-    const onSource = (e: { sourceId?: string }) => { if (e.sourceId === SRC || e.sourceId === 'ofm') schedule(); };
+    const stopSource = buildingSource.subscribe(schedule);
+    const onSource = (e: { sourceId?: string }) => { if (e.sourceId === SRC || e.sourceId === 'ofm' || e.sourceId === buildingSource.peek()) schedule(); };
 
     // the fill is invisible, but a layer keeps the tiles of the source loaded
     void Promise.all([ensurePmtilesProtocol(), osmPmtilesUrl('roofs'), engine.ready]).then(([, url]) => {
@@ -85,6 +93,7 @@ export function startBuildingRoofs(): () => void {
     return () => {
       dead = true;
       stopMask();
+      stopSource();
       clearTimeout(timer);
       ml.off('sourcedata', onSource as never);
       ml.off('moveend', schedule);

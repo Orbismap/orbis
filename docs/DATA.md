@@ -138,5 +138,11 @@ Quelle: [alexwohlbruck/landmarks](https://github.com/alexwohlbruck/landmarks) (W
   Wahrzeichen → je Modell eine GLB (niedrige Stufe, 50-300 kB, nach Inhalts-Hash unveränderlich). Alles mit CORS `*`, direkt von der
   Projektseite; `VITE_LANDMARKS_BASE` stellt auf eine eigene Kopie um.
 - **Vorrang** (`features/landmarks/source.ts`): ab Zoom 13 (Modell-`minZoom`) zeichnet Pro jedes Modell in Sicht, unabhängig von Ebenen und
-  Dachdaten. Die OSM-Gebäude, die es ersetzt, fallen weg: in den 2.5D-Ebenen per Feature-Id (`map/landmark-mask.ts`; OpenFreeMap-Id = OSM-Id × 10
-  + 2 für Way, + 3 für Relation), in Pros Detailgebäuden per Id oder Lage im Footprint-Kasten (`roofs-source.ts`).
+  Dachdaten. Die GLBs tragen Ausrichtung und Maßstab schon in sich (nicht noch einmal drehen oder skalieren), Achsen X Ost / Y oben / Z Süd.
+- **Gebäude ausschneiden** (`map/landmark-buildings.ts`, `map/landmark-geometry.ts`, wie im Landmarks-Demo): OpenFreeMap fasst Nachbargebäude zu
+  einem Feature zusammen (Id endet auf 0), per Id allein lassen sie sich nicht entfernen. Solange ein Wahrzeichen in Sicht ist, lesen die
+  Gebäude-Ebenen die Quelle `ofm-landmarks`: ein Protokoll holt die OFM-Kachel und zieht die Umrisse der Wahrzeichen räumlich ab
+  (`polygon-clipping`), unzusammengefasste Gebäude fallen über die Feature-Id weg (OSM-Id × 10 + 1 Node, 2 Way, 3 Relation). Ohne Wahrzeichen
+  lesen die Ebenen wieder `ofm`. Pros Detailgebäude aus den Dachkacheln fallen weg, wenn ihre Mitte im Umriss liegt.
+- **Umrisse**: `replacement-footprints.json` (2,8 MB, ODbL, © OpenStreetMap-Mitwirkende) gehört nicht zur veröffentlichten API; sie kommt einmal
+  über jsDelivr von einem festen Commit des Repos (`FOOTPRINTS_URL`).

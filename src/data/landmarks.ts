@@ -4,6 +4,7 @@
 // URLs by content hash). Models are CC0-1.0; the placements are derived from OpenStreetMap (ODbL, © OpenStreetMap contributors).
 import { signal } from '@preact/signals';
 import type { LandmarkSample } from '../ext/types';
+import type { MultiPolygon } from 'polygon-clipping';
 
 /** Where the dataset lives; overridable like the other buckets (`.env`). */
 export const LANDMARKS_BASE = ((import.meta.env?.VITE_LANDMARKS_BASE as string | undefined)?.trim() || 'https://landmarks.barrelman.dev').replace(/\/$/, '');
@@ -20,12 +21,27 @@ export const INDEX_ZOOM = 12;
 export const landmarksShown = signal(false);
 /** What the layer stack has to leave out because a model stands in for it. */
 export interface LandmarkMask {
-  /** feature ids of the OpenFreeMap tiles (OSM id × 10 + 2 for a way, + 3 for a relation) */
+  /** feature ids of the OpenFreeMap tiles (OSM id × 10 + 1 node, + 2 way, + 3 relation) */
   ids: ReadonlySet<number>;
   /** [west, south, east, north] of every model in view */
   boxes: readonly (readonly [number, number, number, number])[];
+  /** the outlines of the replaced buildings (lng/lat), where the dataset has them: spatial, for merged tile features */
+  footprints: readonly { geometry: MultiPolygon; ids: number[] }[];
 }
-export const landmarkMask = signal<LandmarkMask>({ ids: new Set(), boxes: [] });
+export const EMPTY_MASK: LandmarkMask = { ids: new Set(), boxes: [], footprints: [] };
+export const landmarkMask = signal<LandmarkMask>(EMPTY_MASK);
+
+/**
+ * The OSM outlines the dataset cuts out of the basemap, by landmark id (~2.8 MB, ODbL, © OpenStreetMap contributors). They are not part
+ * of the published API, only of the demo's source, so they come from a pinned commit through jsDelivr; once, when the first landmark is in view.
+ */
+export const FOOTPRINTS_URL = 'https://cdn.jsdelivr.net/gh/alexwohlbruck/landmarks@a5945afdc50d14bb02bae0c41f42afa3c7451063/web/replacement-footprints.json';
+let footprints: Promise<Record<string, MultiPolygon>> | undefined;
+export function loadFootprints(): Promise<Record<string, MultiPolygon>> {
+  footprints ??= fetch(FOOTPRINTS_URL).then((r) => r.json()).then((j: { assets?: Record<string, MultiPolygon> }) => j.assets ?? {});
+  footprints.catch(() => { footprints = undefined; });
+  return footprints;
+}
 
 export interface Catalogue {
   template: string;
@@ -54,6 +70,7 @@ const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.i
 /** The feature id OpenFreeMap gives a building of OSM (planetiler: id × 10, plus 2 for a way and 3 for a relation). */
 export function ofmId(o: RawOsm | null | undefined): number | undefined {
   if (!o || typeof o.id !== 'number') return undefined;
+  if (o.type === 'node') return o.id * 10 + 1;
   if (o.type === 'way') return o.id * 10 + 2;
   if (o.type === 'relation') return o.id * 10 + 3;
   return undefined;
@@ -77,8 +94,6 @@ export function parseLandmarks(json: unknown, base = LANDMARKS_BASE): LandmarkSa
       name: a.name ?? a.id,
       lng,
       lat,
-      bearing: num(a.placement?.bearing, 0),
-      scale: Math.max(0.01, num(a.placement?.scale, 1)),
       elevationM: num(a.elevation, 0),
       minZoom: num(a.minZoom, 15),
       heightM: num(a.height, 0),
@@ -143,11 +158,15 @@ export function loadTile(cat: Catalogue, key: string): Promise<LandmarkSample[]>
   return hit;
 }
 
-/** The mask of the landmarks that are drawn: the OSM buildings they replace. */
-export function maskOf(items: readonly LandmarkSample[]): LandmarkMask {
+/** The mask of the landmarks that are drawn: the OSM buildings they replace (`shapes`: their outlines by landmark id, if loaded). */
+export function maskOf(items: readonly LandmarkSample[], shapes: Record<string, MultiPolygon> = {}): LandmarkMask {
   const ids = new Set<number>();
   for (const l of items) for (const id of l.osmIds) ids.add(id);
-  return { ids, boxes: items.map((l) => l.bounds) };
+  return {
+    ids,
+    boxes: items.map((l) => l.bounds),
+    footprints: items.map((l) => ({ geometry: shapes[l.id] ?? [], ids: l.osmIds })),
+  };
 }
 
 /** Is a point inside one of the boxes? */
