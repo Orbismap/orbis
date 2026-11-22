@@ -70,6 +70,16 @@ describe('coveredIds', () => {
     expect(coveredIds([{ id: 1, ring: sq(8, 50), base: 29 }], [roof(sq(8, 50), { min_height: '30' })])).toEqual([1]);
   });
 
+  it('does not cover a part that starts above the ground when the roof says nothing about its height (a tower on its base)', () => {
+    expect(coveredIds([{ id: 1, ring: sq(8, 50), base: 20 }], [roof(sq(8, 50))])).toEqual([]);
+    expect(coveredIds([{ id: 1, ring: sq(8, 50), base: 0 }], [roof(sq(8, 50))])).toEqual([1]);
+  });
+
+  it('finds the roof among many (grid lookup)', () => {
+    const roofs = Array.from({ length: 50 }, (_, i) => roof(sq(8 + i * 0.01, 50)));
+    expect(coveredIds([{ id: 9, ring: sq(8.25, 50) }], roofs)).toEqual([9]);
+  });
+
   it('ignores degenerate rings and no roofs', () => {
     expect(coveredIds([{ id: 1, ring: [[8, 50], [8, 50], [8, 50]] }], [roof(sq(8, 50))])).toEqual([]);
     expect(coveredIds([{ id: 1, ring: sq(8, 50) }], [])).toEqual([]);

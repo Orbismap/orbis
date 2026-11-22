@@ -15,8 +15,8 @@ import { isAerial } from '../../map/basemaps';
 import { mapEngine } from '../../state/ui';
 import { activeBasemap, buildings3d, buildingsLayerOn, karteMode } from '../../state/view';
 
-/** Every landmark is drawn from here on, whatever minZoom the dataset gives it: the zoom the 2.5D buildings start at. */
-export const LANDMARK_MIN_ZOOM = 13.5;
+/** Every landmark is drawn from here on, whatever minZoom the dataset gives it: the zoom the 2.5D buildings start at (13 when the view is steep, see map/buildings-tilt.ts). */
+export const LANDMARK_MIN_ZOOM = 13;
 const SCAN_DELAY_MS = 200;
 /** Landmarks this far outside of the view (share of the view) are kept ready. */
 const MARGIN = 0.3;

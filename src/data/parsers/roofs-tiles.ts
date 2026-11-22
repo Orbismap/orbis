@@ -57,18 +57,38 @@ const bbox = (ring: readonly P[]) => {
  * (the shaft of a tower inside the footprint of its base or sphere) are separate buildings, and dropping them leaves holes.
  */
 export function coveredIds(flat: readonly FlatBuilding[], roofs: readonly BuildingSample[]): number[] {
-  const boxes = roofs.map((r) => ({ b: bbox(r.rings[0]!), base: Number.parseFloat(r.tags.min_height ?? '') }));
+  // the roofs in a grid (about 100 m cells): a flat building is compared with the few roofs near it, not with all of them
+  const CELL = 0.001;
+  const boxes: { b: ReturnType<typeof bbox>; base: number }[] = [];
+  const grid = new Map<number, number[]>();
+  const key = (x: number, y: number) => (Math.floor(x / CELL) + 200_000) * 400_000 + Math.floor(y / CELL) + 200_000;
+  for (const r of roofs) {
+    const ring0 = r.rings[0];
+    if (!ring0) continue;
+    const b = bbox(ring0);
+    // a roof part that says nothing about its height starts at the ground, like a building: a flat part that starts higher is another part
+    const min = Number.parseFloat(r.tags.min_height ?? '');
+    const at = boxes.push({ b, base: Number.isFinite(min) ? min : 0 }) - 1;
+    for (let x = Math.floor(b.w / CELL); x <= Math.floor(b.e / CELL); x++) for (let y = Math.floor(b.s / CELL); y <= Math.floor(b.n / CELL); y++) {
+      const k = (x + 200_000) * 400_000 + y + 200_000;
+      (grid.get(k) ?? grid.set(k, []).get(k)!).push(at);
+    }
+  }
   const out: number[] = [];
   for (const f of flat) {
     if (f.ring.length < 4) continue;
     const fb = bbox(f.ring);
-    for (const { b, base } of boxes) {
+    // the roofs of the cell the flat building's centre lies in: a building of the same shape overlaps this cell
+    const near = grid.get(key((fb.w + fb.e) / 2, (fb.s + fb.n) / 2));
+    if (!near) continue;
+    for (const i of near) {
+      const { b, base } = boxes[i]!;
       const w = Math.min(fb.e, b.e) - Math.max(fb.w, b.w);
       const h = Math.min(fb.n, b.n) - Math.max(fb.s, b.s);
       if (w <= 0 || h <= 0) continue;
       const union = (fb.e - fb.w) * (fb.n - fb.s) + (b.e - b.w) * (b.n - b.s) - w * h;
       if (union <= 0 || (w * h) / union < 0.7) continue;
-      if (f.base !== undefined && Number.isFinite(base) && Math.abs(f.base - base) > 2) continue;
+      if (f.base !== undefined && Math.abs(f.base - base) > 2) continue;
       out.push(f.id);
       break;
     }

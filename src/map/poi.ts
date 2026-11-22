@@ -26,6 +26,8 @@ export const heightOffset = (share: number): Ex => ['+', share > 0 ? 3 : 0, ['*'
 /** The basemap's own places layer. */
 export const POI_LAYER_ID = 'bm-poi';
 /** Places a building stands in front of seen from the camera (map/poi-heights.ts): `key` of the feature. Read by `poiFilter`, so an effect that sets the filter follows it. */
+/** The zoom a tilted view adds to what the tiers count (map/buildings-tilt.ts, `pitchZoomBonus`). Read by `poiFilter`, so an effect that sets the filter follows it. */
+export const poiZoomBonus = signal(0);
 export const poiOccluded = signal<readonly string[]>([]);
 /** The fade of a place that a building steps in front of or leaves (feature-state `a`, 1 = visible; map/poi-heights.ts tweens it). */
 const fade: Ex = ['coalesce', ['feature-state', 'a'], 1] as unknown as Ex;
@@ -51,19 +53,41 @@ const TIERS: string[][] = [
 /** The zoom at which tier 1, 2, ... 5 appears. */
 const TIER_ZOOM = [12, 14, 15.5, 16.5, 17.5];
 
-/** The tier of a feature: a station is a landmark, a tram or bus stop is not (OpenMapTiles gives both class `railway` / `bus` and tells them apart by subclass). */
-const tierOf: Ex = ['case',
-  ['all', ['==', ['get', 'class'], 'railway'], ['==', ['get', 'subclass'], 'station']], 1,
-  ['==', ['get', 'class'], 'railway'], 4,
-  ['all', ['==', ['get', 'class'], 'bus'], ['==', ['get', 'subclass'], 'bus_station']], 3,
-  ['match', ['get', 'class'], ...TIERS.flatMap((cl, i) => [cl.filter((c) => !TIERS.slice(0, i).some((t) => t.includes(c))), i + 1]), 5],
-] as unknown as Ex;
+const TIER_OF_CLASS = new Map<string, number>();
+TIERS.forEach((cl, i) => cl.forEach((c) => { if (!TIER_OF_CLASS.has(c)) TIER_OF_CLASS.set(c, i + 1); }));
+const GROUP_OF_CLASS = new Map<string, PoiGroup>();
+POI_GROUPS.forEach((g) => g.classes.forEach((c) => { if (!GROUP_OF_CLASS.has(c)) GROUP_OF_CLASS.set(c, g); }));
+const KNOWN_SET = new Set(KNOWN);
+const SMALL_PRINT_SET = new Set(SMALL_PRINT);
+
+/** The tier of a place: a station is a landmark, a tram or bus stop is not (OpenMapTiles gives both class `railway` / `bus` and tells them apart by subclass). */
+export function poiTier(cls: unknown, subclass: unknown): number {
+  if (cls === 'railway') return subclass === 'station' ? 1 : 4;
+  if (cls === 'bus' && subclass === 'bus_station') return 3;
+  return TIER_OF_CLASS.get(String(cls)) ?? 5;
+}
+
+/** What the layers read from a place: decided once here when the place enters the GeoJSON source, not per feature and per layout in the expressions. */
+export interface PoiProps { tier: number; grp: string; icon: string; color: string }
+/** The resolved properties of a tile place, or undefined where the map leaves it out: no name, a kind the map does not show, or small print (signs, statues, murals, offices). */
+export function poiResolve(p: { name?: unknown; class?: unknown; subclass?: unknown }): PoiProps | undefined {
+  if (!p.name || !KNOWN_SET.has(String(p.class)) || SMALL_PRINT_SET.has(String(p.subclass))) return undefined;
+  const g = GROUP_OF_CLASS.get(String(p.class));
+  return { tier: poiTier(p.class, p.subclass), grp: g?.id ?? 'other', icon: g?.icon ?? POI_OTHER.icon, color: g?.color ?? POI_OTHER.color };
+}
+
+/** The highest tier that shows at a zoom (0: none), `ahead` tiers more for the plain dots. */
+export function poiTierLimit(zoom: number, ahead = 0): number {
+  let t = 0;
+  for (let i = 0; i < TIER_ZOOM.length; i++) if (zoom >= TIER_ZOOM[i]!) t = i + 1;
+  return t + ahead;
+}
 
 /** The highest tier that shows at the current zoom (0: none). */
-const tierLimit: Ex = ['step', ['zoom'], 0, ...TIER_ZOOM.flatMap((z, i) => [z, i + 1])] as unknown as Ex;
-
-const colorOf: Ex = ['match', ['get', 'class'], ...POI_GROUPS.flatMap((g) => [g.classes, g.color]), POI_OTHER.color] as unknown as Ex;
-const iconOf: Ex = ['match', ['get', 'class'], ...POI_GROUPS.flatMap((g) => [g.classes, g.icon]), POI_OTHER.icon] as unknown as Ex;
+const tierLimitAt = (bonus: number): Ex => ['step', bonus ? ['+', ['zoom'], bonus] : ['zoom'], 0, ...TIER_ZOOM.flatMap((z, i) => [z, i + 1])] as unknown as Ex;
+const tierOf: Ex = ['get', 'tier'] as unknown as Ex;
+const colorOf: Ex = ['get', 'color'] as unknown as Ex;
+const iconOf: Ex = ['get', 'icon'] as unknown as Ex;
 
 /** The kind of a place for people: its subclass (or class), "ice_cream" -> "Ice cream". */
 export const poiKind = (p: { class?: unknown; subclass?: unknown }): string =>
@@ -71,19 +95,23 @@ export const poiKind = (p: { class?: unknown; subclass?: unknown }): string =>
 
 export const poiGroupOf = (cls: unknown): PoiGroup | undefined => POI_GROUPS.find((g) => g.classes.includes(String(cls)));
 
-/** Which places show: named ones of the tiers the zoom has reached, narrowed to the chosen groups (`groups`: option value of the layer, undefined = all). */
+/** Which places show: the tiers the zoom has reached, narrowed to the chosen groups (`groups`: option value of the layer, undefined = all). Names, known kinds and small print are settled before a place enters the source (poiResolve). */
 export function poiFilter(groups?: string, ahead = 0, hide: readonly (readonly [number, number, number, number])[] = []): FilterSpecification {
-  // only places of a known kind, and not the small print: signs, statues and murals, flower pots, house entrances, offices
-  const f: unknown[] = ['all', ['has', 'name'], ['in', ['get', 'class'], ['literal', KNOWN]], ['!', ['in', ['get', 'subclass'], ['literal', SMALL_PRINT]]], ['<=', tierOf, ahead ? ['+', tierLimit, ahead] : tierLimit]];
+  const limit = tierLimitAt(poiZoomBonus.value);
+  const f: unknown[] = ['all', ['<=', tierOf, ahead ? ['+', limit, ahead] : limit]];
   // where a 3D landmark stands it has its own badge (pro/landmarks/badges.ts): the plain place of the same building steps aside
   if (hide.length) {
     const pad = 0.00012;
     f.push(['!', ['within', { type: 'MultiPolygon', coordinates: hide.map(([w, s, e, n]) => [[[w - pad, s - pad], [e + pad, s - pad], [e + pad, n + pad], [w - pad, n + pad], [w - pad, s - pad]]]) }]]);
   }
+  // `match` is a hash lookup per place; `in` on a long literal list would be a linear search
   const hidden = poiOccluded.value;
-  if (hidden.length) f.push(['!', ['in', ['get', 'key'], ['literal', hidden]]]);
+  if (hidden.length) f.push(['match', ['get', 'key'], hidden as string[], false, true]);
   const picked = multiValues(groups);
-  if (picked) f.push(['in', ['get', 'class'], ['literal', POI_GROUPS.filter((g) => picked.includes(g.id)).flatMap((g) => g.classes)]]);
+  if (picked) {
+    const ids = POI_GROUPS.filter((g) => picked.includes(g.id)).map((g) => g.id);
+    f.push(ids.length ? ['match', ['get', 'grp'], ids, true, false] : ['==', 0, 1]);
+  }
   return f as FilterSpecification;
 }
 

@@ -20,16 +20,23 @@ const TERRAIN_STEP_M = 0.5;
 const ORIGIN_RESET_M = 4000;
 
 interface Built {
-  /** triangles (x, y, z) relative to the origin, z above the ground */
-  walls: Float32Array;
-  roof: Float32Array;
-  wallRgb: [number, number, number];
-  roofRgb: [number, number, number];
+  /** triangles (x, y, z) relative to the origin, z above the ground: walls first, then the roof */
+  pos: Float32Array;
+  /** vertex colours (the walls with their vertical gradient) and the flat normals of the real shape, ready to be copied into the mesh */
+  col: Float32Array;
+  nor: Float32Array;
   lng: number;
   lat: number;
   /** terrain under the building (m) */
   ground: number;
 }
+
+/** a building that left the view keeps its model this long (ms), at most this many: turning around a point leaves and re-enters houses all the time */
+const KEEP_MS = 60_000;
+const KEEP_MAX = 8000;
+
+/** modelling is spread over frames: at most this long (ms) per slice */
+const SLICE_MS = 6;
 
 /**
  * The stage lights (ambient 1.0 + a sun in the south-west, shared with ships, trees, planes) show a flat roof at about 0.68 of its colour (it was
@@ -70,11 +77,21 @@ export class GebaeudePart implements StagePart {
   readonly object = new THREE.Group();
   private mesh: THREE.Mesh;
   private cache = new Map<string, Built>();
+  /** models of buildings that left the view, by id (insertion order = age) */
+  private kept = new Map<string, { built: Built; at: number }>();
   private origin: [number, number] | null = null;
   private active = false;
   private matrix = new THREE.Matrix4();
   private triangles = 0;
   private drawn = false;
+  /** buildings still to model (nearest to the map centre first) */
+  private queue: { b: BuildingSample; d: number }[] = [];
+  private sliceTimer: ReturnType<typeof setTimeout> | undefined;
+  private wasReady = false;
+  /** where each building's vertices lie in the mesh: the ground attribute is rewritten there when the terrain changes */
+  private spans = new Map<Built, [number, number]>();
+  /** told when `ready` may have changed */
+  onChange: () => void = () => {};
 
   /** the height of every building follows the camera's tilt like the 2.5D buildings of the basemap (host.buildingHeightFactor): see `heightPatch` */
   private height: HeightUniforms = { uF: { value: 1 }, uL: { value: 0 }, uEx: { value: 1 } };
@@ -96,9 +113,17 @@ export class GebaeudePart implements StagePart {
     this.object.visible = false;
   }
 
-  /** Buildings of the last publish. */
+  /** Buildings modelled. */
   get count() {
     return this.cache.size;
+  }
+
+  /**
+   * The mesh shows the view: the first list has been modelled completely. From then on it stays so until the list is empty (the zoom left the
+   * range), so that the 2.5D buildings of the basemap step aside once, not back and forth while a pan adds houses at the edge.
+   */
+  get ready() {
+    return this.wasReady && this.cache.size > 0;
   }
 
   setActive(on: boolean) {
@@ -110,29 +135,68 @@ export class GebaeudePart implements StagePart {
     this.stage.wake();
   }
 
-  /** A new list from the channel: models the buildings that are new, forgets the ones that are gone. */
+  /** A new list from the channel: the buildings that are gone are forgotten at once, the new ones are modelled in slices, nearest to the centre first. */
   feed(items: readonly BuildingSample[]) {
     const shown = withoutSplitOutlines(items);
     const first = shown[0]?.rings[0]?.[0];
-    if (!first) { this.clear(); return; }
+    if (!first) { this.clear(); this.onChange(); return; }
     if (this.origin && Math.hypot((first[0] - this.origin[0]) * Math.cos((first[1] * Math.PI) / 180), first[1] - this.origin[1]) * M_PER_DEG > ORIGIN_RESET_M) this.clear();
-    const origin = (this.origin ??= [first[0], first[1]]);
-    const kx = M_PER_DEG * Math.cos((origin[1] * Math.PI) / 180);
+    this.origin ??= [first[0], first[1]];
+    const c = this.map.getCenter();
+    const kx = Math.cos((c.lat * Math.PI) / 180);
     const next = new Map<string, Built>();
+    this.queue = [];
     for (const b of shown) {
-      const hit = this.cache.get(b.id);
+      let hit = this.cache.get(b.id);
+      if (!hit) {
+        // back in view within KEEP_MS: no new modelling, only the ground may have changed meanwhile
+        hit = this.kept.get(b.id)?.built;
+        if (hit) { hit.ground = this.terrainAt(hit.lng, hit.lat); this.kept.delete(b.id); }
+      }
       if (hit) { next.set(b.id, hit); continue; }
-      const built = this.model(b, origin, kx);
-      if (built) next.set(b.id, built);
+      const o = b.rings[0]![0]!;
+      this.queue.push({ b, d: ((o[0] - c.lng) * kx) ** 2 + (o[1] - c.lat) ** 2 });
+    }
+    // the nearest last, so that `pop` takes it first
+    this.queue.sort((p, q) => q.d - p.d);
+    const changed = next.size !== this.cache.size;
+    const now = performance.now();
+    for (const [id, built] of this.cache) if (!next.has(id)) this.kept.set(id, { built, at: now });
+    for (const [id, e] of this.kept) {
+      if (now - e.at <= KEEP_MS && this.kept.size <= KEEP_MAX) break; // oldest first: the rest is younger
+      this.kept.delete(id);
     }
     this.cache = next;
-    this.rebuild();
-    this.stage.wake();
+    if (changed) this.rebuild();
+    clearTimeout(this.sliceTimer);
+    this.slice();
   }
+
+  /** Models for SLICE_MS, then hands the frame back; the mesh is rebuilt once per slice. */
+  private slice = () => {
+    this.sliceTimer = undefined;
+    const origin = this.origin;
+    if (!origin) return;
+    const kx = M_PER_DEG * Math.cos((origin[1] * Math.PI) / 180);
+    const until = performance.now() + SLICE_MS;
+    let added = 0;
+    while (this.queue.length && performance.now() < until) {
+      const b = this.queue.pop()!.b;
+      const built = this.model(b, origin, kx);
+      if (built) { this.cache.set(b.id, built); added++; }
+    }
+    if (added) { this.rebuild(); this.stage.wake(); }
+    if (this.queue.length) { this.sliceTimer = setTimeout(this.slice, 0); return; }
+    if (!this.wasReady && this.cache.size > 0) { this.wasReady = true; this.onChange(); }
+  };
 
   private clear() {
     this.cache = new Map();
+    this.kept.clear();
+    this.queue = [];
+    clearTimeout(this.sliceTimer);
     this.origin = null;
+    this.wasReady = false;
     this.rebuild();
   }
 
@@ -146,14 +210,32 @@ export class GebaeudePart implements StagePart {
     // a little variation per building, so that equal houses are not one grey block
     const shade = 0.94 + unit(b.id, 3) * 0.1;
     const pitched = roofShapeOf(b.tags) !== 'flat';
-    return {
-      walls: new Float32Array(m.walls),
-      roof: new Float32Array(m.roof),
-      wallRgb: rgb(wallColour(b.tags), shade),
-      roofRgb: rgb(roofColour(b.tags, pitched), shade),
-      lng, lat,
-      ground: this.terrainAt(lng, lat),
-    };
+    const wallRgb = rgb(wallColour(b.tags), shade);
+    const roofRgb = rgb(roofColour(b.tags, pitched), shade);
+    const n = m.walls.length + m.roof.length;
+    const pos = new Float32Array(n), col = new Float32Array(n), nor = new Float32Array(n);
+    pos.set(m.walls, 0);
+    pos.set(m.roof, m.walls.length);
+    let top = 0;
+    for (let i = 2; i < m.walls.length; i += 3) top = Math.max(top, m.walls[i]!);
+    const lift = Math.sqrt(top / 150);
+    for (let i = 0; i < n; i += 3) {
+      const wall = i < m.walls.length;
+      // MapLibre's vertical gradient of the 2.5D walls: darker at the foot, the less so the lower the building
+      const g = wall && top > 0 ? Math.min(1, Math.max(WALL_GRADIENT_MIN, (pos[i + 2]! / top) * lift)) : 1;
+      const c = wall ? wallRgb : roofRgb;
+      col[i] = c[0] * g; col[i + 1] = c[1] * g; col[i + 2] = c[2] * g;
+    }
+    // flat shading: one normal per triangle (the shape as it really is, whatever height share the tilt shows)
+    for (let i = 0; i < n; i += 9) {
+      const ux = pos[i + 3]! - pos[i]!, uy = pos[i + 4]! - pos[i + 1]!, uz = pos[i + 5]! - pos[i + 2]!;
+      const vx = pos[i + 6]! - pos[i]!, vy = pos[i + 7]! - pos[i + 1]!, vz = pos[i + 8]! - pos[i + 2]!;
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const l = Math.hypot(nx, ny, nz) || 1;
+      nx /= l; ny /= l; nz /= l;
+      for (let k = 0; k < 9; k += 3) { nor[i + k] = nx; nor[i + k + 1] = ny; nor[i + k + 2] = nz; }
+    }
+    return { pos, col, nor, lng, lat, ground: this.terrainAt(lng, lat) };
   }
 
   /** The real terrain height at a place (m, without exaggeration); the shader applies the exaggeration of the moment. */
@@ -161,45 +243,39 @@ export class GebaeudePart implements StagePart {
     return groundAt(this.map, lng, lat);
   }
 
-  /** Terrain tiles arrive after the buildings: when the ground under them changed, they move with it. */
+  /** Terrain tiles arrive after the buildings: when the ground under them changed, they move with it (only the ground attribute is rewritten). */
   private onIdle = () => {
+    const attr = this.mesh.geometry.getAttribute('ground') as THREE.BufferAttribute | undefined;
     let changed = false;
-    for (const b of this.cache.values()) {
+    for (const [b, [start, count]] of this.spans) {
       const h = this.terrainAt(b.lng, b.lat);
-      if (Math.abs(h - b.ground) > TERRAIN_STEP_M) changed = true;
+      if (Math.abs(h - b.ground) <= TERRAIN_STEP_M) continue;
       b.ground = h;
+      changed = true;
+      if (attr) (attr.array as Float32Array).fill(h, start, start + count);
     }
-    if (changed) { this.rebuild(); this.stage.wake(); }
+    if (changed && attr) { attr.needsUpdate = true; this.stage.wake(); }
   };
 
-  /** All buildings into one geometry; flat shading, so no vertex is shared. z holds the height above the ground, the ground is an attribute of its own. */
+  /** All buildings into one geometry: the per-building arrays are copied, nothing is computed. z holds the height above the ground, the ground is an attribute of its own. */
   private rebuild() {
     let floats = 0;
-    for (const b of this.cache.values()) floats += b.walls.length + b.roof.length;
-    const pos = new Float32Array(floats), col = new Float32Array(floats), ground = new Float32Array(floats / 3);
+    for (const b of this.cache.values()) floats += b.pos.length;
+    const pos = new Float32Array(floats), col = new Float32Array(floats), nor = new Float32Array(floats), ground = new Float32Array(floats / 3);
+    this.spans.clear();
     let at = 0;
-    const put = (src: Float32Array, c: [number, number, number], z: number, top: number, gradient: boolean) => {
-      for (let i = 0; i < src.length; i += 3) {
-        pos[at] = src[i]!; pos[at + 1] = src[i + 1]!; pos[at + 2] = src[i + 2]!;
-        // MapLibre's vertical gradient of the 2.5D walls: darker at the foot, the less so the lower the building
-        const g = gradient && top > 0 ? Math.min(1, Math.max(WALL_GRADIENT_MIN, (src[i + 2]! / top) * Math.sqrt(top / 150))) : 1;
-        col[at] = c[0] * g; col[at + 1] = c[1] * g; col[at + 2] = c[2] * g;
-        ground[at / 3] = z;
-        at += 3;
-      }
-    };
     for (const b of this.cache.values()) {
-      let top = 0;
-      for (let i = 2; i < b.walls.length; i += 3) top = Math.max(top, b.walls[i]!);
-      put(b.walls, b.wallRgb, b.ground, top, true);
-      put(b.roof, b.roofRgb, b.ground, top, false);
+      pos.set(b.pos, at); col.set(b.col, at); nor.set(b.nor, at);
+      ground.fill(b.ground, at / 3, (at + b.pos.length) / 3);
+      this.spans.set(b, [at / 3, b.pos.length / 3]);
+      at += b.pos.length;
     }
     this.mesh.geometry.dispose();
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     g.setAttribute('ground', new THREE.BufferAttribute(ground, 1));
-    g.computeVertexNormals();
     this.mesh.geometry = g;
     this.triangles = floats / 9;
   }
@@ -228,6 +304,7 @@ export class GebaeudePart implements StagePart {
 
   dispose() {
     this.map.off('idle', this.onIdle);
+    clearTimeout(this.sliceTimer);
     this.mesh.geometry.dispose();
     (this.mesh.material as THREE.Material).dispose();
     this.cache.clear();

@@ -1,7 +1,8 @@
 // The buildings a 3D landmark stands in for are cut out of the basemap, so the model has priority (and never a house inside it).
 // OpenFreeMap merges neighbouring buildings, so an id is not enough: building tiles go through a protocol that subtracts the
 // landmarks' outlines (map/landmark-geometry.ts, loaded lazily). The 2.5D building layers and the detailed Pro buildings read this
-// source instead of `ofm` while a landmark is in view; without one the layers are back on `ofm`, untouched.
+// source instead of `ofm` from the start (an empty cut passes the tiles on untouched): the layers never change source while the map runs, which
+// shows as the buildings going away and coming back. When landmarks arrive, the cut is renewed and the old tiles stay on screen until the new ones are in.
 import * as maplibregl from 'maplibre-gl';
 import type { Map as MlMap, VectorTileSource } from 'maplibre-gl';
 import { EMPTY_MASK, landmarkMask, type LandmarkMask } from '../data/landmarks';
@@ -16,7 +17,7 @@ const BASE_SOURCE = OFM_BUILDINGS_SOURCE_ID;
 const KEEP_LAYER = 'ofm-landmarks-keep';
 const SETTLE_MS = 150;
 
-/** The source the building layers read now: `ofm`, or the cut one while landmarks are in view (for readers of the building features). */
+/** The source the building layers read now: the cut one once the watch runs, `ofm` before (for readers of the building features). */
 export const buildingSource = signal<string>(BASE_SOURCE);
 
 let protocolReady = false;
@@ -44,6 +45,7 @@ function registerProtocol() {
     const data = await bytes;
     if (abort.signal.aborted) throw new DOMException('Aborted', 'AbortError');
     const masks = snapshots.get(Number(url.searchParams.get('v'))) ?? [];
+    if (!masks.length) return { data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer }; // nothing to cut: the tile as it is
     try {
       const { replaceBuildingTile } = await import('./landmark-geometry');
       const out = replaceBuildingTile(data, { z, x, y }, masks);
@@ -73,8 +75,8 @@ function moveLayers(ml: MlMap, from: string, to: string) {
 }
 
 /**
- * Follows `landmarkMask`: while it holds landmarks, the building layers read the cut source; the cut is renewed whenever the set
- * changes (the tiles are loaded anew, the old ones stay on screen until then). Returns the stop function.
+ * Puts the building layers on the cut source and follows `landmarkMask`: the cut is renewed whenever the set changes (the tiles are loaded
+ * anew, the old ones stay on screen until then). Returns the stop function.
  */
 export function watchLandmarkBuildings(ml: MlMap): () => void {
   let active = false;
@@ -83,50 +85,42 @@ export function watchLandmarkBuildings(ml: MlMap): () => void {
 
   const snapshot = (mask: LandmarkMask): Footprint[] => mask.footprints.map((f) => ({ geometry: f.geometry, ids: f.ids }));
 
-  const enable = (mask: LandmarkMask) => {
-    const base = ml.getSource(BASE_SOURCE) as VectorTileSource | undefined;
-    const tiles = base?.tiles?.[0];
-    if (!base || !tiles) return false;
-    template = tiles;
-    registerProtocol();
-    revision++;
-    snapshots.set(revision, snapshot(mask));
-    while (snapshots.size > 4) snapshots.delete(snapshots.keys().next().value!);
-    const src = ml.getSource(MASKED_SOURCE) as VectorTileSource | undefined;
-    if (src) src.setTiles([tilesUrl()]);
-    else ml.addSource(MASKED_SOURCE, { type: 'vector', tiles: [tilesUrl()], minzoom: base.minzoom ?? 0, maxzoom: base.maxzoom ?? 14 });
-    useDetailedBuildingTiles(ml, MASKED_SOURCE);
-    if (!ml.getLayer(KEEP_LAYER)) ml.addLayer({ id: KEEP_LAYER, type: 'fill', source: MASKED_SOURCE, 'source-layer': 'building', minzoom: 12, paint: { 'fill-opacity': 0 } });
-    if (!active) { active = true; moveLayers(ml, BASE_SOURCE, MASKED_SOURCE); buildingSource.value = MASKED_SOURCE; }
-    return true;
-  };
-  const disable = () => {
-    if (!active) return;
-    active = false;
-    moveLayers(ml, MASKED_SOURCE, BASE_SOURCE);
-    buildingSource.value = BASE_SOURCE;
-    if (ml.getLayer(KEEP_LAYER)) ml.removeLayer(KEEP_LAYER);
-    if (ml.getSource(MASKED_SOURCE)) ml.removeSource(MASKED_SOURCE);
-  };
   const apply = () => {
     timer = undefined;
     if (dead) return;
-    const mask = landmarkMask.peek();
     try {
-      if (mask.ids.size || mask.footprints.length) enable(mask);
-      else disable();
+      const base = ml.getSource(BASE_SOURCE) as VectorTileSource | undefined;
+      const tiles = base?.tiles?.[0];
+      if (!base || !tiles) return;
+      template = tiles;
+      registerProtocol();
+      revision++;
+      snapshots.set(revision, snapshot(landmarkMask.peek()));
+      while (snapshots.size > 4) snapshots.delete(snapshots.keys().next().value!);
+      const src = ml.getSource(MASKED_SOURCE) as VectorTileSource | undefined;
+      if (src) src.setTiles([tilesUrl()]);
+      else ml.addSource(MASKED_SOURCE, { type: 'vector', tiles: [tilesUrl()], minzoom: base.minzoom ?? 0, maxzoom: base.maxzoom ?? 14 });
+      useDetailedBuildingTiles(ml, MASKED_SOURCE);
+      if (!ml.getLayer(KEEP_LAYER)) ml.addLayer({ id: KEEP_LAYER, type: 'fill', source: MASKED_SOURCE, 'source-layer': 'building', minzoom: 12, paint: { 'fill-opacity': 0 } });
+      if (!active) { active = true; moveLayers(ml, BASE_SOURCE, MASKED_SOURCE); buildingSource.value = MASKED_SOURCE; }
     } catch (e) {
       console.warn('[landmarks] could not cut the buildings', e);
     }
   };
   const schedule = () => { clearTimeout(timer); timer = setTimeout(apply, SETTLE_MS); };
-  // a basemap switch brings its own building layers on `ofm`: they follow while landmarks are in view
+  // a basemap switch brings its own building layers on `ofm`: they follow
   const onStyle = () => {
     if (!active || dead) return;
     const layers = ml.getStyle().layers ?? [];
     if (layers.some((l) => isBuilding(l as never, BASE_SOURCE))) moveLayers(ml, BASE_SOURCE, MASKED_SOURCE);
   };
-  const stop = landmarkMask.subscribe(schedule);
+  // the first cut at once (nothing to cut yet): from then on the layers stay where they are
+  apply();
+  // a changed set renews the cut; the same set again (a new object) does not reload every tile
+  let seen = '';
+  const key = (m: LandmarkMask) => [...m.ids].sort().join(',') + '|' + m.footprints.length;
+  seen = key(landmarkMask.peek());
+  const stop = landmarkMask.subscribe((m) => { const k = key(m); if (k !== seen) { seen = k; schedule(); } });
   ml.on('styledata', onStyle);
   return () => {
     dead = true;
@@ -134,6 +128,14 @@ export function watchLandmarkBuildings(ml: MlMap): () => void {
     stop();
     ml.off('styledata', onStyle);
     landmarkMask.value = EMPTY_MASK;
-    try { disable(); } catch { /* the style is gone */ }
+    try {
+      if (active) {
+        active = false;
+        moveLayers(ml, MASKED_SOURCE, BASE_SOURCE);
+        buildingSource.value = BASE_SOURCE;
+      }
+      if (ml.getLayer(KEEP_LAYER)) ml.removeLayer(KEEP_LAYER);
+      if (ml.getSource(MASKED_SOURCE)) ml.removeSource(MASKED_SOURCE);
+    } catch { /* the style is gone */ }
   };
 }

@@ -4,17 +4,26 @@
 import type { Map as MlMap } from 'maplibre-gl';
 import { inFootprint } from '../data/landmarks';
 import { OFM_BUILDINGS_SOURCE_ID } from './buildings-tilt';
-import { POI_GEO_SOURCE, heightOffset, poiLayerIds, poiOccluded } from './poi';
+import { boxInside, reachBox, type Box } from './view-reach';
+import { pitchZoomBonus } from './buildings-tilt';
+import { POI_GEO_SOURCE, heightOffset, poiLayerIds, poiOccluded, poiResolve, poiTierLimit, poiZoomBonus } from './poi';
 
 const DELAY_MS = 250;
 /** buildings are looked up through a grid of cells this big (degrees, about 200 m) */
 const CELL = 0.002;
 /** places outside the view by this share are left out */
 const MARGIN = 0.25;
+/** the work is put off at most this long (ms) while tiles keep arriving */
+const MAX_WAIT_MS = 1200;
+/** a place has at most this many sight lines followed per pass (the nearest first) */
+const MAX_SIGHT = 500;
 
 type Poly = [number, number][][];
 interface Building { box: [number, number, number, number]; poly: Poly[]; h: number }
 interface Place { key: string; x: number; y: number; h: number }
+/** one number per grid cell (a string per cell and building was most of the garbage of a pass) */
+const cellKey = (x: number, y: number) => (Math.floor(x / CELL) + 100_000) * 200_000 + Math.floor(y / CELL) + 100_000;
+const hash = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
 /** metres per degree of latitude */
 const M_LAT = 111_320;
 /** the sight line is followed this far from a place (m), in at most this many steps */
@@ -37,9 +46,14 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
   let timer: ReturnType<typeof setTimeout> | undefined;
   let lastKey = '';
   let lastShare = -1;
-  let grid = new Map<string, Building[]>();
+  let grid = new Map<number, Building[]>();
   let placed = new Map<string, Place>();
   let maxH = 0;
+  /** what the last pass covered: the ground, and the highest tier of place it kept. While the view stays inside and nothing arrived, the pass is skipped. */
+  let built: { box: Box; tier: number } | undefined;
+  let dirty = true;
+  let waitingSince = 0;
+  let shareTimer: ReturnType<typeof setTimeout> | undefined;
   let occTimer: ReturnType<typeof setTimeout> | undefined;
   /** the places a building is in front of (what the filter will leave out once they have faded) */
   const target = new Set<string>();
@@ -64,17 +78,26 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
 
   const run = () => {
     timer = undefined;
+    const bonus = pitchZoomBonus(ml.getPitch());
+    if (bonus !== poiZoomBonus.peek()) poiZoomBonus.value = bonus;
+    waitingSince = 0;
     applyShare();
-    if (!o.active() || ml.getZoom() < 12) return;
+    if (!o.active() || ml.getZoom() < 12) { built = undefined; return; }
     const src = ml.getSource(POI_GEO_SOURCE) as { setData(d: unknown): void } | undefined;
     if (!src) return;
-    const b = ml.getBounds();
-    const padLng = (b.getEast() - b.getWest()) * MARGIN;
-    const padLat = (b.getNorth() - b.getSouth()) * MARGIN;
-    const [w, s, e, n] = [b.getWest() - padLng, b.getSouth() - padLat, b.getEast() + padLng, b.getNorth() + padLat];
+    // the places the zoom can show soon: the filter picks by the exact zoom, the source only needs not to miss any (a tier that is a zoom ahead)
+    const tier = Math.min(5, poiTierLimit(ml.getZoom() + pitchZoomBonus(ml.getPitch()) + 1, 1));
+    const view = reachBox(ml);
+    // nothing arrived and the view is still inside what the last pass covered: the grid and the source stay as they are
+    if (!dirty && built && built.tier >= tier && boxInside(built.box, view)) { occlude(); return; }
+    dirty = false;
+    const padLng = (view[2] - view[0]) * MARGIN;
+    const padLat = (view[3] - view[1]) * MARGIN;
+    const [w, s, e, n] = [view[0] - padLng, view[1] - padLat, view[2] + padLng, view[3] + padLat];
+    built = { box: [w, s, e, n], tier };
 
     // buildings of the loaded tiles, in a grid
-    grid = new Map<string, Building[]>();
+    grid = new Map<number, Building[]>();
     maxH = 0;
     const seen = new Set<string>();
     const bsrc = buildingSource();
@@ -87,40 +110,45 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
         if (!(h > 0) || Number(p.render_min_height) > 0) continue; // a part that hangs in the air is no roof to stand on
         const poly = (g.type === 'Polygon' ? [g.coordinates] : g.coordinates) as Poly[];
         let [bw, bs, be, bn] = [Infinity, Infinity, -Infinity, -Infinity];
-        for (const ring of poly[0] ? poly.map((q) => q[0]!) : []) for (const [x, y] of ring) { bw = Math.min(bw, x); be = Math.max(be, x); bs = Math.min(bs, y); bn = Math.max(bn, y); }
+        for (const q of poly) for (const [x, y] of q[0]!) { if (x < bw) bw = x; if (x > be) be = x; if (y < bs) bs = y; if (y > bn) bn = y; }
         if (be < w || bw > e || bn < s || bs > n) continue;
         const key = `${bw.toFixed(6)},${bs.toFixed(6)},${h}`;
         if (seen.has(key)) continue; // a building cut by a tile edge comes once per tile
         seen.add(key);
-        maxH = Math.max(maxH, h);
+        if (h > maxH) maxH = h;
         const bld: Building = { box: [bw, bs, be, bn], poly, h };
         for (let x = Math.floor(bw / CELL); x <= Math.floor(be / CELL); x++) for (let y = Math.floor(bs / CELL); y <= Math.floor(bn / CELL); y++) {
-          const k = `${x}/${y}`;
+          const k = (x + 100_000) * 200_000 + y + 100_000;
           (grid.get(k) ?? grid.set(k, []).get(k)!).push(bld);
         }
       }
     }
 
-    const places = new Map<string, GeoJSON.Feature>();
+    const features: GeoJSON.Feature[] = [];
+    const next = new Map<string, Place>();
+    let sum = 0;
     for (const f of ml.querySourceFeatures('ofm', { sourceLayer: 'poi' })) {
       if (f.geometry.type !== 'Point') continue;
       const [x, y] = f.geometry.coordinates as [number, number];
       if (x < w || x > e || y < s || y > n) continue;
       const p = f.properties as Record<string, unknown>;
-      if (!p.name) continue;
+      const r = poiResolve(p); // no name, a kind the map does not show, small print: never enters the source
+      if (!r || r.tier > tier) continue;
       const key = `${p.name}|${x.toFixed(6)}|${y.toFixed(6)}`;
-      if (places.has(key)) continue;
+      if (next.has(key)) continue;
       let h = 0;
-      for (const bld of grid.get(`${Math.floor(x / CELL)}/${Math.floor(y / CELL)}`) ?? []) {
+      for (const bld of grid.get(cellKey(x, y)) ?? []) {
         const [bw, bs, be, bn] = bld.box;
         if (bld.h <= h || x < bw || x > be || y < bs || y > bn) continue;
         if (inFootprint(x, y, bld.poly as never)) h = bld.h;
       }
-      places.set(key, { type: 'Feature', geometry: { type: 'Point', coordinates: [x, y] }, properties: { key, class: p.class, subclass: p.subclass, name: p.name, 'name:latin': p['name:latin'], rank: p.rank, h } });
+      next.set(key, { key, x, y, h });
+      sum = (sum + hash(key + h)) >>> 0; // order-free signature: the tiles come in any order
+      features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [x, y] }, properties: { key, class: p.class, subclass: p.subclass, name: p.name, 'name:latin': p['name:latin'], rank: p.rank, h, ...r } });
     }
-    placed = new Map([...places.entries()].map(([key, f]) => [key, { key, x: (f.geometry as GeoJSON.Point).coordinates[0]!, y: (f.geometry as GeoJSON.Point).coordinates[1]!, h: (f.properties as { h: number }).h }]));
-    const features = [...places.values()];
-    const sig = features.map((f) => `${(f.properties as { name: string }).name}${(f.properties as { h: number }).h}`).sort().join('|');
+    placed = next;
+    // setData re-tiles the whole source in the worker and lays every place layer out again: only when something changed
+    const sig = `${features.length}:${sum}`;
     if (sig !== lastKey) {
       lastKey = sig;
       src.setData({ type: 'FeatureCollection', features });
@@ -155,9 +183,14 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
       const keys = new Set<string>(target);
       if (ids.length) for (const f of ml.queryRenderedFeatures({ layers: ids })) { const k = (f.properties as { key?: string } | null)?.key; if (k) keys.add(k); }
       const roofMax = 3 + share * maxH;
-      for (const key of keys) {
-        const p = placed.get(key);
-        if (!p) continue;
+      // the nearest first and not more than MAX_SIGHT: what is far away is a few pixels, and a frame of the map is worth more than its exact answer
+      let order: Place[] = [];
+      for (const key of keys) { const p = placed.get(key); if (p) order.push(p); }
+      if (order.length > MAX_SIGHT) {
+        const d2 = (p: Place) => ((p.x - c.lng) * kx) ** 2 + ((p.y - c.lat) * M_LAT) ** 2;
+        order = order.map((p) => [d2(p), p] as const).sort((a, b) => a[0] - b[0]).slice(0, MAX_SIGHT).map((e) => e[1]);
+      }
+      for (const p of order) {
         const px = (p.x - c.lng) * kx;
         const py = (p.y - c.lat) * M_LAT;
         const pz = (p.h > 0 ? 3 + share * p.h : 0) + 1;
@@ -173,7 +206,7 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
           const x = p.x + (dx * t) / kx;
           const y = p.y + (dy * t) / M_LAT;
           const z = pz + (cz - pz) * t;
-          const cell = grid.get(`${Math.floor(x / CELL)}/${Math.floor(y / CELL)}`);
+          const cell = grid.get(cellKey(x, y));
           if (!cell) continue;
           if (cell.some((bld) => 3 + share * bld.h > z + 2 && x >= bld.box[0] && x <= bld.box[2] && y >= bld.box[1] && y <= bld.box[3] && inFootprint(x, y, bld.poly as never))) { hidden.push(p.key); break; }
         }
@@ -223,18 +256,31 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
     occTimer = setTimeout(occlude, THROTTLE_MS);
   };
 
+  // debounced, but not for ever: tiles that keep arriving (a steep view loads many) must not hold the work back past MAX_WAIT_MS
   const schedule = () => {
     clearTimeout(timer);
-    timer = setTimeout(run, DELAY_MS);
+    const now = performance.now();
+    if (!waitingSince) waitingSince = now;
+    timer = setTimeout(run, Math.max(0, Math.min(DELAY_MS, waitingSince + MAX_WAIT_MS - now)));
   };
-  const onSource = (e: { sourceId?: string }) => { if (e.sourceId === 'ofm' || e.sourceId === OFM_BUILDINGS_SOURCE_ID || e.sourceId === 'ofm-landmarks') schedule(); };
+  const onSource = (e: { sourceId?: string; sourceDataType?: string }) => {
+    if (e.sourceDataType === 'metadata') return;
+    if (e.sourceId === 'ofm' || e.sourceId === OFM_BUILDINGS_SOURCE_ID || e.sourceId === 'ofm-landmarks') { dirty = true; schedule(); }
+  };
+  // a change of the height offset lays the layers out again in the worker: while the camera tilts that is at most a few times a second, not once per frame
+  const onPitch = () => {
+    const bonus = pitchZoomBonus(ml.getPitch());
+    if (bonus !== poiZoomBonus.peek()) poiZoomBonus.value = bonus;
+    schedulePitch();
+  };
+  const schedulePitch = () => { if (!shareTimer) shareTimer = setTimeout(() => { shareTimer = undefined; applyShare(); }, 200); };
   ml.on('moveend', schedule);
   ml.on('move', scheduleOcclusion);
   ml.on('sourcedata', onSource);
-  ml.on('pitch', applyShare);
+  ml.on('pitch', onPitch);
   schedule();
   return {
-    refresh: schedule,
+    refresh: () => { dirty = true; schedule(); },
     destroy() {
       clearTimeout(timer);
       ml.off('moveend', schedule);
@@ -242,7 +288,8 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
       clearTimeout(occTimer);
       cancelAnimationFrame(raf);
       ml.off('sourcedata', onSource);
-      ml.off('pitch', applyShare);
+      ml.off('pitch', onPitch);
+      clearTimeout(shareTimer);
     },
   };
 }
