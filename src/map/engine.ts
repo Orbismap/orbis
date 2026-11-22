@@ -9,12 +9,16 @@ import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { activeBasemap as activeBasemapSignal, buildings3d, buildingColour, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
+import { activeBasemap as activeBasemapSignal, buildings3d, poiBasemap, poiLayerOn, buildingColour, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, buildingColourOf, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, isAerial, showsRelief, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { registerKeyedTiles } from './basemaps/keyed-protocol';
 import { registerPmtilesProtocol } from './pmtiles-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
+import { landmarkMask } from '../data/landmarks';
+import { startPoiHeights, type PoiHeights } from './poi-heights';
+import { POI_ICON_NAMES, POI_LAYER_ID, poiDotsId, poiFilter, poiOccluded } from './poi';
+import { ensureIcons } from '../render/icons';
 import { activeMembers, loadRegional, memberIds, membersOf, regionalDef, regionalEntry, regionalReady, type Bounds } from './basemaps/regional';
 import { clampCamera, ENGINE_MAX_PITCH, flyToTarget, locate as locateImpl } from './camera';
 import { attachCameraLimits } from './limits';
@@ -69,8 +73,11 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   let labels = init.labels ?? true;
   let terminatorMode: 'off' | 'auto' = init.terminator === false ? 'off' : 'auto';
   let loaded = false;
+  let poiHeights: PoiHeights | undefined;
   /** Terrain and 2.5D buildings follow the mode of the picker (Daten: off; Erkunden: on) and are always on for aerial images. (On those at true scale and only as the camera's height reference: the 3D tiles are laid over it, see StagePart.coversMap.) */
   const reliefOn = () => showsRelief(karteMode.peek(), basemap);
+  /** Places of interest belong to the Erkunden map (not aerial images), unless the layer "Orte und Läden" draws them itself. */
+  const poiWanted = () => karteMode.peek() === 'erkunden' && !isAerial(basemap) && poiBasemap.peek() && !poiLayerOn.peek();
   registerDemTiles();
   registerKeyedTiles();
   registerPmtilesProtocol(); // the Orbis Karte overlay (PMTiles) is part of the basemap style
@@ -82,7 +89,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   const cam = clampCamera(camera.peek());
   const ml = new maplibregl.Map({
     container,
-    style: composeStyle({ basemap, labels, terminator: terminatorMode === 'auto', projection: projectionSignal.peek(), buildings: buildings3d.peek() && reliefOn() }),
+    style: composeStyle({ basemap, labels, terminator: terminatorMode === 'auto', projection: projectionSignal.peek(), buildings: buildings3d.peek() && reliefOn(), poi: poiWanted() }),
     center: [cam.lng, cam.lat],
     zoom: cam.zoom,
     bearing: cam.bearing,
@@ -97,6 +104,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     renderWorldCopies: true,
   });
   ml.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+  ensureIcons(ml, POI_ICON_NAMES);
   if (import.meta.env?.DEV) ml.on('error', (e) => console.warn('[map]', e.error?.message ?? e));
 
   const disposeBuildingsTilt = installBuildingsTilt(ml);
@@ -126,6 +134,11 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   const resolveReady = () => {
     loaded = true;
     useDetailedBuildingTiles(ml);
+    // places float at the roof of their building while the buildings stand (the same share of the height as the buildings)
+    poiHeights = startPoiHeights(ml, {
+      active: () => ml.getLayoutProperty(POI_LAYER_ID, 'visibility') === 'visible' || poiLayerOn.peek(),
+      share: () => (buildings3d.peek() && reliefOn() && !isAerial(basemap) ? tiltFactor(ml.getPitch()) : 0),
+    });
     if (ml.getProjection()?.type !== projectionSignal.peek()) ml.setProjection({ type: projectionSignal.peek() });
     applyBasemap();
     terminator.setMode(terminatorMode);
@@ -183,6 +196,19 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       buildingsChannel.presented.value;
       karteMode.value;
       if (loaded) (applyBuildings(), applyTerrain());
+    }),
+    effect(() => {
+      const hide = landmarkMask.value.boxes;
+      poiOccluded.value; // followed even before the map is ready
+      if (!loaded) return;
+      if (ml.getLayer(POI_LAYER_ID)) ml.setFilter(POI_LAYER_ID, poiFilter(undefined, 0, hide));
+      if (ml.getLayer(poiDotsId(POI_LAYER_ID))) ml.setFilter(poiDotsId(POI_LAYER_ID), poiFilter(undefined, 1, hide));
+    }),
+    effect(() => {
+      poiBasemap.value;
+      poiLayerOn.value;
+      karteMode.value;
+      if (loaded) applyPoi();
     }),
     effect(() => {
       const p = projectionSignal.value;
@@ -253,6 +279,13 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) setVis(l.id, on && id === shown);
     setVis(GENERIC_BUILDINGS_ID, on && !hasOwnBuildings(shown) && !hasTiles3d(shown));
   }
+  function applyPoi() {
+    const look = isStaticBasemap(basemap) ? BASEMAPS[basemap] : undefined;
+    const on = poiWanted() && labels && !look?.ownLabels;
+    setVis(POI_LAYER_ID, on);
+    setVis(poiDotsId(POI_LAYER_ID), on);
+    poiHeights?.refresh();
+  }
   function applyBasemap() {
     const regional = isStaticBasemap(basemap) ? undefined : regionalDef(basemap);
     // regional data not loaded yet: show the default meanwhile and apply again when it is there
@@ -261,6 +294,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     const shown = isStaticBasemap(basemap) ? basemap : regional ? undefined : DEFAULT_BASEMAP;
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].layers) setVis(l.id, id === shown);
     applyBuildings();
+    applyPoi();
     const look = regional ?? BASEMAPS[shown ?? DEFAULT_BASEMAP];
     mapDark.value = look.theme === 'dark';
     for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) setVis(l.id, labels && !look.ownLabels && v === look.labelVariant);
@@ -434,6 +468,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     destroy() {
       disposers.forEach((d) => d());
       limits.destroy();
+      poiHeights?.destroy();
       writeThrottled.cancel();
       terminator.destroy();
       picking.destroy();

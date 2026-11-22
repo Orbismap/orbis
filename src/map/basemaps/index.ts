@@ -9,6 +9,7 @@ import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../buildings-ti
 import { DEM_NATIVE_ZOOM, DEM_TILES } from '../dem-protocol';
 import { karteBasemap } from './karte';
 import { keyedBasemaps, keyedGroups, type KeyedBasemapId } from './keyed';
+import { POI_GEO_SOURCE, POI_LAYER_ID, poiLayers } from '../poi';
 import { LABEL_VARIANTS, OFM_BUILDINGS_SOURCE, OFM_BUILDINGS_SOURCE_ID, OFM_GLYPHS, OFM_SOURCE, labelLayers, vectorBasemap } from './vector';
 
 export type { BasemapId, StaticBasemapId } from '../types';
@@ -157,7 +158,7 @@ const hillshadeSpec = (): SourceSpecification => {
 };
 export const TERRAIN_SPEC: SourceSpecification = { type: 'raster-dem', tiles: [DEM_TILES], tileSize: 512, maxzoom: DEM_NATIVE_ZOOM, encoding: 'terrarium', attribution: TERRAIN_ATTRIBUTION };
 
-export interface StyleOptions { basemap: BasemapId; labels: boolean; terminator: boolean; projection: 'globe' | 'mercator'; /** 2.5D buildings, default true */ buildings?: boolean }
+export interface StyleOptions { basemap: BasemapId; labels: boolean; terminator: boolean; projection: 'globe' | 'mercator'; /** 2.5D buildings, default true */ buildings?: boolean; /** places of interest (map/poi.ts), default off */ poi?: boolean }
 
 /** The 2.5D buildings for every basemap that has none of its own (aerial images, OSM, terrain, regional); the Orbis ones bring theirs. */
 export const GENERIC_BUILDINGS_ID = 'bm-buildings';
@@ -195,6 +196,7 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
   const sources: Record<string, SourceSpecification> = {
     ofm: OFM_SOURCE,
     [OFM_BUILDINGS_SOURCE_ID]: OFM_BUILDINGS_SOURCE,
+    [POI_GEO_SOURCE]: { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'key' },
     [TERRAIN_SOURCE]: TERRAIN_SPEC,
     [HILLSHADE_SOURCE]: hillshadeSpec(),
   };
@@ -219,7 +221,10 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
   for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].topLayers ?? []) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(buildings && id === shown) } } as LayerSpecification);
   layers.push(genericBuildings(buildings && !hasOwnBuildings(shown) && !hasTiles3d(shown)));
   for (const v of LABEL_VARIANTS) for (const l of labelLayers(v)) layers.push({ ...l, layout: { ...(l.layout ?? {}), ...vis(labelsOn && v === active) } } as LayerSpecification);
-  for (const m of ['basemap-labels', 'points', 'labels', 'top'] as const) layers.push(marker(m));
+  for (const m of ['basemap-labels', 'points'] as const) layers.push(marker(m));
+  // above the points slot, where the 3D models (landmarks, buildings, trees) are drawn: they must not cover the places
+  layers.push(...poiLayers(POI_LAYER_ID, !!o.poi && labelsOn));
+  for (const m of ['labels', 'top'] as const) layers.push(marker(m));
   return {
     version: 8,
     projection: { type: o.projection },

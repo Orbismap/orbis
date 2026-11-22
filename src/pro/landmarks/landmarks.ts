@@ -7,6 +7,7 @@ import type { LandmarkSample } from '../../ext/types';
 import type { GeoFrame } from '../world3d/frame';
 import type { Stage, StagePart } from '../world3d/stage';
 import { exaggeration } from '../world3d/terrain';
+import { LandmarkBadges } from './badges';
 
 // 3D landmarks: the low-poly GLB models of the Landmarks dataset (CC0), each standing where its OpenStreetMap building is. The base
 // finds the landmarks near the view and hides the buildings they replace (features/landmarks/source.ts); this part loads the models
@@ -184,9 +185,11 @@ export class LandmarksPart implements StagePart {
   /** the basemap is dark: the windows are lit */
   private night = false;
   private stopDark?: () => void;
+  private badges: LandmarkBadges;
 
   constructor(private map: MlMap, private stage: Stage, private heightFactor: () => number = () => 1, dark?: ReadonlySignal<boolean>) {
     this.object.visible = false;
+    this.badges = new LandmarkBadges(map, heightFactor);
     this.stopDark = dark?.subscribe((on) => {
       this.night = on;
       for (const e of this.entries.values()) for (const m of e.materials) setNight(m, on);
@@ -242,6 +245,7 @@ export class LandmarksPart implements StagePart {
       e.drape.uTerrain.value.dispose();
     }
     this.entries = next;
+    this.badges.setItems(items);
     this.fill();
     this.stage.wake();
   }
@@ -314,6 +318,7 @@ export class LandmarksPart implements StagePart {
       const url = e.sample.url;
       const model = this.models.get(url);
       if (model) {
+        this.badges.modelReady(e.sample, model);
         // a copy of the materials per landmark: the drape's uniforms are its own
         const copy = model.clone();
         copy.traverse((o) => {
@@ -397,6 +402,7 @@ export class LandmarksPart implements StagePart {
 
   dispose() {
     this.stopDark?.();
+    this.badges.dispose();
     this.map.off('idle', this.onIdle);
     for (const e of this.entries.values()) { for (const m of e.materials) m.dispose(); e.drape.uTerrain.value.dispose(); }
     for (const m of this.models.values()) if (m) disposeModel(m);

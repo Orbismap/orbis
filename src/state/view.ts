@@ -16,6 +16,10 @@ export const projection = signal<Projection>('globe');
 export const activeBasemap = signal<string>('');
 /** The switch "3D-Gebäude" of the basemap popover: plain OSM 2.5D buildings, and the Cesium 3D tiles on aerial images (Orbis Pro). Plateau and the coloured OSM buildings belong to the layer "3D-Gebäude". Not persisted. */
 export const buildings3d = signal(true);
+/** The switch "Orte" of the basemap popover: shops, food, stations ... of the Erkunden map, by importance for the zoom (map/poi.ts). Not persisted. */
+export const poiBasemap = signal(true);
+/** The layer "Orte und Läden" is on: it draws the places itself (with its filter), the basemap's own step aside. Written by the layer. */
+export const poiLayerOn = signal(false);
 export const setBuildings3d = (on: boolean) => {
   buildings3d.value = on;
 };
