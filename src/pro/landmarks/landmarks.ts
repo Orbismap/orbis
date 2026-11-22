@@ -115,6 +115,8 @@ function toLambert(model: THREE.Object3D) {
     if (!mesh.isMesh) return;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    // the part culls by footprint itself; three's own test works on the file's bounds, which neither the drape nor the squash know
+    mesh.frustumCulled = false;
     const convert = (m: THREE.Material): THREE.Material => {
       const s = m as THREE.MeshStandardMaterial;
       const out = new THREE.MeshLambertMaterial({
@@ -317,7 +319,10 @@ export class LandmarksPart implements StagePart {
     for (const e of this.entries.values()) {
       const s = e.sample;
       const lon = s.lng + 360 * Math.round((centre.lng - s.lng) / 360);
-      const out = lon < b.getWest() - padLon || lon > b.getEast() + padLon || s.lat < b.getSouth() - padLat || s.lat > b.getNorth() + padLat;
+      // the whole footprint counts, not its middle: a long bridge is in view when only one end is
+      const shift = lon - s.lng;
+      const [bw, bs, be, bn] = s.bounds;
+      const out = be + shift < b.getWest() - padLon || bw + shift > b.getEast() + padLon || bn < b.getSouth() - padLat || bs > b.getNorth() + padLat;
       if (out || !e.filled || frame.occluded(lon, s.lat, e.ground)) { e.root.visible = false; continue; }
       // the file has its bearing and scale baked in: placed unturned, at true size
       // flattened, the model is lifted by up to MIN_HEIGHT_M, like the 2.5D buildings (their height is MIN_HEIGHT_M + the share): the map's
