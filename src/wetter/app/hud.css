@@ -124,5 +124,3 @@
 }
 
 /* The fullscreen map hides the open panel; the capsule sits at the top edge above it. */
-body:has(.wx-map--fullscreen) .wx-hud-mini { top: 0; }
-body:has(.wx-map--fullscreen) .wx-hud-main { display: none; }

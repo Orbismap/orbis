@@ -5,6 +5,7 @@ import { Search } from '../features/search/Search';
 import { Shortcuts } from '../features/shortcuts/Shortcuts';
 import { CursorTip } from '../features/legend/CursorTip';
 import { Toasts } from '../features/toasts/Toasts';
+import { startedWithMap } from '../map/adopt';
 import { breakpoint, isMobile, searchOpen, shortcutsOpen } from '../state/ui';
 import { settings } from '../state/settings';
 import { TooltipLayer } from '../ui/Tooltip';
@@ -41,7 +42,7 @@ function useDocumentState() {
 export function App() {
   useDocumentState();
   return (
-    <div class="app">
+    <div class={startedWithMap ? 'app app--enter' : 'app'}>
       <MapView />
       <ReturnFromWetter />
       {isMobile.value ? <MobileLayout /> : <DesktopLayout />}

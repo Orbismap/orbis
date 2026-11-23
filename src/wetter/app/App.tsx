@@ -93,7 +93,7 @@ export function App() {
 
   return (
     <WeatherProvider value={data.weather}>
-      <div class="app">
+      <div class="wx-app">
         <div class="wx-hud" data-main={listOpen ? 'open' : 'closed'}>
           <div class="wx-hud-main" inert={!listOpen}>
             <aside class="wx-hudm" aria-label="Orbis Wetter">

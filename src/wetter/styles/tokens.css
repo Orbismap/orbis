@@ -1,6 +1,6 @@
 /* Design tokens, copied from orbis-map. Dark is the default; light follows prefers-color-scheme. */
 @layer tokens {
-  :root {
+  :root[data-app='wetter'] {
     color-scheme: dark;
 
     --ink-0: #0a0f18;
@@ -56,7 +56,7 @@
   }
 
   @media (prefers-color-scheme: light) {
-    :root {
+    :root[data-app='wetter'] {
       color-scheme: light;
       --ink-0: #ffffff;
       --ink-1: #f4f6f9;

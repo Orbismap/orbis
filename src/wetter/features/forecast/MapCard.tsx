@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { Map as MlMap, Marker } from 'maplibre-gl';
 import { attachSharedMap, detachSharedMap } from './sharedMap';
 import { buildKartenUrl } from '../handoff/url';
-import { rememberReturnTo } from '../handoff/contract';
+import { expandToOrbis } from '../handoff/expand';
 import type { WxMapMode } from '../handoff/modes';
 import { applyMapLayer } from './applyMapLayer';
 import { loadWxRender, type WeatherLayerHandle } from './sharedRenderer';
@@ -65,62 +65,18 @@ export function MapCard({
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const expanding = useRef(false);
 
-  /** Grow the map from its exact card rect to the whole viewport. MapLibre is resized every
-      frame so the canvas stays sharp instead of being stretched by a CSS transform. */
+  /** Grow the map to the whole screen and hand it to the map app in the same document (see handoff/expand.ts). */
   const expandMap = useCallback(() => {
-    const el = host.current;
+    const slot = host.current;
     const map = mapRef.current;
-    if (!el || !map || expanding.current) return;
+    if (!slot || !map || expanding.current) return;
     expanding.current = true;
-
-    const from = el.getBoundingClientRect();
-    const to = { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight };
-
-    // Pin the map where it currently sits – adding position:fixed alone would jump it to 0,0.
-    // All geometry is driven inline so the CSS class can stay free of !important overrides.
-    el.classList.add('wx-map--fullscreen');
-    el.style.transition = 'none';
-    el.style.top = `${from.top}px`;
-    el.style.left = `${from.left}px`;
-    el.style.width = `${from.width}px`;
-    el.style.height = `${from.height}px`;
-    el.style.margin = '0';
-    el.style.borderRadius = '20px';
-
-    const duration = 450;
-    const start = performance.now();
-    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
-
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const e = ease(t);
-      el.style.top = `${from.top + (to.top - from.top) * e}px`;
-      el.style.left = `${from.left + (to.left - from.left) * e}px`;
-      el.style.width = `${from.width + (to.width - from.width) * e}px`;
-      el.style.height = `${from.height + (to.height - from.height) * e}px`;
-      el.style.borderRadius = `${20 * (1 - e)}px`;
-      map.resize();
-      if (t < 1) {
-        requestAnimationFrame(tick);
-      } else {
-        // Lock to viewport units so a later window resize still fits exactly.
-        el.style.top = '0';
-        el.style.left = '0';
-        el.style.width = '100vw';
-        el.style.height = '100vh';
-        el.style.borderRadius = '0';
-        map.resize();
-        // Let the final fullscreen frame paint, then leave the map on screen for a moment
-        // before the cross-document transition to orbis-karten starts.
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            rememberReturnTo();
-            window.location.href = hrefRef.current;
-          }, 600);
-        });
-      }
-    };
-    requestAnimationFrame(tick);
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    const hash = new URL(hrefRef.current, window.location.href).hash;
+    expandToOrbis({ map, slot, hash }).catch(() => {
+      // The map app could not load (offline, chunk missing): fall back to a normal page load.
+      window.location.href = hrefRef.current;
+    });
   }, []);
 
   /** Started only by a real user interaction – not on mount, not on a place change or a programmatic fly. */

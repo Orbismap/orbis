@@ -1,4 +1,4 @@
-.app {
+.wx-app {
   min-height: 100vh;
   min-height: 100dvh;
   padding-top: var(--s-4);
@@ -6,7 +6,7 @@
 
 /* ---------- phone ---------- */
 @media (max-width: 719px) {
-  .app {
+  .wx-app {
     /* Room for the status bar / notch and the floating Orbis capsule. */
     padding-top: calc(env(safe-area-inset-top) + var(--hud-edge) + var(--hud-mini-h) + var(--s-2));
   }

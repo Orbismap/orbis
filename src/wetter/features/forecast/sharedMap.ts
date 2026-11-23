@@ -25,9 +25,17 @@ export function attachSharedMap(slot: HTMLElement): MlMap {
       center: [11.4, 53.7],
       zoom: ORIGIN_ZOOM,
       attributionControl: { compact: true },
-      dragRotate: false,
-      pitchWithRotate: false,
+      // Created with the map app's gesture options so it can be taken over as is; the weather card keeps
+      // rotation and tilt off until then.
+      maxPitch: 85,
+      minZoom: 0.5,
+      maxZoom: 19,
+      dragRotate: true,
+      pitchWithRotate: true,
     });
+    map.dragRotate.disable();
+    map.touchPitch.disable();
+    map.touchZoomRotate.disableRotation();
     shared = { map, element };
     return map;
   }
@@ -39,6 +47,11 @@ export function attachSharedMap(slot: HTMLElement): MlMap {
 /** Take the map out of its slot; it keeps running (and keeps its state) until it is attached again. */
 export function detachSharedMap(): void {
   shared?.element.remove();
+}
+
+/** Forget the shared map without touching it – used when the map app takes it over. */
+export function releaseSharedMap(): void {
+  shared = null;
 }
 
 export const peekSharedMap = (): MlMap | null => shared?.map ?? null;

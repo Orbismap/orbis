@@ -3,7 +3,8 @@
   @view-transition { navigation: auto; }
 }
 
-:root {
+/* Scoped: the map app shares this document after the handoff and has its own tokens. */
+:root[data-app='wetter'] {
   --text-1: #ffffff;
   --text-2: rgba(255, 255, 255, 0.86);
   --text-3: rgba(255, 255, 255, 0.66);
@@ -32,7 +33,7 @@
 
 * { box-sizing: border-box; }
 
-body {
+:root[data-app='wetter'] body {
   margin: 0;
   min-height: 100vh;
   background: linear-gradient(160deg, #465469 0%, #667589 45%, #8d8d93 100%);
@@ -258,18 +259,6 @@ body {
    its transparent edges extend beyond the card and are clipped. */
 .widget-frame:has(> .detail.moon) { padding: var(--s-3); }
 .widget-frame:has(> .mapcard) { padding: var(--s-3); }
-/* The card's size containment, glass backdrop-filter and overflow all interfere with a
-   position:fixed descendant: containment and backdrop-filter make the card the containing
-   block (so top/left:0 land at the card, not the viewport), overflow clips it, and the
-   resulting stacking context traps its z-index. Drop all of them while the map is expanded. */
-.widget-frame:has(> .mapcard):has(.wx-map--fullscreen) {
-  container-type: normal;
-  overflow: visible;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-/* The whole HUD must clear the fullscreen map (z-index 99999) – a child cannot escape its context. */
-body:has(.wx-map--fullscreen) .wx-hud { z-index: 100000; }
 .widget-frame:has(> .mapcard) .mapcard { padding: 0; }
 .widget-frame:has(> .mapcard) .mapcard .card-title { padding: 0; }
 .widget-frame:has(> .mapcard) .wx-map { margin: -6px; width: calc(100% + 12px); height: calc(100% + 6px); }
@@ -433,28 +422,20 @@ body:has(.wx-map--fullscreen) .wx-hud { z-index: 100000; }
   overflow: hidden;
   border-radius: 20px;
   background: #1c2739;
-  view-transition-name: wx-map;
 }
 
 /* The shared MapLibre element fills whatever slot it is attached to. */
 .wx-map-canvas { width: 100%; height: 100%; }
 
-/* Fullscreen state (before handoff to orbis-karten). Geometry is set inline by
-   MapCard's rAF animation, so this class only carries stacking/overflow. */
-.wx-map--fullscreen {
+/* Fixed layer that carries the map while it grows to full screen (handoff/expand.ts). */
+.wx-expand {
   position: fixed;
-  z-index: 99999 !important;
-  overflow: visible;
+  z-index: 100000;
+  overflow: hidden;
+  background: #1c2739;
 }
+.wx-expand > .wx-map-canvas { width: 100%; height: 100%; }
 
-/* Handoff view transition: smooth map scaling */
-@media (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(wx-map),
-  ::view-transition-new(wx-map) {
-    animation-duration: 0.5s;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  }
-}
 .city-marker { display: flex; align-items: center; gap: 4px; color: #fff; font-size: 11px; text-shadow: 0 1px 3px #000; white-space: nowrap; pointer-events: none; }
 .city-marker::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--marker-color, #fff); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
 .here-marker { display: flex; flex-direction: column; align-items: center; pointer-events: none; }

@@ -254,25 +254,15 @@
   }
 }
 
-/* Handoff from Orbis Wetter: morph its compact map into this one. Both pages opt in; see
-   https://github.com/Orbismap/orbis-wetter/blob/main/docs/HANDOFF.md */
+/* After the handoff from Orbis Wetter the map app starts in the same document with the running map (map/adopt.ts):
+   the menus fade in over it. */
 @media (prefers-reduced-motion: no-preference) {
-  @view-transition {
-    navigation: auto;
+  .app--enter > :not(.map) {
+    animation: app-enter 380ms 120ms ease-out both;
   }
 }
-.map.wx-map-host {
-  view-transition-name: wx-map;
-  /* Background so the view transition has a visible element before the map loads */
-  background: #1c2739;
-  border-radius: 0;
-}
-@media (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(wx-map),
-  ::view-transition-new(wx-map) {
-    animation-duration: 0.5s;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  }
+@keyframes app-enter {
+  from { opacity: 0; }
 }
 .wx-return {
   position: absolute;

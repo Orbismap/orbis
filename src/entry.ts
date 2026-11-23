@@ -12,6 +12,9 @@ export function appMode(): AppMode {
   return hostname.startsWith('wetter.') ? 'wetter' : 'map';
 }
 
+// Lets each app scope its tokens and global rules; the document is shared once the map takes over.
+document.documentElement.dataset.app = appMode();
+
 if (appMode() === 'wetter') {
   document.title = 'Orbis Wetter';
   document.documentElement.style.background = '#0a0f18';
