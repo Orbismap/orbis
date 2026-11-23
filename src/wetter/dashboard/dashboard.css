@@ -1,0 +1,281 @@
+/* ---------- grid surface ---------- */
+.dashboard-shell {
+  position: relative;
+  width: max-content;
+  margin: 0 auto;
+}
+
+.edit-controls {
+  position: absolute;
+  z-index: 30;
+  top: -40px;
+  right: 0;
+  display: flex;
+  gap: var(--s-2);
+}
+
+.edit-toggle,
+.reset-toggle {
+  font: inherit;
+  font-size: var(--fs-axis);
+  color: var(--text-1);
+  background: var(--g-fill);
+  border: 1px solid var(--g-rim);
+  border-radius: var(--r-input);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.edit-toggle.active {
+  color: var(--ink-0);
+  background: var(--limb);
+  border-color: var(--limb);
+}
+
+.dashboard-wrap {
+  width: 100%;
+  padding: 0 var(--s-5) var(--s-6);
+  /* No overflow container here: it would clip the button above the canvas. Small windows scroll the page. */
+}
+
+.dashboard {
+  position: relative;
+  margin: 0 auto;
+  border-radius: var(--r-panel);
+  background-color: rgba(255, 255, 255, 0.02);
+  /* Faint cell lines make the grid visible – they get stronger in the later edit mode. */
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: var(--step-x) var(--step-y);
+}
+
+.dashboard .widget-frame {
+  position: absolute;
+  display: flex;
+  overflow: hidden;
+  /* Cards adapt their density to the actual cell size, including after rearrange/resize. */
+  container-type: size;
+  /* The rim is an inset shadow, not a border: a border would be an unclipped strip that the resize
+     handles cannot cover, and dragging there would move the card instead. */
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--glass-line), 0 8px 30px rgba(12, 20, 35, 0.14);
+}
+
+/* Widget content fills the frame; the frame owns padding, border and background. */
+.dashboard .widget-frame > * {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------- edit mode: drag to move (resize comes later) ---------- */
+.dashboard.editing {
+  background-image:
+    linear-gradient(to right, rgba(114, 200, 240, 0.18) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(114, 200, 240, 0.18) 1px, transparent 1px);
+}
+
+.dashboard.editing .widget-frame {
+  cursor: grab;
+  user-select: none;
+}
+
+.dashboard.editing .widget-frame > * {
+  pointer-events: none; /* widget buttons must not swallow the drag */
+}
+
+/* Resize handles: invisible hit areas on every edge and corner; only the bottom-right corner shows an icon. */
+.dashboard.editing .widget-frame > .resize-handle {
+  position: absolute;
+  flex: none;
+  width: auto;
+  height: auto;
+  z-index: 6;
+  touch-action: none;
+  pointer-events: auto;
+  background: none;
+}
+
+.resize-handle.resize-n, .resize-handle.resize-s { left: 20px; right: 20px; }
+.resize-handle.resize-e, .resize-handle.resize-w { top: 20px; bottom: 20px; }
+.dashboard.editing .widget-frame > .resize-n, .dashboard.editing .widget-frame > .resize-s { height: 14px; cursor: ns-resize; }
+.dashboard.editing .widget-frame > .resize-e, .dashboard.editing .widget-frame > .resize-w { width: 14px; cursor: ew-resize; }
+.dashboard.editing .widget-frame > .resize-n { top: 0; }
+.dashboard.editing .widget-frame > .resize-s { bottom: 0; }
+.dashboard.editing .widget-frame > .resize-e { right: 0; }
+.dashboard.editing .widget-frame > .resize-w { left: 0; }
+.dashboard.editing .widget-frame > .resize-ne, .dashboard.editing .widget-frame > .resize-nw,
+.dashboard.editing .widget-frame > .resize-se, .dashboard.editing .widget-frame > .resize-sw { width: 28px; height: 28px; }
+.dashboard.editing .widget-frame > .resize-ne { top: 0; right: 0; cursor: nesw-resize; }
+.dashboard.editing .widget-frame > .resize-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.dashboard.editing .widget-frame > .resize-nw { top: 0; left: 0; cursor: nwse-resize; }
+.dashboard.editing .widget-frame > .resize-se { bottom: 0; right: 0; cursor: nwse-resize; }
+
+/* The little grip icon (two diagonal strokes). */
+.resize-handle.resize-se::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 11px;
+  height: 11px;
+  background:
+    linear-gradient(135deg, transparent 0 46%, currentColor 46% 58%, transparent 58% 74%, currentColor 74% 86%, transparent 86%);
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 1px;
+  pointer-events: none;
+  transition: color 120ms var(--ease);
+}
+.resize-handle.resize-se:hover::after, .resize-handle.resize-se.active::after { color: var(--limb, #72c8f0); }
+
+.dashboard.editing .widget-frame.dragging {
+  cursor: grabbing;
+  z-index: 10;
+  opacity: 0.88;
+  box-shadow: inset 0 0 0 1px var(--glass-line), 0 14px 44px rgba(0, 0, 0, 0.38);
+  will-change: transform;
+}
+
+/* Pointer left the canvas – releasing here reverts every widget to the gesture origin. */
+.dashboard.editing .widget-frame.dragging.outside {
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+/* ---------- swap preview outlines ---------- */
+.dashboard .swap-outline {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  box-sizing: border-box;
+  border-radius: var(--r-panel);
+}
+
+.dashboard .swap-origin {
+  border: 2px solid var(--limb);
+  box-shadow: 0 0 0 4px var(--limb-quiet), inset 0 0 0 1px var(--limb-quiet);
+}
+
+.dashboard .swap-target {
+  border: 2px dashed rgba(255, 255, 255, 0.6);
+  transition: left 200ms var(--ease), top 200ms var(--ease);
+}
+
+/* ---------- placeholder content (temporary) ---------- */
+.placeholder {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+
+.placeholder .card-title { margin-bottom: 0; }
+
+.placeholder-title {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.placeholder-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.badge {
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--r-round);
+  background: rgba(255, 255, 255, 0.14);
+  font-size: var(--fs-axis);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.badge.muted {
+  background: transparent;
+  color: var(--text-2);
+}
+
+.placeholder-note {
+  font-size: var(--fs-axis);
+  color: var(--text-3);
+}
+
+.placeholder-edit {
+  align-self: flex-start;
+  font-size: var(--fs-axis);
+  color: var(--limb);
+}
+
+/* ---------- phone layout ---------- */
+.dashboard-wrap[data-preset='mobile'] {
+  padding: 0 12px calc(var(--s-6) + env(safe-area-inset-bottom));
+}
+
+.dashboard-wrap[data-preset='mobile'] .dashboard-shell {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The row is reserved even outside edit mode, so entering it does not push the grid down. */
+.dashboard-wrap[data-preset='mobile'] .dashboard-shell {
+  position: relative;
+  padding-top: calc(var(--hit-touch) + var(--s-3));
+}
+
+.dashboard-wrap[data-preset='mobile'] .edit-controls {
+  top: 0;
+  justify-content: flex-end;
+}
+
+.dashboard-wrap[data-preset='mobile'] .edit-toggle,
+.dashboard-wrap[data-preset='mobile'] .reset-toggle {
+  min-height: var(--hit-touch);
+  padding: 0 var(--s-4);
+}
+
+.dashboard-wrap[data-preset='mobile'] .dashboard {
+  margin: 0;
+}
+
+/* Dragging a widget must not scroll the page on touch screens. */
+.dashboard.editing .widget-frame { touch-action: none; }
+
+/* ---------- edit mode: cards wiggle like app icons ---------- */
+/* `rotate` is a separate property, so it combines with the drag/FLIP transforms instead of replacing them. */
+@keyframes wx-wiggle {
+  0% { rotate: -0.55deg; }
+  100% { rotate: 0.55deg; }
+}
+
+.dashboard.editing.wiggle .widget-frame:not(.dragging):not(.resizing) {
+  animation: wx-wiggle 0.17s ease-in-out infinite alternate;
+  animation-delay: calc(var(--cell-x) * -43ms - var(--cell-y) * 71ms);
+}
+
+.dashboard.editing.wiggle .widget-frame:nth-child(2n):not(.dragging):not(.resizing) {
+  animation-duration: 0.2s;
+  animation-direction: alternate-reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard.editing .widget-frame { animation: none !important; }
+}
+
+.dashboard .widget-frame { -webkit-touch-callout: none; }
+
+/* Edit mode: widget content is greyed out so the arrangement, not the data, is in focus. */
+.dashboard.editing .widget-frame > :not(.resize-handle) {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+  transition: opacity 200ms var(--ease), filter 200ms var(--ease);
+}

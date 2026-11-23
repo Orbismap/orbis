@@ -1,0 +1,535 @@
+/* Desktop forecast: glass cards over a neutral backdrop (the sky photo comes later). */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+}
+
+:root {
+  --text-1: #ffffff;
+  --text-2: rgba(255, 255, 255, 0.86);
+  --text-3: rgba(255, 255, 255, 0.66);
+  --glass: rgba(255, 255, 255, 0.12);
+  --glass-hover: rgba(255, 255, 255, 0.18);
+  --glass-line: rgba(255, 255, 255, 0.22);
+  --warm: #ffd27a;
+  --cold: #7cc4ff;
+
+  /* Tokens mirrored from orbis-karten so both apps' chrome is pixel-identical. */
+  --limb: #72c8f0;
+  --now: #f2b45a;
+  --g-panel: rgba(22, 26, 34, 0.72);
+  --g-fill: rgba(255, 255, 255, 0.06);
+  --g-fill-hover: rgba(255, 255, 255, 0.09);
+  --g-fill-active: rgba(255, 255, 255, 0.12);
+  --g-rim: rgba(255, 255, 255, 0.09);
+  --g-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  --r-panel: 22px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --hud-edge: 8px;
+  --hud-mini-h: 40px;
+  --hud-gap: 8px;
+  --hud-main-w: 222px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(160deg, #465469 0%, #667589 45%, #8d8d93 100%);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- hero (widget content, used later) ---------- */
+.hero { text-align: center; padding: var(--s-5) 0 var(--s-5); }
+.hero .eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.hero-title { position: relative; display: inline-block; }
+.hero h1 { margin: var(--s-1) 0; font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em; }
+/* Absolutely placed so the centred place name never moves when the star appears. */
+.fav-star {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 8px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.fav-star:hover { background: rgba(255, 255, 255, 0.1); color: var(--text-1); }
+.fav-star svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.fav-star.active, .fav-star.active:hover { color: var(--warm); }
+.fav-star.active svg { fill: var(--warm); }
+.hero-temp { font-size: 5.5rem; font-weight: 200; line-height: 1; letter-spacing: -0.06em; }
+.hero-feel { margin-top: var(--s-1); font-size: 1.05rem; color: var(--text-2); }
+.hero-hl { margin-top: 2px; font-size: var(--fs-small); color: var(--text-3); }
+.hero-source { margin-top: var(--s-2); font-size: var(--fs-axis); color: var(--text-3); opacity: 0.85; }
+
+/* ---------- card visuals (shared by the widget frames) ---------- */
+.card {
+  position: relative;
+  padding: var(--s-3);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-panel);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  backdrop-filter: blur(24px) saturate(1.3);
+  box-shadow: 0 8px 30px rgba(12, 20, 35, 0.14);
+  color: var(--text-1);
+  text-align: left;
+  min-width: 0;
+  min-height: 0;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: anywhere; }
+
+/* Detail widgets are buttons filling their widget frame; the frame supplies the glass chrome. */
+.detail {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.detail:focus-visible { outline: 2px solid var(--warm); outline-offset: 2px; }
+.big { font-size: 2rem; font-weight: 500; line-height: 1.1; letter-spacing: -0.03em; }
+.sub { color: var(--text-2); font-size: var(--fs-small); margin-top: 2px; }
+.note { margin: var(--s-2) 0 0; font-size: var(--fs-axis); color: var(--text-2); line-height: 1.3; }
+.source { margin-top: var(--s-3); font-size: var(--fs-axis); color: var(--text-3); }
+.kv {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+  font-size: var(--fs-small);
+}
+.kv:last-child { border-bottom: 0; }
+.kv span { color: var(--text-2); }
+.kv b { font-weight: 600; }
+
+/* ---------- hourly banner ---------- */
+.hourly { display: flex; flex-direction: column; justify-content: center; gap: var(--s-3); }
+.summary {
+  margin: 0 0 var(--s-3);
+  font-size: var(--fs-axis);
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hours {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+}
+.hours::-webkit-scrollbar { display: none; }
+.hour {
+  flex: 0 0 74px;
+  padding: var(--s-2) 2px;
+  border-radius: 12px;
+  text-align: center;
+  scroll-snap-align: start;
+}
+.hour-event { flex-basis: 112px; background: rgba(255, 255, 255, 0.14); }
+.hour-label { font-size: 0.75rem; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.hour-icon { height: 34px; display: grid; place-items: center; margin: var(--s-1) 0; }
+.hour-icon .icon, .day-icon .icon { display: inline-flex; }
+.hour-temp { font-size: 0.9375rem; font-weight: 600; }
+.hour-event .hour-temp { font-size: 0.625rem; font-weight: 500; color: var(--warm); line-height: 1.15; text-align: center; }
+.sun-icon { display: block; flex: none; overflow: visible; }
+.sun-icon .sun-icon-rays line { stroke: var(--warm); stroke-width: 1.8; stroke-linecap: round; }
+.sun-icon .sun-icon-horizon { stroke: rgba(255, 255, 255, 0.85); stroke-width: 1.6; stroke-linecap: round; }
+.sun-icon .sun-icon-arrow { fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- daily ---------- */
+.daily { display: flex; flex-direction: column; }
+.day-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; flex: 1; }
+.day {
+  display: grid;
+  grid-template-columns: 44px 28px 34px 28px minmax(40px, 1fr) 28px;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 1;
+  min-height: 0;
+  padding: var(--s-1) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+  font-size: var(--fs-small);
+}
+.day:last-child { border-bottom: 0; }
+.day-name { font-size: 0.8125rem; font-weight: 600; }
+.day-icon { display: grid; place-items: center; }
+.day-chance { color: var(--cold); text-align: left; font-size: 0.625rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.day-chance.wet { color: #8fd0ff; }
+.day-min { color: var(--text-3); text-align: right; }
+.day-max { font-weight: 600; text-align: right; }
+
+/* ---------- shared visuals ---------- */
+.range { position: relative; display: block; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); }
+.range-fill { position: absolute; top: 0; height: 4px; border-radius: 999px; background: linear-gradient(90deg, #63b8ff, #bfe3ff); }
+.range-dot { position: absolute; top: -2px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: #eaf6ff; }
+.range-label { margin-top: 2px; font-size: var(--fs-axis); color: var(--cold); }
+.range-ends { display: flex; justify-content: space-between; }
+
+.scale { position: relative; display: block; height: 5px; margin: var(--s-3) 0 0; border-radius: 999px; }
+.scale-bar { position: absolute; inset: 0; border-radius: 999px; }
+.scale-mark { position: absolute; top: -4px; width: 4px; height: 13px; margin-left: -2px; border-radius: 2px; background: #fff; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25); }
+
+
+/* Wind compass: ring, cardinal points, speed in the middle, pointer where the wind comes from. */
+.gauge { width: 120px; height: 120px; flex: none; }
+.wind-gauge .compass-face { fill: rgba(255, 255, 255, 0.05); stroke: rgba(255, 255, 255, 0.18); stroke-width: 1; }
+.wind-gauge .compass-tick { stroke: rgba(255, 255, 255, 0.28); stroke-width: 1; stroke-linecap: round; }
+.wind-gauge .compass-tick.major { stroke: rgba(255, 255, 255, 0.7); stroke-width: 1.6; }
+.wind-gauge .cardinal { fill: var(--text-2); font-family: var(--font-ui); font-size: 10px; font-weight: 600; }
+.wind-gauge .cardinal.north { fill: var(--text-1); }
+.wind-gauge .needle-tail { fill: rgba(255, 255, 255, 0.55); }
+.wind-gauge .compass-hub { fill: #101724; stroke: rgba(255, 255, 255, 0.9); stroke-width: 1.6; }
+.wind-gauge .compass-hub-dot { fill: #fff; }
+.wind-caption { display: none; text-align: center; font-size: var(--fs-small); font-weight: 600; }
+
+/* ---------- pressure dial ---------- */
+.detail.pressure { align-items: stretch; }
+.pressure-gauge { width: 100%; height: auto; flex: 1; min-height: 0; max-height: 100%; }
+.pressure-gauge .pressure-track { fill: none; stroke: rgba(255, 255, 255, 0.18); stroke-width: 7; stroke-linecap: round; }
+.pressure-gauge .pressure-fill { fill: none; stroke-width: 7; stroke-linecap: round; }
+.pressure-gauge .pressure-knob { fill: #fff; stroke: rgba(10, 15, 24, 0.35); stroke-width: 1.5; }
+.pressure-gauge .pressure-num { fill: var(--text-1); font-family: var(--font-ui); font-size: 17px; font-weight: 500; }
+.pressure-gauge .pressure-unit { fill: var(--text-3); font-family: var(--font-ui); font-size: 7.5px; }
+.pressure-trend { text-align: center; color: var(--text-2); font-size: var(--fs-small); }
+
+.wind-layout { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+.wind-rows { flex: 1; }
+.wind-rows > div { display: flex; justify-content: space-between; gap: var(--s-2); padding: var(--s-2) 0; border-bottom: 1px solid rgba(255, 255, 255, 0.13); font-size: var(--fs-small); }
+.wind-rows > div:last-child { border-bottom: 0; }
+.wind-rows span { color: var(--text-2); }
+.wind-rows b { white-space: nowrap; }
+
+.sun-curve { position: relative; width: calc(100% + 2 * var(--s-3)); margin: var(--s-1) calc(-1 * var(--s-3)); height: 64px; flex: 1; min-height: 36px; }
+.sun-curve svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.sun-curve .horizon { stroke: rgba(255, 255, 255, 0.55); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.sun-curve .sun-path { fill: none; stroke: rgba(255, 255, 255, 0.78); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.sun-curve .sun-night { fill: none; stroke: rgba(255, 255, 255, 0.3); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.sun-curve .sun-dot { position: absolute; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; border-radius: 50%; background: #1b2233; border: 2px solid #fff; box-shadow: 0 0 10px 4px rgba(255, 255, 255, 0.5); box-sizing: border-box; }
+.card-title-icon { flex: none; }
+@container (max-width: 200px) { .card-title .sun-icon { display: none; } }
+.sun-times { font-size: var(--fs-small); color: var(--text-1); display: flex; justify-content: space-between; gap: var(--s-2); flex-wrap: wrap; }
+
+/* Moon: the image is oversized and absolutely centred behind the text;
+   its transparent edges extend beyond the card and are clipped. */
+.widget-frame:has(> .detail.moon) { padding: var(--s-3); }
+.widget-frame:has(> .mapcard) { padding: var(--s-3); }
+/* The card's size containment, glass backdrop-filter and overflow all interfere with a
+   position:fixed descendant: containment and backdrop-filter make the card the containing
+   block (so top/left:0 land at the card, not the viewport), overflow clips it, and the
+   resulting stacking context traps its z-index. Drop all of them while the map is expanded. */
+.widget-frame:has(> .mapcard):has(.wx-map--fullscreen) {
+  container-type: normal;
+  overflow: visible;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+/* The whole HUD must clear the fullscreen map (z-index 99999) – a child cannot escape its context. */
+body:has(.wx-map--fullscreen) .wx-hud { z-index: 100000; }
+.widget-frame:has(> .mapcard) .mapcard { padding: 0; }
+.widget-frame:has(> .mapcard) .mapcard .card-title { padding: 0; }
+.widget-frame:has(> .mapcard) .wx-map { margin: -6px; width: calc(100% + 12px); height: calc(100% + 6px); }
+.detail.moon { position: relative; display: flex; flex-direction: column; align-items: stretch; }
+.detail.moon .card-title { position: relative; z-index: 2; margin-bottom: var(--s-3); }
+.detail.moon .moon-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 150px;
+  height: 150px;
+  max-width: none;
+  aspect-ratio: 1;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 1;
+}
+.moon-dates {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  margin-top: auto;
+  font-size: 0.625rem;
+  line-height: 1.1;
+  color: var(--text-2);
+}
+.moon-dates > div { white-space: nowrap; }
+
+/* Wide variant: image on the left, phase details on the right. */
+.moon-wide-body { display: flex; align-items: center; gap: var(--s-3); flex: 1; min-height: 0; }
+.moon-wide .moon-image { position: static; transform: none; width: 96px; height: 96px; max-width: none; flex: none; margin: 0; }
+.moon-wide .moon-info { flex: 1; min-width: 0; }
+.moon-wide .moon-dates { justify-content: flex-start; margin-top: 4px; color: var(--text-2); }
+
+.warning .big { font-size: 1.25rem; }
+.warning .note { color: var(--text-1); }
+
+/* ---------- density: keep every card readable in a single 148 px cell ---------- */
+@container (max-height: 180px) {
+  /* Small cells may show a two-line title rather than cutting words off with an ellipsis. */
+  .detail .card-title { margin-bottom: 6px; font-size: 0.625rem; line-height: 1.2; }
+  .detail .title-text { white-space: normal; overflow: visible; text-overflow: clip; }
+  .detail .big { font-size: 1.5rem; }
+  .detail .note { margin-top: 4px; }
+  .detail .kv { padding: 3px 0; font-size: var(--fs-axis); }
+  .detail .scale { margin-top: 8px; flex: none; }
+  .detail .source { margin-top: 4px; }
+  .detail.feels .range { flex: none; }
+  .detail.feels .note { margin-top: 2px; font-size: 0.625rem; line-height: 1.2; }
+
+  .detail.wind .gauge { width: 96px; height: 96px; }
+  .detail.wind .wind-rows > div { padding: 3px 0; font-size: var(--fs-axis); }
+
+  .detail.sun .big { font-size: 2rem; }
+  .detail.sun .source { white-space: nowrap; font-size: 0.625rem; }
+  .detail.sun .sun-curve { height: 42px; margin: 4px 0; }
+
+  .detail.averages .big { font-size: 1.375rem; }
+  .detail.averages .note { font-size: 0.625rem; line-height: 1.2; }
+
+  .warning .big { font-size: 1.0625rem; }
+  .warning .note { font-size: 0.625rem; }
+  .warning .source { font-size: 0.625rem; }
+}
+
+/* ---------- wind map ---------- */
+.mapcard { display: flex; flex-direction: column; }
+.mapcard .card-title { justify-content: flex-start; }
+/* Layer picker sits at the right end of the card title. */
+.layer-controls { margin-left: auto; display: flex; align-items: center; gap: var(--s-2); }
+.layer-note { font-size: var(--fs-axis); color: var(--text-3); white-space: nowrap; letter-spacing: 0; text-transform: none; }
+.layer-picker { position: relative; display: flex; align-items: center; gap: var(--s-2); }
+.layer-toggle {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  background: var(--glass);
+  color: var(--text-1);
+  cursor: pointer;
+}
+.layer-toggle:hover, .layer-toggle[aria-expanded='true'] { background: var(--glass-hover); }
+.layer-handoff-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  background: var(--glass);
+  color: var(--text-1);
+  cursor: pointer;
+}
+.layer-handoff-icon:hover { background: var(--glass-hover); }
+.layer-menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 168px;
+  padding: 6px;
+  border: 1px solid var(--glass-line);
+  border-radius: 12px;
+  background: rgba(20, 26, 36, 0.94);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  backdrop-filter: blur(24px) saturate(1.3);
+  box-shadow: var(--g-shadow);
+  color: var(--text-1);
+}
+.layer-menu-title {
+  padding: 4px 8px 6px;
+  font-size: var(--fs-axis);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.layer-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--fs-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.layer-item:hover, .layer-item.active { background: var(--glass-hover); }
+.layer-check { margin-left: auto; color: var(--warm); }
+.layer-swatch { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.layer-swatch[data-mode='radar'] { background: #c3ccd9; }
+.layer-swatch[data-mode='precip'] { background: #4aa8ff; }
+.layer-swatch[data-mode='temp'] { background: linear-gradient(90deg, #7cc4ff, #ff8a5e); }
+.layer-swatch[data-mode='wind'] { background: #6fd19a; }
+.layer-handoff {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin-top: 5px;
+  padding: 8px;
+  border-top: 1px solid var(--glass-line);
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  text-decoration: none;
+}
+.layer-handoff:hover { color: var(--text-1); }
+/* Shared element: must match orbis-karten exactly. */
+.wx-map {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #1c2739;
+  view-transition-name: wx-map;
+}
+
+/* Fullscreen state (before handoff to orbis-karten). Geometry is set inline by
+   MapCard's rAF animation, so this class only carries stacking/overflow. */
+.wx-map--fullscreen {
+  position: fixed;
+  z-index: 99999 !important;
+  overflow: visible;
+}
+
+/* Handoff view transition: smooth map scaling */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(wx-map),
+  ::view-transition-new(wx-map) {
+    animation-duration: 0.5s;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+.city-marker { display: flex; align-items: center; gap: 4px; color: #fff; font-size: 11px; text-shadow: 0 1px 3px #000; white-space: nowrap; pointer-events: none; }
+.city-marker::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--marker-color, #fff); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
+.here-marker { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+.here-value {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--marker-color, #fff);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--marker-color, #72c8f0) 48%, rgba(12, 20, 35, 0.82));
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #fff;
+}
+.here-label { margin-top: 4px; padding: 2px 5px; border-radius: 5px; background: rgba(0, 0, 0, 0.45); font-size: 9px; white-space: nowrap; }
+
+/* Map attribution: collapsed by default, expand on hover/focus. */
+.wx-map .maplibregl-ctrl-attrib.maplibregl-compact {
+  padding: 2px 24px 2px 0;
+}
+.wx-map .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner {
+  display: none;
+}
+.wx-map .maplibregl-ctrl-attrib.maplibregl-compact:hover,
+.wx-map .maplibregl-ctrl-attrib.maplibregl-compact:focus-within {
+  padding: 2px 28px 2px 8px;
+}
+.wx-map .maplibregl-ctrl-attrib.maplibregl-compact:hover .maplibregl-ctrl-attrib-inner,
+.wx-map .maplibregl-ctrl-attrib.maplibregl-compact:focus-within .maplibregl-ctrl-attrib-inner {
+  display: block;
+}
+
+/* ---------- shared extras ---------- */
+.only-large { display: none; }
+@container (min-width: 280px) { .only-large { display: block; } }
+@container (min-height: 280px) { .only-large { display: block; } }
+
+.air-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); }
+.air-head .sub { margin-top: 0; white-space: nowrap; }
+
+.meter { position: relative; display: block; height: 5px; margin-top: var(--s-2); border-radius: 999px; background: rgba(255, 255, 255, 0.2); overflow: hidden; }
+.meter-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: linear-gradient(90deg, #63b8ff, #bfe3ff); }
+
+.feels-scale { position: relative; display: block; height: 14px; margin: var(--s-2) 0 2px; }
+.feels-track { position: absolute; left: 0; right: 0; top: 5px; height: 4px; border-radius: 999px; background: linear-gradient(90deg, #63b8ff, #f2c94c 60%, #f2994a); opacity: 0.85; }
+.feels-actual { position: absolute; top: 2px; width: 2px; height: 10px; margin-left: -1px; border-radius: 1px; background: rgba(255, 255, 255, 0.85); }
+.feels-dot { position: absolute; top: 1px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25); }
+
+/* ---------- size adaptation (the frame is the container) ---------- */
+/* Wind: a single cell shows only the dial; large cells get a bigger one. */
+@container (max-width: 200px) {
+  .detail.wind .wind-rows { display: none; }
+  .detail.wind .wind-layout { flex: 1; justify-content: center; }
+  .detail.wind .wind-caption { display: block; }
+  .detail.wind .gauge { width: min(100%, 110px); height: auto; }
+}
+@container (min-height: 280px) {
+  .detail.wind .gauge { width: 136px; height: 136px; }
+  .detail.wind .wind-layout { flex: 1; flex-direction: column-reverse; justify-content: center; align-items: stretch; }
+  .detail.wind .gauge { align-self: center; }
+}
+@container (min-width: 440px) {
+  .detail.wind .gauge { width: 130px; height: 130px; }
+}
+
+/* Daily: fewer rows when the card is short instead of squeezing ten of them. */
+@container (max-height: 330px) { .day:nth-child(n + 6) { display: none; } }
+@container (min-height: 331px) and (max-height: 420px) { .day:nth-child(n + 8) { display: none; } }
+
+/* Tall cards: more air for the big numbers. */
+@container (min-height: 280px) {
+  .detail .big { font-size: 2.5rem; }
+  .detail .note { font-size: var(--fs-small); }
+  .detail.sun .big { font-size: 2.5rem; }
+}
+
+/* Narrow single cells: keep the sun card and others readable. */
+@container (max-width: 200px) {
+  .detail.sun .sun-times { font-size: 0.625rem; }
+}
