@@ -64,6 +64,8 @@ export async function expandToOrbis({ map, slot, hash }: { map: MlMap; slot: HTM
   render(null, root);
   window.history.pushState({ orbis: true }, '', `${window.location.pathname}${hash}`);
   document.documentElement.dataset.app = 'map';
+  document.title = 'Orbis Map';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0b1220');
   document.documentElement.style.background = '';
   bootOrbis(root, { adopt: { map, element } });
   // Back to the first entry means back to the weather dashboard: a fresh load of this page.
