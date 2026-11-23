@@ -85,8 +85,8 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
     if (!o.active() || ml.getZoom() < 12) { built = undefined; return; }
     const src = ml.getSource(POI_GEO_SOURCE) as { setData(d: unknown): void } | undefined;
     if (!src) return;
-    // the places the zoom can show soon: the filter picks by the exact zoom, the source only needs not to miss any (a tier that is a zoom ahead)
-    const tier = Math.min(5, poiTierLimit(ml.getZoom() + pitchZoomBonus(ml.getPitch()) + 1, 1));
+    // the places the zoom can show soon: the filter picks by the exact zoom, the source only needs not to miss any (a tier that is half a zoom ahead)
+    const tier = Math.min(5, poiTierLimit(ml.getZoom() + pitchZoomBonus(ml.getPitch()) + 0.5));
     const view = reachBox(ml);
     // nothing arrived and the view is still inside what the last pass covered: the grid and the source stay as they are
     if (!dirty && built && built.tier >= tier && boxInside(built.box, view)) { occlude(); return; }

@@ -176,7 +176,9 @@ const colorOf: Ex = ['coalesce', ['get', 'color'], POI_OTHER.color] as unknown a
  *  the zoom it appears at is TIER_ZOOM. OpenMapTiles' `rank` can lift a well-known place (a landmark, a big station) higher. */
 /** The zoom at which tier 1, 2, ... 5 appears: landmarks first, the full mix of shops and restaurants at street level.
  *  Plain dots start later still (see poiLayers). */
-const TIER_ZOOM = [12, 13, 14, 15.5, 17];
+const TIER_ZOOM = [12, 13.5, 14.8, 16.2, 17.6];
+/** Plain dots (places without room for a badge) appear only this deep, like Apple/Google: before it they would be hundreds of sprites. */
+const DOT_ZOOM = 17.6;
 
 const SMALL_PRINT_SET = new Set(SMALL_PRINT);
 
@@ -207,7 +209,7 @@ export function poiTierLimit(zoom: number, ahead = 0): number {
 }
 
 /** The highest tier that shows at the current zoom (0: none), including tilt bonus. */
-const tierLimitAt = (bonus: number): Ex => ['step', bonus ? ['+', ['zoom'], bonus] : ['zoom'], 0, ...TIER_ZOOM.flatMap((z, i) => [z, i + 1])] as unknown as Ex;
+export const tierLimitAt = (bonus: number): Ex => ['step', bonus ? ['+', ['zoom'], bonus] : ['zoom'], 0, ...TIER_ZOOM.flatMap((z, i) => [z, i + 1])] as unknown as Ex;
 const tierOf: Ex = ['get', 'tier'] as unknown as Ex;
 
 /** The kind of a place for people: its subclass (or class), "ice_cream" -> "Ice cream". */
@@ -271,14 +273,16 @@ export function poiLayers(id: string, visible = true): LayerSpecification[] {
     },
   } as LayerSpecification;
   // Where a badge does not fit (collision), a small plain dot still marks the place. Apple shows those only at street
-  // level and only for a few — no `ahead`, no early zoom, so the city does not fill up with hundreds of tiny points.
+  // level and only where a badge found no room (collision), so the city does not fill up with tiny points.
   const dots = {
-    id: poiDotsId(id), type: 'symbol', source: POI_GEO_SOURCE, minzoom: 14, filter: poiFilter(undefined, 0),
+    id: poiDotsId(id), type: 'symbol', source: POI_GEO_SOURCE, minzoom: DOT_ZOOM, filter: poiFilter(undefined, 0),
     layout: {
       visibility: visible ? 'visible' : 'none',
       'icon-image': 'dot',
-      'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.07, 16, 0.12, 18, 0.16] as Ex,
-      'icon-allow-overlap': true,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 17, 0.1, 19, 0.16] as Ex,
+      // placed after the badges (they sit in the layer above): a dot shows only where badge and label left room, and never blocks another
+      'icon-allow-overlap': false,
+      'icon-padding': 2,
       'icon-ignore-placement': true,
       'symbol-height-offset': heightOffset(0),
     },

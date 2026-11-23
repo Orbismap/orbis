@@ -234,7 +234,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       poiOccluded.value; // followed even before the map is ready
       if (!loaded) return;
       if (ml.getLayer(POI_LAYER_ID)) ml.setFilter(POI_LAYER_ID, poiFilter(undefined, 0, hide));
-      if (ml.getLayer(poiDotsId(POI_LAYER_ID))) ml.setFilter(poiDotsId(POI_LAYER_ID), poiFilter(undefined, 1, hide));
+      if (ml.getLayer(poiDotsId(POI_LAYER_ID))) ml.setFilter(poiDotsId(POI_LAYER_ID), poiFilter(undefined, 0, hide));
     }),
     effect(() => {
       poiBasemap.value;

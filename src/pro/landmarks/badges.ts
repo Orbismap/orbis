@@ -77,15 +77,24 @@ function picture(model: THREE.Object3D): ImageData | undefined {
   }
 }
 
+/** How big a landmark is (m): the larger of its height and the diagonal of its footprint. */
+const tierOf = (sizeM: number): number => (sizeM >= 200 ? 1 : sizeM >= 100 ? 2 : sizeM >= 60 ? 3 : sizeM >= 30 ? 4 : 5);
+const size = (l: LandmarkSample): number => {
+  const [w, s, e, n] = l.bounds;
+  const dx = (e - w) * 111_320 * Math.cos(((s + n) / 2) * Math.PI / 180);
+  return Math.max(l.heightM, Math.hypot(dx, (n - s) * 111_320));
+};
+
 export class LandmarkBadges {
   private items: readonly LandmarkSample[] = [];
   private done = new Set<string>();
   private stopLabels?: () => void;
+  private stopTier?: () => void;
 
   /** the share of its height the model is drawn at (flatter seen from above, like the 2.5D buildings) */
   private lastShare = -1;
 
-  constructor(private map: MlMap, private heightFactor: () => number = () => 1, labelsVisible?: ReadonlySignal<boolean>) {
+  constructor(private map: MlMap, private heightFactor: () => number = () => 1, labelsVisible?: ReadonlySignal<boolean>, tierLimit?: ReadonlySignal<unknown>) {
     map.addSource(SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
       id: LAYER, type: 'symbol', source: SOURCE, minzoom: 12,
@@ -110,6 +119,10 @@ export class LandmarkBadges {
     if (labelsVisible) this.stopLabels = effect(() => {
       const show = labelsVisible.value;
       if (map.getLayer(LAYER)) map.setLayoutProperty(LAYER, 'visibility', show ? 'visible' : 'none');
+    });
+    // like the places: the bigger the model, the earlier its badge (a tilted view counts as more zoom)
+    if (tierLimit) this.stopTier = effect(() => {
+      if (map.getLayer(LAYER)) map.setFilter(LAYER, ['<=', ['get', 'tier'], tierLimit.value] as never);
     });
     map.on('pitch', this.follow);
     this.follow();
@@ -145,14 +158,15 @@ export class LandmarkBadges {
       type: 'FeatureCollection',
       features: this.items.filter((l) => this.map.hasImage(imageId(l.id))).map((l) => ({
         type: 'Feature', geometry: { type: 'Point', coordinates: [l.lng, l.lat] },
-        // the tallest first: they win the room
-        properties: { id: l.id, name: l.name, img: imageId(l.id), order: -l.heightM, h: l.heightM },
+        // the biggest first: they win the room, and they show from the lowest zoom
+        properties: { id: l.id, name: l.name, img: imageId(l.id), order: -size(l), h: l.heightM, tier: tierOf(size(l)) },
       })),
     });
   }
 
   dispose() {
     this.stopLabels?.();
+    this.stopTier?.();
     this.map.off('pitch', this.follow);
     if (this.map.getLayer(LAYER)) this.map.removeLayer(LAYER);
     if (this.map.getSource(SOURCE)) this.map.removeSource(SOURCE);
