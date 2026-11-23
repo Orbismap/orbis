@@ -5,6 +5,8 @@ import { InspectorCard } from '../features/inspector/Inspector';
 import { KartenChangeRow } from '../features/karten-bar/actions';
 import { KartenSwitcher } from '../features/karten-bar/KartenSwitcher';
 import { Legend } from '../features/legend/Legend';
+import { startedWithMap as startedFromWetter } from '../map/adopt';
+import { ReturnFromWetter } from './ReturnFromWetter';
 import { ProbeCard } from '../features/probe/ProbeCard';
 import { Readout } from '../features/timeline/Transport';
 import { TimelineCompact } from '../features/timeline/Timeline';
@@ -64,7 +66,7 @@ export function MobileLayout() {
         <ToolRail popoverUp />
       </div>
       <div class="maplegend-pos">
-        <Legend />
+        <Legend footer={startedFromWetter ? <ReturnFromWetter /> : null} />
       </div>
       <div class="scalebar-pos">
         <Scalebar />

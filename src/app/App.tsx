@@ -14,7 +14,6 @@ import { DesktopLayout } from './Desktop';
 import { startKeyboard } from './keyboard';
 import { MapView } from './MapView';
 import { MobileLayout } from './Mobile';
-import { ReturnFromWetter } from './ReturnFromWetter';
 import './app.css';
 
 // set before the first paint so CSS keyed on data-bp is right from the start
@@ -44,7 +43,6 @@ export function App() {
   return (
     <div class={startedWithMap ? 'app app--enter' : 'app'}>
       <MapView />
-      <ReturnFromWetter />
       {isMobile.value ? <MobileLayout /> : <DesktopLayout />}
       {searchOpen.value && <Search />}
       {shortcutsOpen.value && <Shortcuts />}

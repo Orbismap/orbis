@@ -31,7 +31,7 @@ import { startHistory } from './state/history';
  * per page. With `adopt`, the weather app hands over its running MapLibre map (`createMapEngine` option `adopt`),
  * so the map does not reload.
  */
-export function bootOrbis(root: HTMLElement, opts: { adopt?: { map: MlMap; element: HTMLElement } } = {}): void {
+export function bootOrbis(root: HTMLElement, opts: { adopt?: { map: MlMap; element: HTMLElement; returnTo?: string } } = {}): void {
   if (opts.adopt) offerMap(opts.adopt);
   initSettings();
   initKartenStore();

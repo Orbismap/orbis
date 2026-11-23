@@ -59,6 +59,7 @@ export async function expandToOrbis({ map, slot, hash }: { map: MlMap; slot: HTM
   const { bootOrbis } = await bootModule;
 
   // From here on the weather app is gone. The map element stays in the layer until the map view has moved it.
+  const returnTo = `${window.location.pathname}${window.location.search}`; // the weather page, for the way back
   const root = document.getElementById('app')!;
   releaseSharedMap(); // the card's cleanup must not take the element back
   render(null, root);
@@ -67,7 +68,7 @@ export async function expandToOrbis({ map, slot, hash }: { map: MlMap; slot: HTM
   document.title = 'Orbis Map';
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0b1220');
   document.documentElement.style.background = '';
-  bootOrbis(root, { adopt: { map, element } });
+  bootOrbis(root, { adopt: { map, element, returnTo } });
   // Back to the first entry means back to the weather dashboard: a fresh load of this page.
   window.addEventListener('popstate', () => { if (!window.location.hash) window.location.reload(); });
 

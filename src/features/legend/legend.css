@@ -107,6 +107,17 @@
     gap: 4px;
     white-space: nowrap;
   }
+  /* extra row below the scale bars (column 2 = the bars), centred under them */
+  .mlg-footer {
+    grid-column: 2;
+    justify-self: start;
+    display: flex;
+    justify-content: center; /* same width as the bar (.mlg-scale), so the content sits exactly under its middle */
+    width: clamp(120px, 38vw, 200px);
+    pointer-events: none;
+  }
+  .mlg-footer > * { flex: none; pointer-events: auto; }
+  .maplegend-alone .mlg-footer { grid-column: 1 / -1; justify-self: start; }
   .mlg-more {
     justify-self: start;
     padding: 2px 6px;

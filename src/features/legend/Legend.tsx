@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import { getLayer } from '../../layers/registry';
 import type { LegendSpec } from '../../layers/types';
 import { basemapDef } from '../../map/basemaps';
@@ -87,9 +88,9 @@ function ItemsRow({ spec }: { spec: Exclude<LegendSpec, { type: 'scale' }> }) {
 }
 
 /** Map legend: one thin line per visible layer with a legend (name, colour bar with ticks, unit), at most three, the rest as "+n". */
-export function Legend() {
+export function Legend({ footer }: { footer?: ComponentChildren }) {
   const all = entries();
-  if (!all.length) return null;
+  if (!all.length) return footer ? <div class="maplegend maplegend-alone"><div class="mlg-footer">{footer}</div></div> : null;
   const shown = all.slice(0, MAX_LEGENDS);
   const more = all.length - shown.length;
   return (
@@ -105,6 +106,7 @@ export function Legend() {
           +{more}
         </button>
       )}
+      {footer && <div class="mlg-footer">{footer}</div>}
     </div>
   );
 }
