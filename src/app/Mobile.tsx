@@ -76,7 +76,7 @@ export function MobileLayout() {
         label="Karten, Ebenen und Zeit"
         detent={detent}
         onDetent={(d) => (sheetDetent.value = d)}
-        peekHeight={122}
+        peekHeight={128}
         topInset={64}
         reducedMotion={reducedMotion()}
         peek={<PeekRow />}

@@ -177,18 +177,18 @@
   .hud-mobile .rail-pos {
     position: absolute;
     right: var(--rail-inset);
-    bottom: calc(var(--sheet-h, 122px) + 12px);
+    bottom: calc(var(--sheet-h, 128px) + 12px);
   }
   .hud-mobile .attr-pos {
     position: absolute;
     left: 12px;
-    bottom: calc(var(--sheet-h, 122px) + 8px);
+    bottom: calc(var(--sheet-h, 128px) + 8px);
   }
   /* mobile: above the attribution button, left of the rail, over the sheet */
   .hud-mobile .maplegend-pos {
     left: 12px;
     right: calc(var(--rail-inset) + var(--rail-w) + 12px);
-    bottom: calc(var(--sheet-h, 122px) + 44px);
+    bottom: calc(var(--sheet-h, 128px) + 44px);
   }
   .hud-mobile .rail-pos,
   .hud-mobile .attr-pos,
@@ -243,7 +243,7 @@
     padding-bottom: var(--s-4);
   }
   [data-bp='mobile'] {
-    --toast-bottom: calc(var(--sheet-h, 122px) + 12px);
+    --toast-bottom: calc(var(--sheet-h, 128px) + 12px);
   }
   [data-bp='mobile'] .lrow-main,
   [data-bp='mobile'] .ltab {

@@ -14,6 +14,8 @@
     background: rgba(20, 30, 50, 0.22);
   }
   [data-bp='mobile'] .search-overlay {
+    inset: var(--vv-top, 0px) 0 auto 0;
+    height: var(--vv-h, 100dvh);
     padding-top: calc(env(safe-area-inset-top) + 8px);
   }
   @keyframes fade-in {
@@ -23,7 +25,7 @@
   }
   .search {
     width: min(580px, 100%);
-    max-height: min(560px, calc(100dvh - 24px));
+    max-height: min(560px, calc(var(--vv-h, 100dvh) - 24px - env(safe-area-inset-top)));
     display: flex;
     flex-direction: column;
     border-radius: var(--r-panel);

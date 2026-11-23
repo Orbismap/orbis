@@ -193,8 +193,9 @@ Schmales, dichtes Paneel (300 px, `--panel-left` in `ui/tokens.css`). Zeilen
 └───────────────────────┘
 ```
 
-- Sheet folgt dem Finger, rastet mit Federung ein, respektiert `env(safe-area-inset-*)`. Ziehen am Inhalt scrollt
-  erst, wenn die Stufe „Voll“ erreicht ist. Zurück-Geste/Escape schließt eine Stufe.
+- Sheet folgt dem Finger, rastet mit Federung ein, respektiert `env(safe-area-inset-*)`. Der Inhalt scrollt in „Halb“ und „Voll“
+  nativ (Scroll-Viewport = sichtbarer Teil); Herunterziehen am Scroll-Anfang übergibt die Geste ans Sheet, Griff und Blick-Zeile
+  ziehen das Sheet immer. Zurück-Geste/Escape schließt eine Stufe.
 - Auswahl auf der Karte öffnet den Inspektor in Stufe „Halb“ als Überlagerung; die Karte verschiebt sich nie.
 - Zeitleiste ist in Stufe 1 immer erreichbar, Scrubben mit dem Daumen, haptisches Ticken an Tagesgrenzen
   (`navigator.vibrate`, wenn vorhanden).
