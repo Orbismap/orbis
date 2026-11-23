@@ -258,6 +258,8 @@ export interface ExtensionHost {
   readonly mapDark: ReadonlySignal<boolean>;
   /** True while map place labels are on (basemap POIs or the "Orte und Läden" layer): the landmark badges follow it. */
   readonly landmarkLabels: ReadonlySignal<boolean>;
+  /** MapLibre filter expression (tier <= limit at the current zoom and tilt): a landmark badge with `tier` 1 (biggest) .. 5 (smallest) shows when it holds. Same staggering as the places. */
+  readonly landmarkTierLimit: ReadonlySignal<unknown>;
   /** True when the user wants less motion (setting or OS). */
   reducedMotion(): boolean;
   /**

@@ -5,7 +5,8 @@
 // end up in their own lazy chunk that only loads when Pro is switched on. This file is the ONLY place in the base
 // that mentions the folder (a unit test guards that).
 import { markerLayerId } from '../map/slots';
-import { effect } from '@preact/signals';
+import { computed, effect } from '@preact/signals';
+import { poiZoomBonus, tierLimitAt } from '../map/poi';
 import { mapEngine } from '../state/ui';
 import { mapDark, poiLabelsVisible, projection } from '../state/view';
 import { reducedMotion } from '../state/settings';
@@ -53,6 +54,7 @@ function makeHost(engine: MapEngine): ExtensionHost {
     holdCamera: () => engine.holdCamera(),
     buildingHeightFactor: () => buildingHeightFactor(engine.ml),
     landmarkLabels: poiLabelsVisible,
+    landmarkTierLimit: computed(() => tierLimitAt(poiZoomBonus.value)),
     reducedMotion,
     follow: { wanted: followWanted, report: (ref) => { followCurrent.value = ref; } },
   };

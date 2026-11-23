@@ -77,7 +77,7 @@ describe('POI categories', () => {
 
     // plain dots start at street level and are not shown ahead of the badges
     const [dots] = poiLayers('test');
-    expect((dots as { minzoom?: number }).minzoom).toBeGreaterThanOrEqual(14);
+    expect((dots as { minzoom?: number }).minzoom).toBeGreaterThanOrEqual(17);
     expect(JSON.stringify((dots as { filter?: unknown }).filter)).toBe(JSON.stringify(poiFilter(undefined, 0)));
   });
 });

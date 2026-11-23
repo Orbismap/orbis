@@ -61,7 +61,7 @@ export default defineLayer({
       const groups = String(ctx.options.value.gruppe ?? 'all');
       const hide = landmarkMask.value.boxes;
       ml.setFilter(places, poiFilter(groups, 0, hide));
-      ml.setFilter(dots, poiFilter(groups, 1, hide));
+      ml.setFilter(dots, poiFilter(groups, 0, hide));
       ml.setPaintProperty(dots, 'icon-opacity', poiOpacity(o));
       ml.setPaintProperty(places, 'icon-opacity', poiOpacity(o));
       ml.setPaintProperty(places, 'text-opacity', poiOpacity(o));
