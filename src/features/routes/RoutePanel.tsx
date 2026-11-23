@@ -55,7 +55,7 @@ function StopField({ i }: { i: number }) {
         <input
           type="text"
           aria-label={label}
-          placeholder={`${label} suchen oder auf die Karte tippen`}
+          placeholder={`${label} suchen`}
           autocomplete="off"
           spellcheck={false}
           value={text}
