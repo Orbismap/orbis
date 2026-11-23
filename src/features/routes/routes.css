@@ -5,7 +5,7 @@
   .rt-mode[aria-checked='true'] { background: var(--g-fill-active); color: var(--text-1); }
   .rt-stops { list-style: none; margin: 12px 0 0; padding: 4px 6px 4px 12px; display: flex; flex-direction: column; border-radius: 14px; background: var(--g-fill); }
   .rt-stop { position: relative; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .rt-stop + .rt-stop > .rt-field { box-shadow: inset 0 1px 0 var(--g-fill-active), inset 0 0 0 1.5px transparent; }
+  .rt-stop + .rt-stop::after { content: ''; position: absolute; left: 20px; right: 0; top: 0; border-top: 1px solid var(--g-fill-active); pointer-events: none; }
   .rt-stop + .rt-stop::before { content: ''; position: absolute; left: 4px; top: -11px; height: 22px; border-left: 2px dotted var(--text-3); opacity: 0.6; }
   .rt-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85); }
   .rt-dot.is-start { background: #3ecf8e; }

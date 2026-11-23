@@ -74,7 +74,12 @@ function StopField({ i }: { i: number }) {
             else if (e.key === 'Escape') (e.stopPropagation(), (e.currentTarget as HTMLInputElement).blur());
           }}
         />
-        {(s || text) && <IconButton icon="close" label={`${label} leeren`} size={14} class="rt-clear" onClick={() => (setText(''), s ? setStop(i, null) : undefined)} />}
+        {(s || text) && <IconButton icon="close" label={`${label} leeren`} size={14} class="rt-clear" onClick={() => {
+            setText('');
+            // clearing the start while stops lie between: the first of them moves up to be the start
+            if (i === 0 && list.length > 2) removeStop(0);
+            else if (s) setStop(i, null);
+          }} />}
       </div>
       {list.length > 2 && i > 0 && !last && <IconButton icon="minus" label="Stopp entfernen" size={15} class="rt-rm" onClick={() => removeStop(i)} />}
       {focus && !s && options.length > 0 && (
