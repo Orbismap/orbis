@@ -214,10 +214,10 @@ function Planner() {
           </button>
         )}
       </div>
+      <Result />
       <p class="rt-hint" role="status">
         {stops.value[0] ? 'Klicke auf einen Weg oder eine Straße, um Punkte zu deiner Route hinzuzufügen.' : 'Klicke auf einen Weg oder eine Straße, um deinen Startpunkt hinzuzufügen.'}
       </p>
-      <Result />
     </div>
   );
 }
