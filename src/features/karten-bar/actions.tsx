@@ -2,9 +2,10 @@ import { useRef, useState } from 'preact/hooks';
 import { serializeHash } from '../../core/url';
 import { activeKarteId, openKarte, SCRATCH_ID, setActiveIds, setActiveKarte } from '../../karten/active';
 import { DEFAULT_KARTE_ID } from '../../karten/standard';
-import { createKarte, customKarten, deleteKarte, isBuiltin, listedKarten, saveAs, updateKarteMeta } from '../../karten/store';
+import { createKarte, customKarten, deleteKarte, isBuiltin, listedKarten, saveAs, setKarteView, updateKarteMeta } from '../../karten/store';
 import type { Karte } from '../../karten/types';
 import { activeKarte, browsedKarte } from '../../state/session';
+import { camera } from '../../state/view';
 import { Button } from '../../ui/Button';
 import { cx } from '../../ui/hooks';
 import { Icon } from '../../ui/icons/Icon';
@@ -189,6 +190,28 @@ export function KartenPopover({ open, onClose, anchor, align = 'end', up, class:
           <MenuItem icon="plus" onClick={() => (leftView.value = 'catalog')}>
             Ebene hinzufügen
           </MenuItem>
+          <MenuItem
+            icon="pin"
+            onClick={() => {
+              const c = camera.peek();
+              setKarteView(target.id, { center: [c.lng, c.lat], zoom: c.zoom });
+              toast(`Position für „${target.name}“ gespeichert`, { kind: 'ok' });
+              close();
+            }}
+          >
+            {target.view ? 'Position aktualisieren' : 'Position speichern'}
+          </MenuItem>
+          {target.view && (
+            <MenuItem
+              icon="trash"
+              onClick={() => {
+                setKarteView(target.id, undefined);
+                close();
+              }}
+            >
+              Position entfernen
+            </MenuItem>
+          )}
           <MenuItem icon="copy" onClick={() => duplicate(target)}>
             Duplizieren
           </MenuItem>

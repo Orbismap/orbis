@@ -39,6 +39,8 @@ export interface CameraSource {
   maxZoom?: number;
   /** Card of one object. Without it the source is decorative: no hover, no picking, no glyph. */
   describe?(feature: AnyFeature): InspectCard;
+  /** Dot and cone color of this source, default the layer color. */
+  color?: string;
   /** Property with a unique id (hover, selection), default 'id'. */
   idKey?: string;
   /** Property with the viewing direction in degrees clockwise from north (missing or negative: unknown), default 'dir'. */
@@ -163,7 +165,7 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
             'icon-image': 'fov', 'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 1.3, 16, 2.2, 19, 3], 'icon-rotate': ['to-number', ['get', dirKey], 0],
             'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',
           },
-          paint: { 'icon-color': o.color, 'icon-opacity': 0.5 },
+          paint: { 'icon-color': s.color ?? o.color, 'icon-opacity': 0.5 },
         } as LayerSpecification);
       }
       if (lowLayer) {
@@ -172,7 +174,7 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
           id: lo, type: 'circle', source: src, 'source-layer': lowLayer, minzoom: s.minZoom ?? 0, maxzoom: lowEnd,
           paint: {
             'circle-radius': CAMERA_RADIUS as ExpressionSpecification,
-            'circle-color': o.color,
+            'circle-color': s.color ?? o.color,
             'circle-opacity': zoomOpacity(DOT_OPACITY, 1) as ExpressionSpecification,
             'circle-stroke-color': DARK_HALO as unknown as ExpressionSpecification,
             'circle-stroke-width': STROKE_WIDTH as ExpressionSpecification,
@@ -186,7 +188,7 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
         id: dots, type: 'circle', source: src, ...sl, ...minzoom,
         paint: {
           'circle-radius': picks ? radius : (CAMERA_RADIUS as ExpressionSpecification),
-          'circle-color': o.color,
+          'circle-color': s.color ?? o.color,
           'circle-opacity': zoomOpacity(DOT_OPACITY, 1) as ExpressionSpecification,
           'circle-stroke-color': (picks ? ['case', HOVER, '#ffffff', DARK_HALO] : DARK_HALO) as ExpressionSpecification,
           'circle-stroke-width': STROKE_WIDTH as ExpressionSpecification,
@@ -241,7 +243,7 @@ export function cameraLayer(ctx: LayerContext, o: CameraLayerOptions): LayerHand
           click(f) {
             const id = (f.properties as Record<string, unknown> | null)?.[idKey] ?? f.id;
             const full = (geo ? lookup(geo.peek(), id) : undefined) ?? f;
-            const card: InspectCard = { icon: 'camera', ...s.describe!(full as AnyFeature), color: o.color };
+            const card: InspectCard = { icon: 'camera', ...s.describe!(full as AnyFeature), color: s.color ?? o.color };
             if (!card.location && f.geometry.type === 'Point') card.location = f.geometry.coordinates.slice(0, 2) as [number, number];
             lastCard = card;
             selected.value = { src, id };
