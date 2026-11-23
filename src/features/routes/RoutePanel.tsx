@@ -215,9 +215,6 @@ function Planner() {
         )}
       </div>
       <Result />
-      <p class="rt-hint" role="status">
-        {stops.value[0] ? 'Klicke auf einen Weg oder eine Straße, um Punkte zu deiner Route hinzuzufügen.' : 'Klicke auf einen Weg oder eine Straße, um deinen Startpunkt hinzuzufügen.'}
-      </p>
     </div>
   );
 }
@@ -238,6 +235,11 @@ export function RoutePanel() {
         </span>
       </header>
       <ScrollArea class="hudd-scroll">{planning ? <Planner /> : <SavedList />}</ScrollArea>
+      {planning && (
+        <p class="rt-hint rt-foot" role="status">
+          {stops.value[0] ? 'Klicke auf einen Weg oder eine Straße, um Punkte zu deiner Route hinzuzufügen.' : 'Klicke auf einen Weg oder eine Straße, um deinen Startpunkt hinzuzufügen.'}
+        </p>
+      )}
     </Panel>
   );
 }
