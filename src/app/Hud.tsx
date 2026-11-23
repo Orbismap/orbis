@@ -2,7 +2,7 @@ import { getLayer } from '../layers/registry';
 import { createPortal } from 'preact/compat';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { localResults, placeResult } from '../features/search/results';
-import { ORDER, usePlaces } from '../features/search/Search';
+import { orderResults, usePlaces } from '../features/search/Search';
 import type { Result } from '../features/search/sources';
 import { clearHistory, history, type HistoryEntry, type HistoryKind } from '../state/history';
 import { flyToPoint } from '../features/shared/map';
@@ -235,7 +235,7 @@ function MainPanel() {
   const results = useMemo<Result[]>(() => {
     if (!q.trim()) return [];
     const all = [...localResults(q).filter((r) => r.group === 'Koordinate'), ...(q.trim().length >= 2 ? places.places.map(placeResult) : [])];
-    return ORDER.flatMap((g) => all.filter((r) => r.group === g));
+    return orderResults(all);
   }, [q, places.places]);
   const a = Math.min(sel, Math.max(0, results.length - 1));
   const fr = searching && popOpen ? field.current?.getBoundingClientRect() : undefined;

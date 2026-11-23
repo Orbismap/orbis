@@ -46,4 +46,4 @@ export async function searchPlaces(q: string, signal: AbortSignal): Promise<Plac
 }
 
 export type ResultGroup = 'Koordinate' | 'Befehle' | 'Ebenen' | 'Karten' | 'Orte';
-export interface Result { id: string; group: ResultGroup; icon: UiIconName; title: string; subtitle?: string; hint?: string; color?: string; run(): void }
+export interface Result { /** Group shown before the layers (a command that matches the query by its title). */ top?: boolean; id: string; group: ResultGroup; icon: UiIconName; title: string; subtitle?: string; hint?: string; color?: string; run(): void }

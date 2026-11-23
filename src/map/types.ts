@@ -33,6 +33,8 @@ export interface CameraTarget {
   /** ms; 0 jumps. Default 1200 for flyTo. */
   duration?: number;
   maxZoom?: number;
+  /** Speed curve: default ease-in-out; 'linear' keeps a constant pace, 'out' only slows down at the end (to continue a move that is already under way without stopping). */
+  easing?: 'linear' | 'out';
 }
 
 export interface MapEngine {

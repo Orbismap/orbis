@@ -2,6 +2,7 @@ import { addLayer, openKarte, setLayerVisible } from '../../karten/active';
 import { listedKarten } from '../../karten/store';
 import { allLayers } from '../../layers/registry';
 import { categoryById } from '../../layers/categories';
+import { newRoute } from '../../state/routes';
 import { activeKarte } from '../../state/session';
 import { updateSettings } from '../../state/settings';
 import { selectPlace, setProbe } from '../../state/selection';
@@ -17,6 +18,7 @@ import { coordinateLabel, parseCoordinate, type Place, type Result } from './sou
 interface Command { id: string; title: string; subtitle?: string; icon: Result['icon']; words: string[]; run(): void }
 
 const COMMANDS: Command[] = [
+  { id: 'route-new', title: 'Neue Route', subtitle: 'Route planen', icon: 'route', words: ['routen', 'navigation', 'weg', 'planen', 'wegbeschreibung', 'anfahrt'], run: newRoute },
   { id: 'globe', title: 'Globus anzeigen', icon: 'globe', words: ['3d', 'kugel', 'erde'], run: () => setProjection('globe') },
   { id: 'flat', title: 'Flache Karte anzeigen', icon: 'map', words: ['2d', 'mercator', 'karte'], run: () => setProjection('mercator') },
   { id: 'now', title: 'Jetzt', subtitle: 'Zur aktuellen Zeit springen', icon: 'clock', words: ['live', 'zeit', 'aktuell'], run: goLive },
@@ -66,6 +68,14 @@ export function localResults(q: string): Result[] {
       },
     });
 
+  const cmds = COMMANDS.map((c) => ({ c, s: scoreText(c.title, query, [...c.words, c.subtitle ?? '']) }))
+    .filter((r) => r.s > 0 && !(r.c.id === 'globe' && projection.value === 'globe') && !(r.c.id === 'flat' && projection.value === 'mercator'))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, query ? 4 : 5);
+  // a command that matches a word of its title ('route' -> Neue Route) is listed before the layers
+  const top = !!query && cmds.length > 0 && cmds[0]!.s >= 80;
+  const cmdOut: Result[] = cmds.map(({ c }) => ({ ...(top ? { top: true } : {}), id: `cmd:${c.id}`, group: 'Befehle', icon: c.icon, title: c.title, subtitle: c.subtitle, run: c.run }));
+
   const k = activeKarte.value;
   const state = new Map(k.layers.map((l) => [l.id, l.visible]));
   const layers = allLayers()
@@ -94,10 +104,6 @@ export function localResults(q: string): Result[] {
     .slice(0, 5);
   for (const { x } of kk) out.push({ id: `karte:${x.id}`, group: 'Karten', icon: x.icon, title: x.name, subtitle: 'Karte öffnen', run: () => openKarte(x.id) });
 
-  const cmds = COMMANDS.map((c) => ({ c, s: scoreText(c.title, query, [...c.words, c.subtitle ?? '']) }))
-    .filter((r) => r.s > 0 && !(r.c.id === 'globe' && projection.value === 'globe') && !(r.c.id === 'flat' && projection.value === 'mercator'))
-    .sort((a, b) => b.s - a.s)
-    .slice(0, query ? 4 : 5);
-  for (const { c } of cmds) out.push({ id: `cmd:${c.id}`, group: 'Befehle', icon: c.icon, title: c.title, subtitle: c.subtitle, run: c.run });
+  out.push(...cmdOut);
   return out;
 }

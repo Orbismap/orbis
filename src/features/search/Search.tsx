@@ -8,6 +8,10 @@ import { searchPlaces, type Place, type Result, type ResultGroup } from './sourc
 import './search.css';
 
 export const ORDER: ResultGroup[] = ['Koordinate', 'Ebenen', 'Karten', 'Befehle', 'Orte'];
+const ORDER_COMMANDS_FIRST: ResultGroup[] = ['Koordinate', 'Befehle', 'Ebenen', 'Karten', 'Orte'];
+
+/** Results in the order of their groups; a command that matches the query by its title goes before the layers. */
+export const orderResults = (all: Result[]): Result[] => (all.some((r) => r.top) ? ORDER_COMMANDS_FIRST : ORDER).flatMap((g) => all.filter((r) => r.group === g));
 
 export function usePlaces(q: string) {
   const [state, set] = useState<{ q: string; status: 'idle' | 'loading' | 'ok' | 'error'; places: Place[] }>({ q: '', status: 'idle', places: [] });
@@ -72,7 +76,7 @@ export function Search() {
     const local = localResults(q);
     const ps = q.trim().length >= 2 ? places.places.map(placeResult) : [];
     const all = [...local, ...ps];
-    return ORDER.flatMap((g) => all.filter((r) => r.group === g));
+    return orderResults(all);
   }, [q, places.places]);
 
   const a = Math.min(active, Math.max(0, results.length - 1));

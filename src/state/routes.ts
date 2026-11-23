@@ -134,6 +134,16 @@ export const isRouteSaved = () => {
   return l.every((s) => s) && savedRoutes.value.some((r) => r.id === `${m}:${(l as Stop[]).map((s) => s.id).join('|')}`);
 };
 
+/** Opens the planner with nothing filled in (menu, Cmd+K). */
+export function newRoute(): void {
+  clearSelection();
+  batch(() => {
+    clearRoute();
+    orteView.value = 'routes';
+    routeView.value = 'plan';
+  });
+}
+
 /** Opens the planner with a destination (from a place card). */
 export function routeTo(p: Omit<Stop, 'id'>): void {
   clearSelection();
@@ -186,7 +196,7 @@ effect(() => {
   // while the route is calculated: frame the stops, so that start and destination are in view (the route itself is framed on arrival)
   let w = 180, so = 90, e = -180, n = -90;
   for (const p of pts) (w = Math.min(w, p.lng), e = Math.max(e, p.lng), so = Math.min(so, p.lat), n = Math.max(n, p.lat));
-  mapEngine.peek()?.flyTo({ bounds: [w, so, e, n], maxZoom: 15, padding: { top: 70, bottom: 70, left: 70, right: 70 } });
+  mapEngine.peek()?.flyTo({ bounds: [w, so, e, n], maxZoom: 15, duration: 1800, easing: 'linear', padding: { top: 70, bottom: 70, left: 70, right: 70 } });
   const ctl = new AbortController();
   const id = setTimeout(() => {
     fetchRoutes(mode, pts, ctl.signal).then(
@@ -197,7 +207,9 @@ effect(() => {
         });
         let w = 180, s = 90, e = -180, n = -90;
         for (const [x, y] of routes.flatMap((r) => r.coords)) (w = Math.min(w, x), e = Math.max(e, x), s = Math.min(s, y), n = Math.max(n, y));
-        mapEngine.peek()?.flyTo({ bounds: [w, s, e, n], maxZoom: 15, padding: { top: 70, bottom: 70, left: 70, right: 70 } });
+        // still on its way to the stops: carry on without stopping, only slowing down at the end
+        const moving = mapEngine.peek()?.ml.isMoving() ?? false;
+        mapEngine.peek()?.flyTo({ bounds: [w, s, e, n], maxZoom: 15, padding: { top: 70, bottom: 70, left: 70, right: 70 }, ...(moving ? { easing: 'out' as const, duration: 1000 } : {}) });
       },
       (err: unknown) => {
         if ((err as Error)?.name === 'AbortError') return;
