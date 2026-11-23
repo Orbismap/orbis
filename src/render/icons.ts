@@ -111,8 +111,8 @@ export const SHAPES = {
     g.beginPath();
     g.rect(0.04, 0.26, 0.92, 0.64);
     g.rect(0.3, 0.12, 0.4, 0.16);
-    g.moveTo(0.5 + 0.2, 0.58);
-    g.arc(0.5, 0.58, 0.2, 0, Math.PI * 2, true);
+    g.moveTo(0.5 + 0.13, 0.58);
+    g.arc(0.5, 0.58, 0.13, 0, Math.PI * 2, true);
     g.fill('evenodd');
   },
   // viewing cone of a camera: tip in the centre, opens upwards (rotate by the bearing), ±30°
