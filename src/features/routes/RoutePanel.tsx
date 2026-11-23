@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { orteView } from '../../state/hud';
-import { activeStop, addStop, clearRoute, coordStop, isRouteSaved, loadRoute, removeStop, routeChoice, routeMode, routeState, saveCurrentRoute, savedPlaces, savedRoutes, setStop, stops, swapStops, type Stop } from '../../state/routes';
+import { activeStop, addStop, clearRoute, coordStop, isRouteSaved, removeStop, routeChoice, backfillRoute, routeMode, routeState, routeView, saveCurrentRoute, savedPlaces, savedRoutes, setStop, stops, swapStops, type Stop } from '../../state/routes';
 import { mapEngine } from '../../state/ui';
 import { Button, IconButton } from '../../ui/Button';
 import { cx } from '../../ui/hooks';
@@ -11,6 +11,7 @@ import { toast } from '../../ui/toast';
 import { usePlaces } from '../search/Search';
 import { flyToPoint } from '../shared/map';
 import { formatDistance, formatDuration, MODES, type RouteMode } from './osrm';
+import { SavedRouteCard } from './SavedRouteCard';
 import './routes.css';
 
 const MODE_ICON = { car: 'car', bike: 'bike', foot: 'walk' } as const;
@@ -96,8 +97,9 @@ function StopField({ i }: { i: number }) {
 
 function Result() {
   const st = routeState.value;
+  const [stepsOpen, setStepsOpen] = useState(false);
   const saved = isRouteSaved();
-  if (st.status === 'idle') return <p class="rt-hint">Wähle Start und Ziel oder tippe sie auf der Karte an.</p>;
+  if (st.status === 'idle') return null;
   if (st.status === 'loading') return <p class="rt-hint">Route wird berechnet</p>;
   if (st.status === 'error') return <p class="rt-hint rt-err">{st.message}</p>;
   const c = Math.min(routeChoice.value, st.routes.length - 1);
@@ -125,87 +127,117 @@ function Result() {
           {saved ? 'Gesichert' : 'Sichern'}
         </Button>
       </section>
-      <ol class="rt-steps" aria-label="Wegbeschreibung">
-        {route.steps.map((s, k) => (
-          <li key={k}>
-            <button type="button" class="rt-step" onClick={() => flyToPoint(s.lng, s.lat, 16)}>
-              <span class="rt-step-t">{s.text}</span>
-              {s.distance > 0 && <small class="num">{formatDistance(s.distance)}</small>}
-            </button>
-          </li>
-        ))}
-      </ol>
+      <button type="button" class="rt-steps-toggle" aria-expanded={stepsOpen} aria-controls="rt-steps" onClick={() => setStepsOpen(!stepsOpen)}>
+        <Icon name={stepsOpen ? 'chevron-down' : 'chevron-right'} size={14} />
+        Wegbeschreibung <small class="num">{route.steps.length} Schritte</small>
+      </button>
+      {stepsOpen && (
+        <ol class="rt-steps" id="rt-steps" aria-label="Wegbeschreibung">
+          {route.steps.map((s, k) => (
+            <li key={k}>
+              <button type="button" class="rt-step" onClick={() => flyToPoint(s.lng, s.lat, 16)}>
+                <span class="rt-step-t">{s.text}</span>
+                {s.distance > 0 && <small class="num">{formatDistance(s.distance)}</small>}
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
     </>
   );
 }
 
-/** Route planner in the detail menu: mode, stops, result with turn list, saved routes. */
-export function RoutePanel() {
-  const mode = routeMode.value;
+function SavedList() {
   const routes = savedRoutes.value;
+  useEffect(() => void routes.forEach((r) => void backfillRoute(r)), [routes]);
+  const create = () => {
+    clearRoute();
+    routeView.value = 'plan';
+  };
+  if (!routes.length) {
+    return (
+      <div class="rt-body rt-empty">
+        <Icon name="route" size={56} />
+        <h3>Eigene Route erstellen</h3>
+        <p>Plane Wege zu Fuß, mit dem Rad oder dem Auto und sichere sie hier, um sie später wieder zu öffnen.</p>
+        <Button variant="secondary" icon="plus" onClick={create}>
+          Route erstellen
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div class="rt-body">
+      <Button variant="primary" icon="plus" block onClick={create}>
+        Neue Route
+      </Button>
+      <section class="rt-saved">
+        <h3 class="hud-sect">Gesicherte Routen</h3>
+        <ul class="rt-cards" role="list">
+          {routes.map((r) => (
+            <SavedRouteCard key={r.id} route={r} onOpen={() => (routeView.value = 'plan')} />
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+function Planner() {
+  const mode = routeMode.value;
   const any = stops.value.some((s) => s);
+  return (
+    <div class="rt-body">
+      <div class="rt-modes" role="radiogroup" aria-label="Fortbewegung">
+        {MODES.map((m) => (
+          <button key={m.id} type="button" role="radio" aria-checked={mode === m.id} class="rt-mode" onClick={() => (routeMode.value = m.id as RouteMode)}>
+            <Icon name={MODE_ICON[m.id]} size={16} />
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <ul class="rt-stops" role="list">
+        {stops.value.map((_, i) => (
+          <StopField key={i} i={i} />
+        ))}
+      </ul>
+      <div class="rt-tools">
+        <button type="button" class="rt-link" onClick={addStop} disabled={stops.value.length >= 6}>
+          <Icon name="plus" size={14} /> Stopp
+        </button>
+        <button type="button" class="rt-link" onClick={swapStops}>
+          <Icon name="swap" size={14} /> Tauschen
+        </button>
+        {any && (
+          <button type="button" class="rt-link" onClick={clearRoute}>
+            <Icon name="reset" size={14} /> Zurücksetzen
+          </button>
+        )}
+      </div>
+      <p class="rt-hint" role="status">
+        {stops.value[0] ? 'Klicke auf einen Weg oder eine Straße, um Punkte zu deiner Route hinzuzufügen.' : 'Klicke auf einen Weg oder eine Straße, um deinen Startpunkt hinzuzufügen.'}
+      </p>
+      <Result />
+    </div>
+  );
+}
+
+/** Route menu: a list of saved routes with "Neue Route", and the planner (mode, stops, result, collapsible turn list) behind it. */
+export function RoutePanel() {
+  // a route started from elsewhere (place card, map) goes straight to the planner
+  const anyStop = stops.value.some((s) => s);
+  useEffect(() => void (anyStop && (routeView.value = 'plan')), [anyStop]);
+  const planning = routeView.value === 'plan';
   return (
     <Panel as="section" class="hudd rt" aria-label="Routen">
       <header class="hudd-head">
-        <h2>Routen</h2>
+        {planning && <IconButton icon="chevron-left" label="Zurück zu den Routen" size={16} class="hud-rbtn" onClick={() => (clearRoute(), (routeView.value = 'list'))} />}
+        <h2>{planning ? 'Neue Route' : 'Routen'}</h2>
         <span class="hudd-btns">
           <IconButton icon="close" label="Schließen" shortcut="Esc" class="hud-rbtn" onClick={() => (orteView.value = null)} />
         </span>
       </header>
-      <ScrollArea class="hudd-scroll">
-        <div class="rt-body">
-          <div class="rt-modes" role="radiogroup" aria-label="Fortbewegung">
-            {MODES.map((m) => (
-              <button key={m.id} type="button" role="radio" aria-checked={mode === m.id} class="rt-mode" onClick={() => (routeMode.value = m.id as RouteMode)}>
-                <Icon name={MODE_ICON[m.id]} size={16} />
-                {m.label}
-              </button>
-            ))}
-          </div>
-          <ul class="rt-stops" role="list">
-            {stops.value.map((_, i) => (
-              <StopField key={i} i={i} />
-            ))}
-          </ul>
-          <div class="rt-tools">
-            <button type="button" class="rt-link" onClick={addStop} disabled={stops.value.length >= 6}>
-              <Icon name="plus" size={14} /> Stopp
-            </button>
-            <button type="button" class="rt-link" onClick={swapStops}>
-              <Icon name="swap" size={14} /> Tauschen
-            </button>
-            {any && (
-              <button type="button" class="rt-link" onClick={clearRoute}>
-                <Icon name="reset" size={14} /> Zurücksetzen
-              </button>
-            )}
-          </div>
-          <Result />
-          {routes.length > 0 && (
-            <section class="rt-saved">
-              <h3 class="hud-sect">Gesicherte Routen</h3>
-              <ul class="hud-rows" role="list">
-                {routes.map((r) => (
-                  <li key={r.id} class="rt-srow">
-                    <button type="button" class="hud-row hud-row-2" onClick={() => loadRoute(r)}>
-                      <span class="hud-badge">
-                        <Icon name={MODE_ICON[r.mode]} size={18} />
-                      </span>
-                      <span class="hud-rt2">
-                        <b>{r.name}</b>
-                        <small class="num">
-                          {formatDuration(r.duration)} · {formatDistance(r.distance)}
-                        </small>
-                      </span>
-                    </button>
-                    <IconButton icon="trash" label="Route löschen" size={15} class="rt-del" onClick={() => (savedRoutes.value = savedRoutes.peek().filter((x) => x.id !== r.id))} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-        </div>
-      </ScrollArea>
+      <ScrollArea class="hudd-scroll">{planning ? <Planner /> : <SavedList />}</ScrollArea>
     </Panel>
   );
 }

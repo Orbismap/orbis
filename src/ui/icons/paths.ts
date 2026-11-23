@@ -4,7 +4,7 @@
 import type { IconName } from './names';
 
 /** Icons the UI needs in addition to the names layers may reference. */
-export type UiIconName = IconName | 'chevron-left' | 'chevron-up' | 'compass' | 'copy' | 'pencil' | 'plus-square' | 'panel-left' | 'more' | 'keyboard' | 'link' | 'north' | 'key' | 'boost' | 'route' | 'bookmark' | 'walk' | 'bike' | 'swap' | 'filter' | 'gear' | 'expand' | 'collapse';
+export type UiIconName = IconName | 'chevron-left' | 'chevron-up' | 'compass' | 'copy' | 'pencil' | 'plus-square' | 'panel-left' | 'more' | 'keyboard' | 'link' | 'north' | 'key' | 'boost' | 'route' | 'bookmark' | 'walk' | 'bike' | 'swap' | 'filter' | 'gear' | 'expand' | 'collapse' | 'distance';
 
 const cloud = (y: number) => `M5.5 ${y}a3.25 3.25 0 0 1-.3-6.49 4.75 4.75 0 0 1 9.2-.6 3.55 3.55 0 0 1 .1 7.09z`;
 
@@ -15,6 +15,7 @@ export const ICON_PATHS: Record<UiIconName, string> = {
   bookmark: 'M5.5 3.5h9a1 1 0 0 1 1 1v13l-5.5-3.5-5.5 3.5v-13a1 1 0 0 1 1-1z',
   walk: 'M10.75 3.5a1 1 0 1 0 0 .01M8.5 17.5l1.5-5-2-2 1-4 2.25 1.5 2 .5M7 10.5l-1.75 2M10 12.5l2.25 1.25.75 3.75',
   bike: 'M2.5 13a3 3 0 1 0 6 0 3 3 0 0 0-6 0M11.5 13a3 3 0 1 0 6 0 3 3 0 0 0-6 0M5.5 13l3-6h4.5l2 6M8.5 7H7M9.25 13 12.5 7',
+  distance: 'M3.5 6v8M16.5 6v8M3.5 10h13',
   swap: 'M6 16.5v-13M6 3.5 3.5 6M6 3.5 8.5 6M14 3.5v13M14 16.5l-2.5-2.5M14 16.5l2.5-2.5',
   // weather
   cloud: cloud(16.25),
