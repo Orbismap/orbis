@@ -14,6 +14,7 @@ import type { AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
 
 const COLOR = '#FFB020';
+const MOBILE_COLOR = '#E5322D';
 const MOBILE_ZOOM = 12;
 const GRID = 0.15; // degrees; fixed tiles so that overlapping views share the proxy's 60 s cache
 
@@ -72,7 +73,7 @@ export default defineLayer({
   options: [{ id: 'mobile', label: 'Mobile Blitzer', type: 'toggle', default: true }],
   legend: { type: 'classes', items: [
     { color: COLOR, label: 'Ortsfeste Blitzer mit Blickkegel (Geschwindigkeit, Abschnitt, Rotlicht)' },
-    { color: COLOR, label: 'Mobile Kontrolle (ohne Blickkegel, ab Zoomstufe 12, Community-Meldung)' },
+    { color: MOBILE_COLOR, label: 'Mobile Kontrolle (ohne Blickkegel, ab Zoomstufe 12, Community-Meldung)' },
   ] },
   keywords: ['blitzer', 'radar', 'tempo', 'geschwindigkeit', 'rotlicht', 'speed camera', 'section control', 'traffipax', 'mobil', 'blitzer.de'],
 
@@ -105,6 +106,7 @@ export default defineLayer({
         },
       }, {
         name: 'mobil',
+        color: MOBILE_COLOR,
         minZoom: MOBILE_ZOOM,
         data: { kind: 'geojson', data: mobile },
         describe: (f: AnyFeature) => {

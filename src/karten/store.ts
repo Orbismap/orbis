@@ -109,6 +109,10 @@ export function createKarte(): string {
 export const updateKarteMeta = (id: string, meta: { name?: string; icon?: IconName; color?: string }) =>
   !isBuiltin(id) && editKarte(id, (k) => ({ ...k, ...(meta.name?.trim() ? { name: meta.name.trim() } : {}), ...(meta.icon ? { icon: meta.icon } : {}), ...(meta.color ? { color: meta.color } : {}) }));
 
+/** Stores (or with `undefined` removes) the map position an own Karte flies to when it is opened. */
+export const setKarteView = (id: string, view: Karte['view']) =>
+  !isBuiltin(id) && editKarte(id, ({ view: _old, ...k }) => (view ? { ...k, view: { center: [view.center[0], view.center[1]], zoom: view.zoom } } : k));
+
 /** Saves `src` (an own Karte, or what the scratch Karte currently shows) as a new own Karte and returns its id. */
 export function saveAs(src: Karte, name: string, meta: { icon?: IconName; color?: string } = {}): string {
   const id = newId();

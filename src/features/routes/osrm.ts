@@ -106,3 +106,51 @@ export function formatDuration(s: number): string {
   const m = min % 60;
   return m ? `${h}${NNBSP}Std. ${m}${NNBSP}Min.` : `${h}${NNBSP}Std.`;
 }
+
+const rad = Math.PI / 180;
+const dist = (a: [number, number], b: [number, number]) => {
+  const dx = (b[0] - a[0]) * Math.cos(((a[1] + b[1]) / 2) * rad);
+  return Math.hypot(dx, b[1] - a[1]) * 111_320;
+};
+
+/** At most `n` points evenly spaced along the line (first and last kept): a light copy for previews and elevation lookups. */
+export function thinCoords(coords: readonly [number, number][], n: number): [number, number][] {
+  if (coords.length <= n) return coords.map((c) => [c[0], c[1]]);
+  const cum = [0];
+  for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1]! + dist(coords[i - 1]!, coords[i]!));
+  const total = cum[cum.length - 1]!;
+  if (!total) return [[coords[0]![0], coords[0]![1]], [coords[coords.length - 1]![0], coords[coords.length - 1]![1]]];
+  const out: [number, number][] = [];
+  let j = 0;
+  for (let k = 0; k < n; k++) {
+    const target = (total * k) / (n - 1);
+    while (j < coords.length - 2 && cum[j + 1]! < target) j++;
+    const span = cum[j + 1]! - cum[j]!;
+    const t = span ? Math.min(1, Math.max(0, (target - cum[j]!) / span)) : 0;
+    out.push([coords[j]![0] + (coords[j + 1]![0] - coords[j]![0]) * t, coords[j]![1] + (coords[j + 1]![1] - coords[j]![1]) * t]);
+  }
+  return out;
+}
+
+/** Total climb and descent in metres of an elevation series; changes below `min` m are noise and ignored. */
+export function ascentDescent(elev: readonly number[], min = 3): { ascent: number; descent: number } {
+  let ascent = 0, descent = 0;
+  let ref = elev[0];
+  for (const e of elev) {
+    if (ref === undefined || !Number.isFinite(e)) continue;
+    if (e - ref >= min) (ascent += e - ref, ref = e);
+    else if (ref - e >= min) (descent += ref - e, ref = e);
+  }
+  return { ascent: Math.round(ascent), descent: Math.round(descent) };
+}
+
+/** Climb and descent along a line (Open-Meteo elevation, up to 100 points per request). Throws when the service fails. */
+export async function fetchAscentDescent(coords: readonly [number, number][], signal?: AbortSignal): Promise<{ ascent: number; descent: number }> {
+  const pts = thinCoords(coords, 100);
+  const url = `https://api.open-meteo.com/v1/elevation?latitude=${pts.map((p) => p[1].toFixed(5)).join(',')}&longitude=${pts.map((p) => p[0].toFixed(5)).join(',')}`;
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error('Höhendaten nicht erreichbar');
+  const j = (await res.json()) as { elevation?: number[] };
+  if (!Array.isArray(j.elevation) || j.elevation.length !== pts.length) throw new Error('Höhendaten unvollständig');
+  return ascentDescent(j.elevation);
+}

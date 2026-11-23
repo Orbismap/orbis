@@ -2,14 +2,15 @@
 import { batch, computed, effect, signal } from '@preact/signals';
 import { formatCoord } from '../core/format';
 import { getJSON, setJSON } from '../core/storage';
-import { fetchRoutes, type RouteMode, type RouteResult } from '../features/routes/osrm';
+import { fetchAscentDescent, fetchRoutes, thinCoords, type RouteMode, type RouteResult } from '../features/routes/osrm';
 import { parseReverse } from '../features/place/reverse';
 import { mapEngine } from './ui';
 import { orteView } from './hud';
 import { clearSelection } from './selection';
 
 export interface Stop { id: string; title: string; subtitle?: string; lng: number; lat: number }
-export interface SavedRoute { id: string; name: string; mode: RouteMode; stops: Stop[]; distance: number; duration: number }
+/** `coords`: light copy of the line for the preview; `ascent`/`descent` in metres, once the elevation lookup has answered. */
+export interface SavedRoute { id: string; name: string; mode: RouteMode; stops: Stop[]; distance: number; duration: number; coords?: [number, number][]; ascent?: number; descent?: number; note?: string }
 
 export const stopId = (lng: number, lat: number) => `${lng.toFixed(5)},${lat.toFixed(5)}`;
 export const coordStop = (lng: number, lat: number): Stop => ({ id: stopId(lng, lat), title: formatCoord(lat, lng, 4), lng, lat });
@@ -38,6 +39,8 @@ export const routeMode = signal<RouteMode>(getJSON('route-mode', 1, (v): RouteMo
 effect(() => void setJSON('route-mode', 1, routeMode.value));
 /** Start, optional stops, destination. `null` = field still empty. */
 export const stops = signal<(Stop | null)[]>([null, null]);
+/** Route menu: saved routes ('list') or the planner ('plan'). Map clicks only set route points while planning. */
+export const routeView = signal<'list' | 'plan'>('list');
 /** The field a click on the map fills. */
 export const activeStop = signal(0);
 export type RouteState = { status: 'idle' } | { status: 'loading' } | { status: 'error'; message: string } | { status: 'ok'; routes: RouteResult[] };
@@ -90,8 +93,41 @@ export function saveCurrentRoute(): void {
   const chosen = st.routes[routeChoice.peek()] ?? st.routes[0]!;
   const name = `${all[0]!.title.split(',')[0]} → ${all[all.length - 1]!.title.split(',')[0]}`;
   const id = `${routeMode.peek()}:${all.map((s) => s.id).join('|')}`;
-  savedRoutes.value = [{ id, name, mode: routeMode.peek(), stops: all, distance: chosen.distance, duration: chosen.duration }, ...savedRoutes.peek().filter((r) => r.id !== id)];
+  const coords = thinCoords(chosen.coords, 80);
+  savedRoutes.value = [{ id, name, mode: routeMode.peek(), stops: all, distance: chosen.distance, duration: chosen.duration, coords }, ...savedRoutes.peek().filter((r) => r.id !== id)];
+  void fillElevation(id, coords);
 }
+const patchSaved = (id: string, patch: Partial<SavedRoute>) => (savedRoutes.value = savedRoutes.peek().map((r) => (r.id === id ? { ...r, ...patch } : r)));
+/** Looks up climb and descent of a saved route (once, in the background; no values when the service is down). */
+export async function fillElevation(id: string, coords: [number, number][]): Promise<void> {
+  try {
+    patchSaved(id, await fetchAscentDescent(coords));
+  } catch {
+    /* the card simply shows no elevation */
+  }
+}
+const backfilled = new Set<string>();
+/** Saved routes from before previews existed: fetch the line again (and the elevation), once per session. */
+export async function backfillRoute(r: SavedRoute): Promise<void> {
+  if (backfilled.has(r.id) || (r.coords && r.ascent !== undefined)) return;
+  backfilled.add(r.id);
+  let coords = r.coords;
+  if (!coords) {
+    try {
+      const best = (await fetchRoutes(r.mode, r.stops, new AbortController().signal))[0];
+      if (!best) return;
+      coords = thinCoords(best.coords, 80);
+      patchSaved(r.id, { coords });
+    } catch {
+      return;
+    }
+  }
+  await fillElevation(r.id, coords);
+}
+
+/** Own name (kept when empty) and note of a saved route. */
+export const editSavedRoute = (id: string, v: { name: string; note: string }) => patchSaved(id, { ...(v.name.trim() ? { name: v.name.trim().slice(0, 60) } : {}), note: v.note.trim().slice(0, 300) || undefined });
+export const deleteSavedRoute = (id: string) => (savedRoutes.value = savedRoutes.peek().filter((r) => r.id !== id));
 export const isRouteSaved = () => {
   const l = stops.value;
   const m = routeMode.value;
@@ -108,12 +144,16 @@ export function routeTo(p: Omit<Stop, 'id'>): void {
     activeStop.value = Math.max(0, stops.peek().findIndex((s) => s === null));
     if (stops.peek().every((s) => s)) activeStop.value = 0;
     orteView.value = 'routes';
+    routeView.value = 'plan';
   });
 }
 
 /** Map click while the planner is open: fills the active field. Returns whether the click was used. */
 export function routePick(at: { lng: number; lat: number }, title?: string): boolean {
-  if (orteView.peek() !== 'routes') return false;
+  if (orteView.peek() !== 'routes' || routeView.peek() !== 'plan') return false;
+  const l = stops.peek();
+  // start and destination set: a click adds a point to the route (before the destination)
+  if (l.length < 6 && l.every((x) => x)) addStop();
   const i = Math.min(activeStop.peek(), stops.peek().length - 1);
   const s = coordStop(at.lng, at.lat);
   if (title) return setStop(i, { ...s, title }), true;
