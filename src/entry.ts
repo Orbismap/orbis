@@ -15,6 +15,12 @@ export function appMode(): AppMode {
 if (appMode() === 'wetter') {
   document.title = 'Orbis Wetter';
   document.documentElement.style.background = '#0a0f18';
+  // Same index.html for both apps – the weather app brings its own manifest and icons.
+  const head = document.head;
+  head.querySelector('link[rel="manifest"]')?.setAttribute('href', './wetter/manifest.webmanifest');
+  head.querySelector('link[rel="icon"]')?.setAttribute('href', './wetter/favicon.svg');
+  head.querySelector('link[rel="apple-touch-icon"]')?.setAttribute('href', './wetter/icons/icon-192.png');
+  head.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0a0f18');
   void import('./wetter/main');
 } else {
   void import('./main');

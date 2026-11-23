@@ -2,6 +2,7 @@ import { render } from 'preact';
 import { setWorkerUrl } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { App } from './app/App';
+import { registerServiceWorker } from './pwa/register';
 import { registerWidgets } from './widgets/register';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './styles/tokens.css';
@@ -15,3 +16,4 @@ registerWidgets();
 
 render(<App />, document.getElementById('app')!);
 
+registerServiceWorker();
