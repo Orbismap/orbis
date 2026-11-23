@@ -18,7 +18,7 @@ nur, was die Wetter-App braucht: der Einstieg, der Wetter-Chunk samt statischen 
 
 - Der Service Worker wird nur registriert, wenn der Hostname mit `wetter.` beginnt (`src/wetter/pwa/register.ts`).
   Ein Worker mit Scope `/` auf der Karten-Origin würde sonst die Karte übernehmen.
-- Same-Origin-Dateien: cache-first. Ausnahme `/wx-render/` (bleibt frisch). Alles andere (Wetterdaten, Kacheln):
+- Same-Origin-Dateien: cache-first. Alles andere (Wetterdaten, Kacheln):
   network-first mit Cache als Offline-Fallback; große Binärdaten (`octet-stream`, OWX) werden nicht gecacht.
 
 ## Umstellung (Livegang)

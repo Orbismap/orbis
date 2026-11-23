@@ -1,10 +1,7 @@
 /**
- * Runtime link to orbis-karten's weather render kit. Both apps are served from maps.maltee.dev,
- * so `/wx-render/v1.js` is a same-origin ES module. In local dev Vite proxies that path to the
- * karten dev server (see vite.config.ts).
- *
- * This is intentionally a dynamic import with @vite-ignore: the module is built and deployed by
- * the orbis repo, not by wetter. The `v1` path is the version pin – orbis must keep it compatible.
+ * The weather render kit (wind, temperature, precipitation, radar) lives in this repo: `src/export/wx-render.ts`.
+ * It is a dynamic import, so the shaders and particle code form their own chunk that loads when the first weather
+ * layer is mounted. (Before the repos were merged this was a runtime fetch of `/wx-render/v1.js` with a version pin.)
  */
 import type { Map as MlMap } from 'maplibre-gl';
 
@@ -23,30 +20,10 @@ export interface WeatherLayerHandle {
 }
 
 export interface WxRenderModule {
-  WX_RENDER_VERSION: number;
   mountWeatherLayer(map: MlMap, options: WeatherMountOptions): WeatherLayerHandle;
 }
 
-export const WX_RENDER_URL = '/wx-render/v1.js';
-export const WX_RENDER_EXPECTED_VERSION = 1;
-
-let pending: Promise<WxRenderModule> | undefined;
-
 /** Loaded once and cached for the lifetime of the page. */
 export function loadWxRender(): Promise<WxRenderModule> {
-  pending ??= (() => {
-    const url = WX_RENDER_URL;
-    return import(/* @vite-ignore */ url).then((mod) => {
-      const api = mod as WxRenderModule;
-      if (api.WX_RENDER_VERSION !== WX_RENDER_EXPECTED_VERSION) {
-        throw new Error(`wx-render version mismatch: ${api.WX_RENDER_VERSION}`);
-      }
-      if (typeof api.mountWeatherLayer !== 'function') throw new Error('wx-render API missing');
-      return api;
-    });
-  })().catch((error) => {
-    pending = undefined; // allow a retry after a transient network failure
-    throw error;
-  });
-  return pending;
+  return import('../../../export/wx-render');
 }

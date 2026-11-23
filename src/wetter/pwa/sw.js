@@ -143,8 +143,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(activeCaches().then(({ shell }) => networkFirst(request, shell, `${BASE}index.html`)));
     return;
   }
-  // The app's own files are cache-first; the shared renderer module must stay fresh.
-  if (url.origin === self.location.origin && !url.pathname.startsWith('/wx-render/')) {
+  // The app's own files are cache-first.
+  if (url.origin === self.location.origin) {
     event.respondWith(activeCaches().then(({ shell }) => cacheFirst(request, shell)));
     return;
   }

@@ -33,17 +33,20 @@ export function wetterPwa(): Plugin {
       }
 
       const files = new Set<string>(['index.html']);
-      const visit = (name: string) => {
+      // The weather chunk's own lazy imports (render kit, widgets) are needed offline too; the entry's are not
+      // (that would pull in the whole map app).
+      const visit = (name: string, lazy = false) => {
         if (files.has(name)) return;
         const chunk = bundle[name];
         if (!chunk || chunk.type !== 'chunk') return;
         files.add(name);
-        chunk.imports.forEach(visit);
+        chunk.imports.forEach((dep) => visit(dep, lazy));
+        if (lazy) chunk.dynamicImports.forEach((dep) => visit(dep, lazy));
         chunk.viteMetadata?.importedCss.forEach((css) => files.add(css));
         chunk.viteMetadata?.importedAssets.forEach((asset) => files.add(asset));
       };
       visit(entry.fileName);
-      visit(wetterEntry.fileName);
+      visit(wetterEntry.fileName, true);
 
       const publicFiles = listPublic(publicDir).filter(
         (file) => file.startsWith('wetter/') || file === 'favicon.svg' || file === 'apple-touch-icon.png',
