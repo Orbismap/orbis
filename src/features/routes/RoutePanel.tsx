@@ -114,11 +114,12 @@ function CameraRow() {
         ) : (
           <>
             {fixed > 0 && (
-              <span class="rt-cam"><i class="rt-cam-dot" style={{ background: '#FFB020' }} />{fixed} ortsfest</span>
+              <span class="rt-cam"><i class="rt-cam-dot" style={{ background: '#FFB020' }} />{fixed} {fixed === 1 ? 'ortsfester' : 'ortsfeste'}{mobile > 0 ? ',' : ''}</span>
             )}
             {mobile > 0 && (
-              <span class="rt-cam"><i class="rt-cam-dot" style={{ background: '#E5322D' }} />{mobile} mobil</span>
+              <span class="rt-cam"><i class="rt-cam-dot" style={{ background: '#E5322D' }} />{mobile} {mobile === 1 ? 'mobiler' : 'mobile'}</span>
             )}
+            <span class="rt-cam">Blitzer</span>
           </>
         )}
         </span>

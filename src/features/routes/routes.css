@@ -34,7 +34,7 @@
   .rt-sum span { font-size: 13px; color: var(--text-3); }
   .rt-cams-box { margin: 4px 0 2px; border-radius: 12px; background: var(--g-fill); }
   .rt-cams { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; text-align: left; font-size: 12px; white-space: nowrap; color: var(--text-1); }
-  .rt-cams-t { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  .rt-cams-t { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
   .rt-cams-chev { flex: none; color: var(--text-3); }
   .rt-cams-more { padding: 0 12px 10px; }
   .rt-cams-more p { font-size: 12px; line-height: 1.4; color: var(--text-3); }
