@@ -183,6 +183,10 @@ effect(() => {
   const mode = routeMode.peek();
   const pts = stops.peek() as Stop[];
   routeState.value = { status: 'loading' };
+  // while the route is calculated: frame the stops, so that start and destination are in view (the route itself is framed on arrival)
+  let w = 180, so = 90, e = -180, n = -90;
+  for (const p of pts) (w = Math.min(w, p.lng), e = Math.max(e, p.lng), so = Math.min(so, p.lat), n = Math.max(n, p.lat));
+  mapEngine.peek()?.flyTo({ bounds: [w, so, e, n], maxZoom: 15, padding: { top: 70, bottom: 70, left: 70, right: 70 } });
   const ctl = new AbortController();
   const id = setTimeout(() => {
     fetchRoutes(mode, pts, ctl.signal).then(
