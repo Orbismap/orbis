@@ -32,6 +32,14 @@
   .rt-sum div { display: flex; flex-direction: column; }
   .rt-sum b { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; }
   .rt-sum span { font-size: 13px; color: var(--text-3); }
+  .rt-cams-box { margin: 4px 0 2px; border-radius: 12px; background: var(--g-fill); }
+  .rt-cams { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; text-align: left; font-size: 12px; white-space: nowrap; color: var(--text-1); }
+  .rt-cams-t { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  .rt-cams-chev { flex: none; color: var(--text-3); }
+  .rt-cams-more { padding: 0 12px 10px; }
+  .rt-cams-more p { font-size: 12px; line-height: 1.4; color: var(--text-3); }
+  .rt-cam { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+  .rt-cam-dot { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 1.5px #0B1220; }
   .rt-steps-toggle { display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 2px; font-size: 13px; font-weight: 500; color: var(--text-1); text-align: left; }
   .rt-steps-toggle small { color: var(--text-3); font-size: 12px; }
   .rt-saved { padding-top: 10px; }

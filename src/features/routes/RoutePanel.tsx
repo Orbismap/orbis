@@ -11,6 +11,7 @@ import { toast } from '../../ui/toast';
 import { usePlaces } from '../search/Search';
 import { flyToPoint } from '../shared/map';
 import { formatDistance, formatDuration, MODES, type RouteMode } from './osrm';
+import { routeCameras } from './cameras';
 import { SavedRouteCard } from './SavedRouteCard';
 import './routes.css';
 
@@ -95,6 +96,44 @@ function StopField({ i }: { i: number }) {
   );
 }
 
+/** Speed cameras on the chosen route: counts by kind (the markers are drawn on the map by the route overlay); a click on the line shows the source note. */
+function CameraRow() {
+  const c = routeCameras.value;
+  const [open, setOpen] = useState(false);
+  if (c.status === 'idle') return null;
+  if (c.status === 'loading') return <p class="rt-cams-box rt-cams">Blitzer auf der Route werden gesucht</p>;
+  if (c.status === 'error') return <p class="rt-cams-box rt-cams">Blitzer konnten nicht geladen werden</p>;
+  const fixed = c.cameras.filter((x) => x.kind === 'fixed').length;
+  const mobile = c.cameras.length - fixed;
+  return (
+    <section class="rt-cams-box" data-open={open}>
+      <button type="button" class="rt-cams" aria-expanded={open} aria-controls="rt-cams-more" onClick={() => setOpen(!open)}>
+        <span class="rt-cams-t">
+        {c.cameras.length === 0 ? (
+          <span>Keine Blitzer auf der Route gemeldet</span>
+        ) : (
+          <>
+            {fixed > 0 && (
+              <span class="rt-cam"><i class="rt-cam-dot" style={{ background: '#FFB020' }} />{fixed} ortsfest</span>
+            )}
+            {mobile > 0 && (
+              <span class="rt-cam"><i class="rt-cam-dot" style={{ background: '#E5322D' }} />{mobile} mobil</span>
+            )}
+          </>
+        )}
+        </span>
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} class="rt-cams-chev" />
+      </button>
+      {open && (
+        <div class="rt-cams-more" id="rt-cams-more">
+          {c.mobileFailed && <p>Mobile Meldungen sind gerade nicht verfügbar.</p>}
+          <p>Nach OpenStreetMap und Community-Meldungen, unvollständig.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Result() {
   const st = routeState.value;
   const [stepsOpen, setStepsOpen] = useState(false);
@@ -127,6 +166,7 @@ function Result() {
           {saved ? 'Gesichert' : 'Sichern'}
         </Button>
       </section>
+      <CameraRow />
       <button type="button" class="rt-steps-toggle" aria-expanded={stepsOpen} aria-controls="rt-steps" onClick={() => setStepsOpen(!stepsOpen)}>
         <Icon name={stepsOpen ? 'chevron-down' : 'chevron-right'} size={14} />
         Wegbeschreibung <small class="num">{route.steps.length} Schritte</small>
