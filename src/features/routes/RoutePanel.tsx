@@ -43,6 +43,13 @@ function StopField({ i }: { i: number }) {
       setText(st.title);
       setFocus(false);
       flyToPoint(st.lng, st.lat, Math.max(11, 0));
+      // on to the next empty field; with all fields filled the focus leaves the input
+      const next = stops.peek().findIndex((x) => x === null);
+      setTimeout(() => {
+        const inputs = document.querySelectorAll<HTMLInputElement>('.rt-stops .rt-field input');
+        if (next >= 0) inputs[next]?.focus();
+        else (document.activeElement as HTMLElement | null)?.blur();
+      }, 0);
     } catch (e) {
       toast((e as Error).message || 'Standort nicht verfügbar', { kind: 'error' });
     }
