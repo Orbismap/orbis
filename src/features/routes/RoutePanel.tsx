@@ -42,7 +42,8 @@ function StopField({ i }: { i: number }) {
       setStop(i, st);
       setText(st.title);
       setFocus(false);
-      flyToPoint(st.lng, st.lat, Math.max(11, 0));
+      // a completed route is framed as a whole once it arrives, so no detour to the single point
+      if (!stops.peek().every((x) => x)) flyToPoint(st.lng, st.lat, 11);
       // on to the next empty field; with all fields filled the focus leaves the input
       const next = stops.peek().findIndex((x) => x === null);
       setTimeout(() => {
