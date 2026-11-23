@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
+import { startedWithMap } from '../../map/adopt';
 import { mapEngine } from '../../state/ui';
 import { OrbisSpinner } from './OrbisSpinner';
 import './splash.css';
 
 /** Start splash: shown until the first map is ready, then fades out and unmounts. */
 export function Splash() {
-  const [state, setState] = useState<'on' | 'fading' | 'gone'>('on');
+  const [state, setState] = useState<'on' | 'fading' | 'gone'>(startedWithMap ? 'gone' : 'on');
   const engine = mapEngine.value;
   useEffect(() => {
     if (!engine) return;

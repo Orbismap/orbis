@@ -10,7 +10,11 @@
   // Deploying with this block creates the DNS record for maps.maltee.dev automatically
   // (the zone maltee.dev must be on this Cloudflare account). Do NOT add the record by hand.
   // Remove or comment out "routes" to deploy to the private *.workers.dev URL only.
-  "routes": [{ "pattern": "maps.maltee.dev", "custom_domain": true }],
+  "routes": [
+    { "pattern": "maps.maltee.dev", "custom_domain": true },
+    // Same build, weather mode (see src/entry.ts): its own origin, its own installable PWA.
+    { "pattern": "wetter.maltee.dev", "custom_domain": true }
+  ],
   "workers_dev": false,
   "preview_urls": false
 }

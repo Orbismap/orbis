@@ -5,6 +5,7 @@ import { Search } from '../features/search/Search';
 import { Shortcuts } from '../features/shortcuts/Shortcuts';
 import { CursorTip } from '../features/legend/CursorTip';
 import { Toasts } from '../features/toasts/Toasts';
+import { startedWithMap } from '../map/adopt';
 import { breakpoint, isMobile, searchOpen, shortcutsOpen } from '../state/ui';
 import { settings } from '../state/settings';
 import { TooltipLayer } from '../ui/Tooltip';
@@ -13,7 +14,6 @@ import { DesktopLayout } from './Desktop';
 import { startKeyboard } from './keyboard';
 import { MapView } from './MapView';
 import { MobileLayout } from './Mobile';
-import { ReturnFromWetter } from './ReturnFromWetter';
 import './app.css';
 
 // set before the first paint so CSS keyed on data-bp is right from the start
@@ -41,9 +41,8 @@ function useDocumentState() {
 export function App() {
   useDocumentState();
   return (
-    <div class="app">
+    <div class={startedWithMap ? 'app app--enter' : 'app'}>
       <MapView />
-      <ReturnFromWetter />
       {isMobile.value ? <MobileLayout /> : <DesktopLayout />}
       {searchOpen.value && <Search />}
       {shortcutsOpen.value && <Shortcuts />}

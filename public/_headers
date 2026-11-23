@@ -10,6 +10,15 @@
 /manifest.webmanifest
   Cache-Control: no-cache
 
+/wetter/manifest.webmanifest
+  Cache-Control: no-cache
+
+/wetter-sw.js
+  Cache-Control: no-cache
+
+/wetter-precache.json
+  Cache-Control: no-cache
+
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin

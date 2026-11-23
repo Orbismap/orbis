@@ -1,7 +1,5 @@
 /**
- * Stable, standalone entry point for the weather renderers, consumed by orbis-wetter at
- * runtime from the same origin (`/wx-render/v1.js`). Keep the exported API and the URL
- * version in sync: a breaking change must ship as `v2.js` so a wetter deploy can catch up.
+ * Entry point for the weather renderers, used by the weather app (`src/wetter`) as a lazy chunk.
  *
  * This module deliberately depends only on the render kit and a tiny slice of orbis state.
  * It does NOT import the map engine, the layer registry or the app shell.
@@ -16,9 +14,6 @@ import { particleLayer } from '../render/gl/particles';
 import { radarLayer, type RadarFrame } from '../render/gl/radarLayer';
 import { PRECIP, TEMPERATURE, WIND } from '../render/gl/scales';
 import { settings } from '../state/settings';
-
-/** Bump when the exported API or rendering changes incompatibly. */
-export const WX_RENDER_VERSION = 1;
 
 /** The exact scales used by orbis-karten's weather layers, for widget swatches/legends. */
 export const WX_SCALES = { wind: WIND, temp: TEMPERATURE, precip: PRECIP };
@@ -39,8 +34,9 @@ export interface WeatherMountHandle {
   destroy(): void;
 }
 
-// This bundle is isolated from the karten app, so its copy of the settings signal is ours to set:
-// the compact map must animate even when the OS prefers reduced motion or the karten setting differs.
+// TODO(phase 4): this writes the shared settings signal. Fine while the weather app is a separate document;
+// once the map app runs in the same document, make the motion override local to the weather layers.
+// The compact map must animate even when the OS prefers reduced motion or the map setting differs.
 settings.value = { ...settings.value, motion: 'full' };
 
 /** Adapter: the render kit uses a small subset of MapEngine. Wrap the host's existing MapLibre map. */

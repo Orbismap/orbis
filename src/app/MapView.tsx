@@ -1,6 +1,7 @@
 import { memo } from 'preact/compat';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { startRuntime } from '../layers/runtime';
+import { takeAdoptedMap } from '../map/adopt';
 import { createMapEngine } from '../map/engine';
 import { activeKarte } from '../state/session';
 import { mapEngine, pointerLngLat } from '../state/ui';
@@ -13,9 +14,15 @@ import { startRouteOverlay } from '../features/routes/overlay';
 /** Hosts the MapLibre map. Reads no signals, so it never re-renders. */
 export const MapView = memo(function MapView() {
   const host = useRef<HTMLDivElement>(null);
+  const adopted = useRef(takeAdoptedMap());
+  // In the same commit as the first render, so the weather app's running map never leaves the screen.
+  useLayoutEffect(() => {
+    if (adopted.current) host.current!.appendChild(adopted.current.element);
+  }, []);
   useEffect(() => {
     const k = activeKarte.peek();
-    const engine = createMapEngine(host.current!, { basemap: k.basemap, labels: k.labels, terminator: k.terminator });
+    const engine = createMapEngine(host.current!, { basemap: k.basemap, labels: k.labels, terminator: k.terminator, adopt: adopted.current?.map });
+    adopted.current?.map.resize();
     const stopRuntime = startRuntime(engine);
     mapEngine.value = engine;
     (window as unknown as { orbis?: unknown }).orbis = { engine };

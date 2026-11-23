@@ -1,5 +1,7 @@
 import { Attribution } from '../features/attribution/Attribution';
 import { Legend } from '../features/legend/Legend';
+import { startedWithMap as startedFromWetter } from '../map/adopt';
+import { ReturnFromWetter } from './ReturnFromWetter';
 import { Scalebar } from '../features/scalebar/Scalebar';
 import { Timeline } from '../features/timeline/Timeline';
 import { TopBar, ToolRail } from '../features/tools/Tools';
@@ -26,6 +28,7 @@ export function DesktopLayout() {
       </div>
       <div class="scalebar-pos">
         <Scalebar />
+        {startedFromWetter && <ReturnFromWetter />}
       </div>
       <div class="attr-pos">
         <Attribution />

@@ -55,6 +55,9 @@ function labelAt(ml: maplibregl.Map, at: { lng: number; lat: number }): { title:
 }
 
 export interface EngineInit {
+  /** A MapLibre map that already exists (the weather app's map card). It is taken over instead of creating a new one:
+   *  the engine sets the Orbis style and interaction limits on it. `destroy()` removes it like its own map. */
+  adopt?: maplibregl.Map;
   basemap?: BasemapId;
   labels?: boolean;
   terminator?: boolean;
@@ -88,9 +91,10 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
 
   // a URL/state asking for more tilt than the zoom allows is clamped on load
   const cam = clampCamera(camera.peek());
-  const ml = new maplibregl.Map({
+  const style = composeStyle({ basemap, labels, terminator: terminatorMode === 'auto', projection: projectionSignal.peek(), buildings: buildings3d.peek() && reliefOn(), poi: poiWanted() });
+  const ml = init.adopt ?? new maplibregl.Map({
     container,
-    style: composeStyle({ basemap, labels, terminator: terminatorMode === 'auto', projection: projectionSignal.peek(), buildings: buildings3d.peek() && reliefOn(), poi: poiWanted() }),
+    style,
     center: [cam.lng, cam.lat],
     zoom: cam.zoom,
     bearing: cam.bearing,
@@ -106,7 +110,21 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     pitchWithRotate: true,
     renderWorldCopies: true,
   });
-  ml.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+  if (init.adopt) {
+    // Same limits and gestures a fresh engine map starts with; the weather map had rotation and tilt switched off.
+    ml.setMaxPitch(ENGINE_MAX_PITCH);
+    ml.setMinZoom(0.5);
+    ml.setMaxZoom(19);
+    ml.dragRotate.enable();
+    ml.touchPitch.enable();
+    ml.touchZoomRotate.enableRotation();
+    ml.setStyle(style);
+    if (differs(cam, { lng: ml.getCenter().lng, lat: ml.getCenter().lat, zoom: ml.getZoom(), bearing: ml.getBearing(), pitch: ml.getPitch() })) {
+      ml.jumpTo({ center: [cam.lng, cam.lat], zoom: cam.zoom, bearing: cam.bearing, pitch: cam.pitch });
+    }
+  } else {
+    ml.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+  }
   ensureIcons(ml);
   ensurePoiIcons(ml, POI_ICON_SPECS);
   if (import.meta.env?.DEV) ml.on('error', (e) => console.warn('[map]', e.error?.message ?? e));
