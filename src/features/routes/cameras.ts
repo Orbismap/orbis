@@ -8,11 +8,13 @@ import type { FeatureCollection } from 'geojson';
 import { osmPmtilesUrl } from '../../data/osmfiles';
 import { proxied } from '../../data/endpoints';
 import { fetchRaw } from '../../data/http';
+import type { FixedCameraProps } from '../../layers/verkehr/blitzer-cards';
 import { blitzerdeMarkers, blitzerdeUrl } from '../../data/parsers/blitzerde';
-import { orteView } from '../../state/hud';
-import { routeChoice, routeState } from '../../state/routes';
+import type { InspectCard } from '../../layers/types';
+import { fixedCameraCard, fixedCameraTitle, mobileCameraCard } from '../../layers/verkehr/blitzer-cards';
+import { routeChoice, routeState, routeVisible } from '../../state/routes';
 
-export interface RouteCamera { id: string; lng: number; lat: number; kind: 'fixed' | 'mobile'; title: string; speed?: number }
+export interface RouteCamera { id: string; lng: number; lat: number; kind: 'fixed' | 'mobile'; title: string; speed?: number; card: InspectCard }
 export type RouteCameras = { status: 'idle' } | { status: 'loading' } | { status: 'error' } | { status: 'ok'; cameras: RouteCamera[]; mobileFailed: boolean };
 
 /** A camera counts as "on the route" up to this distance from the line, in metres. */
@@ -21,7 +23,6 @@ const ZOOM = 12;
 const MAX_TILES = 120;
 const GRID = 0.15; // degrees, as in the Blitzer layer, so overlapping requests share the proxy cache
 const MAX_GRID = 24;
-const KIND: Record<string, string> = { cam: 'Ortsfester Blitzer', section: 'Abschnittskontrolle', signals: 'Rotlicht-Blitzer' };
 
 type P = [number, number];
 const M = 111_320;
@@ -105,10 +106,10 @@ async function fixedCameras(line: P[], signal: AbortSignal): Promise<RouteCamera
       if (g.type !== 'Point') continue;
       const c = g.coordinates as P;
       if (distanceToLine(c, line) > NEAR_M) continue;
-      const p = f.properties as { id?: number; kind?: string; speed?: string };
+      const p = f.properties as FixedCameraProps;
       const id = `o${p.id ?? c.join(',')}`;
       const speed = p.speed && /^\d+$/.test(p.speed) ? Number(p.speed) : undefined;
-      found.set(id, { id, lng: c[0], lat: c[1], kind: 'fixed', title: KIND[p.kind ?? 'cam'] ?? KIND.cam!, ...(speed ? { speed } : {}) });
+      found.set(id, { id, lng: c[0], lat: c[1], kind: 'fixed', title: fixedCameraTitle(p.kind), ...(speed ? { speed } : {}), card: { ...fixedCameraCard(p), location: c } });
     }
   }));
   return [...found.values()];
@@ -124,7 +125,7 @@ async function mobileCameras(line: P[], signal: AbortSignal): Promise<RouteCamer
     for (const f of blitzerdeMarkers(r.data).features) {
       const c = f.geometry.coordinates as P;
       if (distanceToLine(c, line) > NEAR_M) continue;
-      out.set(f.properties.id, { id: f.properties.id, lng: c[0], lat: c[1], kind: 'mobile', title: f.properties.title, ...(f.properties.speed > 0 ? { speed: f.properties.speed } : {}) });
+      out.set(f.properties.id, { id: f.properties.id, lng: c[0], lat: c[1], kind: 'mobile', title: f.properties.title, ...(f.properties.speed > 0 ? { speed: f.properties.speed } : {}), card: { ...mobileCameraCard(f.properties), location: c } });
     }
   }));
   if (results.every((r) => r.status === 'rejected')) throw new Error('mobile failed');
@@ -136,7 +137,7 @@ export const routeCameras = signal<RouteCameras>({ status: 'idle' });
 
 effect(() => {
   const st = routeState.value;
-  const open = orteView.value === 'routes';
+  const open = routeVisible.value;
   const route = st.status === 'ok' ? (st.routes[Math.min(routeChoice.value, st.routes.length - 1)] ?? st.routes[0]) : undefined;
   if (!open || !route) {
     routeCameras.value = { status: 'idle' };
@@ -160,4 +161,4 @@ effect(() => {
 
 /** Cameras as GeoJSON points for the route overlay. */
 export const camerasToFeatures = (c: RouteCameras): FeatureCollection['features'] =>
-  c.status === 'ok' ? c.cameras.map((x) => ({ type: 'Feature', properties: { cam: x.kind }, geometry: { type: 'Point', coordinates: [x.lng, x.lat] } })) : [];
+  c.status === 'ok' ? c.cameras.map((x) => ({ type: 'Feature', properties: { cam: x.kind, id: x.id }, geometry: { type: 'Point', coordinates: [x.lng, x.lat] } })) : [];

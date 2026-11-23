@@ -9,6 +9,8 @@ import { searchPlaces, type Place, type Result, type ResultGroup } from './sourc
 import './search.css';
 
 export const ORDER: ResultGroup[] = ['Koordinate', 'Ebenen', 'Karten', 'Befehle', 'Orte'];
+/** The tag that limits the search to a group (shown small behind the group name). */
+const GROUP_TAG: Partial<Record<ResultGroup, string>> = { Orte: 'ort:', Ebenen: 'ebene:', Karten: 'karte:', Befehle: 'cmd:' };
 const ORDER_COMMANDS_FIRST: ResultGroup[] = ['Koordinate', 'Befehle', 'Ebenen', 'Karten', 'Orte'];
 
 /** Results in the order of their groups; a command that matches the query by its title goes before the layers. */
@@ -98,7 +100,7 @@ export function Search() {
 
   let last: ResultGroup | undefined;
   const rows = results.map((r, i) => {
-    const head = r.group !== last ? <div class="sgroup" role="presentation">{r.group}</div> : null;
+    const head = r.group !== last ? <div class="sgroup" role="presentation">{r.group}{GROUP_TAG[r.group] && <span class="sgroup-tag">{GROUP_TAG[r.group]}</span>}</div> : null;
     last = r.group;
     return (
       <div key={r.id}>

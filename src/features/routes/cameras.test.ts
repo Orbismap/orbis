@@ -13,7 +13,7 @@ describe('route cameras', () => {
     expect(new Set(t.map((x) => x.join())).size).toBe(t.length);
   });
   it('merges cameras of the same kind a few metres apart', () => {
-    const c = (id: string, lng: number, kind: 'fixed' | 'mobile'): import('./cameras').RouteCamera => ({ id, lng, lat: 52.5, kind, title: id });
+    const c = (id: string, lng: number, kind: 'fixed' | 'mobile'): import('./cameras').RouteCamera => ({ id, lng, lat: 52.5, kind, title: id, card: { title: id, facts: [] } });
     const m = mergeNear([c('a', 13.368, 'fixed'), c('b', 13.36802, 'fixed'), c('c', 13.36802, 'mobile'), c('d', 13.37, 'fixed')]);
     expect(m.map((x) => x.id)).toEqual(['a', 'c', 'd']);
   });

@@ -41,6 +41,10 @@ effect(() => void setJSON('route-mode', 1, routeMode.value));
 export const stops = signal<(Stop | null)[]>([null, null]);
 /** Route menu: saved routes ('list') or the planner ('plan'). Map clicks only set route points while planning. */
 export const routeView = signal<'list' | 'plan'>('list');
+/** A camera card of the route is open in the detail menu: the route menu is hidden, but the route stays on the map. */
+export const routeCardOpen = signal(false);
+/** The route (line, stops, cameras) is shown on the map. */
+export const routeVisible = computed(() => orteView.value === 'routes' || routeCardOpen.value);
 /** The field a click on the map fills. */
 export const activeStop = signal(0);
 export type RouteState = { status: 'idle' } | { status: 'loading' } | { status: 'error'; message: string } | { status: 'ok'; routes: RouteResult[] };

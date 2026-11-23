@@ -1,6 +1,7 @@
-import { computed, effect } from '@preact/signals';
+import { batch, computed, effect } from '@preact/signals';
 import type { FeatureCollection } from 'geojson';
-import { routeChoice, routeState, stops } from '../../state/routes';
+import { routeCardOpen, routeChoice, routeState, routeView, routeVisible, stops } from '../../state/routes';
+import { inspector, probe, place, selectCard, type Inspected } from '../../state/selection';
 import { orteView } from '../../state/hud';
 import { ensureIcons } from '../../render/icons';
 import { mapEngine } from '../../state/ui';
@@ -8,7 +9,7 @@ import { mountOverlay } from '../shared/overlay';
 import { camerasToFeatures, routeCameras } from './cameras';
 
 const data = computed<FeatureCollection | null>(() => {
-  if (orteView.value !== 'routes') return null;
+  if (!routeVisible.value) return null;
   const list = stops.value;
   const st = routeState.value;
   const features: FeatureCollection['features'] = [];
@@ -43,5 +44,30 @@ export function startRouteOverlay(): () => void {
     { id: 'ui-route-stop-halo', type: 'circle', source: s, filter: pt as never, paint: { 'circle-radius': 9, 'circle-color': 'rgba(10,15,24,0.55)', 'circle-pitch-alignment': 'map' } },
     { id: 'ui-route-stop', type: 'circle', source: s, filter: pt as never, paint: { 'circle-radius': 6.5, 'circle-color': roleColor, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2, 'circle-pitch-alignment': 'map' } },
   ]);
-  return () => (stopIcons(), stopOverlay());
+  // a click on a camera opens its card in the detail menu (it replaces the route menu); closing the card brings the route menu back
+  let opened: Inspected | null = null;
+  const stopPick = effect(() => {
+    const e = mapEngine.value;
+    if (!e) return;
+    return e.onPick(['ui-route-cam'], {
+      click(f) {
+        const cam = (() => { const c = routeCameras.peek(); return c.status === 'ok' ? c.cameras.find((x) => x.id === (f.properties as { id?: string } | null)?.id) : undefined; })();
+        if (!cam) return;
+        selectCard('route-camera', { ...cam.card, icon: 'camera', color: cam.kind === 'mobile' ? '#E5322D' : '#FFB020' });
+        opened = inspector.peek();
+        routeCardOpen.value = true;
+      },
+    });
+  });
+  const stopBack = effect(() => {
+    const cur = inspector.value;
+    if (!opened || cur === opened) return;
+    const gone = cur === null && !probe.peek() && !place.peek();
+    opened = null;
+    batch(() => {
+      if (gone) (orteView.value = 'routes', (routeView.value = 'plan'));
+      routeCardOpen.value = false;
+    });
+  });
+  return () => (stopIcons(), stopPick(), stopBack(), stopOverlay());
 }
