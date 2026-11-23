@@ -4,6 +4,7 @@ import { Icon } from '../../ui/icons/Icon';
 import { Kbd } from '../../ui/Chip';
 import { cx } from '../../ui/hooks';
 import { localResults, placeResult } from './results';
+import { placeQuery } from './tags';
 import { searchPlaces, type Place, type Result, type ResultGroup } from './sources';
 import './search.css';
 
@@ -43,7 +44,7 @@ export function Search() {
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
-  const places = usePlaces(q);
+  const places = usePlaces(placeQuery(q));
   const close = () => (searchOpen.value = false);
 
   useEffect(() => {
@@ -74,7 +75,7 @@ export function Search() {
 
   const results = useMemo(() => {
     const local = localResults(q);
-    const ps = q.trim().length >= 2 ? places.places.map(placeResult) : [];
+    const ps = placeQuery(q).length >= 2 ? places.places.map(placeResult) : [];
     const all = [...local, ...ps];
     return orderResults(all);
   }, [q, places.places]);
@@ -124,7 +125,7 @@ export function Search() {
     );
   });
 
-  const loadingPlaces = places.status === 'loading' && q.trim().length >= 2;
+  const loadingPlaces = places.status === 'loading' && placeQuery(q).length >= 2;
   return (
     <div class="search-overlay" onPointerDown={(e) => e.target === e.currentTarget && close()}>
       <div class="search" role="dialog" aria-modal="true" aria-label="Suche">
