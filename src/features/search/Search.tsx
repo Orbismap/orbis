@@ -48,6 +48,26 @@ export function Search() {
     return () => prev?.focus?.();
   }, []);
 
+  // on-screen keyboard: iOS keeps the layout viewport and shrinks/scrolls only the visual one, so follow it
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement.style;
+    const on = () => {
+      root.setProperty('--vv-h', `${vv.height}px`);
+      root.setProperty('--vv-top', `${vv.offsetTop}px`);
+    };
+    on();
+    vv.addEventListener('resize', on);
+    vv.addEventListener('scroll', on);
+    return () => {
+      vv.removeEventListener('resize', on);
+      vv.removeEventListener('scroll', on);
+      root.removeProperty('--vv-h');
+      root.removeProperty('--vv-top');
+    };
+  }, []);
+
   const results = useMemo(() => {
     const local = localResults(q);
     const ps = q.trim().length >= 2 ? places.places.map(placeResult) : [];
