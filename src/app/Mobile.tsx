@@ -66,10 +66,11 @@ export function MobileLayout() {
         <ToolRail popoverUp />
       </div>
       <div class="maplegend-pos">
-        <Legend footer={startedFromWetter ? <ReturnFromWetter /> : null} />
+        <Legend />
       </div>
       <div class="scalebar-pos">
         <Scalebar />
+        {startedFromWetter && <ReturnFromWetter />}
       </div>
       <div class="attr-pos">
         <Attribution />
