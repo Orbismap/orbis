@@ -1,18 +1,14 @@
-import { useState } from 'preact/hooks';
+import { returnTo } from '../map/adopt';
 
-// Mirrored from Orbis Wetter (src/features/handoff/contract.ts). See docs/HANDOFF.md there.
-const RETURN_KEY = 'orbis.wetter.returnTo';
-
-/** Small chip after the seamless handoff, so the user can get back to the forecast. */
+/**
+ * "Zurück zur Wetter-App": a small pill under the zoom scale bar, shown when the map app was started from the weather
+ * app. It loads the weather page again – the map app is initialised once per page and cannot be torn down yet.
+ */
 export function ReturnFromWetter() {
-  const [href] = useState(() => {
-    try {
-      const v = sessionStorage.getItem(RETURN_KEY);
-      sessionStorage.removeItem(RETURN_KEY);
-      return v;
-    } catch {
-      return null;
-    }
-  });
-  return href ? <a class="wx-return" href={href}>← Zurück zur Wetter-App</a> : null;
+  const href = returnTo ?? '/';
+  return (
+    <a class="wx-return" href={href} onClick={(e) => { e.preventDefault(); window.location.assign(href); }}>
+      <span aria-hidden="true">←</span> Zurück zur Wetter-App
+    </a>
+  );
 }

@@ -22,5 +22,3 @@ models-staging/
 tools/vector-basemap/out/
 public/data/karte/
 
-# generated shared weather renderer (built by `pnpm build:render`, served at /wx-render/v1.js)
-public/wx-render/

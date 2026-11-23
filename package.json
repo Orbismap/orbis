@@ -4,9 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm build:render && vite",
-    "build": "pnpm build:render && tsc --noEmit && vite build",
-    "build:render": "vite build --config vite.render.config.ts",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "brand": "node scripts/build-brand.mjs",
     "thumbs": "node scripts/build-basemap-thumbs.mjs",
