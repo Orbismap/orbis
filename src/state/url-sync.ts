@@ -7,11 +7,23 @@ import { activeIds, clearBasemap, openKarte, setActiveIds, setActiveKarte, setBa
 import { importKarte } from '../karten/store';
 import { modeForBasemap, resolveBasemapId } from '../map/basemaps';
 import { activeKarte, browsedKarte } from './session';
-import { detailOpen } from './hud';
+import { detailOpen, orteView } from './hud';
 import { place, selectPlace } from './selection';
+import { coordStop, routeMode, routeVisible, routeView, stops } from './routes';
 import { isMobile, leftPanelOpen } from './ui';
 import { live, setTime, time } from './time';
 import { camera, karteMode, projection, setCamera, setProjection } from './view';
+
+/** A link with a route: puts it in the planner and opens the route menu (once; the same route again does nothing). */
+function openRouteFromUrl(r: NonNullable<UrlState['route']>): void {
+  const cur = stops.peek();
+  const same = routeMode.peek() === r.mode && cur.length === r.stops.length && cur.every((x, i) => x && Math.abs(x.lat - r.stops[i]!.lat) < 1e-5 && Math.abs(x.lng - r.stops[i]!.lng) < 1e-5);
+  if (same) return;
+  routeMode.value = r.mode;
+  stops.value = r.stops.map((x) => ({ ...coordStop(x.lng, x.lat), ...(x.title ? { title: x.title } : {}) }));
+  orteView.value = 'routes';
+  routeView.value = 'plan';
+}
 
 export function applyUrlState(u: UrlState): void {
   batch(() => {
@@ -39,11 +51,19 @@ export function applyUrlState(u: UrlState): void {
     if (u.time !== undefined) setTime(u.time);
     // a new object each time: the same object asked for again starts the follow again
     followWanted.value = u.follow ? { ...u.follow } : null;
+    if (u.route && !isMobile.peek()) openRouteFromUrl(u.route);
     if (u.place && !isMobile.peek()) {
       const cur = place.peek();
       if (!cur || cur.title !== u.place.title || cur.lat !== u.place.lat || cur.lng !== u.place.lng) selectPlace({ id: `url:${u.place.title}`, title: u.place.title, subtitle: u.place.subtitle, lng: u.place.lng, lat: u.place.lat, kind: u.place.kind });
     }
   });
+}
+
+/** The route being looked at (route menu or one of its camera cards open, every stop set). */
+function routeInUrl(): UrlState['route'] {
+  const list = stops.value;
+  if (!routeVisible.value || list.length < 2 || !list.every((x) => x)) return undefined;
+  return { mode: routeMode.value, stops: list.map((x) => ({ lat: x!.lat, lng: x!.lng, title: x!.title })) };
 }
 
 export function currentUrlState(): UrlState {
@@ -59,6 +79,7 @@ export function currentUrlState(): UrlState {
     globe: projection.value === 'globe',
     sidebar: leftPanelOpen.value ? undefined : false,
     follow: followCurrent.value ?? undefined,
+    route: routeInUrl(),
     place: place.value ? { lat: place.value.lat, lng: place.value.lng, title: place.value.title, subtitle: place.value.subtitle, kind: place.value.kind } : undefined,
   };
 }

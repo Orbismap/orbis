@@ -1,6 +1,7 @@
 // Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&b=<basemap>&m=<name>,<icon>,<color>[,<basemap>]&t=<iso>&g=1&s=0&f=flug:<hex>|schiff:<mmsi>&p=
 // (k = the Karte shown while its detail menu is open; l = the active layers; s=0 = main sidebar collapsed;
 //  b = the basemap on show, round-trips; the picker mode is not part of the link)
+// r=<car|bike|foot>~<lat>,<lng>,<name>~<lat>,<lng>,<name>… (the route shown in the route menu)
 // p=<lat>,<lng>,<name>,<region>[,<kind>]
 // (p = a searched place; name, region and kind are percent-encoded, so their commas do not split)
 import type { FollowRef } from '../ext/types';
@@ -24,6 +25,8 @@ export interface UrlState {
   follow?: FollowRef;
   /** Searched place shown in the detail menu. */
   place?: { lat: number; lng: number; title: string; subtitle: string; kind?: string };
+  /** The route shown in the route menu (r=<mode>~<lat>,<lng>,<title>~…): two to six stops. */
+  route?: { mode: 'car' | 'bike' | 'foot'; stops: { lat: number; lng: number; title: string }[] };
 }
 
 const round = (v: number, d: number) => {
@@ -84,6 +87,20 @@ export function parseHash(hash: string): UrlState {
       /* malformed escape: ignore the place */
     }
   }
+  const rawR = query.split('&').find((x) => x.startsWith('r='));
+  if (rawR) {
+    try {
+      const [mode, ...parts] = rawR.slice(2).split('~');
+      const stops = parts.map((part) => {
+        const [lat, lng, ...title] = part.split(',');
+        return { lat: Number(lat), lng: Number(lng), title: decodeURIComponent(title.join(',')).slice(0, 80) };
+      });
+      if ((mode === 'car' || mode === 'bike' || mode === 'foot') && stops.length >= 2 && stops.length <= 6 && stops.every((x) => Number.isFinite(x.lat) && Number.isFinite(x.lng) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 360))
+        out.route = { mode, stops };
+    } catch {
+      /* malformed escape: ignore the route */
+    }
+  }
   const f = /^(flug|schiff):([A-Za-z0-9_-]{1,32})$/.exec(q.get('f') ?? '');
   if (f) out.follow = { kind: f[1] as FollowRef['kind'], id: f[2]! };
   const g = q.get('g');
@@ -113,5 +130,6 @@ export function serializeHash(s: UrlState): string {
   if (s.sidebar === false) q.push('s=0');
   if (s.follow) q.push(`f=${s.follow.kind}:${encodeURIComponent(s.follow.id)}`);
   if (s.place) q.push(`p=${[round(s.place.lat, 5), round(s.place.lng, 5), encodeURIComponent(s.place.title), encodeURIComponent(s.place.subtitle), ...(s.place.kind ? [encodeURIComponent(s.place.kind)] : [])].join(',')}`);
+  if (s.route) q.push(`r=${[s.route.mode, ...s.route.stops.map((x) => `${round(x.lat, 5)},${round(x.lng, 5)},${encodeURIComponent(x.title).replace(/~/g, '%7E')}`)].join('~')}`);
   return `#/${path}${q.length ? `?${q.join('&')}` : ''}`;
 }

@@ -4,10 +4,15 @@ import { Icon } from '../../ui/icons/Icon';
 import { Kbd } from '../../ui/Chip';
 import { cx } from '../../ui/hooks';
 import { localResults, placeResult } from './results';
+import { placeQuery } from './tags';
 import { searchPlaces, type Place, type Result, type ResultGroup } from './sources';
 import './search.css';
 
 export const ORDER: ResultGroup[] = ['Koordinate', 'Ebenen', 'Karten', 'Befehle', 'Orte'];
+const ORDER_COMMANDS_FIRST: ResultGroup[] = ['Koordinate', 'Befehle', 'Ebenen', 'Karten', 'Orte'];
+
+/** Results in the order of their groups; a command that matches the query by its title goes before the layers. */
+export const orderResults = (all: Result[]): Result[] => (all.some((r) => r.top) ? ORDER_COMMANDS_FIRST : ORDER).flatMap((g) => all.filter((r) => r.group === g));
 
 export function usePlaces(q: string) {
   const [state, set] = useState<{ q: string; status: 'idle' | 'loading' | 'ok' | 'error'; places: Place[] }>({ q: '', status: 'idle', places: [] });
@@ -39,7 +44,7 @@ export function Search() {
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
-  const places = usePlaces(q);
+  const places = usePlaces(placeQuery(q));
   const close = () => (searchOpen.value = false);
 
   useEffect(() => {
@@ -70,9 +75,9 @@ export function Search() {
 
   const results = useMemo(() => {
     const local = localResults(q);
-    const ps = q.trim().length >= 2 ? places.places.map(placeResult) : [];
+    const ps = placeQuery(q).length >= 2 ? places.places.map(placeResult) : [];
     const all = [...local, ...ps];
-    return ORDER.flatMap((g) => all.filter((r) => r.group === g));
+    return orderResults(all);
   }, [q, places.places]);
 
   const a = Math.min(active, Math.max(0, results.length - 1));
@@ -120,7 +125,7 @@ export function Search() {
     );
   });
 
-  const loadingPlaces = places.status === 'loading' && q.trim().length >= 2;
+  const loadingPlaces = places.status === 'loading' && placeQuery(q).length >= 2;
   return (
     <div class="search-overlay" onPointerDown={(e) => e.target === e.currentTarget && close()}>
       <div class="search" role="dialog" aria-modal="true" aria-label="Suche">

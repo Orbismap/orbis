@@ -2,6 +2,7 @@ import { addLayer, openKarte, setLayerVisible } from '../../karten/active';
 import { listedKarten } from '../../karten/store';
 import { allLayers } from '../../layers/registry';
 import { categoryById } from '../../layers/categories';
+import { newRoute } from '../../state/routes';
 import { activeKarte } from '../../state/session';
 import { updateSettings } from '../../state/settings';
 import { selectPlace, setProbe } from '../../state/selection';
@@ -12,11 +13,13 @@ import { scoreLayer, scoreText } from '../catalog/fuzzy';
 import { flyToPoint } from '../shared/map';
 import { mapEngine } from '../../state/ui';
 import { record } from '../../state/history';
+import { karteLayerIds, parseTag } from './tags';
 import { coordinateLabel, parseCoordinate, type Place, type Result } from './sources';
 
 interface Command { id: string; title: string; subtitle?: string; icon: Result['icon']; words: string[]; run(): void }
 
 const COMMANDS: Command[] = [
+  { id: 'route-new', title: 'Neue Route', subtitle: 'Route planen', icon: 'route', words: ['routen', 'navigation', 'weg', 'planen', 'wegbeschreibung', 'anfahrt'], run: newRoute },
   { id: 'globe', title: 'Globus anzeigen', icon: 'globe', words: ['3d', 'kugel', 'erde'], run: () => setProjection('globe') },
   { id: 'flat', title: 'Flache Karte anzeigen', icon: 'map', words: ['2d', 'mercator', 'karte'], run: () => setProjection('mercator') },
   { id: 'now', title: 'Jetzt', subtitle: 'Zur aktuellen Zeit springen', icon: 'clock', words: ['live', 'zeit', 'aktuell'], run: goLive },
@@ -49,10 +52,11 @@ export function flyToPlace(b: Place['bounds'], lng: number, lat: number): void {
 }
 
 /** Local (synchronous) results for a query: coordinates, layers, Karten, commands. */
-export function localResults(q: string): Result[] {
+export function localResults(input: string): Result[] {
   const out: Result[] = [];
-  const query = q.trim();
-  const coord = query ? parseCoordinate(query) : null;
+  const { tag, rest: query } = parseTag(input);
+  if (tag === 'orte') return out; // places come from the place search
+  const coord = !tag && query ? parseCoordinate(query) : null;
   if (coord)
     out.push({
       id: 'coord',
@@ -66,13 +70,24 @@ export function localResults(q: string): Result[] {
       },
     });
 
+  const cmds = COMMANDS.map((c) => ({ c, s: scoreText(c.title, query, [...c.words, c.subtitle ?? '']) }))
+    .filter((r) => r.s > 0 && !(r.c.id === 'globe' && projection.value === 'globe') && !(r.c.id === 'flat' && projection.value === 'mercator'))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, tag === 'befehle' ? COMMANDS.length : query ? 4 : 5);
+  // a command that matches a word of its title ('route' -> Neue Route) is listed before the layers
+  const top = !tag && !!query && cmds.length > 0 && cmds[0]!.s >= 80;
+  const cmdOut: Result[] = cmds.map(({ c }) => ({ ...(top ? { top: true } : {}), id: `cmd:${c.id}`, group: 'Befehle', icon: c.icon, title: c.title, subtitle: c.subtitle, run: c.run }));
+
   const k = activeKarte.value;
   const state = new Map(k.layers.map((l) => [l.id, l.visible]));
+  const inKarte = tag && typeof tag === 'object' ? karteLayerIds(tag.karte) : undefined;
+  const listAll = tag === 'ebenen' || !!inKarte; // with such a tag an empty query lists the layers
   const layers = allLayers()
+    .filter((d) => !inKarte || inKarte.has(d.id))
     .map((d) => ({ d, s: scoreLayer(d, query) }))
-    .filter((r) => (query ? r.s > 0 : false))
-    .sort((a, b) => b.s - a.s)
-    .slice(0, 6);
+    .filter((r) => (query || listAll ? r.s > 0 : false))
+    .sort((a, b) => b.s - a.s || a.d.title.localeCompare(b.d.title, 'de'))
+    .slice(0, listAll ? 40 : 6);
   for (const { d } of layers) {
     const on = state.get(d.id);
     out.push({
@@ -89,15 +104,13 @@ export function localResults(q: string): Result[] {
 
   const kk = listedKarten.value
     .map((x) => ({ x, s: scoreText(x.name, query, ['karte']) }))
-    .filter((r) => r.s > 0 && r.x.id !== k.id)
+    .filter((r) => r.s > 0 && (tag === 'karten' || r.x.id !== k.id))
     .sort((a, b) => b.s - a.s)
-    .slice(0, 5);
+    .slice(0, tag === 'karten' ? 30 : 5);
   for (const { x } of kk) out.push({ id: `karte:${x.id}`, group: 'Karten', icon: x.icon, title: x.name, subtitle: 'Karte öffnen', run: () => openKarte(x.id) });
 
-  const cmds = COMMANDS.map((c) => ({ c, s: scoreText(c.title, query, [...c.words, c.subtitle ?? '']) }))
-    .filter((r) => r.s > 0 && !(r.c.id === 'globe' && projection.value === 'globe') && !(r.c.id === 'flat' && projection.value === 'mercator'))
-    .sort((a, b) => b.s - a.s)
-    .slice(0, query ? 4 : 5);
-  for (const { c } of cmds) out.push({ id: `cmd:${c.id}`, group: 'Befehle', icon: c.icon, title: c.title, subtitle: c.subtitle, run: c.run });
-  return out;
+  out.push(...cmdOut);
+  // a tag shows only its own kind of result
+  const only = tag === 'ebenen' || (tag && typeof tag === 'object') ? 'Ebenen' : tag === 'karten' ? 'Karten' : tag === 'befehle' ? 'Befehle' : undefined;
+  return only ? out.filter((r) => r.group === only) : out;
 }

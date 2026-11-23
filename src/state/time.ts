@@ -91,3 +91,12 @@ export function watchRange(): () => void {
     if (!live.peek() && (p < r.start - MINUTE || p > r.end + MINUTE)) picked.value = clampTime(p, r.start, r.end);
   });
 }
+
+// Without a layer that has a time axis there is no timeline: a time picked earlier (arrow keys, link) must not linger
+// in the URL and in the next layer. Back to live when the last such layer goes away.
+let hadTimeLayers = false;
+effect(() => {
+  const has = hasTimeLayers.value;
+  if (hadTimeLayers && !has) goLive();
+  hadTimeLayers = has;
+});

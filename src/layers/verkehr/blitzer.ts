@@ -2,16 +2,16 @@
 // camera look (render/cameras.ts). blitzer.pmtiles holds all 93,049 objects in every tile from zoom 0 on.
 import { computed, effect } from '@preact/signals';
 import type { FeatureCollection } from 'geojson';
-import { formatAge, formatNumber } from '../../core/format';
 import { MINUTE } from '../../core/time';
 import { proxied } from '../../data/endpoints';
 import { osmPmtilesUrl } from '../../data/osmfiles';
 import { fetchRaw } from '../../data/http';
 import { blitzerdeMarkers, blitzerdeUrl, type MobileProps } from '../../data/parsers/blitzerde';
 import { liveResource } from '../../data/parsers/liveresource';
-import { cameraLayer, directionFact, osmNodeLink, osmSetCount } from '../../render/cameras';
+import { cameraLayer, osmSetCount } from '../../render/cameras';
 import type { AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
+import { fixedCameraCard, mobileCameraCard, type FixedCameraProps } from './blitzer-cards';
 
 const COLOR = '#FFB020';
 const MOBILE_COLOR = '#E5322D';
@@ -55,8 +55,6 @@ function mobileReports(ml: { getZoom(): number; getBounds(): { getWest(): number
   return res;
 }
 
-const KINDS: Record<string, string> = { cam: 'Ortsfester Blitzer', section: 'Abschnittskontrolle', signals: 'Rotlicht-Blitzer' };
-
 export default defineLayer({
   id: 'blitzer',
   category: 'verkehr',
@@ -89,39 +87,13 @@ export default defineLayer({
       detail: [{
         name: 'blitzer',
         data: { kind: 'pmtiles', url: osmPmtilesUrl('blitzer'), sourceLayer: 'blitzer', attribution: '© OpenStreetMap-Mitwirkende (ODbL)' },
-        describe: (f: AnyFeature) => {
-          const p = f.properties as { kind?: string; speed?: string; dir?: number; operator?: string; ref?: string; id?: number };
-          return {
-            title: KINDS[p.kind ?? 'cam'] ?? KINDS.cam!,
-            subtitle: 'Lageplan, keine Fahrwarnung',
-            facts: [
-              ...(p.speed ? [{ label: 'Erlaubt', value: /^\d+$/.test(p.speed) ? `${formatNumber(Number(p.speed))} km/h` : p.speed, emphasis: true }] : []),
-              ...directionFact(p.dir),
-              ...(p.operator ? [{ label: 'Betreiber', value: p.operator }] : []),
-              ...(p.ref ? [{ label: 'Kennung', value: p.ref }] : []),
-            ],
-            text: 'Nach OpenStreetMap erfasst, unvollständig und ohne mobile Kontrollen. In Deutschland ist die Nutzung solcher Hinweise während der Fahrt verboten.',
-            links: osmNodeLink(p.id),
-          };
-        },
+        describe: (f: AnyFeature) => fixedCameraCard(f.properties as FixedCameraProps),
       }, {
         name: 'mobil',
         color: MOBILE_COLOR,
         minZoom: MOBILE_ZOOM,
         data: { kind: 'geojson', data: mobile },
-        describe: (f: AnyFeature) => {
-          const p = f.properties as unknown as MobileProps;
-          return {
-            title: p.title, subtitle: 'Mobile Kontrolle, Meldung von Autofahrern', time: p.reported || undefined,
-            facts: [
-              ...(p.where ? [{ label: 'Ort', value: p.where }] : []),
-              ...(p.speed > 0 ? [{ label: 'Erlaubt', value: `${formatNumber(p.speed)} km/h`, emphasis: true }] : []),
-              ...(p.reported ? [{ label: 'Gemeldet', value: formatAge(p.reported) }] : []),
-              ...(p.votes > 0 ? [{ label: 'Bestätigungen', value: String(p.votes) }] : []),
-            ],
-            text: `${p.desc ? `${p.desc}. ` : ''}Mobile Kontrollen kommen aus einer inoffiziellen Community-Quelle (Blitzer.de) und sind oft schon vorbei. Keine Fahrwarnung: In Deutschland ist die Nutzung solcher Hinweise während der Fahrt verboten (§ 23 StVO).`,
-          };
-        },
+        describe: (f: AnyFeature) => mobileCameraCard(f.properties as unknown as MobileProps),
       }],
     });
     return { destroy: () => { stopOpt(); handle.destroy(); mobile.dispose(); } };

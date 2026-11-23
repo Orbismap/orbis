@@ -1,7 +1,7 @@
 import { clearSelection, inspector, probe } from '../state/selection';
 import { listedKarten } from '../karten/store';
 import { openKarte } from '../karten/active';
-import { goLive, step } from '../state/time';
+import { goLive, hasTimeLayers, step } from '../state/time';
 import { closeKarteDetail, hudSearchFocus, detailOpen, orteView } from '../state/hud';
 import { isMobile, leftPanelOpen, leftView, searchOpen, settingsOpen, shortcutsOpen, sheetDetent } from '../state/ui';
 import { projection, setProjection } from '../state/view';
@@ -78,12 +78,14 @@ export function startKeyboard(): () => void {
         break;
       case ' ':
         if (t?.closest(OWN_SPACE)) return;
+        if (!hasTimeLayers.peek()) break; // no timeline, nothing to play
         e.preventDefault();
         togglePlay();
         break;
       case 'ArrowLeft':
       case 'ArrowRight':
         if (t?.closest(OWN_ARROWS)) return;
+        if (!hasTimeLayers.peek()) break; // no timeline, nothing to step
         e.preventDefault();
         step(e.key === 'ArrowLeft' ? -1 : 1);
         break;

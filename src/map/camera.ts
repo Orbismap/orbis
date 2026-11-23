@@ -87,12 +87,15 @@ export function clampCamera<T extends { zoom: number; pitch: number; bearing: nu
   return { ...c, pitch: clampPitch(c.zoom, c.pitch), bearing: c.zoom < NORTH_MAX_ZOOM ? 0 : c.bearing };
 }
 
+const EASING = { linear: (p: number) => p, out: (p: number) => 1 - (1 - p) * (1 - p) };
+
 export function flyToTarget(ml: MlMap, t: CameraTarget, basePadding: Padding): void {
   const padding = { ...basePadding, ...t.padding };
   const duration = t.duration ?? 1200;
+  const easing = t.easing ? { easing: EASING[t.easing] } : {};
   if (t.bounds) {
     const [w, s, e, n] = t.bounds;
-    ml.fitBounds([[w, s], [e, n]], { padding, duration, maxZoom: t.maxZoom ?? 16, bearing: t.bearing ?? ml.getBearing(), pitch: t.pitch ?? ml.getPitch() });
+    ml.fitBounds([[w, s], [e, n]], { padding, duration, maxZoom: t.maxZoom ?? 16, bearing: t.bearing ?? ml.getBearing(), pitch: t.pitch ?? ml.getPitch(), ...easing });
     return;
   }
   const opts = {
@@ -102,6 +105,7 @@ export function flyToTarget(ml: MlMap, t: CameraTarget, basePadding: Padding): v
     pitch: t.pitch,
     padding,
     essential: true,
+    ...easing,
   };
   if (duration === 0) ml.jumpTo(opts);
   else ml.flyTo({ ...opts, duration });

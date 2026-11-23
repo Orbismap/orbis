@@ -11,6 +11,7 @@ import { toast } from '../../ui/toast';
 import { usePlaces } from '../search/Search';
 import { flyToPoint } from '../shared/map';
 import { formatDistance, formatDuration, MODES, type RouteMode } from './osrm';
+import { routeCameras } from './cameras';
 import { SavedRouteCard } from './SavedRouteCard';
 import './routes.css';
 
@@ -41,7 +42,15 @@ function StopField({ i }: { i: number }) {
       setStop(i, st);
       setText(st.title);
       setFocus(false);
-      flyToPoint(st.lng, st.lat, Math.max(11, 0));
+      // a completed route is framed as a whole once it arrives, so no detour to the single point
+      if (!stops.peek().every((x) => x)) flyToPoint(st.lng, st.lat, 11);
+      // on to the next empty field; with all fields filled the focus leaves the input
+      const next = stops.peek().findIndex((x) => x === null);
+      setTimeout(() => {
+        const inputs = document.querySelectorAll<HTMLInputElement>('.rt-stops .rt-field input');
+        if (next >= 0) inputs[next]?.focus();
+        else (document.activeElement as HTMLElement | null)?.blur();
+      }, 0);
     } catch (e) {
       toast((e as Error).message || 'Standort nicht verfügbar', { kind: 'error' });
     }
@@ -54,7 +63,7 @@ function StopField({ i }: { i: number }) {
         <input
           type="text"
           aria-label={label}
-          placeholder={`${label} suchen oder auf die Karte tippen`}
+          placeholder={`${label} suchen`}
           autocomplete="off"
           spellcheck={false}
           value={text}
@@ -73,7 +82,12 @@ function StopField({ i }: { i: number }) {
             else if (e.key === 'Escape') (e.stopPropagation(), (e.currentTarget as HTMLInputElement).blur());
           }}
         />
-        {(s || text) && <IconButton icon="close" label={`${label} leeren`} size={14} class="rt-clear" onClick={() => (setText(''), s ? setStop(i, null) : undefined)} />}
+        {(s || text) && <IconButton icon="close" label={`${label} leeren`} size={14} class="rt-clear" onClick={() => {
+            setText('');
+            // clearing the start while stops lie between: the first of them moves up to be the start
+            if (i === 0 && list.length > 2) removeStop(0);
+            else if (s) setStop(i, null);
+          }} />}
       </div>
       {list.length > 2 && i > 0 && !last && <IconButton icon="minus" label="Stopp entfernen" size={15} class="rt-rm" onClick={() => removeStop(i)} />}
       {focus && !s && options.length > 0 && (
@@ -92,6 +106,45 @@ function StopField({ i }: { i: number }) {
         </ul>
       )}
     </li>
+  );
+}
+
+/** Speed cameras on the chosen route: counts by kind (the markers are drawn on the map by the route overlay); a click on the line shows the source note. */
+function CameraRow() {
+  const c = routeCameras.value;
+  const [open, setOpen] = useState(false);
+  if (c.status === 'idle') return null;
+  if (c.status === 'loading') return <p class="rt-cams-box rt-cams">Blitzer auf der Route werden gesucht</p>;
+  if (c.status === 'error') return <p class="rt-cams-box rt-cams">Blitzer konnten nicht geladen werden</p>;
+  const fixed = c.cameras.filter((x) => x.kind === 'fixed').length;
+  const mobile = c.cameras.length - fixed;
+  return (
+    <section class="rt-cams-box" data-open={open}>
+      <button type="button" class="rt-cams" aria-expanded={open} aria-controls="rt-cams-more" onClick={() => setOpen(!open)}>
+        <span class="rt-cams-t">
+        {c.cameras.length === 0 ? (
+          <span>Keine Blitzer auf der Route gemeldet</span>
+        ) : (
+          <>
+            {fixed > 0 && (
+              <span class="rt-cam"><i class="rt-cam-dot" style={{ background: '#FFB020' }} />{fixed} {fixed === 1 ? 'ortsfester' : 'ortsfeste'}{mobile > 0 ? ',' : ''}</span>
+            )}
+            {mobile > 0 && (
+              <span class="rt-cam"><i class="rt-cam-dot" style={{ background: '#E5322D' }} />{mobile} {mobile === 1 ? 'mobiler' : 'mobile'}</span>
+            )}
+            <span class="rt-cam">Blitzer</span>
+          </>
+        )}
+        </span>
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} class="rt-cams-chev" />
+      </button>
+      {open && (
+        <div class="rt-cams-more" id="rt-cams-more">
+          {c.mobileFailed && <p>Mobile Meldungen sind gerade nicht verfügbar.</p>}
+          <p>Nach OpenStreetMap und Community-Meldungen, unvollständig.</p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -127,6 +180,7 @@ function Result() {
           {saved ? 'Gesichert' : 'Sichern'}
         </Button>
       </section>
+      <CameraRow />
       <button type="button" class="rt-steps-toggle" aria-expanded={stepsOpen} aria-controls="rt-steps" onClick={() => setStepsOpen(!stepsOpen)}>
         <Icon name={stepsOpen ? 'chevron-down' : 'chevron-right'} size={14} />
         Wegbeschreibung <small class="num">{route.steps.length} Schritte</small>
