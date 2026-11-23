@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Map as MlMap, Marker } from 'maplibre-gl';
+import { attachSharedMap, detachSharedMap } from './sharedMap';
 import { buildKartenUrl } from '../handoff/url';
 import { rememberReturnTo } from '../handoff/contract';
 import type { WxMapMode } from '../handoff/modes';
@@ -7,7 +8,6 @@ import { applyMapLayer } from './applyMapLayer';
 import { loadWxRender, type WeatherLayerHandle } from './sharedRenderer';
 import { MapLayerPicker } from './MapLayerPicker';
 import { MODE_TITLE, markerColor, markerValue, suggestedMapMode, type MarkerCondition } from './mapLayers';
-import { wxStyle } from './map-style';
 
 const FALLBACK: [number, number] = [11.47, 53.75]; // Bad Kleinen
 const ORIGIN_ZOOM = 6;
@@ -143,15 +143,7 @@ export function MapCard({
   hrefRef.current = href;
 
   useEffect(() => {
-    const map = new MlMap({
-      container: host.current!,
-      style: wxStyle,
-      center: [11.4, 53.7],
-      zoom: ORIGIN_ZOOM,
-      attributionControl: { compact: true },
-      dragRotate: false,
-      pitchWithRotate: false,
-    });
+    const map = attachSharedMap(host.current!);
     mapRef.current = map;
 
     const hereEl = document.createElement('div');
@@ -190,7 +182,7 @@ export function MapCard({
       map.off('move', sync);
       map.off('moveend', onMoveEnd);
       hereMarker.remove();
-      map.remove();
+      detachSharedMap(); // the map keeps running for the next card mount
       mapRef.current = null;
       markers.current = null;
     };
@@ -263,7 +255,7 @@ export function MapCard({
           <MapLayerPicker mode={mode} onChange={setMode} onExpand={expandMap} />
         </div>
       </div>
-      <div ref={host} class="wx-map" role="application" aria-label="Wetterkarte" />
+      <div ref={host} class="wx-map" />
     </section>
   );
 }

@@ -436,6 +436,9 @@ body:has(.wx-map--fullscreen) .wx-hud { z-index: 100000; }
   view-transition-name: wx-map;
 }
 
+/* The shared MapLibre element fills whatever slot it is attached to. */
+.wx-map-canvas { width: 100%; height: 100%; }
+
 /* Fullscreen state (before handoff to orbis-karten). Geometry is set inline by
    MapCard's rAF animation, so this class only carries stacking/overflow. */
 .wx-map--fullscreen {
