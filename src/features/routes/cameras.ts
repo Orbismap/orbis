@@ -74,6 +74,18 @@ export function tilesAlong(line: readonly P[], z = ZOOM): [number, number][] {
   return [...seen.values()];
 }
 
+/** One camera per spot: OpenStreetMap lists a camera once per direction, a few metres apart, which would draw on top of each other. */
+export function mergeNear(cams: readonly RouteCamera[], within = 30): RouteCamera[] {
+  const kept: RouteCamera[] = [];
+  for (const c of cams) {
+    const k = Math.cos((c.lat * Math.PI) / 180);
+    const same = kept.find((o) => o.kind === c.kind && Math.hypot((o.lng - c.lng) * k, o.lat - c.lat) * M <= within);
+    if (!same) kept.push(c);
+    else if (same.speed === undefined && c.speed !== undefined) same.speed = c.speed;
+  }
+  return kept;
+}
+
 let archive: { url: string; pm: PMTiles } | undefined;
 async function fixedCameras(line: P[], signal: AbortSignal): Promise<RouteCamera[]> {
   const url = await osmPmtilesUrl('blitzer');
@@ -139,7 +151,7 @@ effect(() => {
       batch(() => {
         routeCameras.value = fixed.status === 'rejected' && mobile.status === 'rejected'
           ? { status: 'error' }
-          : { status: 'ok', mobileFailed: mobile.status === 'rejected', cameras: [...(fixed.status === 'fulfilled' ? fixed.value : []), ...(mobile.status === 'fulfilled' ? mobile.value : [])] };
+          : { status: 'ok', mobileFailed: mobile.status === 'rejected', cameras: mergeNear([...(fixed.status === 'fulfilled' ? fixed.value : []), ...(mobile.status === 'fulfilled' ? mobile.value : [])]) };
       });
     });
   }, 400);
