@@ -18,6 +18,9 @@ const listPublic = (dir: string, prefix = ''): string[] =>
  * precached: the entry chunk, the weather chunk with everything it imports statically (plus CSS and worker assets),
  * index.html and public/wetter/. Everything else of the map never reaches the weather cache.
  */
+const isMapApp = (item: { type: string; facadeModuleId?: string | null } | undefined): boolean =>
+  item?.type === 'chunk' && !!item.facadeModuleId?.replace(/\\/g, '/').endsWith('/src/boot.tsx');
+
 export function wetterPwa(): Plugin {
   return {
     name: 'orbis-wetter-pwa',
@@ -40,8 +43,9 @@ export function wetterPwa(): Plugin {
         const chunk = bundle[name];
         if (!chunk || chunk.type !== 'chunk') return;
         files.add(name);
-        chunk.imports.forEach((dep) => visit(dep, lazy));
-        if (lazy) chunk.dynamicImports.forEach((dep) => visit(dep, lazy));
+        chunk.imports.forEach((dep) => visit(dep, false));
+        // The map app (handoff target) is not precached: offline there are no tiles for it anyway.
+        if (lazy) chunk.dynamicImports.filter((dep) => !isMapApp(bundle[dep])).forEach((dep) => visit(dep, false));
         chunk.viteMetadata?.importedCss.forEach((css) => files.add(css));
         chunk.viteMetadata?.importedAssets.forEach((asset) => files.add(asset));
       };
