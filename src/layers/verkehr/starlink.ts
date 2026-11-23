@@ -6,11 +6,14 @@ import type { Feature, FeatureCollection, Point } from 'geojson';
 import { formatAge, formatDateTime, formatNumber } from '../../core/format';
 import { HOUR, MINUTE } from '../../core/time';
 import { bucketUrl } from '../../data/endpoints';
-import { initSats, positionAt, type Sat, type SatLib } from '../../data/parsers/orbit';
+import { groundTrack, initSats, positionAt, type Sat, type SatLib } from '../../data/parsers/orbit';
 import type { TleRec } from '../../data/parsers/tle';
 import type { AnyFeature } from '../../render/common';
+import { EMPTY_FC } from '../../render/common';
+import { lineLayer } from '../../render/lines';
 import { pointLayer } from '../../render/points';
 import { defineLayer } from '../define';
+import type { InspectCard } from '../types';
 
 const COLOR = '#59d7ff';
 const SLICE = 2500;
@@ -33,6 +36,7 @@ export default defineLayer({
     { name: 'CelesTrak (Bahnelemente)', url: 'https://celestrak.org/', license: 'frei, Quellenangabe', manifest: { bucket: 'live', key: 'space/tle/starlink.txt' } },
     { name: 'satellite.js (SGP4)', url: 'https://github.com/shashwatak/satellite-js', license: 'MIT' },
   ],
+  options: [{ id: 'track', label: 'Bodenspur der Auswahl', type: 'toggle', default: true }],
   legend: { type: 'scale', unit: 'km', stops: STOPS, ticks: [320, 450, 570, 1200] },
   keywords: ['starlink', 'spacex', 'satelliten', 'internet', 'konstellation'],
 
@@ -85,6 +89,24 @@ export default defineLayer({
     const stopPass = effect(() => { void sats.value; void ctx.time.value; void pass(); });
     const timer = setInterval(() => { if (!document.hidden && isLive(ctx.time.peek())) void pass(); }, 3000);
 
+    // ground track of the selected satellite (one orbit, from now)
+    const selected = signal<string | null>(null);
+    let lastCard: InspectCard | null = null;
+    const trackFc = signal<FeatureCollection>(EMPTY_FC);
+    const at = () => (isLive(ctx.time.peek()) ? Date.now() : ctx.time.peek());
+    const stopSel = effect(() => { if (ctx.selection.value !== lastCard) selected.value = null; });
+    const updateTrack = () => {
+      const id = selected.peek();
+      const s = id ? byId.get(id) : undefined;
+      if (!s || !ctx.options.peek().track) { trackFc.value = EMPTY_FC; return; }
+      const segs = groundTrack(lib, s, at(), s.rec.period * MINUTE, 120);
+      const features: Feature[] = segs.map((c, i) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: { id: `track-${i}` } }));
+      trackFc.value = { type: 'FeatureCollection', features };
+    };
+    const stopTrack = effect(() => { void selected.value; void ctx.options.value.track; void sats.value; updateTrack(); });
+    const trackTimer = setInterval(() => { if (!document.hidden && selected.peek() && isLive(ctx.time.peek())) updateTrack(); }, 30_000);
+    const line = lineLayer(ctx, { data: trackFc, name: 'track', color: '#ffffff', width: 1.4, opacity: 0.55, casing: false });
+
     const handle = pointLayer(ctx, {
       data: fc,
       resources: [res],
@@ -95,7 +117,7 @@ export default defineLayer({
         const s = byId.get(String(f.properties.id));
         const r = s?.rec;
         const p = s ? positionAt(lib, s, new Date(isLive(ctx.time.peek()) ? Date.now() : ctx.time.peek())) : undefined;
-        return {
+        const card: InspectCard = {
           title: r?.name ?? `Starlink ${f.properties.id}`,
           subtitle: 'Starlink',
           color: COLOR,
@@ -109,14 +131,19 @@ export default defineLayer({
             { label: 'Bahndaten', value: `${formatDateTime(r.epoch)} (${formatAge(r.epoch)})` },
           ] : [],
         };
+        lastCard = card;
+        selected.value = r ? String(r.id) : null;
+        return card;
       },
     });
     return {
       destroy() {
         stopped = true;
         clearInterval(timer);
-        stopInit(); stopPass();
+        clearInterval(trackTimer);
+        stopInit(); stopPass(); stopSel(); stopTrack();
         handle.destroy();
+        line.destroy();
       },
     };
   },
