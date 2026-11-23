@@ -123,6 +123,14 @@ describe('url', () => {
     expect(parseHash('#/?k=wetter&b=satellite')).toEqual({ karte: 'wetter', basemap: 'satellite' });
     expect(parseHash('#/?b=a<b').basemap).toBeUndefined();
   });
+  it('round-trips a route with stop names', () => {
+    const route = { mode: 'bike' as const, stops: [{ lat: 53.55, lng: 10, title: 'Hamburg, Altstadt' }, { lat: 52.52, lng: 13.4, title: 'Berlin ~ Mitte' }] };
+    const h = serializeHash({ route });
+    expect(h).toBe('#/?r=bike~53.55,10,Hamburg%2C%20Altstadt~52.52,13.4,Berlin%20%7E%20Mitte');
+    expect(parseHash(h).route).toEqual(route);
+    expect(parseHash('#/?r=car~1,2,A').route).toBeUndefined(); // one stop is no route
+    expect(parseHash('#/?r=plane~1,2,A~3,4,B').route).toBeUndefined();
+  });
   it('round-trips the collapsed sidebar, without writing the default open state', () => {
     expect(parseHash('#/?s=0').sidebar).toBe(false);
     expect(parseHash('#/?s=1').sidebar).toBe(true);
