@@ -53,7 +53,7 @@ export function startRouteOverlay(): () => void {
       click(f) {
         const cam = (() => { const c = routeCameras.peek(); return c.status === 'ok' ? c.cameras.find((x) => x.id === (f.properties as { id?: string } | null)?.id) : undefined; })();
         if (!cam) return;
-        selectCard('route-camera', { ...cam.card, icon: 'camera', color: cam.kind === 'mobile' ? '#E5322D' : '#FFB020' });
+        selectCard('route-camera', { ...cam.card, icon: 'camera', color: cam.kind === 'mobile' ? '#E5322D' : '#FFB020', backLabel: 'Zurück zur Route' });
         opened = inspector.peek();
         routeCardOpen.value = true;
       },

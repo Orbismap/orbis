@@ -54,6 +54,8 @@ export interface InspectCard {
   location?: [lng: number, lat: number];
   /** Desktop: show this as the place card (like a searched place) instead of the inspector card. Needs `location`; `subtitle` is the type line. */
   asPlace?: boolean;
+  /** Shows a back button in place of the icon (closes the card; whoever opened it brings its own menu back). */
+  backLabel?: string;
   /** Extra buttons of the card, e.g. contributed by an extension ("Folgen"). Rendered by the inspector as plain buttons. */
   actions?: { id: string; label: string; icon?: IconName; active?: boolean; run(): void }[];
 }
