@@ -1,62 +1,11 @@
 /* Desktop left HUD: main menu + detail menu, full window height. Layer "materials" so the panel radius wins over .panel. */
 @layer materials {
-  .hudl {
-    --hud-edge: 8px;
-    --hud-mini-h: 40px;
-    position: absolute;
-    top: var(--hud-edge);
-    left: var(--hud-edge);
-    bottom: var(--hud-edge);
-    display: flex;
-    gap: var(--hud-gap);
-    pointer-events: none;
-    transition: top 260ms var(--ease);
-  }
-  .hudl > * { pointer-events: auto; }
-  .hudl[data-main='closed'] { top: calc(var(--hud-edge) + var(--hud-mini-h) + var(--hud-gap)); }
-
-  .hudl-main {
-    position: relative;
-    flex: none;
-    width: var(--hud-main-w);
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    transition: margin 260ms var(--ease), opacity 200ms var(--ease), transform 260ms var(--ease);
-  }
-  /* the main menu only slides sideways: its negative top margin cancels the downward move of .hudl */
-  .hudl[data-main='closed'] .hudl-main {
-    margin-left: calc(-1 * (var(--hud-main-w) + var(--hud-gap)));
-    margin-top: calc(-1 * (var(--hud-mini-h) + var(--hud-gap)));
-    opacity: 0;
-    transform: translateX(-12px);
-    pointer-events: none;
-  }
   .hudl .panel { border-radius: 20px; }
-  .hudm, .hudd { display: flex; flex-direction: column; min-height: 0; }
-  .hudm { flex: 1; }
+  .hudd { display: flex; flex-direction: column; min-height: 0; }
   .hudd { flex: none; width: var(--hud-detail-w); animation: hud-in 240ms var(--ease); }
   @keyframes hud-in { from { opacity: 0; transform: translateX(-10px); } }
 
-  .hudl-mini {
-    position: absolute;
-    top: calc(-1 * (var(--hud-mini-h) + var(--hud-gap)));
-    left: 0;
-    width: max-content; /* .hudl is ~0 wide when both menus are closed: without this the logo shrinks to nothing */
-    height: var(--hud-mini-h);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 6px 0 10px;
-    border-radius: 999px !important;
-    animation: hud-in 240ms var(--ease);
-  }
-  .hudl-mini h1 .orbis-mark, .hudm-head h1 .orbis-mark { flex: none; }
-  .hudl-mini h1 { display: flex; align-items: center; gap: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
-
-  /* ---- main menu ---- */
-  .hudm-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 6px 14px; }
-  .hudm-head h1 { display: flex; align-items: center; gap: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  /* ---- main menu (frame, header and capsule: src/ui/hud) ---- */
   .hudm-search {
     display: flex; align-items: center; gap: 7px; margin: 6px 12px 8px; height: 32px; padding: 0 10px;
     border-radius: 999px; background: var(--g-fill); color: var(--text-3); text-align: left; font-size: 14px;

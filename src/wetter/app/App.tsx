@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { OrbisMark } from '../../ui/brand/OrbisMark';
+import { OrbisHud } from '../../ui/hud/OrbisHud';
 import { Dashboard } from '../dashboard/Dashboard';
 import { loadWarning } from '../data/openMeteo';
 import { loadWeather, type WeatherResult } from '../data/weather';
@@ -10,7 +10,6 @@ import { DEFAULT_PLACE, type Place } from '../data/geocoding';
 import { isMobileViewport } from '../dashboard/viewport';
 import { PlaceList } from '../features/search/PlaceList';
 import './app.css';
-import './hud.css';
 const INITIAL: WeatherResult = {
   weather: sample,
   source: { label: 'Beispieldaten', detail: 'lädt …' },
@@ -94,35 +93,9 @@ export function App() {
   return (
     <WeatherProvider value={data.weather}>
       <div class="wx-app">
-        <div class="wx-hud" data-main={listOpen ? 'open' : 'closed'}>
-          <div class="wx-hud-main" inert={!listOpen}>
-            <aside class="wx-hudm" aria-label="Orbis Wetter">
-              <header class="wx-hudm-head">
-                <h1>
-                  <OrbisMark size={32} variant="small" />
-                  Orbis Wetter
-                </h1>
-                <button type="button" class="wx-hud-rbtn" aria-label="Menü ausblenden" aria-keyshortcuts="Meta+B Control+B" onClick={() => setListOpen(false)}>
-                  <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-                    <path d="M4.5 3.5h11A1.5 1.5 0 0 1 17 5v10a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15V5a1.5 1.5 0 0 1 1.5-1.5zM8 3.5v13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
-                  </svg>
-                </button>
-              </header>
-              <PlaceList onSelect={selectCity} inputRef={searchInput} />
-            </aside>
-          </div>
-          <div class="wx-hud-mini" aria-label="Orbis Wetter">
-            <h1>
-              <OrbisMark size={28} variant="small" />
-              Orbis Wetter
-            </h1>
-            <button type="button" class="wx-hud-rbtn" aria-label="Menü einblenden" aria-keyshortcuts="Meta+B Control+B" onClick={() => setListOpen(true)}>
-              <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-                <path d="M4.5 3.5h11A1.5 1.5 0 0 1 17 5v10a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15V5a1.5 1.5 0 0 1 1.5-1.5zM8 3.5v13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        <OrbisHud project="wetter" fixed open={listOpen} onOpenChange={setListOpen}>
+          <PlaceList onSelect={selectCity} inputRef={searchInput} />
+        </OrbisHud>
         <Hero place={data.weather.place} current={data.weather.current} source={data.source} />
         <Dashboard />
       </div>

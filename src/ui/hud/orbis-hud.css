@@ -1,0 +1,168 @@
+/* Left menu shared by all Orbis apps (see OrbisHud.tsx). Relies on the glass tokens (--g-*) both apps define. */
+.ohud {
+  --hud-edge: 8px;
+  --hud-mini-h: 40px;
+  --hud-gap: 8px;
+  position: absolute;
+  top: var(--hud-edge);
+  left: var(--hud-edge);
+  bottom: var(--hud-edge);
+  display: flex;
+  gap: var(--hud-gap);
+  pointer-events: none;
+  transition: top 260ms var(--ease);
+}
+.ohud[data-fixed='true'] { position: fixed; z-index: 40; }
+.ohud > * { pointer-events: auto; }
+/* hidden menu: whatever sits next to it moves down to make room for the capsule */
+.ohud[data-main='closed'] { top: calc(var(--hud-edge) + var(--hud-mini-h) + var(--hud-gap)); }
+
+.ohud-main {
+  position: relative;
+  flex: none;
+  width: var(--hud-main-w);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  transition: margin 260ms var(--ease), opacity 200ms var(--ease), transform 260ms var(--ease);
+}
+/* the menu only slides sideways: its negative top margin cancels the downward move of .ohud */
+.ohud[data-main='closed'] .ohud-main {
+  margin-left: calc(-1 * (var(--hud-main-w) + var(--hud-gap)));
+  margin-top: calc(-1 * (var(--hud-mini-h) + var(--hud-gap)));
+  opacity: 0;
+  transform: translateX(-12px);
+  pointer-events: none;
+}
+
+.ohud-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--g-rim);
+  border-radius: 20px;
+  background: var(--g-panel);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.6);
+  box-shadow: var(--g-shadow);
+  color: var(--text-1);
+}
+
+.ohud-head { position: relative; display: flex; align-items: center; justify-content: flex-end; min-height: 36px; padding: 12px 12px 6px 14px; }
+.ohud-head h1 { display: flex; align-items: center; margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+/* logo left, app name centred; the whole title row is the switcher button (its overlay stops short of the hide button) */
+.ohud-head-title { display: block; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.ohud-head-title::before { content: ''; position: absolute; inset: 0 52px 0 0; border-radius: 20px 0 0 0; }
+.ohud-head .orbis-logo { position: absolute; left: 14px; top: calc(50% + 3px); transform: translateY(-50%); }
+.ohud-head .ohud-name { position: absolute; left: 50%; top: calc(50% + 3px); transform: translate(-50%, -50%); }
+
+.ohud-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--g-fill);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.ohud-btn:hover { background: var(--g-fill-hover); color: var(--text-1); }
+
+/* ---- capsule (menu hidden) ---- */
+.ohud-mini {
+  position: absolute;
+  top: calc(-1 * (var(--hud-mini-h) + var(--hud-gap)));
+  left: 0;
+  width: max-content;
+  min-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--g-rim);
+  border-radius: calc(var(--hud-mini-h) / 2);
+  background: var(--g-panel);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.6);
+  box-shadow: var(--g-shadow);
+  color: var(--text-1);
+  transition: border-radius 220ms var(--ease);
+}
+.ohud-mini[data-switcher='open'] { border-radius: 20px; }
+.ohud-mini[inert] { visibility: hidden; }
+
+.ohud-mini-bar { display: flex; align-items: center; gap: 10px; height: calc(var(--hud-mini-h) - 2px); padding: 0 6px 0 10px; }
+.ohud-mini-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ohud-mini .orbis-logo { flex: none; }
+.ohud-chev { flex: none; margin-left: -4px; color: var(--text-3); transition: transform 220ms var(--ease); }
+.ohud-mini[data-switcher='open'] .ohud-chev { transform: rotate(180deg); }
+.ohud-mini-title:hover .ohud-chev { color: var(--text-1); }
+
+/* the capsule grows downward: the row height animates from 0 to its content */
+.ohud-switch { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 240ms var(--ease); }
+.ohud-mini[data-switcher='open'] .ohud-switch { grid-template-rows: 1fr; }
+.ohud-switch > ul,
+.ohud-drop > ul { min-height: 0; margin: 0; padding: 0 6px; list-style: none; overflow: hidden; }
+.ohud-mini[data-switcher='open'] .ohud-switch > ul { padding-bottom: 6px; }
+
+/* header variant: a popover below the header */
+.ohud-drop {
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 8px;
+  right: 8px;
+  z-index: 5;
+  display: grid;
+  grid-template-rows: 0fr;
+  border-radius: 16px;
+  background: var(--g-pop, var(--g-panel));
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.6);
+  box-shadow: var(--g-shadow);
+  visibility: hidden;
+  opacity: 0;
+  transition: grid-template-rows 240ms var(--ease), opacity 160ms var(--ease), visibility 0s 240ms;
+}
+.ohud-head[data-switcher='open'] .ohud-drop { grid-template-rows: 1fr; visibility: visible; opacity: 1; transition-delay: 0s; }
+.ohud-head[data-switcher='open'] .ohud-drop > ul { padding: 6px; }
+.ohud-proj {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.ohud-proj svg:first-child { flex: none; }
+.ohud-proj span { flex: 1; }
+.ohud-check { flex: none; color: var(--text-1); }
+.ohud-proj[aria-current='page'] { color: var(--text-1); background: var(--g-fill); }
+@media (hover: hover) { .ohud-proj:hover { background: var(--g-fill-hover); color: var(--text-1); } }
+
+@media (max-width: 719px) {
+  /* The open menu spans (almost) the full width instead of a narrow strip; room for the notch. */
+  .ohud { --hud-main-w: calc(100vw - 2 * var(--hud-edge)); top: calc(var(--hud-edge) + env(safe-area-inset-top)); bottom: calc(var(--hud-edge) + env(safe-area-inset-bottom)); }
+  .ohud[data-main='closed'] { top: calc(var(--hud-edge) + env(safe-area-inset-top) + var(--hud-mini-h) + var(--hud-gap)); }
+  .ohud-btn { width: 36px; height: 36px; }
+}
