@@ -34,7 +34,7 @@ import { flyToPlace } from '../features/search/results';
 import { useFlip } from '../features/layers-panel/flip';
 import { startRowDrag } from '../features/layers-panel/reorder';
 import { MenuItem, Popover } from '../ui/Popover';
-import { OrbisMark } from '../ui/brand/OrbisMark';
+import { OrbisHud } from '../ui/hud/OrbisHud';
 import { Catalog } from '../features/catalog/Catalog';
 import { LeftBody } from './LeftBody';
 import { isMobile } from '../state/ui';
@@ -294,14 +294,7 @@ function MainPanel() {
   const list = expanded ? all : all.slice(0, KARTEN_SHOWN);
   const showing = detailVisible.value && leftView.value !== 'settings' && !inspector.value && !probe.value && !orteView.value;
   return (
-    <Panel as="section" class="hudm" aria-label="Orbis Karten">
-      <header class="hudm-head">
-        <h1>
-          <OrbisMark size={32} variant="small" />
-          Orbis Karten
-        </h1>
-        <IconButton icon="panel-left" label="Menü ausblenden" shortcut="mod+B" class="hud-rbtn" onClick={() => (leftPanelOpen.value = false)} />
-      </header>
+    <>
       <label class="hudm-search" ref={field}>
         <Icon name="search" size={15} />
         <input
@@ -441,7 +434,7 @@ function MainPanel() {
         </button>
         <Recents />
       </ScrollArea>
-    </Panel>
+    </>
   );
 }
 
@@ -545,22 +538,17 @@ export function LeftHud() {
   const open = leftPanelOpen.value;
   const detail = detailVisible.value;
   return (
-    <div class="hudl" data-main={open ? 'open' : 'closed'} style={{ '--hud-main-w': `${hudMainWidth.value}px`, '--hud-detail-w': `${HUD_DETAIL_W}px`, '--hud-gap': `${HUD_GAP}px` }}>
-      <div class="hudl-main" {...(open ? {} : ({ inert: '' } as object))}>
-        <MainPanel />
-        <Grip />
-      </div>
-      {detail && <DetailPanel />}
-      {!open && (
-        <Panel as="div" class="hudl-mini">
-          <h1>
-            <OrbisMark size={28} variant="small" />
-            Orbis Karten
-          </h1>
-          <IconButton icon="panel-left" label="Menü einblenden" shortcut="mod+B" class="hud-rbtn" onClick={() => (leftPanelOpen.value = true)} />
-        </Panel>
-      )}
-    </div>
+    <OrbisHud
+      project="map"
+      rootClass="hudl"
+      open={open}
+      onOpenChange={(v) => (leftPanelOpen.value = v)}
+      mainExtra={<Grip />}
+      aside={detail && <DetailPanel />}
+      style={{ '--hud-main-w': `${hudMainWidth.value}px`, '--hud-detail-w': `${HUD_DETAIL_W}px`, '--hud-gap': `${HUD_GAP}px` }}
+    >
+      <MainPanel />
+    </OrbisHud>
   );
 }
 
