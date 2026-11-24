@@ -80,7 +80,6 @@
   top: calc(-1 * (var(--hud-mini-h) + var(--hud-gap)));
   left: 0;
   width: max-content;
-  min-width: 100%;
   overflow: hidden;
   border: 1px solid var(--g-rim);
   border-radius: calc(var(--hud-mini-h) / 2);
