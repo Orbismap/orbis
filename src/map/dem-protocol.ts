@@ -6,7 +6,7 @@ import { addProtocol } from 'maplibre-gl';
  * hochskaliert; andere Quellen (AWS Terrain Tiles: je Region Ellipsoidhöhen und Fehlwerte) sind bewusst nicht
  * dabei. Terrarium-Kodierung, 512 px Kacheln.
  */
-const MAPTERHORN = 'https://tiles.mapterhorn.com';
+export const MAPTERHORN = 'https://tiles.mapterhorn.com';
 
 /** Tile-URL für die raster-dem-Quelle */
 export const DEM_TILES = 'orbis-dem://{z}/{x}/{y}';

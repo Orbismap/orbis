@@ -12,6 +12,7 @@ import { isMobile } from '../state/ui';
 import { activeBasemap as activeBasemapSignal, buildings3d, poiBasemap, poiLayerOn, poiLabelsVisible, buildingColour, buildingsColoured, buildingsLayerOn, buildingsPlainWanted, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, terrainLayerOn, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, buildingColourOf, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, isAerial, showsRelief, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
+import { reliefRange } from './relief';
 import { registerKeyedTiles } from './basemaps/keyed-protocol';
 import { registerPmtilesProtocol } from './pmtiles-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
@@ -166,6 +167,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
 
   const resolveReady = () => {
     loaded = true;
+    void checkFlat();
     useDetailedBuildingTiles(ml);
     // places float at the roof of their building while the buildings stand (the same share of the height as the buildings)
     poiHeights = startPoiHeights(ml, {
@@ -387,10 +389,36 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   };
   /** The 3D tiles of the aerial images are true to scale (sea level, see tiles3d/geoid): no exaggeration under them, so the camera's height agrees with theirs. */
   const TILES_TERRAIN_EXAGGERATION = 1;
+  /**
+   * Flat ground (Berlin, the Netherlands): the 3D terrain costs every frame and shows nothing, so the Erkunden map leaves it off there.
+   * Decided from the height range around the view (relief.ts) with a gap between the two limits so that it does not flip back and forth.
+   * Only from this zoom on (further out the view covers regions, not a place) and never for aerial images or with the layer "Gelände".
+   */
+  const FLAT_BELOW_M = 50;
+  const FLAT_ABOVE_M = 80;
+  const FLAT_MIN_ZOOM = 11;
+  let flatGround = false;
+  let flatSeq = 0;
+  const flatGateApplies = () => karteMode.peek() === 'erkunden' && !isAerial(basemap) && !terrainLayerOn.peek();
+  async function checkFlat() {
+    const seq = ++flatSeq;
+    let flat = false;
+    if (flatGateApplies() && ml.getZoom() >= FLAT_MIN_ZOOM) {
+      const b = ml.getBounds(), c = ml.getCenter();
+      const half = Math.min(0.25, Math.max(0.02, Math.max(b.getEast() - b.getWest(), b.getNorth() - b.getSouth()) / 2));
+      const range = await reliefRange(c.lng, c.lat, half);
+      if (seq !== flatSeq) return;
+      if (range === undefined) return; // no data: keep what it was
+      flat = flatGround ? range < FLAT_ABOVE_M : range < FLAT_BELOW_M;
+    }
+    if (flat !== flatGround) { flatGround = flat; if (loaded) applyTerrain(); }
+  }
+  ml.on('moveend', () => { if (loaded) void checkFlat(); });
   /** The terrain without the tilt: what the basemap and the mode ask for, or forced on by the layer "Gelände". */
   const terrainBase = () => {
     const exaggeration = hasTiles3d(basemap) ? TILES_TERRAIN_EXAGGERATION : TERRAIN_EXAGGERATION;
     if (terrainLayerOn.peek()) return exaggeration;
+    if (flatGround && flatGateApplies()) return 0;
     const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';
     return reliefOn() && !(flatOrbis && (projectionSignal.peek() !== 'globe' || (TERRAIN_ZOOM_FADE && ml.getZoom() >= TERRAIN_MAX_ZOOM_ORBIS))) ? exaggeration : 0;
   };
