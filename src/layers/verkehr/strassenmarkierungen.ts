@@ -1,20 +1,15 @@
 // Road surface and markings at street scale. The basemap draws roads as thin lines of constant width, so from zoom 15
 // this layer paints REAL-SIZE roads (metres, scaled with the zoom) and the markings on them:
 //   (1) from the OpenFreeMap vector tiles, for every road class: smoothed asphalt, dashed centre lines that stop at junctions,
-//       oneway arrows (no edge lines),
-//   (2) from OpenStreetMap (Overpass, for the view): zebra and marked crossings, stop and give-way lines at signals and
-//       signs, turn arrows from turn:lanes, multi-lane roads (lanes=*) with surface and lane dividers,
-//       road_marking lines, no-overtaking lines and traffic islands.
-// Lane counts are only known where OpenStreetMap has them; everywhere else the tile rendering assumes the usual layout of the class.
+//       oneway arrows (no edge lines), zebra crossings derived from footways that cross a street.
+// Everything comes from the tiles (no extra requests): the tile rendering assumes the usual layout of each road class. Mapped
+// details from OpenStreetMap (stop lines, turn arrows, mapped crossings, lane counts) are not drawn for now.
 import { effect } from '@preact/signals';
 import type { ExpressionSpecification, GeoJSONSource, LayerSpecification } from 'maplibre-gl';
 import { runParser } from '../../data/worker/pool';
-import { overpassArea } from '../../data/parsers/overpassarea';
-import { laneQuery, markQuery, type MarkProps } from '../../data/parsers/roadmark';
 import { addArrowIcons, arrowId } from '../../render/roadicons';
 import { KERB_BRIDGE, KERB_GROUND, roadClass, type RawRoad } from '../../render/roadnet';
 import { defineLayer } from '../define';
-import type { InspectCard } from '../types';
 
 type Expr = ExpressionSpecification;
 type Num = number | Expr;
@@ -46,7 +41,6 @@ export const metres = (v: Num, k: number, minPx = -Infinity): Expr => {
   return ['interpolate', ['exponential', 2], ['zoom'], 16, ['*', v, k], 22, ['*', v, k * 64]] as unknown as Expr;
 };
 
-const kindIs = (...k: string[]): Expr => ['in', ['get', 'kind'], ['literal', k]] as unknown as Expr;
 const all = (...f: Expr[]): Expr => ['all', ...f] as unknown as Expr;
 const MID_W = 0.18;
 /** dash length / gap in metres per centre-line pattern of roadnet.ts */
@@ -70,7 +64,7 @@ export default defineLayer({
   cadence: 'daily',
   coverage: 'Ausschnitt',
   minZoom: 15,
-  sources: [{ name: 'OpenStreetMap-Mitwirkende (Overpass API), OpenFreeMap', url: 'https://www.openstreetmap.org/copyright', license: 'ODbL 1.0' }],
+  sources: [{ name: 'OpenStreetMap-Mitwirkende, OpenFreeMap', url: 'https://www.openstreetmap.org/copyright', license: 'ODbL 1.0' }],
   legend: { type: 'classes', items: [
     { color: WHITE, label: 'Mittellinien (aus der Straßenklasse abgeleitet)', shape: 'line' },
     { color: WHITE, label: 'Zebrastreifen, Haltelinien, Pfeile (OpenStreetMap)', shape: 'line' },
@@ -81,8 +75,6 @@ export default defineLayer({
 
   mount(ctx) {
     const ml = ctx.map.ml;
-    const src = `${ctx.id}.osm`;
-    ctx.map.addSource(src, { type: 'geojson', data: EMPTY as never });
     addArrowIcons(ml);
     const onMissing = (e: { id: string }) => { if (e.id.startsWith('rm-arrow-')) addArrowIcons(ml); };
     ml.on('styleimagemissing', onMissing);
@@ -144,29 +136,18 @@ export default defineLayer({
       add('net.paths', { source: roads, minzoom: 15, layout: sorted, paint: { 'line-color': surfColour(FOOT) } }, { filter: all(isPath, lvIs(0)), w: [['get', 'w'] as unknown as Expr], fade: [15.2, 16, 0.95] });
       add('net.steps', { source: roads, minzoom: 16, layout: { 'line-cap': 'butt' }, paint: { 'line-color': STEPS } }, { filter: all(['==', ['get', 'cls'], 'steps'] as unknown as Expr, lvIs(0)), w: [['get', 'w'] as unknown as Expr], dash: [0.2, 0.2], fade: [16, 16.8, 0.9] });
     };
-    const osmLevel = (L: (typeof LEVELS)[number]) => {
-      const osm = { source: src };
-      const own = (...x: string[]) => all(kindIs(...x), lvIs(L.lv));
-      add(`osm.${L.id}.surf.case`, { ...osm, minzoom: 15, layout: round, paint: { 'line-color': L.kerb } }, { filter: own('surf'), w: [['+', ['get', 'w'], L.lv >= 1 ? 1 : L.kw] as unknown as Expr], fade: [15.2, 16, 0.9] });
-      add(`osm.${L.id}.surf`, { ...osm, minzoom: 15, layout: round, paint: { 'line-color': L.surf } }, { filter: own('surf'), w: [['get', 'w'] as unknown as Expr], fade: [15.2, 16, 1] });
-      add(`osm.${L.id}.centre`, { ...osm, minzoom: 16.4, paint: { 'line-color': WHITE } }, { filter: own('centre'), w: [MID_W, 0.7], off: ['get', 'off'] as unknown as Expr, fade: [16.4, 17, 0.9] });
-      add(`osm.${L.id}.lane`, { ...osm, minzoom: 16.4, paint: { 'line-color': WHITE } }, { filter: own('lane'), w: [MID_W, 0.7], off: ['get', 'off'] as unknown as Expr, dash: [3 / MID_W, 9 / MID_W], fade: [16.4, 17, 0.9] });
-    };
     netLevel(LEVELS[0]!);
     pathLayer();
     netLevel(LEVELS[1]!);
-    osmLevel(LEVELS[1]!);
     netLevel(LEVELS[2]!);
-    osmLevel(LEVELS[2]!);
     netLevel(LEVELS[3]!);
-    osmLevel(LEVELS[3]!);
     // arrows are the first markings to appear (before centre lines): from 15.8 on, never smaller than a readable minimum
     const ARROW_FROM = 15.8;
     const arrowSizeOf = (metresLong: number) => (kk: number): Expr => {
       const real = (z: number) => (metresLong * kk * 2 ** (z - 16)) / 32;
       return ['interpolate', ['exponential', 2], ['zoom'], ARROW_FROM, Math.max(0.32, real(ARROW_FROM)), 18, Math.max(0.32, real(18)), 22, real(22)] as unknown as Expr;
     };
-    const arrowSize = arrowSizeOf(3.2), turnArrowSize = arrowSizeOf(3.6);
+    const arrowSize = arrowSizeOf(3.2);
     add('oneway', {
       source: arrowPts, type: 'symbol', minzoom: ARROW_FROM,
       layout: {
@@ -178,31 +159,8 @@ export default defineLayer({
     }, { fade: [ARROW_FROM, 16.4, 0.7] });
     dyn.push({ id: `${ctx.id}.oneway`, prop: 'icon-size', make: arrowSize });
 
-    // (2) OpenStreetMap
-    const osm = { source: src };
-    const kinds = (...x: string[]) => kindIs(...x);
-    add('island-fill', { ...osm, type: 'fill', minzoom: 15, paint: { 'fill-color': '#cfd8dc' } }, { filter: all(kinds('island'), ['==', ['geometry-type'], 'Polygon'] as unknown as Expr), fade: [15, 16, 0.4] });
-    add('island-line', { ...osm, minzoom: 15, paint: { 'line-color': WHITE } }, { filter: kinds('island'), w: [0.3, 0.8], fade: [15, 16, 0.7] });
-    // zebra crossings derived from the network (a footway crossing a street): same look as the mapped ones, but only where none is mapped
+    // zebra crossings derived from the network (a footway crossing a street): 
     add('zebra.derived', { source: zebras, type: 'fill', minzoom: 15.5, paint: { 'fill-color': ZEBRA, 'fill-antialias': true } }, { fade: [15.5, 16.2, 0.95] });
-    // zebra: stripes of 0.17 m (gap 0.33 m, so over 10 on a normal street) across a 3 m deep crossing, in true metres at every zoom (no pixel floor: it would stretch the stripes when zooming out)
-    add('zebra', { ...osm, minzoom: 15.5, layout: { 'line-cap': 'butt' }, paint: { 'line-color': ZEBRA } }, { filter: kinds('zebra'), w: [3], dash: [0.057, 0.11], fade: [15.5, 16.2, 0.95] });
-    // marked crossing without stripes: two dashed lines 3.2 m apart, running across the road
-    for (const side of [-1, 1]) add(`cross${side}`, { ...osm, minzoom: 16, layout: { 'line-cap': 'butt' }, paint: { 'line-color': WHITE } }, { filter: kinds('cross'), w: [0.3, 1], off: side * 1.6, dash: [2.5, 2.5], fade: [16, 16.8, 0.9] });
-    add('line', { ...osm, minzoom: 15, layout: { 'line-cap': 'butt' }, paint: { 'line-color': WHITE } }, { filter: all(kinds('marking', 'over'), ['!=', ['get', 'dash'], true] as unknown as Expr), w: [0.22, 0.8], fade: [15, 16, 0.9] });
-    add('line-dash', { ...osm, minzoom: 15, layout: { 'line-cap': 'butt' }, paint: { 'line-color': WHITE } }, { filter: all(kinds('marking', 'over'), ['==', ['get', 'dash'], true] as unknown as Expr), w: [0.22, 0.8], dash: [3 / 0.22, 6 / 0.22], fade: [15, 16, 0.9] });
-    add('stop', { ...osm, minzoom: 16.4, layout: { 'line-cap': 'butt' }, paint: { 'line-color': WHITE } }, { filter: kinds('stop'), w: [0.5, 1.2], fade: [16.4, 17, 0.95] });
-    add('giveway', { ...osm, minzoom: 16.4, layout: { 'line-cap': 'butt' }, paint: { 'line-color': WHITE } }, { filter: kinds('giveway'), w: [0.5, 1.2], dash: [1, 1], fade: [16.4, 17, 0.95] });
-    add('arrow', {
-      ...osm, type: 'symbol', minzoom: ARROW_FROM,
-      layout: {
-        'icon-image': ['concat', 'rm-arrow-', ['get', 'icon']], 'icon-rotate': ['get', 'rot'], 'icon-allow-overlap': true, 'icon-ignore-placement': true,
-        'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',
-        'icon-size': turnArrowSize(k),
-      },
-      paint: {},
-    }, { filter: kinds('arrow'), fade: [ARROW_FROM, 16.4, 0.92] });
-    dyn.push({ id: `${ctx.id}.arrow`, prop: 'icon-size', make: turnArrowSize });
 
     for (const s of specs) ctx.map.addLayer(s, 'lines');
     const ids = specs.map((s) => s.id);
@@ -225,15 +183,7 @@ export default defineLayer({
     const NET_ZOOM = 15.2;
     type DerivedZebra = { type: 'Feature'; geometry: unknown; properties: { lv: number; mid: number[] } };
     let derived: DerivedZebra[] = [];
-    // a derived zebra (it follows the footway) is dropped where a crossing is mapped in OpenStreetMap
-    let mapped: number[][] = []; // vertices of the mapped crossings
-    const showDerived = () => {
-      const keep = derived.filter((f) => {
-        const [mx, my] = f.properties.mid as [number, number], k = Math.cos(my * Math.PI / 180) * 111320;
-        return !mapped.some((q) => Math.hypot((q[0]! - mx) * k, (q[1]! - my) * 111320) < 9);
-      });
-      (ml.getSource(zebras) as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: keep } as never);
-    };
+    const showDerived = () => (ml.getSource(zebras) as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: derived } as never);
     let hadNet = false;
     let dirty = true;
     let seq = 0;
@@ -284,22 +234,7 @@ export default defineLayer({
     ml.on('sourcedata', onSource);
     schedule();
 
-    const area = (query: typeof markQuery) => overpassArea(ctx, { parser: 'overpassRoadmarks', query, empty: { type: 'FeatureCollection', features: [] }, minZoom: 15.5, grid: 0.015 });
-    const resA = area(markQuery), resB = area(laneQuery);
-    const stopData = effect(() => {
-      const da = resA.data.value, db = resB.data.value;
-      // both requests can contain the same road: keep every feature once
-      const seen = new Set<string>();
-      const features = [...(da?.features ?? []), ...(db?.features ?? [])].filter((f) => { const k = `${f.properties.kind}:${f.properties.id}`; return !seen.has(k) && !!seen.add(k); });
-      (ml.getSource(src) as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features } as never);
-      const zoomedOut = ml.getZoom() < 15.5;
-      mapped = features.filter((f) => f.properties.kind === 'zebra' || f.properties.kind === 'cross').flatMap((f) => f.geometry.type === 'LineString' ? f.geometry.coordinates : []);
-      showDerived();
-      const n = (kind: string) => features.filter((f) => f.properties.kind === kind).length;
-      const err = da === undefined && db === undefined ? (resA.error.value ?? resB.error.value) : undefined;
-      if (da === undefined && db === undefined) ctx.status(err ? { state: 'error', note: err } : { state: 'loading' });
-      else ctx.status({ state: features.length || !zoomedOut ? 'ready' : 'empty', count: features.length, updatedAt: resA.updatedAt.value ?? resB.updatedAt.value, note: features.length ? `${n('zebra')} Zebrastreifen, ${n('stop')} Haltelinien, ${n('arrow')} Pfeile in OpenStreetMap erfasst` : zoomedOut ? undefined : 'In diesem Ausschnitt sind keine Markierungen erfasst' });
-    });
+    ctx.status({ state: 'ready', note: 'Fahrbahnen und Markierungen aus den Kartenkacheln (ohne OpenStreetMap-Detailabfrage)' });
     const stopOpacity = effect(() => {
       const o = ctx.opacity.value;
       for (const [id, f] of fades) {
@@ -309,14 +244,6 @@ export default defineLayer({
         else ml.setPaintProperty(id, f.prop as never, v as never);
       }
     });
-    const off = ctx.map.onPick([`${ctx.id}.zebra`, `${ctx.id}.cross-1`, `${ctx.id}.cross1`, `${ctx.id}.line`, `${ctx.id}.line-dash`, `${ctx.id}.island-line`, `${ctx.id}.stop`, `${ctx.id}.giveway`, `${ctx.id}.arrow`, `${ctx.id}.osm.g.surf`, `${ctx.id}.osm.b.surf`], {
-      click(f, ll) {
-        const p = f.properties as unknown as MarkProps;
-        const facts = [p.marking ? { label: p.kind === 'arrow' ? 'turn:lanes' : p.kind === 'surf' ? 'Fahrbahn' : 'Markierung', value: p.marking } : undefined].filter((x): x is { label: string; value: string } => !!x);
-        const card: InspectCard = { title: p.title, subtitle: 'Markierung nach OpenStreetMap', icon: 'car', facts, links: [{ label: 'OpenStreetMap', url: p.url }], location: [ll[0], ll[1]] };
-        ctx.select(card);
-      },
-    });
-    return { destroy: () => { off(); stopData(); stopOpacity(); ml.off('moveend', onMove); ml.off('moveend', schedule); ml.off('sourcedata', onSource); clearTimeout(netTimer); ml.off('styleimagemissing', onMissing); resA.dispose(); resB.dispose(); ctx.map.remove({ layers: [...ids].reverse(), sources: [src, roads, marks, kerbs, zebras, arrowPts] }); } };
+    return { destroy: () => { stopOpacity(); ml.off('moveend', onMove); ml.off('moveend', schedule); ml.off('sourcedata', onSource); clearTimeout(netTimer); ml.off('styleimagemissing', onMissing); ctx.map.remove({ layers: [...ids].reverse(), sources: [roads, marks, kerbs, zebras, arrowPts] }); } };
   },
 });

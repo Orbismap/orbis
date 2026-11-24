@@ -38,6 +38,40 @@ const HI = {
   taiga: '#2b6857', rainforest: '#037071', wetland: '#2f6a60', tundra: '#58726a', ice: '#8895b2',
 };
 
+// --- one layer for several classes -----------------------------------------------------------------------------------
+// Every layer costs a draw pass per tile (and a phone feels that much more than a Mac), so classes that only differ in colour,
+// opacity or the zoom they start at share one layer. A value that follows its own zoom curve per class is written as one
+// `interpolate` over the zoom whose stops are a `match` on the class: at every stop the match returns the class's value, and
+// between stops MapLibre interpolates, which is what the class's own curve did (all curves are linear).
+type Stop = [zoom: number, value: number | string];
+type Curve = Stop[];
+const rgb = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)) as [number, number, number];
+const mix = (a: number | string, b: number | string, t: number): number | string => {
+  if (typeof a === 'number' && typeof b === 'number') return a + (b - a) * t;
+  const [x, y] = [rgb(a as string), rgb(b as string)];
+  return `#${x.map((v, i) => Math.round(v + (y[i]! - v) * t).toString(16).padStart(2, '0')).join('')}`;
+};
+/** The value of a curve at a zoom: constant before the first and after the last stop, linear in between. */
+const sample = (curve: Curve, zoom: number): number | string => {
+  if (zoom <= curve[0]![0]) return curve[0]![1];
+  for (let i = 1; i < curve.length; i++) {
+    const [z0, v0] = curve[i - 1]!, [z1, v1] = curve[i]!;
+    if (zoom <= z1) return mix(v0, v1, (zoom - z0) / (z1 - z0));
+  }
+  return curve[curve.length - 1]![1];
+};
+/** The curve is 0 below `minzoom` (the layer of this class started there before), and its own value from there on. */
+const from = (curve: Curve, minzoom: number): Curve => [[minzoom - 0.001, 0], [minzoom, sample(curve, minzoom)], ...curve.filter(([zz]) => zz > minzoom)];
+interface ClassCurve { classes: string[]; curve: Curve }
+/** `key` decides the group; classes of none fall back to `fallback`. */
+function byClass(key: Ex, groups: ClassCurve[], fallback: number | string): Ex {
+  const zooms = [...new Set(groups.flatMap((g) => g.curve.map(([zz]) => zz)))].sort((a, b) => a - b);
+  const stops = zooms.flatMap((zoom) => [zoom, ['match', key, ...groups.flatMap((g) => [g.classes, sample(g.curve, zoom)]), fallback]]);
+  return ['interpolate', ['linear'], ['zoom'], ...stops] as Ex;
+}
+/** A constant as a curve. */
+const flat = (v: number | string): Curve => [[0, v]];
+
 const z = (...stops: (number | string | Ex)[]): Ex => ['interpolate', ['linear'], ['zoom'], ...stops] as Ex;
 const cls = (...v: string[]): Ex => ['in', ['get', 'class'], ['literal', v]] as Ex;
 const hidden = { visibility: 'none' as const };
@@ -45,6 +79,8 @@ const round = { ...hidden, 'line-cap': 'round' as const, 'line-join': 'round' as
 
 /** What is drawn as thin paths; the road thresholds below follow tools/vector-basemap/schema.yml. */
 const PATHS = ['path', 'track'];
+/** The class of a major road: the ramps of motorways and trunks form a class of their own (they start later than the road). */
+const MAJOR_KEY = ['case', ['all', ['==', ['get', 'ramp'], 1], cls('motorway', 'trunk')], 'ramp', ['get', 'class']] as Ex;
 const notPath: Ex = ['!', cls(...PATHS, 'ferry', 'rail', 'transit', 'pier', 'aerialway')];
 
 export function karteBasemap(): BasemapDef {
@@ -83,27 +119,47 @@ export function karteBasemap(): BasemapDef {
     },
     // Below zoom 6 OFM only has coarse, merged residential blobs that shrink when the next tile level loads, so urban areas start at 6.
     // one layer per class: the zoom may only drive a colour at the top of an interpolate, not inside a match
-    ...([
-      ['forest', cls('wood', 'forest'), z(5, K.forestFar, 9, K.forest, 15, K.forestNear)],
-      ['grass', cls('grass'), z(6, K.farmland, 10, K.grass, 15, K.grassNear)],
-      ['farmland', cls('farmland'), K.farmland],
-      ['wild', cls('wetland'), K.wild],
-      ['bare', cls('sand', 'rock'), K.bare],
-      ['ice', cls('ice'), K.ice],
-    ] as [string, Ex, Ex | string][]).map(([n, filter, color]): LayerSpecification => ({
-      id: id(`landcover-${n}`), type: 'fill', source: 'ofm', 'source-layer': 'landcover', layout: hidden, filter, paint: { 'fill-color': color, 'fill-opacity': z(10, 0, 11.5, 1) },
-    })),
-    ...([
-      ['urban', cls('residential', 'suburb', 'neighbourhood', 'quarter', 'industrial', 'stadium', 'pitch', 'track', 'railway', 'garages', 'military', 'bus_station', 'playground'), 6, z(4, K.urbanFar, 10, K.urbanFar, 15, K.urbanNear), z(6, 0.55, 8, 1)],
-      // businesses and institutions fade in early (like Apple's purple and brown patches) and turn grey when zoomed in
-      ['commercial', cls('commercial', 'retail'), 8, z(13, K.commercial, 17, K.commercialNear), z(8, 0, 10.5, 1)],
-      ['institutional', cls('hospital', 'school', 'university', 'college', 'kindergarten'), 8, z(13, K.institutional, 17, K.institutionalNear), z(8, 0, 10.5, 1)],
-      ['cemetery', cls('cemetery'), 10, K.grassNear, 1],
-      // quarries (Apple: olive brown). OpenMapTiles has no landfill class, so tips like the Deponie Wicker are not in the OFM tiles
-      ['quarry', cls('quarry'), 9, K.quarry, 1],
-    ] as [string, Ex, number, Ex | string, Ex | number][]).map(([n, filter, minzoom, color, opacity]): LayerSpecification => ({
-      id: id(`landuse-${n}`), type: 'fill', source: 'ofm', 'source-layer': 'landuse', minzoom, layout: hidden, filter, paint: { 'fill-color': color, 'fill-opacity': opacity },
-    })),
+    // forests and grass change colour with the zoom, the others do not; one layer for all (see byClass)
+    {
+      // the single layers were drawn in this order (the later on top where areas overlap): the sort key keeps it
+      id: id('landcover'), type: 'fill', source: 'ofm', 'source-layer': 'landcover', layout: { ...hidden, 'fill-sort-key': ['match', ['get', 'class'], ['wood', 'forest'], 1, 'grass', 2, 'farmland', 3, 'wetland', 4, ['sand', 'rock'], 5, 6] as Ex },
+      filter: cls('wood', 'forest', 'grass', 'farmland', 'wetland', 'sand', 'rock', 'ice'),
+      paint: {
+        'fill-color': byClass(['get', 'class'] as Ex, [
+          { classes: ['wood', 'forest'], curve: [[5, K.forestFar], [9, K.forest], [15, K.forestNear]] },
+          { classes: ['grass'], curve: [[6, K.farmland], [10, K.grass], [15, K.grassNear]] },
+          { classes: ['farmland'], curve: flat(K.farmland) },
+          { classes: ['wetland'], curve: flat(K.wild) },
+          { classes: ['sand', 'rock'], curve: flat(K.bare) },
+          { classes: ['ice'], curve: flat(K.ice) },
+        ], K.land),
+        'fill-opacity': z(10, 0, 11.5, 1),
+      },
+    },
+    // urban areas from zoom 6; businesses and institutions fade in early (like Apple's purple and brown patches) and turn grey when zoomed in;
+    // quarries (Apple: olive brown; OpenMapTiles has no landfill class, so tips like the Deponie Wicker are not in the OFM tiles)
+    {
+      // drawn in the order of the former layers (cemeteries and quarries on top of the built-up areas): the sort key keeps it
+      id: id('landuse'), type: 'fill', source: 'ofm', 'source-layer': 'landuse', minzoom: 6,
+      layout: { ...hidden, 'fill-sort-key': ['match', ['get', 'class'], ['commercial', 'retail'], 2, ['hospital', 'school', 'university', 'college', 'kindergarten'], 3, 'cemetery', 4, 'quarry', 5, 1] as Ex },
+      filter: cls('residential', 'suburb', 'neighbourhood', 'quarter', 'industrial', 'stadium', 'pitch', 'track', 'railway', 'garages', 'military', 'bus_station', 'playground',
+        'commercial', 'retail', 'hospital', 'school', 'university', 'college', 'kindergarten', 'cemetery', 'quarry'),
+      paint: {
+        'fill-color': byClass(['get', 'class'] as Ex, [
+          { classes: ['residential', 'suburb', 'neighbourhood', 'quarter', 'industrial', 'stadium', 'pitch', 'track', 'railway', 'garages', 'military', 'bus_station', 'playground'], curve: [[4, K.urbanFar], [10, K.urbanFar], [15, K.urbanNear]] },
+          { classes: ['commercial', 'retail'], curve: [[13, K.commercial], [17, K.commercialNear]] },
+          { classes: ['hospital', 'school', 'university', 'college', 'kindergarten'], curve: [[13, K.institutional], [17, K.institutionalNear]] },
+          { classes: ['cemetery'], curve: flat(K.grassNear) },
+          { classes: ['quarry'], curve: flat(K.quarry) },
+        ], K.land),
+        'fill-opacity': byClass(['get', 'class'] as Ex, [
+          { classes: ['residential', 'suburb', 'neighbourhood', 'quarter', 'industrial', 'stadium', 'pitch', 'track', 'railway', 'garages', 'military', 'bus_station', 'playground'], curve: from([[6, 0.55], [8, 1]], 6) },
+          { classes: ['commercial', 'retail', 'hospital', 'school', 'university', 'college', 'kindergarten'], curve: from([[8, 0], [10.5, 1]], 8) },
+          { classes: ['cemetery'], curve: from(flat(1), 10) },
+          { classes: ['quarry'], curve: from(flat(1), 9) },
+        ], 0),
+      },
+    },
     { id: id('landfill'), type: 'fill', source: KARTE_OVERLAY_SOURCE, 'source-layer': 'landfill', minzoom: 9, layout: hidden, paint: { 'fill-color': K.quarry } },
     // relief shading as a 2D overlay (the DEM source is part of every composed style, see composeStyle)
     {
@@ -113,11 +169,19 @@ export function karteBasemap(): BasemapDef {
         'hillshade-accent-color': '#02142e', 'hillshade-illumination-direction': 315,
       },
     },
-    // only the big rivers from afar; streams and ditches only close up (Apple shows few of them). Filters cannot depend on the zoom, so one layer per step.
-    ...([['river-canal', 6, ['river', 'canal']], ['stream', 12, ['stream']], ['ditch', 14, ['drain', 'ditch']]] as [string, number, string[]][]).map(([n, minzoom, classes]): LayerSpecification => ({
-      id: id(`waterway-${n}`), type: 'line', source: 'ofm', 'source-layer': 'waterway', minzoom, layout: hidden, filter: cls(...classes),
-      paint: { 'line-color': K.water, 'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 12, 1.2, 14, 3, 18, 10] as Ex },
-    })),
+    // only the big rivers from afar; streams and ditches only close up (Apple shows few of them): one layer, the class decides from which zoom on
+    {
+      id: id('waterway'), type: 'line', source: 'ofm', 'source-layer': 'waterway', minzoom: 6, layout: hidden, filter: cls('river', 'canal', 'stream', 'drain', 'ditch'),
+      paint: {
+        'line-color': K.water,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 12, 1.2, 14, 3, 18, 10] as Ex,
+        'line-opacity': byClass(['get', 'class'] as Ex, [
+          { classes: ['river', 'canal'], curve: flat(1) },
+          { classes: ['stream'], curve: from(flat(1), 12) },
+          { classes: ['drain', 'ditch'], curve: from(flat(1), 14) },
+        ], 0),
+      },
+    },
     {
       id: id('water'), type: 'fill', source: 'ofm', 'source-layer': 'water', layout: hidden,
       // the ocean polygon only shows from zoom 6 on, below it the depth gradient (bathymetry) is the ocean
@@ -155,25 +219,38 @@ export function karteBasemap(): BasemapDef {
       paint: { 'line-color': K.bridge, 'line-opacity': z(15.5, 0, 16, 1), 'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 16, 7, 19, 26] as Ex },
     },
     // everything below secondary: the OFM tiles carry it from far out, Apple shows it from about zoom 11 (tertiary) and 12 (streets) on
-    ...([['tertiary', 11, ['tertiary']], ['street', 12, ['minor', 'service', 'busway', 'raceway']]] as [string, number, string[]][]).map(([n, minzoom, classes]): LayerSpecification => ({
-      id: id(`road-${n}`), type: 'line', ...tr, minzoom, layout: round,
-      filter: ['all', cls(...classes), ['!=', ['get', 'brunnel'], 'ford']] as Ex,
+    {
+      id: id('road-minor'), type: 'line', ...tr, minzoom: 11, layout: { ...round, 'line-sort-key': ['match', ['get', 'class'], 'tertiary', 1, 2] as Ex },
+      filter: ['all', cls('tertiary', 'minor', 'service', 'busway', 'raceway'), ['!=', ['get', 'brunnel'], 'ford']] as Ex,
       paint: {
         'line-color': z(10, K.roadMinorFar, 14, K.roadMinor, 15.5, K.roadMinor, 16, K.roadDark),
-        'line-opacity': z(10, 0.55, 14, 1),
+        'line-opacity': byClass(['get', 'class'] as Ex, [
+          { classes: ['tertiary'], curve: from([[10, 0.55], [14, 1]], 11) },
+          { classes: ['minor', 'service', 'busway', 'raceway'], curve: from([[10, 0.55], [14, 1]], 12) },
+        ], 0),
         'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 10, 0.7, 13, 1, 16, 5, 19, 18] as Ex,
       },
-    })),
-    // motorway 4, trunk 5, primary 7, secondary 10; ramps of the motorways a bit later
-    ...([['motorway', 4, ['all', cls('motorway'), ['!=', ['get', 'ramp'], 1]]], ['ramp', 10.5, ['all', cls('motorway', 'trunk'), ['==', ['get', 'ramp'], 1]]], ['trunk', 5, ['all', cls('trunk'), ['!=', ['get', 'ramp'], 1]]], ['primary', 7, cls('primary')], ['secondary', 10, cls('secondary')]] as [string, number, Ex][]).map(([n, minzoom, filter]): LayerSpecification => ({
-      id: id(`road-${n}`), type: 'line', ...tr, minzoom, layout: round, filter,
+    },
+    // motorway 4, trunk 5, primary 7, secondary 10; ramps of the motorways a bit later. A ramp is its own class here, drawn in this order (secondary on top)
+    {
+      id: id('road-major'), type: 'line', ...tr, minzoom: 4, layout: { ...round, 'line-sort-key': ['match', MAJOR_KEY, 'motorway', 1, 'ramp', 2, 'trunk', 3, 'primary', 4, 5] as Ex },
+      filter: ['in', MAJOR_KEY, ['literal', ['motorway', 'trunk', 'primary', 'secondary', 'ramp']]] as Ex,
       paint: {
-        'line-color': z(10, n === 'motorway' ? K.motorway : K.roadMajor, 15.5, n === 'motorway' ? K.motorway : K.roadMajor, 16, K.roadDark),
+        'line-color': byClass(MAJOR_KEY, [
+          { classes: ['motorway'], curve: [[10, K.motorway], [15.5, K.motorway], [16, K.roadDark]] },
+          { classes: ['trunk', 'primary', 'secondary', 'ramp'], curve: [[10, K.roadMajor], [15.5, K.roadMajor], [16, K.roadDark]] },
+        ], K.roadMajor),
         // below one device pixel the light lines look dashed and flicker, so they start at about a pixel
         'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 4, 1, 8, 1.2, 11, 1.7, 16, 9, 19, 34] as Ex,
-        'line-opacity': z(4, 0.8, 10, 1),
+        'line-opacity': byClass(MAJOR_KEY, [
+          { classes: ['motorway'], curve: from([[4, 0.8], [10, 1]], 4) },
+          { classes: ['trunk'], curve: from([[4, 0.8], [10, 1]], 5) },
+          { classes: ['primary'], curve: from([[4, 0.8], [10, 1]], 7) },
+          { classes: ['secondary'], curve: from([[4, 0.8], [10, 1]], 10) },
+          { classes: ['ramp'], curve: from([[4, 0.8], [10, 1]], 10.5) },
+        ], 0),
       },
-    })),
+    },
   ];
   const topLayers: LayerSpecification[] = [
     {
