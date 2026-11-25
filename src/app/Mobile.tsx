@@ -1,4 +1,5 @@
 import { useEffect } from 'preact/hooks';
+import { SeasonBar } from '../features/season/SeasonBar';
 import { Scalebar } from '../features/scalebar/Scalebar';
 import { Attribution } from '../features/attribution/Attribution';
 import { InspectorCard } from '../features/inspector/Inspector';
@@ -64,6 +65,9 @@ export function MobileLayout() {
       <Header />
       <div class="rail-pos">
         <ToolRail popoverUp />
+      </div>
+      <div class="season-pos">
+        <SeasonBar />
       </div>
       <div class="maplegend-pos">
         <Legend />

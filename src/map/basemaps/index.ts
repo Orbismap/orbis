@@ -3,7 +3,7 @@ import type { LayerSpecification, SkySpecification, SourceSpecification, StyleSp
 import { MARKERS, markerLayerId } from '../slots';
 import type { BasemapId, StaticBasemapId } from '../types';
 import { canonicalRegionalId, isRegionalId, regionalDef } from './regional';
-import { blank, bluemarble, nachtlichter, cyclosm, EOX_YEARS, eox, oepnv, osmDe, osmFr, wikimedia, esriDarkGray, esriHillshade, esriLightGray, esriNatgeo, esriNavigation, esriOcean, esriPhysical, esriShadedRelief, esriStreets, esriTerrain, esriTopo, osmHot, esriClarity, imagicoAlps, osm, satellite, swissalti3d, swissimage, swisssurface3d, terrain } from './raster';
+import { blank, bluemarble, jahreszeiten, nachtlichter, cyclosm, EOX_YEARS, eox, oepnv, osmDe, osmFr, wikimedia, esriDarkGray, esriHillshade, esriLightGray, esriNatgeo, esriNavigation, esriOcean, esriPhysical, esriShadedRelief, esriStreets, esriTerrain, esriTopo, osmHot, esriClarity, imagicoAlps, osm, satellite, swissalti3d, swissimage, swisssurface3d, terrain } from './raster';
 import type { BasemapDef, LabelVariant } from './types';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT } from '../buildings-tilt';
 import { DEM_NATIVE_ZOOM, DEM_TILES } from '../dem-protocol';
@@ -34,7 +34,7 @@ export const DEFAULT_KARTE_MODE: KarteMode = 'erkunden';
 /** Keyed providers' aerial images (the other keyed maps are plain maps). */
 const KEYED_AERIAL: StaticBasemapId[] = ['mt-satellite', 'mt-hybrid', 'st-satellite', 'mb-satellite', 'mb-hybrid', 'here-satellite', 'here-hybrid'];
 /** Every aerial image (the picker's Satellit list). */
-const AERIAL_SET = new Set<string>([...['satellite', 'esri-clarity', 'bluemarble', 'nachtlichter'], ...EOX_YEARS.map((y) => `eox-${y}`), ...KEYED_AERIAL]);
+const AERIAL_SET = new Set<string>([...['satellite', 'esri-clarity', 'bluemarble', 'jahreszeiten', 'nachtlichter'], ...EOX_YEARS.map((y) => `eox-${y}`), ...KEYED_AERIAL]);
 /** A provider (or kind) of maps in the picker: the maps stand under its small heading. */
 export interface BasemapGroup { title: string; ids: StaticBasemapId[] }
 /** Keyed providers' maps of one kind (aerial or plain), as groups under the provider's name. */
@@ -44,7 +44,7 @@ const keyedByKind = (aerial: boolean): BasemapGroup[] =>
 export const AERIAL_GROUPS: BasemapGroup[] = [
   { title: 'Esri', ids: ['satellite', 'esri-clarity'] },
   { title: 'Sentinel-2 (EOX)', ids: EOX_YEARS.map((y) => `eox-${y}` as const) },
-  { title: 'Weitere', ids: ['bluemarble', 'nachtlichter'] },
+  { title: 'Weitere', ids: ['jahreszeiten', 'bluemarble', 'nachtlichter'] },
   ...keyedByKind(true),
 ];
 export const AERIAL_IDS: StaticBasemapId[] = AERIAL_GROUPS.flatMap((g) => g.ids);
@@ -83,6 +83,7 @@ export const BASEMAPS: Record<StaticBasemapId, BasemapDef> = {
   swissimage: swissimage(),
   'imagico-alps': imagicoAlps(),
   bluemarble: bluemarble(),
+  jahreszeiten: jahreszeiten(),
   nachtlichter: nachtlichter(),
   osm: osm(),
   'osm-fr': osmFr(),

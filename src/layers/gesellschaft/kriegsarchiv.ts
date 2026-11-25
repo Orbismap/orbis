@@ -5,17 +5,20 @@ import { computed, effect } from '@preact/signals';
 import type { ExpressionSpecification, GeoJSONSourceSpecification, LayerSpecification } from 'maplibre-gl';
 import type { FeatureCollection } from 'geojson';
 import { formatDate } from '../../core/format';
+import { DAY } from '../../core/time';
 import { proxied } from '../../data/endpoints';
 import { fetchJson } from '../../data/http';
 import { CAT_LABEL, captionParts, dayToDate, type ArchivePinProps, type ArchivePins } from '../../data/parsers/archive';
 import { ZEUGEN_WARNUNG, hostLabel, isHttp } from '../../data/parsers/zeitzeugen';
 import { pointLayer } from '../../render/points';
-import { EMPTY_FC, type AnyFeature } from '../../render/common';
+import { EMPTY_FC, markEventTimes, type AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
 
 const COLOR = '#C0392B';
 const ORIGIN = 'https://archivegenocide.com';
 const DATA = `${ORIGIN}/geolocation/data/`;
+/** Beginn der Dokumentation: das Archiv zählt die Tage ab dem 7. Oktober 2023 (stats.epoch). */
+const FIRST = Date.UTC(2023, 9, 7);
 const EMPTY = { type: 'FeatureCollection', features: [] } as ArchivePins;
 
 interface Clip { c?: string; d?: string; a?: string; k?: string; du?: string; et?: string; cat?: string; m?: string; cp?: string; pu?: string | null; pv?: { links?: [string, string][] }[] }
@@ -36,6 +39,7 @@ export default defineLayer({
   color: COLOR,
   form: 'points',
   cadence: 'daily',
+  time: { mode: 'window', range: () => ({ start: FIRST - Date.now(), end: 0, step: DAY }) },
   coverage: 'Gaza',
   sources: [
     { name: 'Archive Genocide, Geolocation Map (archivegenocide.com), Abruf über den Daten-Proxy', url: 'https://archivegenocide.com/geolocation/', license: 'Archivdaten, Quellenangabe; Belegmaterial gehört den Urhebern' },
@@ -51,6 +55,26 @@ export default defineLayer({
     const ext = ctx.resource<ArchivePins>({ key: 'ag:external', url: proxied(`${DATA}external.json`), parse: 'archiveExternal', timeout: 40_000 });
     const dots = ctx.resource<FeatureCollection>({ key: 'ag:dots', url: proxied(`${DATA}dots.json`), parse: 'archiveDots', timeout: 60_000 });
     const all = computed<ArchivePins | undefined>(() => (pins.data.value || ext.data.value ? { type: 'FeatureCollection', features: [...(pins.data.value ?? EMPTY).features, ...(ext.data.value ?? EMPTY).features] } : undefined));
+    // Datum eines Eintrags (Mittag, ms); Einträge ohne Datum bleiben immer sichtbar
+    const timeOf = (p: ArchivePinProps, epoch: string) => {
+      const d = p.date || dayToDate(epoch, p.day);
+      return d ? Date.parse(`${d}T12:00:00Z`) : undefined;
+    };
+    const epoch = computed(() => stats.data.value?.epoch ?? '2023-10-07');
+    const visible = computed<ArchivePins | undefined>(() => {
+      const a = all.value;
+      if (!a) return undefined;
+      const t = ctx.time.value + DAY / 2;
+      const ep = epoch.value;
+      return { type: 'FeatureCollection', features: a.features.filter((f) => (timeOf(f.properties, ep) ?? 0) <= t) };
+    });
+    // Zeitleiste: alle datierten Einträge, unabhängig vom gewählten Zeitpunkt
+    markEventTimes(ctx, () => {
+      const a = all.value;
+      if (!a) return undefined;
+      const ep = epoch.value;
+      return a.features.flatMap((f) => timeOf(f.properties, ep) ?? []);
+    });
 
     // density of approximate placements
     const ml = ctx.map.ml;
@@ -69,7 +93,7 @@ export default defineLayer({
     const stopOpacity = effect(() => { const o = ctx.opacity.value; if (ml.getLayer(dotsLayer)) ml.setPaintProperty(dotsLayer, 'heatmap-opacity', ['interpolate', ['linear'], ['zoom'], 6, 0.85 * o, 12, 0.5 * o, 15, 0.15 * o] as unknown as number); });
 
     const handle = pointLayer(ctx, {
-      data: all,
+      data: visible,
       resources: [stats, pins, ext, dots],
       cluster: { radius: 34, maxZoom: 11 },
       radius: ['interpolate', ['linear'], ['zoom'], 6, 3, 12, 5, 16, 8] as ExpressionSpecification,

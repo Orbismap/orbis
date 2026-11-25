@@ -14,6 +14,8 @@ import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDI
 import { registerDemTiles } from './dem-protocol';
 import { reliefRange } from './relief';
 import { registerKeyedTiles } from './basemaps/keyed-protocol';
+import { seasonLayerId } from './basemaps/raster';
+import { seasonBlend, seasonPos } from '../state/season';
 import { registerPmtilesProtocol } from './pmtiles-protocol';
 import { LABEL_VARIANTS, labelLayers } from './basemaps/vector';
 import { landmarkMask } from '../data/landmarks';
@@ -352,6 +354,25 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     poiLabelsVisible.value = on || poiLayerOn.peek();
     poiHeights?.refresh();
   }
+  /** Basemap "Jahreszeiten": the two month images around the slider are blended (the lower one opaque, the upper one by its share); the neighbours load invisibly. */
+  function applySeason() {
+    if (basemap !== 'jahreszeiten') return;
+    const { a, b, mix } = seasonBlend(seasonPos.peek());
+    for (let m = 0; m < 12; m++) {
+      const id = seasonLayerId(m);
+      setVis(id, true); // all twelve stay visible at opacity 0: their tiles load at once and the slider never waits
+      if (ml.getLayer(id)) ml.setPaintProperty(id, 'raster-opacity', 0);
+    }
+    const top = Math.max(a, b);
+    const bottom = Math.min(a, b);
+    if (mix < 0.002) return void ml.setPaintProperty(seasonLayerId(a), 'raster-opacity', 1);
+    ml.setPaintProperty(seasonLayerId(bottom), 'raster-opacity', 1);
+    ml.setPaintProperty(seasonLayerId(top), 'raster-opacity', top === b ? mix : 1 - mix);
+  }
+  const stopSeason = effect(() => {
+    seasonPos.value;
+    if (loaded) applySeason();
+  });
   function applyBasemap() {
     const regional = isStaticBasemap(basemap) ? undefined : regionalDef(basemap);
     // regional data not loaded yet: show the default meanwhile and apply again when it is there
@@ -359,6 +380,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     syncDynamic(regional?.id);
     const shown = isStaticBasemap(basemap) ? basemap : regional ? undefined : DEFAULT_BASEMAP;
     for (const id of BASEMAP_IDS) for (const l of BASEMAPS[id].layers) setVis(l.id, id === shown);
+    applySeason();
     applyBuildings();
     applyPoi();
     const look = regional ?? BASEMAPS[shown ?? DEFAULT_BASEMAP];
@@ -561,6 +583,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
     },
     destroy() {
       disposers.forEach((d) => d());
+      stopSeason();
       limits.destroy();
       poiHeights?.destroy();
       writeThrottled.cancel();

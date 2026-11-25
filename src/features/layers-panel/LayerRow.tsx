@@ -1,3 +1,4 @@
+import { customPage } from './pages/registry';
 import { isMobile } from '../../state/ui';
 import { computed } from '@preact/signals';
 import { createPortal } from 'preact/compat';
@@ -11,7 +12,7 @@ import { hasKey } from '../../keys';
 import { setLayerVisible } from '../../karten/active';
 import { useEscape } from '../../ui/hooks';
 import { multiValues } from '../../layers/multi';
-import { OptionFields } from './LayerDetails';
+import { OptionFields, shownOptions } from './LayerDetails';
 import { Icon } from '../../ui/icons/Icon';
 import { cx } from '../../ui/hooks';
 import { openKeySettings } from '../boost/open';
@@ -174,7 +175,7 @@ const hasChoices = (def: LayerDef) => !!def.options?.some((o) => o.type === 'sel
 /** Short text of the chosen options: the labels of the select choices (toggle labels are too long for a row). */
 function optionSummary(def: LayerDef, layer: KarteLayer): string {
   const parts: string[] = [];
-  for (const o of def.options ?? []) {
+  for (const o of shownOptions(def, layer)) {
     const v = layer.options?.[o.id] ?? o.default;
     if (o.type === 'select') parts.push(o.choices.find((c) => c.value === v)?.label ?? String(v));
     else if (o.type === 'multi') {
@@ -229,7 +230,7 @@ function FilterButton({ def, layer, karteId, onSettings }: { def: LayerDef; laye
   return (
     <>
       <button ref={btn} type="button" class={cx('lrow-filter', open && 'is-open')} data-nav aria-haspopup="dialog" aria-expanded={open} aria-label={`Optionen ${def.title}`} title="Optionen" onClick={toggle}>
-        <Icon name="filter" size={16} />
+        <Icon name={customPage(def.id) ? 'sliders' : 'filter'} size={16} />
       </button>
       {open &&
         createPortal(

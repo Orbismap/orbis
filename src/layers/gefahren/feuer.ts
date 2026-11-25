@@ -6,7 +6,7 @@ import { formatAge, formatDateTime, formatNumber, withUnit } from '../../core/fo
 import { MINUTE } from '../../core/time';
 import { bucketUrl } from '../../data/endpoints';
 import type { FireCollection, FireProps } from '../../data/parsers/firms';
-import { Cleanup, EMPTY_FC, idBase, trackStatus } from '../../render/common';
+import { Cleanup, EMPTY_FC, idBase, markEventTimes, trackStatus } from '../../render/common';
 import { defineLayer } from '../define';
 
 const COLOR = '#FF7A1A';
@@ -54,6 +54,8 @@ export default defineLayer({
     const clean = new Cleanup();
 
     ctx.map.addSource(src, { type: 'geojson', data: EMPTY_FC });
+    // Striche in der Zeitleiste: wann Feuer erkannt wurden (t in Minuten)
+    markEventTimes(ctx, () => res.data.value?.features.map((f) => f.properties.t * 60_000));
 
     // window [from, to] in minutes since 1970
     const range = computed(() => {

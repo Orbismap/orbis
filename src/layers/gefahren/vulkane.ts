@@ -1,13 +1,13 @@
 // Smithsonian GVP: Holocene volcanoes (triangles) plus their eruption history (11 000 events).
-// One layer, two views selectable in the inspector: active volcanoes or eruptions over time.
+// One layer, two views selectable in the inspector: eruptions over time (default, on the timeline) or the volcanoes as they are today.
 import { computed, effect } from '@preact/signals';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { formatInt, formatWithUnit } from '../../core/format';
-import { HOUR } from '../../core/time';
+import { DAY, HOUR } from '../../core/time';
 import { bucketUrl } from '../../data/endpoints';
 import type { EruptionCollection, EruptionProps } from '../../data/parsers/eruptions';
 import type { VolcanoCollection, VolcanoProps, VolcanoState } from '../../data/parsers/gvp';
-import type { AnyFeature } from '../../render/common';
+import { markEventTimes, type AnyFeature } from '../../render/common';
 import { pointLayer } from '../../render/points';
 import type { LayerHandle } from '../types';
 import { defineLayer } from '../define';
@@ -17,6 +17,13 @@ const LAST_YEAR = new Date().getFullYear() - 1;
 const env = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
 const ERUPTIONS_URL = `${env.BASE_URL ?? './'}data/gvp-eruptions.json`;
 
+/** Beginn eines Ausbruchs in ms (Jahre vor 100 und negative Jahre inklusive; unbekannter Monat = Januar). */
+const eruptionMs = (year: number, month: number) => {
+  const d = new Date(0);
+  d.setUTCFullYear(year, Math.max(0, month - 1), 1);
+  return d.getTime();
+};
+const FIRST_ERUPTION = eruptionMs(-55000, 1);
 const year = (y: number) => (y < 0 ? `${-y} v. Chr.` : String(y));
 const sizeBy = (a: number, h: number, d: number): ExpressionSpecification => ['match', ['get', 'rank'], 2, a, 1, h, d] as ExpressionSpecification;
 
@@ -27,12 +34,17 @@ const EPOCHS = [
   { min: -Infinity, label: 'Älter (bis 55 500 v. Chr.)', color: '#8C939E', dim: 'rgba(140, 147, 158, 0.3)' },
 ] as const;
 const FILTERS = [
-  { value: 'all', label: 'Alle (bis 55 500 v. Chr.)', min: -Infinity },
-  { value: 'holo', label: 'Holozän (ab 9 700 v. Chr.)', min: -9700 },
-  { value: 'ce', label: 'Seit der Zeitenwende', min: 1 },
+  { value: 'all', label: 'Alles', min: -Infinity },
+  { value: 'holo', label: 'Holozän', min: -9700 },
+  { value: 'ce', label: 'Zeitenwende', min: 1 },
   { value: '1500', label: 'Seit 1500', min: 1500 },
   { value: '1900', label: 'Seit 1900', min: 1900 },
 ];
+/** Von- und Bis-Jahr der Ausbrüche nach der Option „Zeitraum“. */
+function eruptionYears(o: Record<string, unknown>): { lo: number; hi: number } {
+  const min = FILTERS.find((f) => f.value === String(o.epoch ?? '1900'))?.min ?? -Infinity;
+  return { lo: Number.isFinite(min) ? min : -Infinity, hi: Infinity };
+}
 const VEI = ['nicht angegeben', 'schwach', 'mäßig', 'stark', 'sehr stark', 'gewaltig', 'katastrophal', 'Superausbruch'];
 const yearLabel = (y: number) => (y < 0 ? `${formatInt(-y)} v. Chr.` : formatInt(y));
 const whenLabel = (p: EruptionProps) => {
@@ -57,17 +69,28 @@ export default defineLayer({
   color: COLORS.active,
   form: 'points',
   cadence: 'daily',
+  // Zeitleiste nur in der Ansicht „Ausbrüche“: von den ältesten Ausbrüchen bis heute, in Zehnjahresschritten
+  time: {
+    mode: 'window',
+    enabled: (o) => o.view !== 'vulkane',
+    // Der Zeitraum der Ausbrüche (Option „Zeitraum“) bestimmt auch die Zeitleiste
+    range: (o) => {
+      const { lo, hi } = eruptionYears(o);
+      const now = Date.now();
+      return { start: (Number.isFinite(lo) ? eruptionMs(lo, 1) : FIRST_ERUPTION) - now, end: hi >= new Date().getFullYear() ? 0 : eruptionMs(hi, 12) - now, step: 10 * 365.25 * DAY };
+    },
+  },
   coverage: 'Welt',
   sources: [{ name: 'Smithsonian Global Volcanism Program', url: 'https://volcano.si.edu/', license: 'Smithsonian, Quellenangabe', manifest: { bucket: 'data', key: 'volcanoes.json' } }],
   options: [
-    { id: 'view', label: 'Ansicht', type: 'select', choices: [{ value: 'vulkane', label: 'Vulkane' }, { value: 'ausbrueche', label: 'Ausbrüche' }], default: 'vulkane' },
-    { id: 'onlyActive', label: 'Nur aktive', type: 'toggle', default: false },
-    { id: 'epoch', label: 'Zeitraum (Ausbrüche)', type: 'select', choices: FILTERS.map((f) => ({ value: f.value, label: f.label })), default: 'all' },
-    { id: 'minYear', label: 'Von Jahr (Ausbrüche)', type: 'range', min: -55000, max: 2026, step: 100, default: -55000, unit: 'Jahr' },
-    { id: 'maxYear', label: 'Bis Jahr (Ausbrüche)', type: 'range', min: -55000, max: 2026, step: 100, default: 2026, unit: 'Jahr' },
+    { id: 'view', label: 'Ansicht', type: 'select', choices: [{ value: 'ausbrueche', label: 'Ausbrüche' }, { value: 'vulkane', label: 'Vulkane' }], default: 'ausbrueche' },
+    // Ausbrüche: der Zeitraum bestimmt auch die Zeitleiste
+    { id: 'epoch', label: 'Zeitraum', type: 'select', choices: FILTERS.map((f) => ({ value: f.value, label: f.label })), default: '1900', when: (o) => o.view !== 'vulkane' },
+    // Vulkane: nur die mit Ausbruch seit dem letzten Jahr
+    { id: 'onlyActive', label: 'Nur aktive', type: 'toggle', default: false, when: (o) => o.view === 'vulkane' },
   ],
   legend: (o) =>
-    o.view === 'ausbrueche'
+    o.view !== 'vulkane'
       ? { type: 'classes', items: EPOCHS.map((e) => ({ color: e.color, label: e.label })) }
       : {
           type: 'classes',
@@ -92,15 +115,20 @@ export default defineLayer({
     const visibleEruption = computed<EruptionCollection | undefined>(() => {
       const d = resEruption.data.value;
       if (!d) return undefined;
-      const choice = String(ctx.options.value.epoch ?? 'all');
-      const min = Math.max(FILTERS.find((f) => f.value === choice)?.min ?? -Infinity, Number(ctx.options.value.minYear ?? -55000));
-      const max = Math.min(2026, Number(ctx.options.value.maxYear ?? 2026));
-      const lo = Number.isFinite(min) ? min : -Infinity;
-      const hi = Number.isFinite(max) ? max : Infinity;
-      return { type: 'FeatureCollection', features: d.features.filter((f) => f.properties.year >= lo && f.properties.year <= hi) };
+      const { lo, hi } = eruptionYears(ctx.options.value);
+      // Fenster: Ausbrüche bis zum gewählten Zeitpunkt (live: alle)
+      const upTo = new Date(ctx.time.value).getUTCFullYear();
+      return { type: 'FeatureCollection', features: d.features.filter((f) => f.properties.year >= lo && f.properties.year <= hi && f.properties.year <= upTo) };
     });
 
-    const view = computed(() => String(ctx.options.value.view ?? 'vulkane'));
+    const view = computed(() => String(ctx.options.value.view ?? 'ausbrueche'));
+
+    // Zeitleiste (Ansicht „Ausbrüche“): alle Ausbrüche in den Farben der Legende, unabhängig vom gewählten Zeitpunkt
+    markEventTimes(ctx, () => {
+      const d = view.value !== 'vulkane' ? resEruption.data.value : undefined;
+      if (!d) return undefined;
+      return { times: d.features.map((f) => eruptionMs(f.properties.year, f.properties.month)), colors: d.features.map((f) => EPOCHS.find((e) => f.properties.year >= e.min)!.color) };
+    });
 
     let active: LayerHandle | null = null;
     let activeView: string | null = null;
@@ -109,7 +137,7 @@ export default defineLayer({
       if (v === activeView) return;
       if (active) { active.destroy(); active = null; }
       activeView = v;
-      if (v === 'ausbrueche') {
+      if (v !== 'vulkane') {
         active = pointLayer(ctx, {
           data: visibleEruption,
           resources: [resEruption],

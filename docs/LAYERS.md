@@ -131,3 +131,17 @@ export default defineLayer({
 
 Fehlt ein Pflicht-Schlüssel, ruft die Runtime `mount` nicht auf; die Oberfläche zeigt „Schlüssel nötig“. Schlüssel nie loggen und nie in
 Abruf-URLs von Spiegeln oder Fehlermeldungen schreiben. Standardkarten können `sensitive` ebenfalls tragen (`karten/standard.ts`).
+
+## Eigene Detailseite
+
+Die Standardseite einer Ebene (Schalter, Optionen, Deckkraft, Legende, Daten) lässt sich ersetzen: eine Datei
+`src/features/layers-panel/pages/<ebenen-id>.tsx` mit `export default function Seite(props: LayerPageProps)`. Rahmen, Zurück-Knopf und
+Escape bleiben; die Seite liefert den Körper. Bausteine aus `layers-panel/page-kit.tsx`: `PageHead` (Titel und ein Satz, ohne Symbol),
+`ShowSwitch`, `PageFoot` (Quellen, Entfernen) und `useLayerOption(layer, def, karteId, id)`. Optionen müssen weiter in `defineLayer`
+stehen (dort liegt ihr gespeicherter Wert). Beispiel: `pages/zugvoegel.tsx`. In der Ebenenliste zeigt eine Ebene mit eigener Seite das
+Regler- statt des Filtersymbols.
+
+## Spuren unter der Zeitleiste
+
+`setTimeTracks(ctx.id, [{ id, label, color, active: [{ start, end }] }])` (`state/time-tracks.ts`) zeigt je Gruppe einen Streifen, wo sich
+etwas tut; die Zeitleiste bietet dann „Ruhe überspringen“ beim Abspielen. Beim Abbau `setTimeTracks(ctx.id, null)`.

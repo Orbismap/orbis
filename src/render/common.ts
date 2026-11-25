@@ -172,3 +172,17 @@ export function featureFinder(features: AnyFeature[], idKey: string): (id: strin
     return map.get(id);
   };
 }
+
+/**
+ * Meldet die Ereigniszeiten einer Ebene an die Zeitleiste (Striche oder Kurve): `times` liefert die Zeiten in ms (und optional
+ * eine Farbe je Ereignis, wie in der Legende), sobald die Daten da sind. Gedacht für alle Ereignisse des Zeitbereichs, unabhängig
+ * vom gewählten Zeitpunkt, und für Ebenen mit zu vielen Ereignissen für eine Liste (`ctx.feed`). Der Effekt endet mit der Ebene.
+ */
+export function markEventTimes(ctx: LayerContext, times: () => { times: ArrayLike<number>; colors?: ArrayLike<string> } | ArrayLike<number> | undefined): void {
+  const stop = effect(() => {
+    const t = times();
+    if (t && 'times' in t) ctx.marks(t.times, t.colors);
+    else ctx.marks(t ?? []);
+  });
+  ctx.signal.addEventListener('abort', stop, { once: true });
+}

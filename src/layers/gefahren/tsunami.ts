@@ -5,7 +5,7 @@ import { formatAge, formatDateTime, formatNumber } from '../../core/format';
 import { DAY, HOUR, MINUTE } from '../../core/time';
 import { bucketUrl } from '../../data/endpoints';
 import type { TsunamiCollection, TsunamiProps } from '../../data/parsers/tsunami';
-import type { AnyFeature } from '../../render/common';
+import { markEventTimes, type AnyFeature } from '../../render/common';
 import { pointLayer } from '../../render/points';
 import { defineLayer } from '../define';
 import type { LayerContext } from '../types';
@@ -51,6 +51,11 @@ export default defineLayer({
       const t = ctx.time.value;
       const info = ctx.options.value.info !== false;
       return { type: 'FeatureCollection', features: d.features.filter((f) => f.properties.t <= t && f.properties.t >= t - MAX_AGE && (info || f.properties.level > 0)) };
+    });
+    // Zeitleiste: alle Meldungen, unabhängig vom gewählten Zeitpunkt, in den Farben der Legende
+    markEventTimes(ctx, () => {
+      const all = merged.value?.features.filter((f) => ctx.options.value.info !== false || f.properties.level > 0);
+      return all && { times: all.map((f) => f.properties.t), colors: all.map((f) => LEVELS[f.properties.level].color) };
     });
     const active = computed(() => visible.value?.features.filter((f) => f.properties.level > 0).length);
     const emptyNote = () => {

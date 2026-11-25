@@ -11,7 +11,7 @@ import { nwsAlerts, type NwsCollection, type NwsProps } from '../../data/parsers
 import { reportDayStart, spcReports, type SpcCollection, type SpcKind, type SpcProps } from '../../data/parsers/spc';
 import { areaLayer } from '../../render/areas';
 import { pointLayer } from '../../render/points';
-import type { AnyFeature } from '../../render/common';
+import { markEventTimes, type AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
 import type { FeedItem } from '../types';
 
@@ -105,6 +105,30 @@ export default defineLayer({
       if (reportRes.every((r) => !r.data.value)) return undefined;
       const features = reportRes.flatMap((r) => r.data.value?.features ?? []).filter((f) => f.properties.time <= t && f.properties.time > t - 2 * DAY && (kinds === 'all' || f.properties.kind === 'tornado'));
       return { type: 'FeatureCollection', features };
+    });
+
+    // Zeitleiste: Beginn aller Warnungen und alle Meldungen der letzten Tage, unabhängig vom gewählten Zeitpunkt (die Liste ist zeitgefiltert)
+    markEventTimes(ctx, () => {
+      const times: number[] = [];
+      const colors: string[] = [];
+      for (const r of feeds) {
+        for (const f of r.data.value?.features ?? []) {
+          if (!f.properties.onset) continue;
+          times.push(f.properties.onset);
+          colors.push(info(f.properties.event).color);
+        }
+      }
+      const kinds = ctx.options.value.meldungen ?? 'all';
+      if (kinds !== 'off') {
+        for (const r of reportRes) {
+          for (const f of r.data.value?.features ?? []) {
+            if (kinds !== 'all' && f.properties.kind !== 'tornado') continue;
+            times.push(f.properties.time);
+            colors.push(REPORTS[f.properties.kind as SpcKind]?.color ?? '#FF9900');
+          }
+        }
+      }
+      return times.length ? { times, colors } : undefined;
     });
 
     // both kits feed the same list: collect their items and hand them over together

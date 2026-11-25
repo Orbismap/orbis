@@ -1,0 +1,45 @@
+@layer features {
+  .season {
+    width: min(440px, calc(100vw - 2 * var(--edge, 12px)));
+    padding: var(--s-2) var(--s-4) var(--s-2);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .season-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: var(--fs-small);
+    color: var(--text-2, inherit);
+  }
+  .season-value {
+    font-size: var(--fs-ui);
+    color: var(--text-1, inherit);
+  }
+  .season-months {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    margin: 0 8px;
+    font-size: var(--fs-small);
+    text-align: center;
+    opacity: 0.6;
+  }
+  .season-months .on {
+    opacity: 1;
+    font-weight: 600;
+  }
+  .season-pos {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: auto;
+  }
+  .hud-desktop .season-pos {
+    bottom: calc(var(--dock-h, 90px) + var(--dock-bottom) + 10px);
+  }
+  .hud-mobile .season-pos {
+    top: calc(env(safe-area-inset-top, 0px) + 68px);
+  }
+}

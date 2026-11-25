@@ -6,7 +6,7 @@ import { hasKey, keySignal } from '../keys';
 import { settings, warningKey } from '../state/settings';
 import { scopeEngine, type ScopeRecord } from '../map/scope';
 import type { MapEngine, SlotId } from '../map/types';
-import { clearLayerSession, activeKarte, setFeed, setLayerStatus, setLegend, activeKarteId } from '../state/session';
+import { clearLayerSession, activeKarte, setFeed, setLayerStatus, setMarkTimes, setLegend, activeKarteId } from '../state/session';
 import { inspector, selectCard, selectPlace } from '../state/selection';
 import { karteMode } from '../state/view';
 import { isMobile } from '../state/ui';
@@ -82,6 +82,7 @@ export function startRuntime(engine: MapEngine): () => void {
         return r;
       },
       feed: (items) => alive() && setFeed(id, items),
+      marks: (times, colors) => alive() && setMarkTimes(id, { times, colors }),
       key: keySignal,
       select: (card) => {
         if (card) own.add(card);
@@ -216,7 +217,14 @@ export function startRuntime(engine: MapEngine): () => void {
       // Like the POIs of the basemap: on in the background while Erkunden is shown, never in `l=`.
       // If the layer is switched on as a layer itself it is already in `wanted` and mounted once only.
       if (erkunden) for (const id of ERKUNDEN_LAYERS) if (!wanted.includes(id) && getLayer(id)) wanted.push(id);
-      timeSources.value = wanted.map((id) => getLayer(id)!.time).filter((t): t is NonNullable<typeof t> => !!t);
+      // jede Zeitachse bekommt die gewählten Optionen (mit Vorgaben); ändern sie sich, wird der Zeitbereich neu berechnet
+      timeSources.value = wanted.flatMap((id) => {
+        const def = getLayer(id)!;
+        const t = def.time;
+        if (!t) return [];
+        const o = { ...defaultOptions(def.options), ...(k.layers.find((l) => l.id === id)?.options ?? {}) };
+        return !t.enabled || t.enabled(o) ? [{ ...t, range: () => t.range(o) }] : [];
+      });
       untracked(() => {
         for (const id of [...mounted.keys()]) if (!wanted.includes(id)) unmount(id);
         for (const id of wanted) if (!mounted.has(id)) mount(getLayer(id)!);

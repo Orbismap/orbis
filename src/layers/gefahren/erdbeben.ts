@@ -9,7 +9,7 @@ import { fetchJson } from '../../data/http';
 import { mergeQuakes, type QuakeCollection, type QuakeProps } from '../../data/parsers/quakes';
 import { usgsQuakes } from '../../data/parsers/usgs';
 import { pointLayer } from '../../render/points';
-import type { AnyFeature } from '../../render/common';
+import { markEventTimes, type AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
 
 const COLOR = '#F2B45A';
@@ -73,6 +73,14 @@ export default defineLayer({
       return { type: 'FeatureCollection', features: m.features.filter((f) => f.properties.mag >= min && f.properties.time <= t) };
     });
     const color = computed(() => ageColor(ctx.time.value));
+    // Zeitleiste: alle Beben des Zeitbereichs, unabhängig vom gewählten Zeitpunkt (die Liste unten ist nach Zeit gefiltert und auf 200 gekürzt)
+    markEventTimes(ctx, () => {
+      const u = usgs.data.value;
+      const e = emsc.data.value;
+      if (!u && !e) return undefined;
+      const min = Number(ctx.options.value.minMag ?? 2.5);
+      return mergeQuakes([u, e]).features.filter((f) => f.properties.mag >= min).map((f) => f.properties.time);
+    });
 
     return pointLayer(ctx, {
       data: visible,

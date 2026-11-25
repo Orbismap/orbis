@@ -2,6 +2,7 @@
 import { computed, effect, signal } from '@preact/signals';
 import type { TimeSpec } from '../layers/types';
 import { HOUR, MINUTE, clampTime } from '../core/time';
+import { nextActive, skipRest, timeTracks } from './time-tracks';
 
 export interface TimeRange { start: number; end: number; step: number; frames?: number[] }
 
@@ -21,7 +22,7 @@ export const hasTimeLayers = computed(() => timeSources.value.length > 0);
 
 export const range = computed<TimeRange>(() => {
   const n = now.value;
-  const specs = timeSources.value.map((s) => s.range());
+  const specs = timeSources.value.map((s) => s.range({}));
   if (!specs.length) return { start: n + DEFAULT_REL.start, end: n + DEFAULT_REL.end, step: DEFAULT_REL.step };
   const frames = [...new Set(specs.flatMap((s) => s.frames ?? []))].sort((a, b) => a - b).map((f) => n + f);
   return {
@@ -61,7 +62,14 @@ export function play(intervalMs = 450): void {
   playTimer = setInterval(() => {
     const r = range.value;
     if (time.value >= r.end - 1) picked.value = r.start;
-    else step(1);
+    else {
+      step(1);
+      // Ruhe überspringen: liegt die Zeit in einer Pause aller Spuren, geht es zum nächsten Geschehen
+      if (skipRest.peek() && timeTracks.peek().length) {
+        const to = nextActive(picked.peek());
+        if (to !== undefined && to > picked.peek()) picked.value = clampTime(to, r.start, r.end);
+      }
+    }
   }, intervalMs);
 }
 export function pause(): void {

@@ -6,7 +6,7 @@ import { formatDateTime, formatInt } from '../../core/format';
 import { DAY, HOUR, MINUTE } from '../../core/time';
 import type { DemoData, DemoCollection, DemoProps } from '../../data/parsers/demos';
 import { pointLayer } from '../../render/points';
-import type { AnyFeature } from '../../render/common';
+import { markEventTimes, type AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
 import { bucketUrl } from '../../data/endpoints';
 
@@ -49,6 +49,8 @@ export default defineLayer({
       const until = t + days * DAY;
       return { type: 'FeatureCollection', features: d.features.features.filter((f) => f.properties.end >= t && f.properties.start <= until) };
     });
+    // Zeitleiste: Beginn aller Versammlungen, unabhängig vom gewählten Zeitpunkt
+    markEventTimes(ctx, () => raw.data.value?.features.features.map((f) => f.properties.start));
     const color = computed(() => {
       const t = ctx.time.value;
       return ['case',

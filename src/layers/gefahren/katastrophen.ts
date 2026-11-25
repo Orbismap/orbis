@@ -7,7 +7,7 @@ import { formatQuantity } from '../../core/units';
 import { bucketUrl } from '../../data/endpoints';
 import { fetchJson } from '../../data/http';
 import { gdacsEvents, type GdacsCollection, type GdacsProps, type GdacsType } from '../../data/parsers/gdacs';
-import type { AnyFeature } from '../../render/common';
+import { markEventTimes, type AnyFeature } from '../../render/common';
 import { pointLayer } from '../../render/points';
 import type { IconName } from '../../ui/icons/names';
 import { defineLayer } from '../define';
@@ -77,6 +77,13 @@ export default defineLayer({
       const grace = Number(ctx.options.value.grace ?? 7) * DAY;
       const t = ctx.time.value;
       return { type: 'FeatureCollection', features: d.features.filter((f) => f.properties.alert >= min && f.properties.from <= t && f.properties.to + grace >= t) };
+    });
+    // Zeitleiste: alle Ereignisse mit ihrem Beginn, in den Farben der Legende
+    markEventTimes(ctx, () => {
+      const d = res.data.value;
+      const min = Number(ctx.options.value.minAlert ?? 0);
+      const all = d?.features.filter((f) => f.properties.alert >= min);
+      return all && { times: all.map((f) => f.properties.from), colors: all.map((f) => ALERT[f.properties.alert].color) };
     });
     const alertColor = ['match', ['get', 'alert'], 2, ALERT[2].color, 1, ALERT[1].color, ALERT[0].color] as ExpressionSpecification;
     const size = (a: number, b: number, c: number): ExpressionSpecification => ['match', ['get', 'alert'], 2, c, 1, b, a] as ExpressionSpecification;
