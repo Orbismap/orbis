@@ -134,7 +134,7 @@
     left: var(--map-left, 0px);
     bottom: calc(var(--dock-h, 90px) + var(--dock-bottom) + 10px);
     right: calc(var(--rail-inset) + var(--rail-w) + 12px);
-    transition: left var(--t-panel) var(--ease);
+    transition: left var(--t-panel) var(--ease), bottom 160ms var(--ease);
   }
   .hud-desktop .attr-pos {
     position: absolute;
