@@ -153,6 +153,28 @@
     background: color-mix(in oklab, var(--now) 22%, transparent);
     color: var(--now);
   }
+  .rp-end {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+  }
+  .rp-menu {
+    position: relative;
+  }
+  .rp-pop {
+    min-width: 220px;
+  }
+  .rp-pop-wide {
+    width: 320px;
+    max-width: min(320px, calc(100vw - 24px));
+    padding: var(--s-3);
+  }
+  .rp-pop-hint {
+    margin: 4px 8px 2px;
+    font-size: var(--fs-small);
+    color: var(--text-3);
+  }
   .rp-cams {
     display: flex;
     flex-wrap: wrap;

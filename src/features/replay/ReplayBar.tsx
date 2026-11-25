@@ -1,4 +1,4 @@
-import { useMemo } from 'preact/hooks';
+import { useMemo, useRef, useState } from 'preact/hooks';
 import { proAvailable } from '../../ext/loader';
 import { proEnabled } from '../../ext/licence';
 import { phaseAt, scrubPos, scrubTime, tLabel } from '../../replay/director';
@@ -6,6 +6,8 @@ import { tipProps } from '../../ui/tip-state';
 import { closeReplay, REPLAY_SPEEDS, replayFocus, setReplayFocus, replayAuto, replayEffectiveSpeed, replayError, replayEvent, replayLoading, replayPlaying, replaySpeed, replayT, seekReplay, setReplaySpeed, toggleReplay } from '../../state/replay';
 import { IconButton } from '../../ui/Button';
 import { Icon } from '../../ui/icons/Icon';
+import { MenuItem, Popover } from '../../ui/Popover';
+import type { ReplayEvent } from '../../replay/types';
 import { EngineStatus } from './EngineStatus';
 import './replay.css';
 
@@ -60,6 +62,63 @@ function Scrubber() {
   );
 }
 
+/** The camera as a dropdown: the director's shot or one of the vehicles. */
+function CameraMenu({ ev }: { ev: ReplayEvent }) {
+  const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLDivElement>(null);
+  const focus = replayFocus.value;
+  const cams = [
+    ...ev.actors.filter((a) => a.kind !== 'satellite').map((a) => ({ id: a.id, label: a.label })),
+    ...(ev.actors.some((a) => a.kind === 'satellite') ? [{ id: 'sat1', label: 'Starlink' }] : []),
+  ];
+  const pick = (id: string | null) => { setReplayFocus(id); setOpen(false); };
+  return (
+    <div class="rp-menu" ref={anchor}>
+      <IconButton icon="camera" label="Kamera" variant="ghost" pressed={open || focus !== null} onClick={() => setOpen(!open)} />
+      <Popover open={open} onClose={() => setOpen(false)} align="end" up menu label="Kamera" anchorRef={anchor} class="rp-pop">
+        <MenuItem checked={focus === null} onClick={() => pick(null)}>Regie (automatisch)</MenuItem>
+        {cams.map((c) => (
+          <MenuItem key={c.id} checked={focus === c.id || (c.id === 'sat1' && focus?.startsWith('sat') === true)} onClick={() => pick(c.id)}>{c.label}</MenuItem>
+        ))}
+        <p class="rp-pop-hint">Oder ein Fahrzeug in der Karte anklicken.</p>
+      </Popover>
+    </div>
+  );
+}
+
+/** The footage, the sources and the note on what is modelled, behind an info button at the bottom right. */
+function SourcesMenu({ ev }: { ev: ReplayEvent }) {
+  const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLDivElement>(null);
+  return (
+    <div class="rp-menu" ref={anchor}>
+      <IconButton icon="info" label="Originalvideos, Quellen, Hinweis" variant="ghost" pressed={open} onClick={() => setOpen(!open)} />
+      <Popover open={open} onClose={() => setOpen(false)} align="end" up label="Originalvideos, Quellen, Hinweis" anchorRef={anchor} class="rp-pop rp-pop-wide">
+        <p class="rp-note">{ev.note}</p>
+        <ul class="rp-links">
+          {ev.links.map((l) => (
+            <li key={l.url}>
+              <a href={l.url} target="_blank" rel="noopener noreferrer">
+                {l.label} <Icon name="external" size={12} />
+              </a>
+              {l.kind === 'official' && <span class="rp-tag">offiziell</span>}
+            </li>
+          ))}
+        </ul>
+        <p class="rp-src">
+          Quellen:{' '}
+          {ev.sources.map((s, i) => (
+            <span key={s.url}>
+              {i > 0 && ', '}
+              <a href={s.url} target="_blank" rel="noopener noreferrer">{s.name}</a>
+            </span>
+          ))}
+        </p>
+      </Popover>
+    </div>
+  );
+}
+
 export function ReplayBar({ mobile }: { mobile?: boolean }) {
   const ev = replayEvent.value;
   const loading = replayLoading.value;
@@ -83,11 +142,6 @@ export function ReplayBar({ mobile }: { mobile?: boolean }) {
   const manual = replaySpeed.value;
   const eff = replayEffectiveSpeed.value;
   const noPro = !proAvailable || !proEnabled.value;
-  const focus = replayFocus.value;
-  const cams = [
-    ...ev.actors.filter((a) => a.kind !== 'satellite').map((a) => ({ id: a.id, label: a.kind === 'booster' ? 'Booster' : 'Ship' })),
-    ...(ev.actors.some((a) => a.kind === 'satellite') ? [{ id: 'sat1', label: 'Starlink' }] : []),
-  ];
   return (
     <div class={`rp-wrap ${mobile ? 'is-mobile' : ''}`}>
     <EngineStatus />
@@ -114,38 +168,11 @@ export function ReplayBar({ mobile }: { mobile?: boolean }) {
             </button>
           ))}
         </div>
+        <div class="rp-end">
+          <CameraMenu ev={ev} />
+          <SourcesMenu ev={ev} />
+        </div>
       </div>
-      <div class="rp-cams" role="group" aria-label="Kamera">
-        <span class="rp-cams-label">Kamera</span>
-        <button type="button" class="rp-chip" aria-pressed={focus === null} onClick={() => setReplayFocus(null)} {...tipProps('Die Regie wählt den Blickpunkt', undefined, 'top')}>Regie</button>
-        {cams.map((c) => (
-          <button key={c.id} type="button" class="rp-chip" aria-pressed={focus === c.id || (c.id === 'sat1' && focus?.startsWith('sat') === true)} onClick={() => setReplayFocus(c.id)}>{c.label}</button>
-        ))}
-        <span class="rp-cams-hint">oder ein Fahrzeug in der Karte anklicken</span>
-      </div>
-      <details class="rp-more">
-        <summary>Originalvideos, Quellen, Hinweis</summary>
-        <p class="rp-note">{ev.note}</p>
-        <ul class="rp-links">
-          {ev.links.map((l) => (
-            <li key={l.url}>
-              <a href={l.url} target="_blank" rel="noopener noreferrer">
-                {l.label} <Icon name="external" size={12} />
-              </a>
-              {l.kind === 'official' && <span class="rp-tag">offiziell</span>}
-            </li>
-          ))}
-        </ul>
-        <p class="rp-src">
-          Quellen:{' '}
-          {ev.sources.map((s, i) => (
-            <span key={s.url}>
-              {i > 0 && ', '}
-              <a href={s.url} target="_blank" rel="noopener noreferrer">{s.name}</a>
-            </span>
-          ))}
-        </p>
-      </details>
     </section>
     </div>
   );

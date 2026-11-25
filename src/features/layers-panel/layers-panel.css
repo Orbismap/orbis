@@ -454,27 +454,21 @@
     color: var(--limb);
     font-size: var(--fs-title);
   }
+  /* the title stands under the back button, left-aligned */
   .lpage-bar {
-    position: relative;
     display: flex;
-    align-items: center;
-    min-height: max(44px, var(--hit, 28px));
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
   }
   .lpage-bartitle {
-    position: absolute;
-    inset: 0 64px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     margin: 0;
-    font-size: var(--fs-inspector);
-    font-weight: 600;
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
     line-height: 1.2;
-    text-align: center;
-    pointer-events: none;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    text-align: left;
+    overflow-wrap: anywhere;
   }
   .lpage-head {
     display: flex;
