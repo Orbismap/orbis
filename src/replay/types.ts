@@ -39,6 +39,11 @@ export interface Actor {
   label: string;
   /** engine arrangement (vehicles only) */
   engines?: EngineLayout;
+  /** the shape to draw; absent: a Starship booster / ship by `kind` */
+  model?: 'falcon-core' | 'falcon-side' | 'falcon-upper';
+  /** length and radius of the body in metres, for the drawing (absent: the Starship values) */
+  lengthM?: number;
+  radiusM?: number;
   /** visible from / to, seconds after T-0 */
   from: number;
   to: number;

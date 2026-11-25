@@ -31,6 +31,15 @@ export const REPLAY_EVENTS: readonly ReplayListing[] = [
     badges: ['22 h 33 min', 'Ship gefangen'],
     load: async () => (await import('./starship15')).starship15,
   },
+  {
+    id: 'falcon-heavy-demo',
+    title: 'Falcon Heavy Demoflug',
+    subtitle: 'Drei Kerne, zwei Landungen und ein Roadster im All',
+    t0: Date.UTC(2018, 1, 6, 20, 45, 0),
+    pad: [-80.6041, 28.6083],
+    badges: ['18 min', 'Doppellandung'],
+    load: async () => (await import('./falcon-heavy-demo')).buildFalconHeavyDemo(),
+  },
   ...FLIGHT_TESTS.map((f): ReplayListing => ({
     id: f.id,
     title: f.title,

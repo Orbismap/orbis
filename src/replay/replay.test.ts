@@ -3,6 +3,7 @@ import { haversine } from '../core/geo';
 import { curve, lerpHeading, ramp } from './curve';
 import { autoSpeed, phaseAt, scrubPos, scrubTime, separationM, shotAt, tLabel } from './director';
 import { FLIGHT_TESTS } from './events/starship-tests';
+import { buildFalconHeavyDemo } from './events/falcon-heavy-demo';
 import { buildTestFlight } from './events/test-flight';
 import { buildFlight, buildStarship15, PAD, returnMiss, T } from './events/starship15';
 import { orbitPosition, orbitThrough, periodOf } from './orbit';
@@ -269,5 +270,40 @@ describe('Starship test flights 1 to 5', () => {
   it('flight 2 loses the booster early and flight 1 never separates', () => {
     expect(events[1]!.actors[0]!.to).toBeLessThan(200);
     expect(events[0]!.phases.some((p) => p.id === 'staging')).toBe(false);
+  });
+});
+
+describe('Falcon Heavy demo flight', () => {
+  const ev = buildFalconHeavyDemo();
+  it('is continuous and its phases follow each other', () => {
+    for (const a of ev.actors) {
+      let prev = a.at(a.from);
+      for (let t = a.from + 1; t <= a.to; t++) {
+        const s = a.at(t);
+        if (s && prev) {
+          expect(haversine([prev.lng, prev.lat], [s.lng, s.lat]) * 1000 + Math.abs(prev.altM - s.altM), `${a.id} t=${t}`).toBeLessThan(a.id === 'upper' ? 12_000 : 6000);
+          expect(Number.isFinite(s.altM)).toBe(true);
+        }
+        prev = s;
+      }
+    }
+    for (let i = 1; i < ev.phases.length; i++) expect(ev.phases[i]!.from).toBe(ev.phases[i - 1]!.to);
+  });
+  it('the side boosters land on the two landing zones, the centre core comes down about 600 km out', () => {
+    for (const id of ['left', 'right']) {
+      const s = ev.actors.find((a) => a.id === id)!.at(525)!;
+      expect(haversine([s.lng, s.lat], [-80.544, 28.4856]) * 1000).toBeLessThan(200);
+      expect(s.altM).toBeLessThan(50);
+    }
+    const core = ev.actors.find((a) => a.id === 'core')!.at(537)!;
+    expect(haversine([core.lng, core.lat], ev.pad)).toBeGreaterThan(450);
+    expect(core.altM).toBeLessThan(50);
+  });
+  it('27 engines at liftoff, the three cores side by side', () => {
+    const e = ev.actors.slice(0, 3).map((a) => a.at(10)!.engines!.reduce((x, y) => x + y, 0));
+    expect(e).toEqual([9, 9, 9]);
+    const [l, r] = [ev.actors[1]!.at(10)!, ev.actors[2]!.at(10)!];
+    expect(haversine([l.lng, l.lat], [r.lng, r.lat]) * 1000).toBeGreaterThan(5);
+    expect(haversine([l.lng, l.lat], [r.lng, r.lat]) * 1000).toBeLessThan(12);
   });
 });

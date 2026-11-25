@@ -4,7 +4,7 @@ import type { Actor, ActorSample, ReplayChannel, ReplayEvent, Tower } from '../.
 import type { GeoFrame, Vec3 } from '../world3d/frame';
 import { GeoLine } from '../world3d/line';
 import type { StagePart } from '../world3d/stage';
-import { BOOSTER_LEN, disposeGroup, makeBooster, makePlasma, makePlume, makeSatellite, makeShip, R, SAT_LEN, SHIP_LEN } from './models';
+import { BOOSTER_LEN, disposeGroup, makeBooster, makeFalconCore, makeFalconUpper, makePlasma, makePlume, makeSatellite, makeShip, R, SAT_LEN, SHIP_LEN } from './models';
 
 // The 3D side of the replay mode: draws the actors of the open event (booster, ship, Starlink satellites) at the playhead,
 // their exhaust and re-entry plasma, the growing trails, the launch tower with its catch arms and a few labels. Everything is
@@ -17,6 +17,9 @@ const smooth = (x: number) => x * x * (3 - 2 * x);
 /** the models are never smaller on screen than this many CSS px (they grow when far away) */
 const MIN_PX: Record<Actor['kind'], number> = { booster: 16, ship: 20, satellite: 5 };
 const LEN: Record<Actor['kind'], number> = { booster: BOOSTER_LEN, ship: SHIP_LEN, satellite: SAT_LEN };
+/** length and radius of an actor's body in metres: its own, else the Starship value of its kind */
+const lengthOf = (a: Actor) => a.lengthM ?? LEN[a.kind];
+const radiusOf = (a: Actor) => a.radiusM ?? R;
 const TRAIL_COLOR: Partial<Record<Actor['kind'], string>> = { ship: '#ffb35c', booster: '#7fd0ff' };
 
 interface Trail {
@@ -118,13 +121,17 @@ export class ReplayPart implements StagePart {
     // one shared model per kind would save memory, but there are few actors; satellites share geometry through clone()
     const satTemplate = makeSatellite();
     for (const actor of ev.actors) {
-      const model = actor.kind === 'booster' ? makeBooster() : actor.kind === 'ship' ? makeShip() : satTemplate.clone();
+      const model =
+        actor.model === 'falcon-core' ? makeFalconCore(lengthOf(actor), false)
+        : actor.model === 'falcon-side' ? makeFalconCore(lengthOf(actor), true)
+        : actor.model === 'falcon-upper' ? makeFalconUpper(lengthOf(actor))
+        : actor.kind === 'booster' ? makeBooster() : actor.kind === 'ship' ? makeShip() : satTemplate.clone();
       model.matrixAutoUpdate = false;
       model.visible = false;
       const rig: Rig = { actor, model, last: null };
       if (actor.kind !== 'satellite') {
         const p = makePlume();
-        const length = actor.kind === 'ship' ? SHIP_LEN : BOOSTER_LEN;
+        const length = lengthOf(actor);
         p.group.position.z = -length / 2;
         model.add(p.group);
         rig.plume = { ...p, base: p.mats.map((m) => m.opacity), length };
@@ -184,7 +191,7 @@ export class ReplayPart implements StagePart {
       if (!s || !rig.model.visible) continue;
       const p = frame.toScreen(s.lng, s.lat, s.altM);
       if (!p) continue;
-      const len = LEN[rig.actor.kind];
+      const len = lengthOf(rig.actor);
       const px = Math.max(MIN_PX[rig.actor.kind], len / frame.metresPerPixel(s.lng, s.lat, s.altM));
       const reach = px / 2 + 8;
       const d = Math.hypot(p[0] - x, p[1] - y);
@@ -222,7 +229,7 @@ export class ReplayPart implements StagePart {
       rig.trail?.line.setVisible(0);
       return;
     }
-    const len = LEN[rig.actor.kind];
+    const len = lengthOf(rig.actor);
     const mpp = frame.metresPerPixel(s.lng, s.lat, s.altM);
     const scale = Math.max(1, (MIN_PX[rig.actor.kind] * mpp) / len);
     // placement: heading about the vertical, then the body axis tilts from upright by (90 - pitch) towards the nose
@@ -238,7 +245,7 @@ export class ReplayPart implements StagePart {
       const flick = 0.9 + 0.1 * Math.sin(performance.now() * 0.04 + rig.actor.from);
       const on = s.burn ? flick * far : 0;
       rig.plume.group.visible = on > 0.01;
-      const w = R * (1.05 + 2.4 * vac);
+      const w = radiusOf(rig.actor) * (1.05 + 2.4 * vac);
       const l = rig.plume.length * (1.0 - 0.25 * vac) * (rig.actor.kind === 'ship' ? 0.9 : 1.2);
       rig.plume.group.scale.set(w, w, l);
       rig.plume.mats.forEach((m, i) => (m.opacity = rig.plume!.base[i]! * on));

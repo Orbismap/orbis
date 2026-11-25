@@ -10,6 +10,7 @@ const STEP_S = 2;
 
 /** radii of the rings in drawing units, by number of rings */
 const RINGS: Record<number, { r: number; size: number }[]> = {
+  1: [{ r: 0, size: 0.9 }],
   2: [{ r: 0.95, size: 0.55 }, { r: 2.4, size: 0.7 }],
   3: [{ r: 0.8, size: 0.52 }, { r: 2.25, size: 0.5 }, { r: 3.85, size: 0.5 }],
 };
@@ -42,7 +43,7 @@ function Rings({ actor, lit }: { actor: Actor; lit: number[] }) {
         // a ring of three is a triangle with a point up; the others start at the top as well
         return Array.from({ length: g.total }, (_, i) => {
           const a = -Math.PI / 2 + (i / g.total) * Math.PI * 2;
-          return <circle key={`${gi}-${i}`} class={on.has(i) ? 'rp-eng on' : 'rp-eng'} cx={Math.cos(a) * ring.r} cy={Math.sin(a) * ring.r} r={ring.size} />;
+          return <circle key={`${gi}-${i}`} class={on.has(i) ? 'rp-eng on' : 'rp-eng'} cx={g.total === 1 ? 0 : Math.cos(a) * ring.r} cy={g.total === 1 ? 0 : Math.sin(a) * ring.r} r={ring.size} />;
         });
       })}
     </svg>

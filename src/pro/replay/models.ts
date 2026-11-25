@@ -10,6 +10,8 @@ const STEEL_DARK = new THREE.MeshLambertMaterial({ color: 0x8b9099 });
 const TILES = new THREE.MeshLambertMaterial({ color: 0x15161a, side: THREE.DoubleSide });
 const ENGINES = new THREE.MeshLambertMaterial({ color: 0x2a2c31 });
 const PANEL = new THREE.MeshLambertMaterial({ color: 0xe6e9ef });
+const FALCON_WHITE = new THREE.MeshLambertMaterial({ color: 0xf1f3f6 });
+const FALCON_BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1c20 });
 const SOLAR = new THREE.MeshLambertMaterial({ color: 0x1c2a4a });
 
 export const R = 4.5;
@@ -72,6 +74,44 @@ export function makeShip(): THREE.Group {
     g.add(box(8.2, 0.7, 9.5, s * (R + 3.6), 0.9, bottom + 7, STEEL_DARK));
     g.add(box(4.6, 0.6, 6.6, s * (R + 1.9), 0.9, shoulder - 3, STEEL_DARK));
   }
+  return g;
+}
+
+/** A Falcon 9 first stage (radius 1.83 m): a white cylinder with a black interstage band, nine engines at the foot, four legs and, for a side booster, a nose cone. */
+export function makeFalconCore(len: number, nose: boolean): THREE.Group {
+  const g = new THREE.Group();
+  const r = 1.83;
+  const bottom = -len / 2;
+  const body = nose ? len - 6 : len;
+  g.add(tube(r, r, bottom + 1.2, bottom + body, FALCON_WHITE));
+  g.add(tube(r, r, bottom + body - 6, bottom + body - 4, FALCON_BLACK));
+  g.add(tube(r * 0.95, r * 0.85, bottom, bottom + 1.2, ENGINES));
+  if (nose) {
+    const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.35, r, 6, 24, 1), FALCON_WHITE);
+    cone.geometry.rotateX(Math.PI / 2);
+    cone.geometry.translate(0, 0, bottom + body + 3);
+    g.add(cone);
+  }
+  // landing legs: four, folded against the foot
+  for (const a of [45, 135, 225, 315]) {
+    const rad = (a * Math.PI) / 180;
+    g.add(box(0.3, 0.3, 6, Math.cos(rad) * (r + 0.2), Math.sin(rad) * (r + 0.2), bottom + 3, FALCON_BLACK));
+  }
+  return g;
+}
+
+/** The second stage with the payload fairing on top (Starman's Roadster rides inside). */
+export function makeFalconUpper(len: number): THREE.Group {
+  const g = new THREE.Group();
+  const r = 1.83;
+  const bottom = -len / 2;
+  g.add(tube(r, r, bottom + 1.5, bottom + 13.8, FALCON_WHITE));
+  g.add(tube(r * 0.5, r * 0.4, bottom, bottom + 1.5, ENGINES));
+  g.add(tube(2.6, 2.6, bottom + 13.8, bottom + len - 6, FALCON_WHITE));
+  const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 2.6, 6, 24, 1), FALCON_WHITE);
+  cone.geometry.rotateX(Math.PI / 2);
+  cone.geometry.translate(0, 0, bottom + len - 3);
+  g.add(cone);
   return g;
 }
 
