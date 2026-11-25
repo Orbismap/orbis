@@ -3,7 +3,6 @@ import { CADENCE_LABEL } from '../catalog/fuzzy';
 import type { KarteLayer } from '../../karten/types';
 import type { LayerDef, OptionSpec } from '../../layers/types';
 import { layerStatus } from '../../state/session';
-import { Icon } from '../../ui/icons/Icon';
 import { LayerLegend, LayerNotes, OpacityField, OptionFields, shownOptions } from './LayerDetails';
 import { PageFoot, PageFrame, ShowSwitch } from './page-kit';
 import { customPage } from './pages/registry';
@@ -31,11 +30,7 @@ export function LayerPage({ layer, def, karteId, from, removable }: { layer: Kar
       ) : (
         <>
           <header class="lpage-head">
-            <span class="lrow-badge" style={{ ['--c' as string]: def.color }} aria-hidden="true">
-              <Icon name={def.icon} size={18} />
-            </span>
             <div class="lpage-title">
-              <h3>{def.title}</h3>
               <p>{def.summary}</p>
             </div>
           </header>

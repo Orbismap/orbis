@@ -119,8 +119,8 @@ describe('url', () => {
     expect(parseHash(h)).toEqual(s);
   });
   it('writes k= and b=, and reads both from older links', () => {
-    expect(serializeHash({ karte: 'wetter', basemap: 'satellite', globe: false })).toBe('#/?k=wetter&b=satellite&g=0');
-    expect(parseHash('#/?k=wetter&b=satellite')).toEqual({ karte: 'wetter', basemap: 'satellite' });
+    expect(serializeHash({ detail: 'wetter', basemap: 'satellite', globe: false })).toBe('#/?k=wetter&b=satellite&g=0');
+    expect(parseHash('#/?k=wetter&b=satellite')).toEqual({ detail: 'wetter', basemap: 'satellite' });
     expect(parseHash('#/?b=a<b').basemap).toBeUndefined();
   });
   it('round-trips a route with stop names', () => {

@@ -1,5 +1,5 @@
-// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<karte>&l=<id>,<id>…&b=<basemap>&m=<name>,<icon>,<color>[,<basemap>]&t=<iso>&g=1&s=0&f=flug:<hex>|schiff:<mmsi>&p=
-// (k = the Karte shown while its detail menu is open; l = the active layers; s=0 = main sidebar collapsed;
+// Hash format: #/@<lat>,<lng>,<zoom>z[,<bearing>b][,<pitch>p]?k=<ebene>&l=<id>,<id>…&b=<basemap>&m=<name>,<icon>,<color>[,<basemap>]&t=<iso>&g=1&s=0&f=flug:<hex>|schiff:<mmsi>&p=
+// (k = the layer whose detail menu is open (older links: a Karte id); l = the active layers; s=0 = main sidebar collapsed;
 //  b = the basemap on show, round-trips; the picker mode is not part of the link)
 // r=<car|bike|foot>~<lat>,<lng>,<name>~<lat>,<lng>,<name>… (the route shown in the route menu)
 // p=<lat>,<lng>,<name>,<region>[,<kind>]
@@ -9,7 +9,8 @@ import type { FollowRef } from '../ext/types';
 export interface UrlView { lat: number; lng: number; zoom: number; bearing?: number; pitch?: number }
 export interface UrlState {
   view?: UrlView;
-  karte?: string;
+  /** The open detail menu: a layer id (k=flugzeuge); older links carry a Karte id. */
+  detail?: string;
   layers?: string[];
   /** A shared own Karte (m=name,icon,color[,basemap]): opening the link creates it with the layers of `l=`. */
   shared?: { name: string; icon: string; color: string; basemap?: string };
@@ -55,7 +56,7 @@ export function parseHash(hash: string): UrlState {
   }
   const q = new URLSearchParams(query);
   const k = q.get('k');
-  if (k) out.karte = k;
+  if (k) out.detail = k;
   const l = q.get('l');
   if (l !== null) out.layers = l.split(',').filter(Boolean);
   const sh = query.split('&').find((x) => x.startsWith('m='))?.slice(2);
@@ -121,7 +122,7 @@ export function serializeHash(s: UrlState): string {
     if (v.pitch) path += `,${Math.round(v.pitch)}p`;
   }
   const q: string[] = [];
-  if (s.karte) q.push(`k=${encodeURIComponent(s.karte)}`);
+  if (s.detail) q.push(`k=${encodeURIComponent(s.detail)}`);
   if (s.shared) q.push(`m=${[s.shared.name, s.shared.icon, s.shared.color.replace('#', ''), ...(s.shared.basemap ? [s.shared.basemap] : [])].map(encodeURIComponent).join(',')}`);
   if (s.layers) q.push(`l=${s.layers.map(encodeURIComponent).join(',')}`);
   if (s.basemap) q.push(`b=${encodeURIComponent(s.basemap)}`);

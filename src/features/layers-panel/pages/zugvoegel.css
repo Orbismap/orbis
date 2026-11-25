@@ -43,6 +43,9 @@
     filter: none;
     outline-color: var(--c);
   }
+  .zv-tile:focus-visible {
+    outline: none; /* the photo carries the ring, so it follows the photo's corners */
+  }
   .zv-tile:focus-visible .zv-photo {
     outline-color: var(--limb);
   }

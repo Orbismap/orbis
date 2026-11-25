@@ -3,7 +3,9 @@ import { effect, batch } from '@preact/signals';
 import { throttle } from '../core/scheduler';
 import { followCurrent, followWanted } from '../ext/channels';
 import { parseHash, serializeHash, type UrlState } from '../core/url';
-import { activeIds, clearBasemap, openKarte, setActiveIds, setActiveKarte, setBasemap } from '../karten/active';
+import { hasLayer } from '../layers/registry';
+import { openDetail, detailPage } from '../features/layers-panel/themes-state';
+import { activeIds, clearBasemap, openActive, openKarte, setActiveIds, setActiveKarte, setBasemap } from '../karten/active';
 import { importKarte } from '../karten/store';
 import { modeForBasemap, resolveBasemapId } from '../map/basemaps';
 import { activeKarte, browsedKarte } from './session';
@@ -30,11 +32,18 @@ export function applyUrlState(u: UrlState): void {
     // A link can carry the Karte and the layers together: open the Karte, then apply the link's
     // layers on top of it (so both survive the next serialize instead of `k=` being dropped).
     if (u.shared && u.layers) setActiveKarte(importKarte({ ...u.shared, layers: u.layers }));
-    else if (u.karte) {
-      openKarte(u.karte);
-      detailOpen.value = true; // the detail menu belongs to the Karte named in the link
+    else if (u.detail && !hasLayer(u.detail)) {
+      // older links: the detail menu of a Karte
+      openKarte(u.detail);
+      detailOpen.value = true;
       if (u.layers) setActiveIds(u.layers);
     } else if (u.layers) setActiveIds(u.layers);
+    // k=<layer>: the layer's detail menu, independent of any Karte (it opens on whatever is shown)
+    if (u.detail && hasLayer(u.detail) && !u.shared) {
+      openActive();
+      detailOpen.value = true;
+      openDetail(activeKarte.peek().id, u.detail, 'Karte');
+    }
     if (u.view) setCamera({ lng: u.view.lng, lat: u.view.lat, zoom: u.view.zoom, bearing: u.view.bearing ?? 0, pitch: u.view.pitch ?? 0 });
     if (u.globe !== undefined) setProjection(u.globe ? 'globe' : 'mercator');
     if (u.sidebar !== undefined) leftPanelOpen.value = u.sidebar;
@@ -71,8 +80,8 @@ export function currentUrlState(): UrlState {
   const layers = activeIds.value;
   return {
     view: { lat: c.lat, lng: c.lng, zoom: c.zoom, bearing: c.bearing, pitch: c.pitch },
-    // While the Karte's detail menu is open, that Karte is part of the visible state.
-    karte: detailOpen.value ? browsedKarte.value.id : undefined,
+    // While a detail menu is open it is part of the visible state: the layer's page, else the Karte.
+    detail: detailOpen.value ? (detailPage.value?.karteId === browsedKarte.value.id && hasLayer(detailPage.value.layerId) ? detailPage.value.layerId : browsedKarte.value.id) : undefined,
     layers: layers.length ? layers : undefined,
     basemap: activeKarte.value.basemap,
     time: live.value ? undefined : time.value,
