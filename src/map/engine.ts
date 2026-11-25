@@ -9,7 +9,7 @@ import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { activeBasemap as activeBasemapSignal, buildings3d, poiBasemap, poiLayerOn, poiLabelsVisible, buildingColour, buildingsColoured, buildingsLayerOn, buildingsPlainWanted, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, sheetCover, terrainLayerOn, viewport, type CameraState, type Padding } from '../state/view';
+import { activeBasemap as activeBasemapSignal, buildings3d, poiBasemap, poiLayerOn, poiLabelsVisible, buildingColour, buildingsColoured, buildingsLayerOn, buildingsPlainWanted, buildingsReplaced, camera, mapDark, karteMode, padding, replayLook, projection as projectionSignal, sheetCover, terrainLayerOn, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, buildingColourOf, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, isAerial, showsRelief, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { reliefRange } from './relief';
@@ -247,6 +247,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       buildingsChannel.presented.value;
       karteMode.value;
       terrainLayerOn.value;
+      replayLook.value;
       if (loaded) (applyBuildings(), applyTerrain());
     }),
     effect(() => {
@@ -437,6 +438,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   /** The terrain without the tilt: what the basemap and the mode ask for, or forced on by the layer "Gelände". */
   const terrainBase = () => {
     const exaggeration = hasTiles3d(basemap) ? TILES_TERRAIN_EXAGGERATION : TERRAIN_EXAGGERATION;
+    if (replayLook.peek()) return 0;
     if (terrainLayerOn.peek()) return exaggeration;
     if (flatGround && flatGateApplies()) return 0;
     const flatOrbis = basemap === 'orbis-dark' || basemap === 'orbis-light';

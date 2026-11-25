@@ -7,6 +7,7 @@ import { getJSON, setJSON } from '../core/storage';
 import { getLayer, hasLayer } from '../layers/registry';
 import type { OptionValues } from '../layers/types';
 import type { BasemapId } from '../map/types';
+import { replayLook } from '../state/view';
 import { builtinKarten, DEFAULT_KARTE_ID, universeOf } from './standard';
 import { customKarten, editKarte } from './store';
 import type { Karte, KarteLayer } from './types';
@@ -96,6 +97,8 @@ export const activeKarte = computed<Karte>(() => {
   const hidden = hiddenIds.value;
   const hide = (k: Karte): Karte => (hidden.length ? { ...k, layers: k.layers.map((l) => (hidden.includes(l.id) ? { ...l, visible: false } : l)) } : k);
   const own = ownOpen.value;
+  // a replay shows the Earth from the air: aerial images, whatever the Karte's basemap is
+  if (replayLook.value) return { ...hide(own ?? withState(derived.value, activeIds.value, layerPrefs.value)), basemap: 'satellite' };
   if (own) return hide(own);
   const k = hide(withState(derived.value, activeIds.value, layerPrefs.value));
   const o = viewOverride.value;

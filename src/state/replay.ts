@@ -7,7 +7,7 @@ import { findReplay } from '../replay/events';
 import type { ReplayEvent } from '../replay/types';
 import { clearSelection } from './selection';
 import { mapEngine } from './ui';
-import { camera, projection, setProjection } from './view';
+import { camera, projection, replayLook, setProjection } from './view';
 
 export const replayEvent = signal<ReplayEvent | null>(null);
 /** an event is being loaded */
@@ -80,6 +80,7 @@ export async function openReplay(id: string, at?: number): Promise<void> {
     if (projectionBefore === null) projectionBefore = projection.peek();
     if (cameraBefore === null) cameraBefore = { ...camera.peek() };
     setProjection('globe');
+    replayLook.value = true;
     replayFocus.value = null;
     replayEvent.value = ev;
     replayT.value = Math.min(ev.end, Math.max(ev.start, at ?? ev.start));
@@ -110,6 +111,7 @@ export function closeReplay(): void {
   const back = cameraBefore;
   cameraBefore = null;
   if (back) mapEngine.peek()?.flyTo({ center: [back.lng, back.lat], zoom: back.zoom, bearing: back.bearing, pitch: back.pitch, duration: 1500 });
+  replayLook.value = false;
   replayEvent.value = null;
   replayFocus.value = null;
   replayPlaying.value = false;
