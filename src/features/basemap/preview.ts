@@ -9,6 +9,8 @@ import { OFM_GLYPHS, OFM_SOURCE } from '../../map/basemaps/vector';
 import { regionalDef } from '../../map/basemaps/regional';
 import type { BasemapDef } from '../../map/basemaps';
 import type { BasemapId } from '../../map/types';
+import { seasonLayerId } from '../../map/basemaps/raster';
+import { seasonBlend, seasonPos } from '../../state/season';
 import { camera, projection, viewport } from '../../state/view';
 
 /** basemap id -> data URL of its miniature (missing until rendered) */
@@ -20,6 +22,13 @@ const H = 288;
 
 /** The definition to render: a static basemap as it is; a regional one with only its background and its newest layer (a series has up to dozens of editions). */
 function previewDef(id: BasemapId): BasemapDef | undefined {
+  // "Jahreszeiten" has twelve month images: the miniature shows the one of the slider's position, opaque
+  if (id === 'jahreszeiten') {
+    const d = BASEMAPS.jahreszeiten;
+    const top = d.layers.find((l) => l.id === seasonLayerId(seasonBlend(seasonPos.peek()).a))!;
+    const src = (top as { source: string }).source;
+    return { ...d, layers: [d.layers[0]!, { ...top, paint: { ...(top as { paint?: object }).paint, 'raster-opacity': 1 } } as typeof top], sources: { [src]: d.sources[src]! } };
+  }
   if (Object.hasOwn(BASEMAPS, id)) return BASEMAPS[id as keyof typeof BASEMAPS];
   const d = regionalDef(id);
   if (!d || d.layers.length < 2) return d;

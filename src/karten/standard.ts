@@ -44,6 +44,7 @@ const THEMES: Record<string, KarteTheme[]> = {
     T('medien', 'Medien', 'radio', ['radio']),
   ],
   erde: [
+    T('tiere', 'Tierzüge', 'navigate', ['zugvoegel']),
     T('oberflaeche', 'Oberfläche', 'leaf', ['satellitenbild', 'vegetation', 'baeume', 'landbedeckung', 'schneedecke', 'bodentemperatur', 'aerosole', 'nachtlichter']),
     T('untergrund', 'Untergrund', 'mountain', ['geologie', 'plattengrenzen', 'gelaende', 'erdbeben', 'vulkane']),
     T('meer', 'Meer', 'wave', ['meerestemperatur', 'meeresstroemung', 'seegang', 'meerestiefe', 'meereis', 'chlorophyll']),

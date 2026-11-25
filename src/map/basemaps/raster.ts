@@ -1,5 +1,7 @@
 // Imagery and topography basemaps: raster tiles, vector labels are added on top by the shared label layers.
 import type { LayerSpecification, SourceSpecification } from 'maplibre-gl';
+import { seasonDate } from '../../state/season';
+import { ensureSeasonProtocol, SEASON_PROTOCOL } from '../season-protocol';
 import type { BasemapId } from '../types';
 import type { BasemapDef } from './types';
 
@@ -123,6 +125,36 @@ export const bluemarble = (): BasemapDef =>
     maxzoom: 8,
     attribution: 'Bilder: NASA Blue Marble, <a href="https://earthdata.nasa.gov/gibs" target="_blank" rel="noopener">NASA GIBS</a>',
   });
+
+/** Layer id of the Blue Marble image of month `m` (0 = January) in the basemap "Jahreszeiten". */
+export const seasonLayerId = (m: number): string => `bm-jahreszeiten-m${String(m).padStart(2, '0')}`;
+
+/**
+ * NASA MODIS true colour (Terra, 8-day composites): one image per month of a complete year (vegetation, snow and sea ice follow the
+ * seasons; GIBS's Blue Marble has no time axis). Twelve sources and layers; the engine keeps all of them visible (so all twelve months
+ * load as soon as the basemap is chosen) and blends the two around the slider (map/engine.ts applySeason). The tiles come through
+ * map/season-protocol.ts and stay in the Cache API.
+ */
+export const jahreszeiten = (): BasemapDef => {
+  ensureSeasonProtocol();
+  const sources: Record<string, SourceSpecification> = {};
+  const layers: LayerSpecification[] = [{ id: 'bm-jahreszeiten-bg', type: 'background', layout: hidden, paint: { 'background-color': DARK } }];
+  for (let m = 0; m < 12; m++) {
+    const src = `bm-jahreszeiten-s${String(m).padStart(2, '0')}`;
+    sources[src] = {
+      type: 'raster',
+      tiles: [`${SEASON_PROTOCOL}://https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_SurfaceReflectance_Bands143_8Day/default/${seasonDate(m)}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg`],
+      tileSize: 256,
+      maxzoom: 8,
+      attribution: 'Bilder: NASA MODIS (Terra, 8-Tage-Komposite), <a href="https://earthdata.nasa.gov/gibs" target="_blank" rel="noopener">NASA GIBS</a>',
+    };
+    layers.push({
+      id: seasonLayerId(m), type: 'raster', source: src, layout: hidden,
+      paint: { 'raster-fade-duration': 0, 'raster-opacity': 0, 'raster-opacity-transition': { duration: 0, delay: 0 } },
+    } as LayerSpecification);
+  }
+  return { id: 'jahreszeiten', label: 'Jahreszeiten', sources, layers, labelVariant: 'imagery', background: DARK, theme: 'dark' };
+};
 
 /** NASA Black Marble (VIIRS), the lights of the Earth at night (composite of 2016). */
 export const nachtlichter = (): BasemapDef =>

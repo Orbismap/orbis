@@ -2,6 +2,7 @@ import { Attribution } from '../features/attribution/Attribution';
 import { Legend } from '../features/legend/Legend';
 import { startedWithMap as startedFromWetter } from '../map/adopt';
 import { ReturnFromWetter } from './ReturnFromWetter';
+import { SeasonBar } from '../features/season/SeasonBar';
 import { Scalebar } from '../features/scalebar/Scalebar';
 import { Timeline } from '../features/timeline/Timeline';
 import { TopBar, ToolRail } from '../features/tools/Tools';
@@ -22,6 +23,9 @@ export function DesktopLayout() {
       </div>
       <div class="dock">
         <Timeline />
+      </div>
+      <div class="season-pos">
+        <SeasonBar />
       </div>
       <div class="maplegend-pos">
         <Legend />

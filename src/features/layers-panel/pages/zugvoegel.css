@@ -1,0 +1,62 @@
+@layer features {
+  .lpage-head-plain .lpage-title p {
+    margin-top: 4px;
+  }
+  .zv-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-2);
+  }
+  .zv-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    color: var(--text-1);
+    cursor: pointer;
+    min-width: 0;
+  }
+  .zv-photo {
+    display: block;
+    aspect-ratio: 4 / 3;
+    border-radius: var(--r-inner);
+    overflow: hidden;
+    background: color-mix(in srgb, var(--c) 22%, var(--g-fill));
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    transition: outline-color 0.15s, opacity 0.15s, filter 0.15s;
+    opacity: 0.45;
+    filter: grayscale(0.7);
+  }
+  .zv-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .zv-tile.is-on .zv-photo {
+    opacity: 1;
+    filter: none;
+    outline-color: var(--c);
+  }
+  .zv-tile:focus-visible .zv-photo {
+    outline-color: var(--limb);
+  }
+  .zv-name {
+    font-size: var(--fs-small);
+    line-height: 1.25;
+    padding: 0 2px;
+    overflow-wrap: anywhere;
+  }
+  .zv-all {
+    align-self: flex-start;
+    margin: 0 var(--s-1);
+  }
+  .zv-credit {
+    margin: 0 var(--s-1);
+  }
+}

@@ -1,3 +1,4 @@
+import { customPage } from './pages/registry';
 import { isMobile } from '../../state/ui';
 import { computed } from '@preact/signals';
 import { createPortal } from 'preact/compat';
@@ -229,7 +230,7 @@ function FilterButton({ def, layer, karteId, onSettings }: { def: LayerDef; laye
   return (
     <>
       <button ref={btn} type="button" class={cx('lrow-filter', open && 'is-open')} data-nav aria-haspopup="dialog" aria-expanded={open} aria-label={`Optionen ${def.title}`} title="Optionen" onClick={toggle}>
-        <Icon name="filter" size={16} />
+        <Icon name={customPage(def.id) ? 'sliders' : 'filter'} size={16} />
       </button>
       {open &&
         createPortal(

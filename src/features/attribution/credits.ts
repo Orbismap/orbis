@@ -60,6 +60,7 @@ export const BASEMAP_CREDITS: Record<StaticBasemapId, Credit[]> = {
   blank: [OFM, OSM],
   ...KEYED_CREDITS,
   nachtlichter: [{ name: 'NASA Black Marble (VIIRS), GIBS', url: 'https://earthdata.nasa.gov/gibs', license: 'NASA, frei nutzbar' }],
+  jahreszeiten: [{ name: 'NASA MODIS Terra (Echtfarben-Komposite 2023), GIBS', url: 'https://earthdata.nasa.gov/gibs', license: 'gemeinfrei' }],
   bluemarble: [{ name: 'NASA Blue Marble, GIBS', url: 'https://earthdata.nasa.gov/gibs', license: 'gemeinfrei' }],
 };
 

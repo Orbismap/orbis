@@ -55,7 +55,7 @@ Die Karte ist in neun Kategorien gegliedert; jede Ebene ist eine eigene, in sich
 | ✈️ **Verkehr** | Straßennetz und Verkehrslage, Blitzer, Flugzeuge, Schiffe, Züge, Nahverkehr, Raketenstarts, Satelliten |
 | ⚡ **Infrastruktur** | Kraftwerke, Stromnetz, Telekomnetz, Rechenzentren, Rohstoffe, Pipelines, 3D-Gebäude |
 | 💧 **Wasser** | Stauseen, Wasserwerke, Wasserleitungen |
-| 🌍 **Erde** | Gelände, Satellitenbild, Landbedeckung, Vegetation, Schneedecke, Nachtlichter, Plattengrenzen |
+| 🌍 **Erde** | Gelände, Satellitenbild, Landbedeckung, Vegetation, Schneedecke, Nachtlichter, Plattengrenzen, Tierzüge im Jahreslauf, Basiskarte „Jahreszeiten“ mit Monatsregler |
 | 🌊 **Meer** | Strömung, Temperatur, Seegang, Gezeiten, Meereis, Schiffsrouten, Bojen |
 | 📷 **Medien** | Webcams, Radiosender, Überwachung |
 | 👥 **Gesellschaft** | Wahlen, Lage- und Hilfedaten, Geldflüsse |

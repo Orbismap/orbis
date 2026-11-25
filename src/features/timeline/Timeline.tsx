@@ -1,6 +1,7 @@
 import { hasTimeLayers } from '../../state/time';
 import { Panel } from '../../ui/Panel';
 import { TimeBand } from './TimeBand';
+import { SkipRestButton, TimeTracks } from './TimeTracks';
 import { LivePill, LiveSlot, PlayButton, Readout, SpeedButton } from './Transport';
 import './timeline.css';
 
@@ -18,9 +19,11 @@ export function Timeline() {
         <PlayButton />
         <SpeedButton />
         <Readout />
+        <SkipRestButton />
         <LiveSlot />
       </div>
       <TimeBand />
+      <TimeTracks />
     </Panel>
   );
 }
