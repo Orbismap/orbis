@@ -15,7 +15,7 @@ import { detailPage, editMode } from '../features/layers-panel/themes-state';
 import { PlaceCard } from '../features/place/PlaceCard';
 import { ProbeCard } from '../features/probe/ProbeCard';
 import '../features/karten-bar/karten-bar.css';
-import { SCRATCH_ID, activeIds, openActive, openKarte, setActiveIds, setLayerVisible } from '../karten/active';
+import { SCRATCH_ID, activeIds, hiddenIds, openActive, openKarte, setActiveIds, setLayerVisible, toggleHidden } from '../karten/active';
 import { createKarte, karten, listedKarten, moveKarteTo } from '../karten/store';
 import { clearSelection, inspector, place, probe, selectPlace } from '../state/selection';
 import { activeKarte, browsedKarte } from '../state/session';
@@ -355,17 +355,25 @@ function MainPanel() {
               {activeLayers.map((id) => {
                 const def = getLayer(id);
                 if (!def) return null;
+                const hidden = hiddenIds.value.includes(id);
                 return (
-                  <li key={id} class="hud-arow">
+                  <li key={id} class="hud-arow hud-lrow" data-hidden={hidden || undefined}>
                     <button type="button" class="hud-row" aria-current={showing && detailPage.value?.layerId === id ? 'true' : undefined} onClick={() => openActiveLayer(id)}>
                       <span class="hud-badge" style={{ color: def.color }}>
                         <Icon name={def.icon} size={18} />
                       </span>
                       <span class="hud-rt">{def.title}</span>
                     </button>
-                    <button type="button" class="hud-rowx" aria-label={`${def.title} ausschalten`} onClick={() => setLayerVisible(working.id, id, false)}>
-                      <Icon name="close" size={13} />
-                    </button>
+                    <span class="hud-rowacts">
+                      <button type="button" class="hud-rowx" aria-label={`${def.title} ${hidden ? 'einblenden' : 'ausblenden'}`} aria-pressed={hidden} onClick={() => toggleHidden(id)}>
+                        <Icon name={hidden ? 'eye-off' : 'eye'} size={15} />
+                      </button>
+                      {hidden && (
+                        <button type="button" class="hud-rowx" aria-label={`${def.title} entfernen`} onClick={() => setLayerVisible(working.id, id, false)}>
+                          <Icon name="close" size={13} />
+                        </button>
+                      )}
+                    </span>
                   </li>
                 );
               })}

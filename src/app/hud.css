@@ -30,6 +30,17 @@
   .hud-arow:hover .hud-rowx, .hud-rowx:focus-visible, .hud-rowx.hud-rowdel { opacity: 1; }
   .hud-rowx.hud-rowdel { animation: hud-rowx-in 200ms var(--ease); }
   @keyframes hud-rowx-in { from { opacity: 0; } }
+  /* ausgeblendete Ebene: Zeile gedimmt, geschlossenes Auge bleibt sichtbar */
+  .hud-arow[data-hidden] .hud-row { opacity: 0.5; }
+  .hud-arow[data-hidden] .hud-rowx { opacity: 1; }
+  /* aktive Ebenen: Auge und Kreuz liegen über dem rechten Rand der Zeile, der Text hat sonst die volle Breite und wird nur gekürzt, solange sie zu sehen sind */
+  .hud-lrow { position: relative; }
+  .hud-rowacts { position: absolute; right: 6px; top: 0; bottom: 0; display: flex; align-items: center; pointer-events: none; }
+  .hud-rowacts .hud-rowx { margin-right: 0; pointer-events: auto; }
+  /* solange die Symbole zu sehen sind, läuft der Name darunter weiter und blendet davor aus: ohne "…" und ohne verlorenen Platz */
+  .hud-lrow:hover .hud-rt, .hud-lrow:focus-within .hud-rt { text-overflow: clip; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 30px), transparent calc(100% - 10px)); mask-image: linear-gradient(90deg, #000 calc(100% - 30px), transparent calc(100% - 10px)); }
+  .hud-lrow[data-hidden] .hud-rt { text-overflow: clip; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 56px), transparent calc(100% - 36px)); mask-image: linear-gradient(90deg, #000 calc(100% - 56px), transparent calc(100% - 36px)); }
+  @media (hover: none) { .hud-lrow .hud-rt { text-overflow: clip; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 30px), transparent calc(100% - 10px)); mask-image: linear-gradient(90deg, #000 calc(100% - 30px), transparent calc(100% - 10px)); } }
   .hud-rowx:hover { background: var(--g-fill-hover); color: var(--text-1); }
   @media (hover: none) { .hud-rowx { opacity: 1; } }
   .hud-rt { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

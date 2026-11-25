@@ -39,6 +39,15 @@ export const activeKarteId = signal<string>(
     return customKarten.peek().some((k) => k.id === id) ? id : DEFAULT_KARTE_ID;
   })(),
 );
+/**
+ * Ausgeblendete Ebenen: bleiben in der Liste der aktiven Ebenen (Auge geschlossen), werden aber nicht gezeigt und nicht geladen,
+ * weil sie auf der Karte nicht eingehängt sind. Nur für diese Sitzung; wer eine Ebene ein- oder ausschaltet, hebt es auf.
+ */
+export const hiddenIds = signal<string[]>([]);
+export function toggleHidden(layerId: string): void {
+  const h = hiddenIds.peek();
+  hiddenIds.value = h.includes(layerId) ? h.filter((x) => x !== layerId) : [...h, layerId];
+}
 /** Basemap/labels/terminator picked for a standard or scratch Karte: this session only. */
 const viewOverride = signal<{ basemap?: BasemapId; labels?: boolean; terminator?: boolean }>({});
 
@@ -84,9 +93,11 @@ function withState(base: Karte, ids: string[], prefs: Record<string, LayerPref>)
 
 /** What the map shows: an opened own Karte, else the Karte derived from the active layers (with the session's basemap choice). */
 export const activeKarte = computed<Karte>(() => {
+  const hidden = hiddenIds.value;
+  const hide = (k: Karte): Karte => (hidden.length ? { ...k, layers: k.layers.map((l) => (hidden.includes(l.id) ? { ...l, visible: false } : l)) } : k);
   const own = ownOpen.value;
-  if (own) return own;
-  const k = withState(derived.value, activeIds.value, layerPrefs.value);
+  if (own) return hide(own);
+  const k = hide(withState(derived.value, activeIds.value, layerPrefs.value));
   const o = viewOverride.value;
   return { ...k, ...(o.basemap ? { basemap: o.basemap } : {}), ...(o.labels !== undefined ? { labels: o.labels } : {}), ...(o.terminator !== undefined ? { terminator: o.terminator } : {}) };
 });
@@ -160,6 +171,7 @@ const mapLayer = (k: Karte, layerId: string, fn: (l: KarteLayer) => KarteLayer):
 
 /** Switches a layer on/off. Switching on a field layer switches other field layers off (exclusive). */
 export function setLayerVisible(karteId: string, layerId: string, visible: boolean): void {
+  if (hiddenIds.peek().includes(layerId)) hiddenIds.value = hiddenIds.peek().filter((x) => x !== layerId);
   if (isOwn(karteId)) {
     editKarte(karteId, (k) => {
       const exists = k.layers.some((l) => l.id === layerId);
