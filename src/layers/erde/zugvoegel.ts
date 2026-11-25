@@ -5,6 +5,7 @@ import { computed, effect } from '@preact/signals';
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
 import { DAY } from '../../core/time';
 import { dayOfYear, makeFlock, moveShare, positionAt, PHASE_LABEL, type Bird, type Phase } from '../../data/migration/flock';
+import { roundKm, speciesFacts } from '../../data/migration/facts';
 import { loadSpeciesImage, speciesImages } from '../../data/migration/images';
 import { SPECIES, SPECIES_BY_ID, type LngLat, type Species } from '../../data/migration/species';
 import { formatIsoDay } from '../../data/parsers/gibsdaily';
@@ -280,13 +281,28 @@ export default defineLayer({
 
     const describe = (id: string, phase: Phase): InspectCard => {
       const sp = SPECIES_BY_ID[id]!;
+      const f = speciesFacts(sp, phase);
+      const photo = speciesImages.peek()[id];
+      const wiki = sp.wiki.includes(':') ? sp.wiki.split(':') as [string, string] : ['de', sp.wiki] as [string, string];
       return {
         title: sp.name,
         subtitle: `${sp.latin} · ${KIND_LABEL[sp.kind]}`,
         color: sp.color,
         icon: 'navigate',
-        facts: [{ label: 'Jetzt', value: PHASE_LABEL[phase], emphasis: true }],
-        text: `${sp.note}. Die Punkte sind simulierte Einzeltiere nach den bekannten Zugwegen und -zeiten der Art, keine Messdaten.`,
+        media: photo ? { type: 'image', url: photo } : undefined,
+        facts: [
+          { label: `Am ${formatIsoDay(isoDate(ctx.time.peek()))}`, value: PHASE_LABEL[phase], emphasis: true },
+          { label: f.next.label, value: f.next.value },
+          { label: 'Sommer', value: sp.breedIn },
+          { label: 'Winter', value: sp.winterIn },
+          { label: 'Strecke', value: `etwa ${roundKm(f.km)} km einfach${f.ways > 1 ? ` (häufigster von ${f.ways} Zugwegen)` : ''}` },
+          { label: 'Tempo', value: `etwa ${Math.round(f.kmPerDay / 10) * 10} km pro Tag` },
+          { label: 'Herbstzug', value: f.autumn },
+          { label: 'Frühjahrszug', value: f.spring },
+          { label: 'Größe', value: sp.size },
+        ],
+        text: `${sp.note}.\n\nDie Punkte sind simulierte Einzeltiere nach den bekannten Zugwegen und -zeiten der Art, keine Messdaten.`,
+        links: [{ label: 'Mehr bei Wikipedia', url: `https://${wiki[0]}.wikipedia.org/wiki/${encodeURIComponent(wiki[1])}` }],
       };
     };
     clean.add(ctx.map.onPick([dotId, markId], {

@@ -35,6 +35,10 @@ export interface Species {
   autumn: [doy: number, sd: number];
   spring: [doy: number, sd: number];
   flyways: Flyway[];
+  /** Wo die Art den Sommer und den Winter verbringt, und ihre Größe (für die Karte). */
+  breedIn: string;
+  winterIn: string;
+  size: string;
   /** Ein Satz zu Zug und Besonderheit für die Karte. */
   note: string;
 }
@@ -42,6 +46,7 @@ export interface Species {
 export const SPECIES: Species[] = [
   {
     id: 'weissstorch', name: 'Weißstorch', latin: 'Ciconia ciconia', wiki: 'Weißstorch', kind: 'vogel', color: '#FF6F91', n: 520,
+    breedIn: 'Mittel- und Osteuropa', winterIn: 'Sahelzone und Ostafrika', size: 'Spannweite bis 2,2 m',
     autumn: [232, 12], spring: [58, 12],
     note: 'Westzieher über Gibraltar, Ostzieher über den Bosporus; Winter in der Sahelzone und in Ost- und Südafrika',
     flyways: [
@@ -51,18 +56,21 @@ export const SPECIES: Species[] = [
   },
   {
     id: 'rauchschwalbe', name: 'Rauchschwalbe', latin: 'Hirundo rustica', wiki: 'Rauchschwalbe', kind: 'vogel', color: '#FFB347', n: 520,
+    breedIn: 'Europa', winterIn: 'südliches Afrika', size: 'Spannweite etwa 33 cm',
     autumn: [255, 12], spring: [75, 10],
     note: 'Von Europa über die Sahara bis nach Südafrika, etwa 10 000 km in jeder Richtung',
     flyways: [{ weight: 1, breed: [11, 51, 800], winter: [23, -25, 600], via: [[3, 44], [-4, 36], [5, 24], [15, 6], [22, -8]], days: [45, 45] }],
   },
   {
     id: 'mauersegler', name: 'Mauersegler', latin: 'Apus apus', wiki: 'Mauersegler', kind: 'vogel', color: '#C9A0FF', n: 380,
+    breedIn: 'Europa', winterIn: 'Zentral- und Südafrika', size: 'Spannweite etwa 42 cm',
     autumn: [212, 8], spring: [118, 8],
     note: 'Zieht früh ab (Ende Juli) und kommt spät, verbringt fast das ganze Leben in der Luft',
     flyways: [{ weight: 1, breed: [14, 52, 900], winter: [22, -5, 700], via: [[8, 44], [4, 33], [12, 14], [18, 3]], days: [26, 30] }],
   },
   {
     id: 'kranich', name: 'Kranich', latin: 'Grus grus', wiki: 'Kranich', kind: 'vogel', color: '#7FDBDA', n: 420,
+    breedIn: 'Nord- und Osteuropa', winterIn: 'Spanien und Nordostafrika', size: 'Spannweite bis 2,4 m',
     autumn: [281, 9], spring: [57, 12],
     note: 'Westroute über Frankreich nach Spanien, Ostroute über die Türkei nach Äthiopien',
     flyways: [
@@ -72,30 +80,35 @@ export const SPECIES: Species[] = [
   },
   {
     id: 'kuestenseeschwalbe', name: 'Küstenseeschwalbe', latin: 'Sterna paradisaea', wiki: 'Küstenseeschwalbe', kind: 'vogel', color: '#FF8A5B', n: 320,
+    breedIn: 'Arktis und Subarktis', winterIn: 'Packeis der Antarktis', size: 'Spannweite etwa 80 cm',
     autumn: [212, 14], spring: [62, 12],
     note: 'Der längste Zug im Tierreich: von der Arktis bis zum Packeis der Antarktis, im Bogen über den Atlantik, gut 70 000 km im Jahr',
     flyways: [{ weight: 1, breed: [-22, 66, 900], winter: [5, -66, 1300], via: [[-18, 48], [-20, 28], [-18, 8], [-30, -8], [-34, -30], [-22, -50]], springVia: [[-10, -50], [-40, -30], [-42, -8], [-36, 14], [-34, 40]], days: [85, 80] }],
   },
   {
     id: 'pfuhlschnepfe', name: 'Pfuhlschnepfe (Alaska)', latin: 'Limosa lapponica baueri', wiki: 'Pfuhlschnepfe', kind: 'vogel', color: '#6FE3A8', n: 260,
+    breedIn: 'Westalaska', winterIn: 'Neuseeland und Ostaustralien', size: 'Spannweite etwa 75 cm',
     autumn: [247, 8], spring: [78, 8],
     note: 'Fliegt im Herbst in rund neun Tagen ohne Pause von Alaska nach Neuseeland, zurück mit Rast am Gelben Meer',
     flyways: [{ weight: 1, breed: [-160, 62, 250], winter: [-185, -38, 250], via: [[-169, 45], [-175, 25], [-182, 5], [-187, -20]], springVia: [[-205, -10], [-237, 35], [-215, 57]], days: [9, 42] }],
   },
   {
     id: 'kolibri', name: 'Rubinkehlkolibri', latin: 'Archilochus colubris', wiki: 'Rubinkehlkolibri', kind: 'vogel', color: '#FF5D8F', n: 260,
+    breedIn: 'östliches Nordamerika', winterIn: 'Mittelamerika', size: 'Spannweite etwa 11 cm, Gewicht etwa 3 g',
     autumn: [232, 14], spring: [72, 10],
     note: 'Fliegt etwa 800 km nonstop über den Golf von Mexiko',
     flyways: [{ weight: 1, breed: [-80, 42, 900], winter: [-86, 11, 450], via: [[-84, 32], [-90, 26.5], [-90, 21], [-88, 16]], days: [30, 38] }],
   },
   {
     id: 'monarch', name: 'Monarchfalter', latin: 'Danaus plexippus', wiki: 'Monarchfalter', kind: 'insekt', color: '#FF9F1C', n: 420,
+    breedIn: 'Nordamerika', winterIn: 'Bergwälder in Mexiko', size: 'Spannweite etwa 10 cm',
     autumn: [250, 12], spring: [64, 12],
     note: 'Ein Schmetterling zieht im Herbst über 4 000 km nach Mexiko; im Frühjahr tragen mehrere Generationen den Zug zurück',
     flyways: [{ weight: 1, breed: [-83, 42, 800], winter: [-100.3, 19.6, 120], via: [[-91, 36], [-97, 30], [-100, 24]], days: [60, 105] }],
   },
   {
     id: 'buckelwal', name: 'Buckelwal (Nordatlantik)', latin: 'Megaptera novaeangliae', wiki: 'Buckelwal', kind: 'meer', color: '#5CC8FF', n: 240,
+    breedIn: 'Neuengland, Island und Norwegen', winterIn: 'Karibik und Kap Verde', size: 'Länge bis 16 m',
     autumn: [296, 18], spring: [76, 18],
     note: 'Frisst im Sommer vor Neuengland, Island und Norwegen und gebiert im Winter in der Karibik und vor Kap Verde',
     flyways: [
@@ -106,6 +119,7 @@ export const SPECIES: Species[] = [
   },
   {
     id: 'grauwal', name: 'Grauwal (Ostpazifik)', latin: 'Eschrichtius robustus', wiki: 'en:Gray_whale', kind: 'meer', color: '#8EA8C3', n: 200,
+    breedIn: 'Beringsee und Tschuktschensee', winterIn: 'Lagunen von Baja California', size: 'Länge bis 15 m',
     autumn: [305, 20], spring: [62, 20],
     note: 'Etwa 18 000 km im Jahr, die längste Wanderung eines Säugetiers: von der Beringsee zu den Lagunen von Baja California',
     flyways: [{ weight: 1, breed: [-168, 62, 400], winter: [-112, 26.5, 220], via: [[-160, 55], [-150, 52], [-135, 46], [-124, 38], [-118, 31]], days: [70, 75] }],
