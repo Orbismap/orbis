@@ -45,9 +45,11 @@ export function orbitThrough(lng: number, lat: number, t: number, altKm: number,
 }
 
 /** Longitude / latitude (degrees) of the object at `t` seconds after T-0. */
-export function orbitPosition(o: CircularOrbit, t: number): LngLat {
+export const orbitPosition = (o: CircularOrbit, t: number): LngLat => orbitPositionAt(o, o.u0 + meanMotion(o.a) * (t - o.t0), t);
+
+/** Like `orbitPosition`, but the argument of latitude `u` (radians) is given: for a body that does not move at a constant rate along its plane (a sub-orbital arc, a burn). */
+export function orbitPositionAt(o: CircularOrbit, u: number, t: number): LngLat {
   const dt = t - o.t0;
-  const u = o.u0 + meanMotion(o.a) * dt;
   const raan = o.raan0 + nodeDrift(o.a, o.inc) * dt;
   const cu = Math.cos(u);
   const su = Math.sin(u);

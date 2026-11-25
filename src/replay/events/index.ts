@@ -1,6 +1,8 @@
 // The events that can be replayed. The data of an event is only loaded when it is opened; what the list needs (title, cover) is here, so the list shows at once.
 import type { LngLat } from '../../core/geo';
 import type { ReplayEvent } from '../types';
+import { PAD_A } from './pad';
+import { FLIGHT_TESTS } from './starship-tests';
 import starship15Cover from './covers/starship-flight-15.webp';
 
 export interface ReplayListing {
@@ -11,8 +13,8 @@ export interface ReplayListing {
   t0: number;
   /** where it happened (the map marker) */
   pad: LngLat;
-  /** cover photo */
-  cover: string;
+  /** cover photo; none yet: the list shows a plain gradient */
+  cover?: string;
   /** short facts for the list chips, e.g. the length and the outcome */
   badges: string[];
   load(): Promise<ReplayEvent>;
@@ -29,6 +31,15 @@ export const REPLAY_EVENTS: readonly ReplayListing[] = [
     badges: ['22 h 33 min', 'Ship gefangen'],
     load: async () => (await import('./starship15')).starship15,
   },
+  ...FLIGHT_TESTS.map((f): ReplayListing => ({
+    id: f.id,
+    title: f.title,
+    subtitle: f.subtitle,
+    t0: f.t0,
+    pad: PAD_A,
+    badges: f.badges,
+    load: async () => (await import('./test-flight')).buildTestFlight(f),
+  })),
 ];
 
 export const findReplay = (id: string) => REPLAY_EVENTS.find((e) => e.id === id);

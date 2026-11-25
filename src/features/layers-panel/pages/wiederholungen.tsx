@@ -34,7 +34,7 @@ async function openEvent(def: LayerDef, listing: ReplayListing) {
 function EventCard({ def, e, first }: { def: LayerDef; e: ReplayListing; first: boolean }) {
   return (
     <li class={`rpg-card${first ? ' is-first' : ''}`}>
-      <img class="rpg-img" src={e.cover} alt="" loading={first ? 'eager' : 'lazy'} decoding="async" draggable={false} />
+      {e.cover && <img class="rpg-img" src={e.cover} alt="" loading={first ? 'eager' : 'lazy'} decoding="async" draggable={false} />}
       <div class="rpg-scrim" aria-hidden="true" />
       <h4 class="rpg-title">{e.title}</h4>
       <ul class="rpg-chips" aria-label="Kennzahlen">

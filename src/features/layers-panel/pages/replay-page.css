@@ -75,7 +75,7 @@
     position: relative;
     aspect-ratio: 2 / 1;
     overflow: hidden;
-    background: #0b1f3a;
+    background: radial-gradient(120% 140% at 80% 10%, #1d4f86 0%, #0b1f3a 55%, #070f1d 100%);
     isolation: isolate;
     color: #fff;
   }

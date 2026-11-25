@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { haversine } from '../core/geo';
 import { curve, lerpHeading, ramp } from './curve';
 import { autoSpeed, phaseAt, scrubPos, scrubTime, separationM, shotAt, tLabel } from './director';
+import { FLIGHT_TESTS } from './events/starship-tests';
+import { buildTestFlight } from './events/test-flight';
 import { buildFlight, buildStarship15, PAD, returnMiss, T } from './events/starship15';
 import { orbitPosition, orbitThrough, periodOf } from './orbit';
 
@@ -227,5 +229,45 @@ describe('director', () => {
     expect(tLabel(125)).toBe('T+02:05');
     expect(tLabel(-30)).toBe('T-00:30');
     expect(tLabel(21 * 3600 + 36 * 60 + 10)).toBe('T+21:36:10');
+  });
+});
+
+describe('Starship test flights 1 to 5', () => {
+  const events = FLIGHT_TESTS.map((f) => buildTestFlight(f));
+  const moved = (a: { lng: number; lat: number; altM: number }, b: { lng: number; lat: number; altM: number }) => haversine([a.lng, a.lat], [b.lng, b.lat]) * 1000 + Math.abs(a.altM - b.altM);
+
+  it('every actor is continuous, with no jump over a second', () => {
+    for (const ev of events) {
+      for (const a of ev.actors) {
+        let prev = a.at(a.from);
+        for (let t = a.from + 1; t <= a.to; t += 1) {
+          const s = a.at(t);
+          if (!s || !prev) { prev = s; continue; }
+          expect(moved(prev, s), `${ev.id} ${a.id} t=${t}`).toBeLessThan(a.kind === 'ship' ? 12_000 : 5000);
+          expect(Number.isFinite(s.altM) && Number.isFinite(s.lng) && Number.isFinite(s.lat), `${ev.id} ${a.id} t=${t} finite`).toBe(true);
+          prev = s;
+        }
+      }
+    }
+  });
+  it('phases follow each other without gaps', () => {
+    for (const ev of events) for (let i = 1; i < ev.phases.length; i++) expect(ev.phases[i]!.from, `${ev.id} phase ${i}`).toBe(ev.phases[i - 1]!.to);
+  });
+  it('flights 4 and 5 come down off Western Australia, flight 5 catches its booster at the tower', () => {
+    for (const ev of events.slice(3)) {
+      const s = ev.actors[1]!.at(ev.actors[1]!.to - 40)!;
+      expect(s.lng).toBeGreaterThan(105);
+      expect(s.lng).toBeLessThan(120);
+      expect(s.lat).toBeLessThan(-18);
+      expect(s.altM).toBeLessThan(200);
+    }
+    const f5 = events[4]!;
+    const b = f5.actors[0]!.at(417)!;
+    expect(haversine([b.lng, b.lat], f5.pad) * 1000).toBeLessThan(30);
+    expect(b.altM).toBeLessThan(60);
+  });
+  it('flight 2 loses the booster early and flight 1 never separates', () => {
+    expect(events[1]!.actors[0]!.to).toBeLessThan(200);
+    expect(events[0]!.phases.some((p) => p.id === 'staging')).toBe(false);
   });
 });
