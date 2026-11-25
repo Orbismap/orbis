@@ -13,12 +13,16 @@ export interface SourceRef {
   manifest?: { bucket: Bucket; key: string };   // for the age display
 }
 
-export type OptionSpec =
+export type OptionSpec = (
   | { id: string; label: string; type: 'range'; min: number; max: number; step: number; default: number; unit?: string }
   | { id: string; label: string; type: 'select'; choices: { value: string; label: string }[]; default: string }
   /** Multiple choice (a filter): the value is 'all' or the chosen values joined by commas, see layers/multi.ts. `choices` starts with the entry 'all'. */
   | { id: string; label: string; type: 'multi'; choices: { value: string; label: string }[]; default: string }
-  | { id: string; label: string; type: 'toggle'; default: boolean };
+  | { id: string; label: string; type: 'toggle'; default: boolean }
+) & {
+  /** Die Option erscheint nur, solange das für die gewählten Optionen gilt (z. B. nur in einer bestimmten Ansicht). Ohne: immer. */
+  when?(options: OptionValues): boolean;
+};
 export type OptionValues = Record<string, number | string | boolean>;
 
 export type LegendSpec =
@@ -28,9 +32,11 @@ export type LegendSpec =
 
 export interface TimeSpec {
   /** Range relative to now in ms, e.g. radar [-2 h, +0.5 h], forecast [0, +72 h], quakes [-7 d, 0] */
-  range(): { start: number; end: number; step?: number; frames?: number[] };
+  range(options: OptionValues): { start: number; end: number; step?: number; frames?: number[] };
   /** 'frames': discrete/interpolated time steps; 'window': shows events up to the selected time */
   mode: 'frames' | 'window';
+  /** Zeitleiste nur, solange das gilt (nach den gewählten Optionen, ohne Eintrag: immer), z. B. nur in der Ansicht mit Zeitbezug. */
+  enabled?(options: OptionValues): boolean;
 }
 
 export interface LayerStatus {
@@ -74,6 +80,7 @@ export interface LayerContext {
   status(s: LayerStatus): void;
   resource<T>(spec: ResourceSpec<T>): Resource<T>;   // disposed automatically when the layer is switched off
   feed(items: FeedItem[]): void;                 // "Aktuell" list + marks on the timeline
+  marks(times: ArrayLike<number>, colors?: ArrayLike<string>): void;         // only marks on the timeline (event times in ms), for layers with too many events for a list
   key(id: string): ReadonlySignal<string | undefined>;   // value of a user key (see src/keys), reactive
   select(card: InspectCard | null): void;        // opens the inspector
   /** The card currently shown in the inspector (any layer); kits use it to draw their selection ring. */

@@ -7,7 +7,7 @@ import { DAY } from '../../core/time';
 import { bucketUrl } from '../../data/endpoints';
 import type { ProtestCollection, ProtestProps } from '../../data/parsers/ccc';
 import { pointLayer } from '../../render/points';
-import type { AnyFeature } from '../../render/common';
+import { markEventTimes, type AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
 
 const COLOR = '#8F7BFF';
@@ -44,6 +44,8 @@ export default defineLayer({
       return { type: 'FeatureCollection', features: d.features.filter((f) => f.properties.t > start && f.properties.t <= end) };
     });
     const note = computed(() => { const d = raw.data.value; return d?.lastDay ? `Daten bis ${new Date(d.lastDay).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}` : undefined; });
+    // Striche in der Zeitleiste: wann die Ereignisse stattfanden
+    markEventTimes(ctx, () => raw.data.value?.features.map((x) => x.properties.t));
     return pointLayer({ ...ctx, status: (s) => ctx.status(s.state === 'ready' || s.state === 'empty' ? { ...s, note: note.peek() ?? s.note } : s) }, {
       data: visible,
       resources: [raw],

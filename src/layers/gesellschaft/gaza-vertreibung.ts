@@ -7,7 +7,7 @@ import { bucketUrl } from '../../data/endpoints';
 import type { DisplaceCollection, DisplaceProps } from '../../data/parsers/gaza';
 import { ZEUGEN_WARNUNG } from '../../data/parsers/zeitzeugen';
 import { pointLayer } from '../../render/points';
-import type { AnyFeature } from '../../render/common';
+import { markEventTimes, type AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
 
 const COLOR = '#4FB3E8';
@@ -37,6 +37,8 @@ export default defineLayer({
       const t = ctx.time.value;
       return { type: 'FeatureCollection', features: d.features.filter((f) => f.properties.t <= t + DAY / 2) };
     });
+    // Striche in der Zeitleiste: wann die Ereignisse stattfanden
+    markEventTimes(ctx, () => raw.data.value?.features.map((x) => x.properties.t));
     return pointLayer(ctx, {
       data: visible,
       resources: [raw],

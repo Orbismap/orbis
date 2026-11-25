@@ -114,10 +114,16 @@ export function OpacityField({ layer, def, karteId }: PartProps) {
   );
 }
 
+/** Die Optionen einer Ebene mit ihren Vorgaben; `when` entscheidet, welche gerade angezeigt werden. */
+export const shownOptions = (def: LayerDef, layer: KarteLayer, specs: OptionSpec[] | undefined = def.options): OptionSpec[] => {
+  const values = Object.fromEntries((def.options ?? []).map((o) => [o.id, layer.options?.[o.id] ?? o.default]));
+  return (specs ?? []).filter((o) => !o.when || o.when(values));
+};
+
 export function OptionFields({ layer, def, karteId, specs = def.options }: PartProps & { specs?: OptionSpec[] }) {
   return (
     <>
-      {specs?.map((o) => (
+      {shownOptions(def, layer, specs).map((o) => (
         <Option key={o.id} spec={o} value={layer.options?.[o.id] ?? o.default} onChange={(v) => setLayerOption(karteId, def.id, o.id, v)} />
       ))}
     </>

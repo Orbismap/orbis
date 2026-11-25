@@ -4,7 +4,7 @@ import type { KarteLayer } from '../../karten/types';
 import type { LayerDef, OptionSpec } from '../../layers/types';
 import { layerStatus } from '../../state/session';
 import { Icon } from '../../ui/icons/Icon';
-import { LayerLegend, LayerNotes, OpacityField, OptionFields } from './LayerDetails';
+import { LayerLegend, LayerNotes, OpacityField, OptionFields, shownOptions } from './LayerDetails';
 import { PageFoot, PageFrame, ShowSwitch } from './page-kit';
 import { customPage } from './pages/registry';
 
@@ -22,7 +22,8 @@ export function optionSections(options: OptionSpec[] | undefined): { title: stri
 export function LayerPage({ layer, def, karteId, from, removable }: { layer: KarteLayer; def: LayerDef; karteId: string; from: string; removable: boolean }) {
   const Custom = customPage(def.id);
   const st = layerStatus.value[def.id];
-  const sections = optionSections(def.options);
+  // nur die Optionen, die zur gewählten Ansicht passen (`when`): sonst bleiben leere Abschnitte stehen
+  const sections = optionSections(shownOptions(def, layer));
   return (
     <PageFrame def={def} from={from}>
       {Custom ? (

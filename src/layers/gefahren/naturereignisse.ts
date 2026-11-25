@@ -8,7 +8,7 @@ import { formatQuantity } from '../../core/units';
 import { bucketUrl } from '../../data/endpoints';
 import { fetchJson } from '../../data/http';
 import { eonetEvents, type EonetCollection, type EonetProps } from '../../data/parsers/eonet';
-import type { AnyFeature } from '../../render/common';
+import { markEventTimes, type AnyFeature } from '../../render/common';
 import { pointLayer } from '../../render/points';
 import type { IconName } from '../../ui/icons/names';
 import { defineLayer } from '../define';
@@ -81,6 +81,12 @@ export default defineLayer({
       const o = ctx.options.value;
       const t = ctx.time.value;
       return { type: 'FeatureCollection', features: d.features.filter((f) => o[cat(f.properties.cat).group] !== false && f.properties.t0 <= t) };
+    });
+    // Zeitleiste: alle Ereignisse mit ihrem Beginn, in den Farben der Legende
+    markEventTimes(ctx, () => {
+      const o = ctx.options.value;
+      const all = res.data.value?.features.filter((f) => o[cat(f.properties.cat).group] !== false);
+      return all && { times: all.map((f) => f.properties.t0), colors: all.map((f) => cat(f.properties.cat).color) };
     });
     const color = ['match', ['get', 'cat'], ...Object.entries(CATS).flatMap(([k, v]) => [k, v.color]), FALLBACK.color] as unknown as ExpressionSpecification;
 

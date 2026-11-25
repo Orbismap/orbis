@@ -13,7 +13,7 @@ import { groundTrack, phaseAt, STATUS_DE, tLabel, type LaunchDetail } from '../.
 import { countdownText } from '../../data/parsers/traffic';
 import { lineLayer } from '../../render/lines';
 import { pointLayer } from '../../render/points';
-import type { AnyFeature } from '../../render/common';
+import { markEventTimes, type AnyFeature } from '../../render/common';
 import { defineLayer } from '../define';
 import type { InspectCard, LayerContext } from '../types';
 
@@ -41,6 +41,8 @@ export default defineLayer({
     { name: 'The Space Devs – Launch Library 2', url: 'https://thespacedevs.com/llapi', license: 'frei, Quellenangabe', manifest: { bucket: 'live', key: 'space/launches/upcoming.json' } },
     { name: 'Launch Library 2 (Detail, nächste Starts)', url: 'https://thespacedevs.com/llapi', license: 'frei, Quellenangabe', manifest: { bucket: 'live', key: 'space/launches/tracker.json' } },
   ],
+  // Zeitleiste: von kurz vor jetzt bis 7 Tage voraus (weiter hinaus gibt es nur wenige, unsichere Termine); Bahnen und Countdown folgen der gewählten Zeit
+  time: { mode: 'window', range: () => ({ start: -PRE, end: 7 * DAY, step: HOUR }) },
   options: [{ id: 'days', label: 'Zeitraum', type: 'select', choices: RANGES, default: '30' }, { id: 'track', label: 'Simulierte Flugbahn', type: 'toggle', default: true }],
   legend: {
     type: 'scale', unit: 'Std. bis Start',
@@ -85,6 +87,8 @@ export default defineLayer({
       const end = Date.now() + Number(ctx.options.value.days ?? 30) * DAY;
       return groupByPad(l.filter((x) => x.net <= end && x.net > Date.now() - 6 * HOUR));
     });
+    // Striche in der Zeitleiste: alle Starts im gewählten Zeitraum, nicht nur die 60 der Liste
+    markEventTimes(ctx, () => pads.value?.flatMap((p) => p.launches.map((l) => l.net)));
     const padById = computed(() => new Map((pads.value ?? []).map((p) => [String(p.id), p])));
     const fc = computed<FeatureCollection<Point> | undefined>(() => {
       const list = pads.value;

@@ -1,28 +1,11 @@
-import { computed, effect, signal } from '@preact/signals';
+import { effect, signal } from '@preact/signals';
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { roundTo, startOfDay } from '../../core/time';
-import { getLayer } from '../../layers/registry';
-import { feeds } from '../../state/session';
 import { goLive, live, now, pause, range, setTime, step, time } from '../../state/time';
-import { camera } from '../../state/view';
 import { settings } from '../../state/settings';
-import { drawTimeline, readPalette, type Mark } from './draw';
+import { bandHeight, drawTimeline, readPalette } from './draw';
+import { collapsed, rowScale, rows } from './rows';
 import { formatSelected } from './math';
-
-/** Centre of the map quantised to 2°: the day/night shading only redraws when it visibly changes. */
-const centreKey = computed(() => {
-  const c = camera.value;
-  return `${Math.round(c.lng / 2) * 2}:${Math.round(c.lat / 2) * 2}`;
-});
-
-const marks = computed<Mark[]>(() => {
-  const out: Mark[] = [];
-  for (const [id, items] of Object.entries(feeds.value)) {
-    const color = getLayer(id)?.color ?? '#72C8F0';
-    for (const it of items) if (it.time !== undefined) out.push({ t: it.time, color: it.color ?? color });
-  }
-  return out.sort((a, b) => a.t - b.t);
-});
 
 const SNAP_NOW_PX = 7;
 
@@ -30,9 +13,9 @@ const SNAP_NOW_PX = 7;
 export function TimeBand({ compact }: { compact?: boolean }) {
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const hover = useMemo(() => signal<number | null>(null), []);
-  const scrub = useRef({ on: false, day: -1 });
+  const hover = useMemo(() => signal<{ x: number; y: number } | null>(null), []);
   const wheelAcc = useRef(0);
+  const scrub = useRef({ on: false, day: -1 });
 
   // ---- drawing: redraw only when an input changes, coalesced into one frame ----
   useEffect(() => {
@@ -55,10 +38,9 @@ export function TimeBand({ compact }: { compact?: boolean }) {
       if (!size.w) return;
       g.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
       const r = range.peek();
-      const [lng, lat] = centreKey.peek().split(':').map(Number) as [number, number];
       drawTimeline(
         g,
-        { w: size.w, h: size.h, start: r.start, end: r.end, frames: r.frames, now: now.peek(), time: time.peek(), live: live.peek(), centre: { lng, lat }, marks: marks.peek(), hoverX: hover.peek(), compact: !!compact },
+        { w: size.w, h: size.h, start: r.start, end: r.end, frames: r.frames, now: now.peek(), time: time.peek(), live: live.peek(), rows: rows.peek(), collapsed: collapsed.peek(), scale: rowScale.peek(), hover: hover.peek(), compact: !!compact },
         readPalette(cv),
       );
     };
@@ -70,8 +52,9 @@ export function TimeBand({ compact }: { compact?: boolean }) {
       now.value;
       time.value;
       live.value;
-      marks.value;
-      centreKey.value;
+      rows.value;
+      collapsed.value;
+      rowScale.value;
       hover.value;
       settings.value.theme;
       schedule();
@@ -92,14 +75,15 @@ export function TimeBand({ compact }: { compact?: boolean }) {
   // ---- interaction ----
   const tFromX = (clientX: number) => {
     const r = canvas.current!.getBoundingClientRect();
-    const rg = range.peek();
+    const v = range.peek();
     const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
-    return { t: rg.start + f * (rg.end - rg.start), px: clientX - r.left, width: r.width };
+    return { t: v.start + f * (v.end - v.start), px: clientX - r.left, width: r.width };
   };
   const apply = (clientX: number) => {
     const rg = range.peek();
+    const v = rg;
     const { t, px, width } = tFromX(clientX);
-    const nowPx = ((now.peek() - rg.start) / (rg.end - rg.start)) * width;
+    const nowPx = ((now.peek() - v.start) / (v.end - v.start)) * width;
     if (Math.abs(px - nowPx) < SNAP_NOW_PX) goLive();
     else {
       let snapped = t;
@@ -116,13 +100,16 @@ export function TimeBand({ compact }: { compact?: boolean }) {
     if (e.button > 0) return;
     pause();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    scrub.current = { on: true, day: startOfDay(time.peek()) };
     wrap.current?.focus({ preventScroll: true });
+    scrub.current = { on: true, day: startOfDay(time.peek()) };
     apply(e.clientX);
   };
   const move = (e: PointerEvent) => {
     if (scrub.current.on) apply(e.clientX);
-    else if (e.pointerType === 'mouse') hover.value = tFromX(e.clientX).px;
+    if (e.pointerType === 'mouse') {
+      const r = canvas.current!.getBoundingClientRect();
+      hover.value = { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
   };
   const up = () => {
     scrub.current = { on: false, day: -1 };
@@ -154,6 +141,7 @@ export function TimeBand({ compact }: { compact?: boolean }) {
 
   const rg = range.value;
   const t = time.value;
+  const height = bandHeight(rows.value, rg.start, rg.end, collapsed.value, rowScale.value, !!compact);
   return (
     <div
       ref={wrap}
@@ -164,9 +152,10 @@ export function TimeBand({ compact }: { compact?: boolean }) {
       aria-valuemin={rg.start}
       aria-valuemax={rg.end}
       aria-valuenow={t}
-      aria-valuetext={live.value ? `Jetzt, ${formatSelected(t)}` : formatSelected(t)}
+      aria-valuetext={live.value ? `Jetzt, ${formatSelected(t, rg.step)}` : formatSelected(t, rg.step)}
       aria-orientation="horizontal"
       data-nodrag
+      style={compact ? undefined : { height: `${height}px` }}
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={up}

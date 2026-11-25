@@ -22,7 +22,7 @@ export const hasTimeLayers = computed(() => timeSources.value.length > 0);
 
 export const range = computed<TimeRange>(() => {
   const n = now.value;
-  const specs = timeSources.value.map((s) => s.range());
+  const specs = timeSources.value.map((s) => s.range({}));
   if (!specs.length) return { start: n + DEFAULT_REL.start, end: n + DEFAULT_REL.end, step: DEFAULT_REL.step };
   const frames = [...new Set(specs.flatMap((s) => s.frames ?? []))].sort((a, b) => a - b).map((f) => n + f);
   return {
