@@ -62,6 +62,30 @@ export function InspectorCard({ card, layerId }: { card: InspectCard; layerId: s
         </dl>
       )}
       {card.text && <p class="insp-text">{card.text}</p>}
+      {card.timeline && card.timeline.length > 0 && (
+        <ol class="insp-tl" aria-label="Ablauf">
+          {card.timeline.map((step, i) => {
+            const body = (
+              <>
+                {step.at && <span class="insp-tl-at num">{step.at}</span>}
+                <span class="insp-tl-title">{step.title}</span>
+                {step.text && <span class="insp-tl-text">{step.text}</span>}
+              </>
+            );
+            return (
+              <li key={`${i}-${step.title}`} class="insp-tl-step">
+                {step.run ? (
+                  <button type="button" class="insp-tl-body is-link" onClick={step.run}>
+                    {body}
+                  </button>
+                ) : (
+                  <div class="insp-tl-body">{body}</div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
       {card.media && <Media media={card.media} title={card.title} />}
       {card.links && card.links.length > 0 && (
         <ul class="insp-links" role="list">
@@ -81,7 +105,7 @@ export function InspectorCard({ card, layerId }: { card: InspectCard; layerId: s
       <div class="insp-actions">
         {card.location && <RouteButton title={card.title} lng={card.location[0]} lat={card.location[1]} />}
         {card.actions?.map((a) => (
-          <Button key={a.id} variant={a.active ? 'primary' : 'secondary'} icon={a.icon} aria-pressed={a.active} onClick={a.run}>
+          <Button key={a.id} variant={a.active || a.primary ? 'primary' : 'secondary'} icon={a.icon} aria-pressed={a.primary ? undefined : a.active} onClick={a.run}>
             {a.label}
           </Button>
         ))}

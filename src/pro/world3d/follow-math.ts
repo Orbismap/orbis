@@ -89,6 +89,11 @@ export function mapZoomFor(distanceZoom: number, altM: number, pitch: number, t:
   return Math.log2(k / (k / 2 ** distanceZoom + sightToObject(altM, pitch) * t));
 }
 
+/** The zoom of the distance to the object for a camera distance in metres (`toCentre` as above). */
+export function zoomForDistance(distM: number, toCentre: number): number {
+  return Math.log2((distanceAtZoom0(toCentre) * EARTH_RADIUS_M) / Math.max(0.01, distM));
+}
+
 /** The zoom of the distance to the object for a map's zoom. */
 export function distanceZoomFor(mapZoom: number, altM: number, pitch: number, t: number, toCentre: number): number {
   const k = distanceAtZoom0(toCentre);

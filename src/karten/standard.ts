@@ -31,7 +31,7 @@ const THEMES: Record<string, KarteTheme[]> = {
     T('schiene', 'Schiene', 'train', ['bahnnetz', 'zuege', 'nahverkehr', 'netzplaene', 'oepnv-linien']),
     T('luft', 'Luft', 'plane', ['flugzeuge', 'flughafen', 'gps-stoerungen', 'wetterballons']),
     T('see', 'See', 'ship', ['schiffe', 'haefen', 'schiffsrouten']),
-    T('raumfahrt', 'Raumfahrt', 'rocket', ['satelliten', 'starlink', 'raketenstarts']),
+    T('raumfahrt', 'Raumfahrt', 'rocket', ['satelliten', 'starlink', 'raketenstarts', 'wiederholungen']),
     T('rad-fuss', 'Rad und Fuß', 'bike', ['fahrradstaender', 'leihraeder', 'wegenetze']),
   ],
   infrastruktur: [
@@ -81,7 +81,7 @@ const DEFS: Karte[] = [
   },
   {
     id: 'verkehr', name: 'Verkehr', icon: 'plane', color: '#F2B45A', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,
-    layers: [on('flugzeuge'), on('satelliten'), off('schiffe'), off('flughafen'), off('gps-stoerungen'), off('haefen'), off('raketenstarts'), off('starlink'), off('blitzer'), off('wetterballons'), off('zuege'), off('nahverkehr'), off('autobahn'), off('strassennetz'), off('bahnnetz'), off('netzplaene'), off('oepnv-linien'), off('wegenetze'), off('leihraeder'), off('fahrradstaender'), off('verkehrslage'), off('strassenmarkierungen')],
+    layers: [on('flugzeuge'), on('satelliten'), off('schiffe'), off('flughafen'), off('gps-stoerungen'), off('haefen'), off('raketenstarts'), on('wiederholungen'), off('starlink'), off('blitzer'), off('wetterballons'), off('zuege'), off('nahverkehr'), off('autobahn'), off('strassennetz'), off('bahnnetz'), off('netzplaene'), off('oepnv-linien'), off('wegenetze'), off('leihraeder'), off('fahrradstaender'), off('verkehrslage'), off('strassenmarkierungen')],
   },
   {
     id: 'infrastruktur', name: 'Infrastruktur', icon: 'power', color: '#58D0A0', builtin: true, basemap: 'orbis-dark', labels: true, terminator: false,

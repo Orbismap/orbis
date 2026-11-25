@@ -7,6 +7,7 @@ import { closeKarteDetail, hudSearchFocus, detailOpen, orteView } from '../state
 import { isMobile, leftPanelOpen, leftView, searchOpen, settingsOpen, shortcutsOpen, sheetDetent } from '../state/ui';
 import { projection, setProjection } from '../state/view';
 import { togglePlay } from '../features/timeline/Transport';
+import { closeReplay, replayEvent, toggleReplay } from '../state/replay';
 
 const INTERACTIVE = 'input, textarea, select, [contenteditable="true"]';
 const OWN_ARROWS = '[role="slider"], [role="tab"], [role="radio"], [role="option"], [role="menuitem"], [role="menuitemradio"], [role="combobox"]';
@@ -47,7 +48,8 @@ export function startKeyboard(): () => void {
       return;
     }
     if (e.key === 'Escape') {
-      if (isMobile.peek()) {
+      if (replayEvent.peek()) closeReplay();
+      else if (isMobile.peek()) {
         if (sheetPages.peek().length) goBack();
         else if (sheetDetent.peek() !== 'peek') sheetDetent.value = sheetDetent.peek() === 'full' ? 'half' : 'peek';
         else return;
@@ -80,6 +82,11 @@ export function startKeyboard(): () => void {
         break;
       case ' ':
         if (t?.closest(OWN_SPACE)) return;
+        if (replayEvent.peek()) {
+          e.preventDefault();
+          toggleReplay();
+          break;
+        }
         if (!hasTimeLayers.peek()) break; // no timeline, nothing to play
         e.preventDefault();
         togglePlay();

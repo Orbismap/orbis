@@ -91,10 +91,14 @@ void main() {
   vAlong = mix(aAlong.x, aAlong.y, aCorner.x);
   float te = aTime.y < 0.0 ? uNow : aTime.y;
   vFade = uFade > 0.0 ? clamp(1.0 - (uNow - mix(aTime.x, te, aCorner.x)) / uFade, 0.0, 1.0) : 1.0;
-  if (cs.w <= 0.0 || ce.w <= 0.0) {
+  // a segment that reaches behind the camera is cut at the near side (not dropped: close to a moving head the line would flicker)
+  const float NEAR_W = 0.02;
+  if (cs.w <= NEAR_W && ce.w <= NEAR_W) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     return;
   }
+  if (cs.w < NEAR_W) cs = mix(cs, ce, (NEAR_W - cs.w) / (ce.w - cs.w));
+  else if (ce.w < NEAR_W) ce = mix(ce, cs, (NEAR_W - ce.w) / (cs.w - ce.w));
   vec2 d = (ce.xy / ce.w - cs.xy / cs.w) * uRes;
   float len = length(d);
   vec2 dir = len > 0.0001 ? d / len : vec2(1.0, 0.0);
@@ -270,6 +274,34 @@ export class GeoLine implements StagePart {
       me.setXYZ(first + v, m[0], m[1], m[2]);
     }
     ge.needsUpdate = me.needsUpdate = true;
+  }
+
+  /** the segment whose end `setVisible` moved to a head position, -1: none */
+  private headSeg = -1;
+
+  /**
+   * Shows only the first `n` points, so a trail can grow with time: with a `head`, the last visible segment ends there (the
+   * moving tip) instead of at its own end point. Cheap enough for every frame; the points themselves stay as they are.
+   */
+  setVisible(n: number, head?: Vec3) {
+    if (this.segs < 1) return;
+    const shown = Math.max(0, Math.min(this.segs, Math.floor(n) - 1));
+    this.object.geometry.setDrawRange(0, shown * 6);
+    const g = this.object.geometry;
+    const ge = g.getAttribute('aGlobeEnd') as THREE.BufferAttribute;
+    const me = g.getAttribute('aMercEnd') as THREE.BufferAttribute;
+    const put = (seg: number, p: Vec3) => {
+      const [u, m] = [this.relGlobe(p), this.relMerc(p)];
+      for (let v = 0; v < 4; v++) {
+        ge.setXYZ(seg * 4 + v, u[0], u[1], u[2]);
+        me.setXYZ(seg * 4 + v, m[0], m[1], m[2]);
+      }
+      ge.needsUpdate = me.needsUpdate = true;
+    };
+    const want = head && shown > 0 ? shown - 1 : -1;
+    if (this.headSeg >= 0 && this.headSeg !== want && this.points[this.headSeg + 1]) put(this.headSeg, this.points[this.headSeg + 1]!);
+    this.headSeg = want;
+    if (want >= 0) put(want, head!);
   }
 
   /** `liftM`: the whole line this much higher (terrain below it). */

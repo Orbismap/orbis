@@ -8,6 +8,8 @@ import { BalloonsPart } from './balloons/balloons';
 import { GebaeudePart } from './gebaeude/gebaeude';
 import { LandmarksPart } from './landmarks/landmarks';
 import { PlanesPart } from './planes/planes';
+import { ReplayCamera } from './replay/camera';
+import { ReplayPart } from './replay/part';
 import { ShipsPart } from './ships/ships';
 import { StromnetzPart } from './stromnetz/stromnetz';
 import { TilesetPart } from './tiles3d/tileset';
@@ -54,6 +56,8 @@ export const extension: OrbisExtension = {
       else { tilesRelease?.(); tilesRelease = null; }
     });
     const follow = new Follow(map, stage, host.reducedMotion, host.holdCamera);
+    const replayCamera = new ReplayCamera(map, stage, host.replay, host.holdCamera, host.reducedMotion);
+    const replay = new ReplayPart(map, host.replay, () => replayCamera.wasDrag);
     // below aircraft and ships: the stage asks the part added last first, so an aircraft over a pylon is the one clicked
     stage.add(tiles);
     stage.add(buildings);
@@ -64,6 +68,7 @@ export const extension: OrbisExtension = {
     stage.add(ships);
     stage.add(balloons);
     stage.add(planes);
+    stage.add(replay);
     host.addCustomLayer(stage, 'points');
 
     /** what can be followed: the part that draws it and the channel that opens its card */
@@ -231,6 +236,7 @@ export const extension: OrbisExtension = {
       tilesRelease?.();
       buildingsRelease?.();
       follow.dispose();
+      replayCamera.dispose();
       host.removeLayer(stage.id);
     };
   },

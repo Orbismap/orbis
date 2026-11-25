@@ -23,6 +23,7 @@ import { startBuildingTiles } from './features/buildings3d/tiles-source';
 import { initSettings } from './state/settings';
 import { startClock, watchRange } from './state/time';
 import { initUi } from './state/ui';
+import { startReplayFromUrl } from './state/replay';
 import { startUrlSync } from './state/url-sync';
 import { startHistory } from './state/history';
 
@@ -40,6 +41,7 @@ export function bootOrbis(root: HTMLElement, opts: { adopt?: { map: MlMap; eleme
   startClock();
   watchRange();
   startUrlSync();
+  startReplayFromUrl();
   startHistory();
   startExtensions();
   startBuildingTiles();

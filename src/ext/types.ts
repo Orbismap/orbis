@@ -5,6 +5,10 @@
 import type { ReadonlySignal } from '@preact/signals';
 import type { CustomLayerInterface, Map as MlMap } from 'maplibre-gl';
 import type { IconName } from '../ui/icons/names';
+import type { Actor, ActorSample, EngineLayout, Phase, ReplayEvent, Shot, ShotView, Tower } from '../replay/types';
+
+// Replay mode (rewatching a past event): the data types are plain data without any drawing, so they are part of the contract.
+export type { Actor, ActorSample, EngineLayout, Phase, ReplayEvent, Shot, ShotView, Tower };
 
 /** One tracked moving object (aircraft) as the base layer knows it. Positions are the last report, not extrapolated. */
 export interface TrackSample {
@@ -254,6 +258,28 @@ export interface FollowRef {
   id: string;
 }
 
+/** The replay mode as the extension sees it: the open event and its playhead. The base owns the time. */
+export interface ReplayChannel {
+  /** the event being replayed, null: replay mode is off */
+  readonly event: ReadonlySignal<ReplayEvent | null>;
+  /** playhead, seconds after the event's T-0 */
+  readonly t: ReadonlySignal<number>;
+  readonly playing: ReadonlySignal<boolean>;
+  /** the phase at the playhead */
+  readonly phase: ReadonlySignal<Phase | null>;
+  /** counts jumps of the playhead (scrubbing): the camera snaps instead of gliding */
+  readonly seeks: ReadonlySignal<number>;
+  /** event seconds per real second right now */
+  readonly speed: ReadonlySignal<number>;
+  /** the vehicle (actor id) the viewer picked to look at, null: the director's shot */
+  readonly focus: ReadonlySignal<string | null>;
+  setFocus(id: string | null): void;
+  /** The camera shot at the playhead (worked out by the base), null while its target does not exist. */
+  shot(): ShotView | null;
+  /** Called after every step of the playhead, in the same frame; returns the remover. */
+  onFrame(fn: (t: number, dtReal: number) => void): () => void;
+}
+
 /** What the base gives an extension. */
 export interface ExtensionHost {
   /** The MapLibre map (the extension adds its custom layer to it). */
@@ -280,6 +306,8 @@ export interface ExtensionHost {
   readonly buildings: TracksChannel<BuildingSample>;
   /** Channel for 3D landmark models (`features/landmarks/source.ts`, no layer: they are always drawn, in front of OSM buildings). */
   readonly landmarks: TracksChannel<LandmarkSample>;
+  /** Replay mode: rewatching a past event as a 3D animation. */
+  readonly replay: ReplayChannel;
   /** Channel for streamed 3D city models (`features/buildings3d/tiles-source.ts`). */
   readonly tilesets: TracksChannel<TilesetSample>;
   /** Tells the base what the tilesets do: loading, errors. */

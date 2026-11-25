@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'preact/hooks';
+import { ReplayBar } from '../features/replay/ReplayBar';
+import { replayEvent, replayLoading, replayError } from '../state/replay';
 import { Attribution } from '../features/attribution/Attribution';
 import { Legend } from '../features/legend/Legend';
 import { startedWithMap as startedFromWetter } from '../map/adopt';
@@ -41,7 +43,7 @@ export function DesktopLayout() {
         <ToolRail />
       </div>
       <div ref={dock} class="dock">
-        <Timeline />
+        {replayEvent.value || replayLoading.value || replayError.value ? <ReplayBar /> : <Timeline />}
       </div>
       <div class="season-pos">
         <SeasonBar />

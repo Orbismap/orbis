@@ -1,6 +1,7 @@
 import { useEffect } from 'preact/hooks';
 import { serializeHash } from '../core/url';
 import { SeasonBar } from '../features/season/SeasonBar';
+import { ReplayBar } from '../features/replay/ReplayBar';
 import { Scalebar } from '../features/scalebar/Scalebar';
 import { Attribution } from '../features/attribution/Attribution';
 import { KartenSwitcher } from '../features/karten-bar/KartenSwitcher';
@@ -12,6 +13,7 @@ import { TimelineCompact } from '../features/timeline/Timeline';
 import { LocateButton, ToolRail } from '../features/tools/Tools';
 import { SearchBar } from '../features/search/SheetSearch';
 import { startKeepVisible } from '../features/shared/keep-visible';
+import { replayEvent, replayLoading } from '../state/replay';
 import { reducedMotion } from '../state/settings';
 import { activeKarte } from '../state/session';
 import { goBack, sheetPages, startSheetPages } from '../state/sheet-pages';
@@ -77,6 +79,12 @@ export function MobileLayout() {
     };
   }, []);
 
+  // a replay needs the map: the sheet steps down, so it does not lie over the animation and its bar
+  const replaying = !!replayEvent.value || replayLoading.value;
+  useEffect(() => {
+    if (replaying) sheetDetent.value = 'peek';
+  }, [replaying]);
+
   const searching = top?.id === 'search';
   const feed = !page && leftTab.value === 'feed' && feedEntries.value.length > 0;
   const bar = !top || searching;
@@ -84,6 +92,7 @@ export function MobileLayout() {
   return (
     <div class="hud hud-mobile" data-detent={detent} data-behind-modal>
       <OrbisSwitcher project="map" />
+      <ReplayBar mobile />
       <div class="rail-pos">
         <ToolRail popoverUp locate={false} />
       </div>
