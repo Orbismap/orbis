@@ -21,21 +21,23 @@ export function PageFrame({ def, from, children }: { def: LayerDef; from: string
   }, [def.id]);
   return (
     <section class="lpage" aria-label={def.title} onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), closeDetail())}>
-      <button ref={back} type="button" class="lpage-back" aria-label={`Zurück zu ${from}`} onClick={closeDetail}>
-        <Icon name="chevron-left" size={18} />
-        <span>{from}</span>
-      </button>
+      <div class="lpage-bar">
+        <button ref={back} type="button" class="lpage-back" aria-label={`Zurück zu ${from}`} onClick={closeDetail}>
+          <Icon name="chevron-left" size={18} />
+          <span>{from}</span>
+        </button>
+        <h3 class="lpage-bartitle">{def.title}</h3>
+      </div>
       {children}
     </section>
   );
 }
 
-/** Titel und ein kurzer Satz, ohne Symbol. */
+/** Ein kurzer Satz unter dem Titel in der Leiste (der Titel selbst steht im PageFrame). */
 export function PageHead({ def, text = def.summary }: { def: LayerDef; text?: string }) {
   return (
     <header class="lpage-head lpage-head-plain">
       <div class="lpage-title">
-        <h3>{def.title}</h3>
         <p>{text}</p>
       </div>
     </header>

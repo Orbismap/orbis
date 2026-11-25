@@ -1,3 +1,5 @@
+import { batch } from '@preact/signals';
+import { openLayerPage } from '../features/layers-panel/open-layer';
 import { getLayer } from '../layers/registry';
 import { createPortal } from 'preact/compat';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -15,7 +17,7 @@ import { detailPage, editMode } from '../features/layers-panel/themes-state';
 import { PlaceCard } from '../features/place/PlaceCard';
 import { ProbeCard } from '../features/probe/ProbeCard';
 import '../features/karten-bar/karten-bar.css';
-import { SCRATCH_ID, activeIds, hiddenIds, openActive, openKarte, setActiveIds, setLayerVisible, toggleHidden } from '../karten/active';
+import { SCRATCH_ID, activeIds, hiddenIds, openKarte, setActiveIds, setLayerVisible, toggleHidden } from '../karten/active';
 import { createKarte, karten, listedKarten, moveKarteTo } from '../karten/store';
 import { clearSelection, inspector, place, probe, selectPlace } from '../state/selection';
 import { activeKarte, browsedKarte } from '../state/session';
@@ -49,14 +51,7 @@ function pickKarte(id: string) {
 }
 
 /** Click on an active layer in the main menu: opens its page in the detail menu. */
-function openActiveLayer(layerId: string) {
-  clearSelection();
-  orteView.value = null;
-  leftView.value = 'layers';
-  openActive();
-  detailOpen.value = true;
-  openDetail(activeKarte.peek().id, layerId, 'Karte');
-}
+const openActiveLayer = openLayerPage;
 
 const FILTERS: { id: HistoryKind; label: string }[] = [
   { id: 'layer', label: 'Ebenen' },
@@ -68,8 +63,11 @@ const FILTERS: { id: HistoryKind; label: string }[] = [
 function openEntry(e: HistoryEntry) {
   if (e.kind === 'layer' && e.layerId) {
     const id = e.karteId && karten.peek().some((k) => k.id === e.karteId) ? e.karteId : activeKarte.peek().id;
-    pickKarte(id);
-    openDetail(id, e.layerId, 'Karte');
+    const layerId = e.layerId;
+    batch(() => {
+      pickKarte(id);
+      openDetail(id, layerId, 'Karte');
+    });
   } else if (e.kind === 'object' && e.layerId && e.card) {
     selectCard(e.layerId, e.card);
     if (e.lng !== undefined && e.lat !== undefined) flyToPoint(e.lng, e.lat, 9);

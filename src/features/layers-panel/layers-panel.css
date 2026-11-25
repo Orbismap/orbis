@@ -447,12 +447,34 @@
     align-items: center;
     gap: 2px;
     align-self: flex-start;
-    min-height: max(44px, var(--hit, 28px));
+    min-height: 32px;
     margin-left: -6px;
-    padding: 0 8px 0 2px;
-    border-radius: var(--r-round);
+    padding: 0 8px 0 4px;
+    border-radius: var(--r-input);
     color: var(--limb);
     font-size: var(--fs-title);
+  }
+  .lpage-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: max(44px, var(--hit, 28px));
+  }
+  .lpage-bartitle {
+    position: absolute;
+    inset: 0 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    font-size: var(--fs-inspector);
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    pointer-events: none;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .lpage-head {
     display: flex;
@@ -465,14 +487,11 @@
     height: 40px;
     border-radius: 12px;
   }
-  .lpage-title h3 {
-    margin: 0;
-    font-size: var(--fs-inspector);
-    font-weight: 600;
-    line-height: 1.2;
+  .lpage-title {
+    text-align: center;
   }
   .lpage-title p {
-    margin: 2px 0 0;
+    margin: 0;
     font-size: var(--fs-small);
     line-height: var(--lh-text);
     color: var(--text-2);
@@ -497,6 +516,7 @@
     margin: 0 -8px;
   }
   .lpage-switch {
+    border-radius: var(--r-input); /* the focus ring follows the corners */
     width: 100%;
     justify-content: space-between;
   }

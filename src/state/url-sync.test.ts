@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { activeIds, activeKarte, setActiveIds, setBasemap, setLayerVisible, SCRATCH_ID } from '../karten/active';
 import { parseHash, serializeHash } from '../core/url';
 import { detailOpen } from './hud';
+import { closeDetail, detailPage } from '../features/layers-panel/themes-state';
 import { karteMode } from './view';
 import { leftPanelOpen } from './ui';
 import { applyUrlState, currentUrlState } from './url-sync';
@@ -37,7 +38,7 @@ describe('url layers', () => {
     setActiveIds(['erdbeben', 'radar']);
     const u = currentUrlState();
     expect(u.layers).toEqual(['erdbeben', 'radar']);
-    expect(u.karte).toBeUndefined();
+    expect(u.detail).toBeUndefined();
     expect(u.basemap).toBe(activeKarte.value.basemap);
     setActiveIds([]);
     expect(currentUrlState().layers).toBeUndefined();
@@ -47,7 +48,7 @@ describe('url layers', () => {
     expect(activeIds.value).toEqual(['niederschlag']);
     expect(detailOpen.value).toBe(true);
     const u = currentUrlState();
-    expect(u.karte).toBe('wetter');
+    expect(u.detail).toBe('wetter');
     expect(u.layers).toEqual(['niederschlag']);
     const hash = serializeHash(u);
     expect(hash).toContain('k=wetter');
@@ -57,9 +58,18 @@ describe('url layers', () => {
   it('writes the browsed Karte while its detail menu is open, and drops it when closed', () => {
     setActiveIds(['radar']);
     detailOpen.value = true;
-    expect(currentUrlState().karte).toBe('wetter');
+    expect(currentUrlState().detail).toBe('wetter');
     detailOpen.value = false;
-    expect(currentUrlState().karte).toBeUndefined();
+    expect(currentUrlState().detail).toBeUndefined();
+  });
+  it('k=<layer> opens that layer\'s page and is written back instead of the Karte', () => {
+    applyUrlState(parseHash('#/?k=flugzeuge&l=flughafen,flugzeuge'));
+    expect(detailOpen.value).toBe(true);
+    expect(detailPage.value?.layerId).toBe('flugzeuge');
+    expect(currentUrlState().detail).toBe('flugzeuge');
+    expect(serializeHash(currentUrlState())).toContain('k=flugzeuge');
+    closeDetail();
+    detailOpen.value = false;
   });
   it('applies and keeps the collapsed sidebar', () => {
     applyUrlState(parseHash('#/?s=0'));

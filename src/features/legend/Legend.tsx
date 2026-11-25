@@ -1,3 +1,4 @@
+import { batch } from '@preact/signals';
 import { getLayer } from '../../layers/registry';
 import type { LegendSpec } from '../../layers/types';
 import { basemapDef } from '../../map/basemaps';
@@ -31,7 +32,7 @@ function reveal(): void {
   detailOpen.value = true;
   if (isMobile.peek() && sheetDetent.peek() === 'peek') sheetDetent.value = 'half';
 }
-const openLayer = (id: string) => (reveal(), openActive(), openDetail(activeKarte.peek().id, id, 'Karte'));
+const openLayer = (id: string) => batch(() => (reveal(), openActive(), openDetail(activeKarte.peek().id, id, 'Karte')));
 const openList = () => (reveal(), closeDetail());
 
 function ScaleRow({ e, spec }: { e: Entry; spec: Extract<LegendSpec, { type: 'scale' }> }) {

@@ -9,6 +9,8 @@ import { selectPlace, setProbe } from '../../state/selection';
 import { goLive } from '../../state/time';
 import { isMobile, leftPanelOpen, leftView, shortcutsOpen } from '../../state/ui';
 import { projection, setProjection } from '../../state/view';
+import { customPage } from '../layers-panel/pages/registry';
+import { openLayerPage } from '../layers-panel/open-layer';
 import { scoreLayer, scoreText } from '../catalog/fuzzy';
 import { flyToPoint } from '../shared/map';
 import { mapEngine } from '../../state/ui';
@@ -98,7 +100,11 @@ export function localResults(input: string): Result[] {
       title: d.title,
       subtitle: `${categoryById(d.category).title}: ${d.summary}`,
       hint: on ? 'ausschalten' : 'einschalten',
-      run: () => (state.has(d.id) ? setLayerVisible(k.id, d.id, !on) : addLayer(k.id, d.id)),
+      run: () => {
+        if (state.has(d.id)) setLayerVisible(k.id, d.id, !on);
+        else addLayer(k.id, d.id);
+        if (!on && !isMobile.peek() && customPage(d.id)) openLayerPage(d.id); // switched on: show its page, if it has its own
+      },
     });
   }
 
