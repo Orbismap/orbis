@@ -2,15 +2,13 @@
 // (`symbol-height-offset`, in metres), like in Apple Maps. The tiles' places have no height: after the view settles, the places and the
 // buildings of the loaded tiles are joined here (a point in the building's outline) and handed to the GeoJSON source the place layers read.
 import type { Map as MlMap } from 'maplibre-gl';
-import { inFootprint } from '../data/landmarks';
+import { BuildingGrid } from './building-grid';
 import { OFM_BUILDINGS_SOURCE_ID } from './buildings-tilt';
 import { boxInside, reachBox, type Box } from './view-reach';
 import { pitchZoomBonus } from './buildings-tilt';
 import { POI_GEO_SOURCE, heightOffset, poiLayerIds, poiOccluded, poiResolve, poiTierLimit, poiZoomBonus } from './poi';
 
 const DELAY_MS = 250;
-/** buildings are looked up through a grid of cells this big (degrees, about 200 m) */
-const CELL = 0.002;
 /** places outside the view by this share are left out */
 const MARGIN = 0.25;
 /** the work is put off at most this long (ms) while tiles keep arriving */
@@ -18,11 +16,7 @@ const MAX_WAIT_MS = 1200;
 /** a place has at most this many sight lines followed per pass (the nearest first) */
 const MAX_SIGHT = 500;
 
-type Poly = [number, number][][];
-interface Building { box: [number, number, number, number]; poly: Poly[]; h: number }
 interface Place { key: string; x: number; y: number; h: number }
-/** one number per grid cell (a string per cell and building was most of the garbage of a pass) */
-const cellKey = (x: number, y: number) => (Math.floor(x / CELL) + 100_000) * 200_000 + Math.floor(y / CELL) + 100_000;
 const hash = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
 /** metres per degree of latitude */
 const M_LAT = 111_320;
@@ -31,10 +25,14 @@ const SIGHT_M = 1500;
 const SIGHT_STEPS = 48;
 /** under this tilt (degrees) buildings hide nothing worth the work */
 const MIN_PITCH = 8;
+/** a failed look at the drawn places is repeated at most this often in a row */
+const MAX_RETRIES = 10;
 /** the camera has been still this long (ms) */
 const THROTTLE_MS = 180;
 /** a place fades in or out over this long (ms) */
 const FADE_MS = 220;
+/** and in steps this far apart (ms): a feature state rewrites the paint buffers of every place layer, not worth doing in every frame */
+const FADE_STEP_MS = 55;
 
 export interface PoiHeights {
   /** Looks again soon (the view moved, tiles arrived, the layers were switched on). */
@@ -46,15 +44,15 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
   let timer: ReturnType<typeof setTimeout> | undefined;
   let lastKey = '';
   let lastShare = -1;
-  let grid = new Map<number, Building[]>();
+  let grid = new BuildingGrid();
   let placed = new Map<string, Place>();
-  let maxH = 0;
   /** what the last pass covered: the ground, and the highest tier of place it kept. While the view stays inside and nothing arrived, the pass is skipped. */
   let built: { box: Box; tier: number } | undefined;
   let dirty = true;
   let waitingSince = 0;
   let shareTimer: ReturnType<typeof setTimeout> | undefined;
   let occTimer: ReturnType<typeof setTimeout> | undefined;
+  let failed = 0;
   /** the places a building is in front of (what the filter will leave out once they have faded) */
   const target = new Set<string>();
   /** places mid-fade: alpha now and where it goes */
@@ -72,8 +70,11 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
 
   /** The source the visible building layer reads: the plain building tiles, or the cut ones while a 3D landmark replaces buildings (map/landmark-buildings.ts). */
   const buildingSource = (): string | undefined => {
-    const l = ml.getStyle().layers.find((x) => x.type === 'fill-extrusion' && x.layout?.visibility !== 'none' && 'source' in x && (x as { 'source-layer'?: string })['source-layer'] === 'building') as { source?: string } | undefined;
-    return l?.source ?? (ml.getSource(OFM_BUILDINGS_SOURCE_ID) ? OFM_BUILDINGS_SOURCE_ID : undefined);
+    for (const id of ml.getLayersOrder()) {
+      const l = ml.getLayer(id);
+      if (l?.type === 'fill-extrusion' && l.sourceLayer === 'building' && ml.getLayoutProperty(id, 'visibility') !== 'none') return l.source;
+    }
+    return ml.getSource(OFM_BUILDINGS_SOURCE_ID) ? OFM_BUILDINGS_SOURCE_ID : undefined;
   };
 
   const run = () => {
@@ -97,30 +98,14 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
     built = { box: [w, s, e, n], tier };
 
     // buildings of the loaded tiles, in a grid
-    grid = new Map<number, Building[]>();
-    maxH = 0;
-    const seen = new Set<string>();
+    grid = new BuildingGrid();
     const bsrc = buildingSource();
     if (bsrc) {
       for (const f of ml.querySourceFeatures(bsrc, { sourceLayer: 'building' })) {
-        const g = f.geometry;
-        if (g.type !== 'Polygon' && g.type !== 'MultiPolygon') continue;
         const p = f.properties as { render_height?: number; render_min_height?: number };
         const h = Number(p.render_height);
         if (!(h > 0) || Number(p.render_min_height) > 0) continue; // a part that hangs in the air is no roof to stand on
-        const poly = (g.type === 'Polygon' ? [g.coordinates] : g.coordinates) as Poly[];
-        let [bw, bs, be, bn] = [Infinity, Infinity, -Infinity, -Infinity];
-        for (const q of poly) for (const [x, y] of q[0]!) { if (x < bw) bw = x; if (x > be) be = x; if (y < bs) bs = y; if (y > bn) bn = y; }
-        if (be < w || bw > e || bn < s || bs > n) continue;
-        const key = `${bw.toFixed(6)},${bs.toFixed(6)},${h}`;
-        if (seen.has(key)) continue; // a building cut by a tile edge comes once per tile
-        seen.add(key);
-        if (h > maxH) maxH = h;
-        const bld: Building = { box: [bw, bs, be, bn], poly, h };
-        for (let x = Math.floor(bw / CELL); x <= Math.floor(be / CELL); x++) for (let y = Math.floor(bs / CELL); y <= Math.floor(bn / CELL); y++) {
-          const k = (x + 100_000) * 200_000 + y + 100_000;
-          (grid.get(k) ?? grid.set(k, []).get(k)!).push(bld);
-        }
+        grid.add(f.geometry, h, built.box);
       }
     }
 
@@ -136,12 +121,7 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
       if (!r || r.tier > tier) continue;
       const key = `${p.name}|${x.toFixed(6)}|${y.toFixed(6)}`;
       if (next.has(key)) continue;
-      let h = 0;
-      for (const bld of grid.get(cellKey(x, y)) ?? []) {
-        const [bw, bs, be, bn] = bld.box;
-        if (bld.h <= h || x < bw || x > be || y < bs || y > bn) continue;
-        if (inFootprint(x, y, bld.poly as never)) h = bld.h;
-      }
+      const h = grid.heightAt(x, y);
       next.set(key, { key, x, y, h });
       sum = (sum + hash(key + h)) >>> 0; // order-free signature: the tiles come in any order
       features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [x, y] }, properties: { key, class: p.class, subclass: p.subclass, name: p.name, 'name:latin': p['name:latin'], rank: p.rank, h, ...r } });
@@ -166,7 +146,7 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
     const pitch = ml.getPitch();
     let hidden: string[] = [];
     const share = o.share();
-    if (o.active() && share > 0 && pitch >= MIN_PITCH && placed.size && grid.size) {
+    if (o.active() && share > 0 && pitch >= MIN_PITCH && placed.size && !grid.empty) {
       const c = ml.getCenter();
       const kx = M_LAT * Math.cos((c.lat * Math.PI) / 180);
       const rad = (pitch * Math.PI) / 180;
@@ -181,8 +161,17 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
       // only what is drawn (and what is hidden now, to see whether it stays so): the map says which places have room on screen
       const ids = [...poiLayerIds].filter((id) => ml.getLayer(id));
       const keys = new Set<string>(target);
-      if (ids.length) for (const f of ml.queryRenderedFeatures({ layers: ids })) { const k = (f.properties as { key?: string } | null)?.key; if (k) keys.add(k); }
-      const roofMax = 3 + share * maxH;
+      let drawn: ReturnType<MlMap['queryRenderedFeatures']> = [];
+      try {
+        if (ids.length) drawn = ml.queryRenderedFeatures({ layers: ids });
+        failed = 0;
+      } catch {
+        // MapLibre throws while its symbol index still points into the tiles from before the last setData: ask again after the next placement
+        if (++failed < MAX_RETRIES) scheduleOcclusion();
+        return;
+      }
+      for (const f of drawn) { const k = (f.properties as { key?: string } | null)?.key; if (k) keys.add(k); }
+      const roofMax = 3 + share * grid.maxH;
       // the nearest first and not more than MAX_SIGHT: what is far away is a few pixels, and a frame of the map is worth more than its exact answer
       let order: Place[] = [];
       for (const key of keys) { const p = placed.get(key); if (p) order.push(p); }
@@ -206,9 +195,9 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
           const x = p.x + (dx * t) / kx;
           const y = p.y + (dy * t) / M_LAT;
           const z = pz + (cz - pz) * t;
-          const cell = grid.get(cellKey(x, y));
-          if (!cell) continue;
-          if (cell.some((bld) => 3 + share * bld.h > z + 2 && x >= bld.box[0] && x <= bld.box[2] && y >= bld.box[1] && y <= bld.box[3] && inFootprint(x, y, bld.poly as never))) { hidden.push(p.key); break; }
+          // a roof as drawn (3 + share * h) that reaches more than 2 m over the line
+          const over = (z - 1) / share;
+          if (grid.heightAt(x, y, over) > over) { hidden.push(p.key); break; }
         }
       }
     }
@@ -236,6 +225,10 @@ export function startPoiHeights(ml: MlMap, o: { active: () => boolean; share: ()
   };
   const tick = (now: number) => {
     raf = 0;
+    if (now - lastTick < FADE_STEP_MS) {
+      raf = requestAnimationFrame(tick);
+      return;
+    }
     const step = (now - lastTick) / FADE_MS;
     lastTick = now;
     const out: string[] = [];

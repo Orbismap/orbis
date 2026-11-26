@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Map as MlMap } from 'maplibre-gl';
 import type { TreeSample } from '../../ext/types';
 import type { GeoFrame } from '../world3d/frame';
+import { ViewGate, gateCamera } from '../world3d/gate';
 import { GeoInstances } from '../world3d/instances';
 import type { Stage, StagePart } from '../world3d/stage';
 import { exaggeration, groundAt, idleThrottle } from '../world3d/terrain';
@@ -11,8 +12,8 @@ import { TREE_H, modelKey, treeGeometries, treeMaterial, type TreeShape } from '
 // tags or a guess, standing on the terrain, turned at random). The base layer publishes the trees of the loaded tiles near the
 // view from zoom 15; trees close to the camera get the smooth model, far ones the cheap one.
 
-/** A tree this far outside of the screen (share of the view) is left out. */
-const VIEW_MARGIN = 0.2;
+/** A tree this far outside of the screen (share of the view) is left out: wide enough for what the view moves between two builds (world3d/gate). */
+const VIEW_MARGIN = 0.35;
 /** the terrain under a tree counts as changed from this much (m) */
 const TERRAIN_STEP_M = 0.5;
 /** From this height on screen (px) a tree gets the smooth model. */
@@ -89,6 +90,7 @@ export class BaeumePart implements StagePart {
   private active = false;
   private drawn = 0;
   private matrix = new THREE.Matrix4();
+  private gate = new ViewGate();
 
   constructor(private map: MlMap, private stage: Stage) {
     this.object.add(this.models.object);
@@ -104,6 +106,7 @@ export class BaeumePart implements StagePart {
     if (on === this.active) return;
     this.active = on;
     this.object.visible = on;
+    this.gate.reset();
     if (on) this.map.on('idle', this.onIdle);
     else {
       this.map.off('idle', this.onIdle);
@@ -122,6 +125,7 @@ export class BaeumePart implements StagePart {
       tint: grey(0.88 + unit(t.id, 2) * 0.12),
     }));
     this.ground = items.map((t) => this.terrainAt(t.lng, t.lat));
+    this.gate.reset();
     this.stage.wake();
   }
 
@@ -142,17 +146,26 @@ export class BaeumePart implements StagePart {
       if (Math.abs(h - (this.ground[i] ?? 0)) > TERRAIN_STEP_M) changed = true;
       this.ground[i] = h;
     });
-    if (changed) this.stage.wake();
+    if (!changed) return;
+    this.gate.reset();
+    this.stage.wake();
   });
 
   update(frame: GeoFrame): boolean {
     if (!this.active) return false;
+    const ex = exaggeration(this.map);
+    if (this.gate.due(frame, gateCamera(this.map, ex))) this.build(frame, ex);
+    this.models.update(frame);
+    return false;
+  }
+
+  /** The instances of the trees in sight, each with the detail its size on screen asks for. */
+  private build(frame: GeoFrame, ex: number) {
     const b = this.map.getBounds();
     const centre = this.map.getCenter();
     const padLon = (b.getEast() - b.getWest()) * VIEW_MARGIN;
     const padLat = (b.getNorth() - b.getSouth()) * VIEW_MARGIN;
     const trees = this.trees;
-    const ex = exaggeration(this.map);
     this.models.start(frame, trees.length);
     let drawn = 0;
     for (let i = 0; i < trees.length; i++) {
@@ -168,9 +181,7 @@ export class BaeumePart implements StagePart {
       drawn++;
     }
     this.models.finish();
-    this.models.update(frame);
     this.drawn = drawn;
-    return false;
   }
 
   dispose() {

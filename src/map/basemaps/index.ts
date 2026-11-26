@@ -203,7 +203,9 @@ export function composeStyle(o: StyleOptions): StyleSpecification {
   const sources: Record<string, SourceSpecification> = {
     ofm: OFM_SOURCE,
     [OFM_BUILDINGS_SOURCE_ID]: OFM_BUILDINGS_SOURCE,
-    [POI_GEO_SOURCE]: { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'key' },
+    // tiles up to zoom 14 only, drawn larger further in: a tilted street view covers a quarter as many of them, and each one costs a layout,
+    // an icon atlas upload and (with 3D terrain) its own cover test
+    [POI_GEO_SOURCE]: { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'key', maxzoom: 14 },
     [TERRAIN_SOURCE]: TERRAIN_SPEC,
     [HILLSHADE_SOURCE]: hillshadeSpec(),
   };

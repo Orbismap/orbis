@@ -1,6 +1,15 @@
 import { validateStyleMin } from '@maplibre/maplibre-gl-style-spec';
 import { describe, expect, it } from 'vitest';
-import { metres, pxPerMetre16 } from './strassenmarkierungen';
+import { metres, pxPerMetre16, roadSignature } from './strassenmarkierungen';
+
+describe('Straßenmarkierungen rebuild', () => {
+  const road = (x: number, cls = 'residential') => ({ cls, oneway: 0, level: 0, coords: [[x, 48], [x + 0.001, 48.001]] });
+  it('knows the same roads again in any order, and notices a change', () => {
+    expect(roadSignature([road(2), road(3)])).toBe(roadSignature([road(3), road(2)]));
+    expect(roadSignature([road(2), road(3)])).not.toBe(roadSignature([road(2)]));
+    expect(roadSignature([road(2)])).not.toBe(roadSignature([road(2, 'primary')]));
+  });
+});
 
 describe('Straßenmarkierungen scale', () => {
   it('px per metre at zoom 16 grows with the latitude', () => {

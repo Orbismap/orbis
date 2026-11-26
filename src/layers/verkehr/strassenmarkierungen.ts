@@ -7,6 +7,7 @@
 import { effect } from '@preact/signals';
 import type { ExpressionSpecification, GeoJSONSource, LayerSpecification } from 'maplibre-gl';
 import { runParser } from '../../data/worker/pool';
+import { boxInside, reachBox, type Box } from '../../map/view-reach';
 import { addArrowIcons, arrowId } from '../../render/roadicons';
 import { KERB_BRIDGE, KERB_GROUND, roadClass, type RawRoad } from '../../render/roadnet';
 import { defineLayer } from '../define';
@@ -52,6 +53,19 @@ export const levelOf = (p: { brunnel?: string; layer?: number | string }): numbe
   if (p.brunnel === 'tunnel') return -1;
   return p.brunnel === 'bridge' ? Math.max(1, lay) : lay;
 };
+
+/** Tells two sets of tile roads apart, whatever order the tiles came in: their number and a sum over class, level, ends and length. */
+export function roadSignature(roads: readonly RawRoad[]): string {
+  let sum = 0;
+  for (const r of roads) {
+    const a = r.coords[0]!, b = r.coords[r.coords.length - 1]!;
+    const key = `${r.cls}|${r.level}|${r.oneway}|${r.coords.length}|${a[0]},${a[1]}|${b[0]},${b[1]}`;
+    let h = 2166136261;
+    for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+    sum = (sum + (h >>> 0)) >>> 0;
+  }
+  return `${roads.length}:${sum}`;
+}
 
 export default defineLayer({
   id: 'strassenmarkierungen',
@@ -179,7 +193,9 @@ export default defineLayer({
 
     // the road network is rebuilt from the tiles that are loaded for the view (smoothed, deduplicated, markings cut at junctions).
     // Cheap by design: the heavy part runs in a worker, it only runs when the view left the area built last time or new
-    // tiles arrived, and an answer for an outdated view is dropped.
+    // tiles brought other roads, and an answer for an outdated view is dropped. Handing the result to the map costs the
+    // main thread by its size: so only the ground near the view (view-reach, not a tilted view's horizon), and tiles that
+    // arrive while the camera moves inside that ground wait until it rests.
     const NET_ZOOM = 15.2;
     type DerivedZebra = { type: 'Feature'; geometry: unknown; properties: { lv: number; mid: number[] } };
     let derived: DerivedZebra[] = [];
@@ -187,23 +203,25 @@ export default defineLayer({
     let hadNet = false;
     let dirty = true;
     let seq = 0;
-    let built: { w: number; s: number; e: number; n: number } | undefined;
+    let built: Box | undefined;
+    /** what the last build was made of: the same roads again need no new one */
+    let madeOf = '';
     let netTimer: ReturnType<typeof setTimeout> | undefined;
     const rebuild = async () => {
       const rs = ml.getSource(roads) as GeoJSONSource | undefined, ms = ml.getSource(marks) as GeoJSONSource | undefined;
       if (!rs || !ms) return;
       if (ml.getZoom() < NET_ZOOM) {
-        seq++; built = undefined; dirty = true;
+        seq++; built = undefined; dirty = true; madeOf = '';
         if (hadNet) { rs.setData(EMPTY as never); ms.setData(EMPTY as never); (ml.getSource(kerbs) as GeoJSONSource | undefined)?.setData(EMPTY as never); (ml.getSource(arrowPts) as GeoJSONSource | undefined)?.setData(EMPTY as never); derived = []; showDerived(); hadNet = false; }
         return;
       }
-      const b = ml.getBounds();
-      const inside = built && b.getWest() >= built.w && b.getEast() <= built.e && b.getSouth() >= built.s && b.getNorth() <= built.n;
-      if (inside && !dirty) return;
+      const view = reachBox(ml);
+      const inside = built && boxInside(built, view);
+      if (inside && (!dirty || ml.isMoving())) return; // `moveend` asks again
       dirty = false;
-      const padX = (b.getEast() - b.getWest()) * 0.5, padY = (b.getNorth() - b.getSouth()) * 0.5;
-      const area = { w: b.getWest() - padX, e: b.getEast() + padX, s: b.getSouth() - padY, n: b.getNorth() + padY };
-      const inView = (c: number[]) => c[0]! > area.w && c[0]! < area.e && c[1]! > area.s && c[1]! < area.n;
+      const padX = (view[2] - view[0]) * 0.5, padY = (view[3] - view[1]) * 0.5;
+      const area: Box = [view[0] - padX, view[1] - padY, view[2] + padX, view[3] + padY];
+      const inView = (c: number[]) => c[0]! > area[0] && c[0]! < area[2] && c[1]! > area[1] && c[1]! < area[3];
       const raw: RawRoad[] = [];
       for (const f of ml.querySourceFeatures('ofm', { sourceLayer: 'transportation' })) {
         const p = f.properties as { class?: string; subclass?: string; ramp?: number; oneway?: number; brunnel?: string; layer?: number | string };
@@ -213,6 +231,8 @@ export default defineLayer({
         const parts = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
         for (const coords of parts) if (coords.some(inView)) raw.push({ cls, oneway: Number(p.oneway) || 0, level: levelOf(p), coords });
       }
+      const signature = roadSignature(raw);
+      if (signature === madeOf) { seq++; built = area; return; } // an answer still on its way is for other roads: dropped
       const c = ml.getCenter();
       const mine = ++seq;
       try {
@@ -225,6 +245,7 @@ export default defineLayer({
         derived = net.zebras.features as DerivedZebra[];
         showDerived();
         built = area;
+        madeOf = signature;
         hadNet = true;
       } catch { dirty = true; }
     };
