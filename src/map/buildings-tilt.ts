@@ -68,8 +68,9 @@ export const tiltFactor = (pitchDeg: number) => FLAT_SHARE + (1 - FLAT_SHARE) * 
 /** The same for the map now (1 when nothing is hooked): what a 3D model's height is scaled by. */
 export const buildingHeightFactor = (ml: MlMap) => tiltFactor(ml.getPitch());
 
-const HEIGHT: ExpressionSpecification = ['coalesce', ['to-number', ['get', 'render_height']], 9];
-const BASE: ExpressionSpecification = ['coalesce', ['to-number', ['get', 'render_min_height']], 0];
+/** Real height and base in metres (without the tilt factor, e.g. for a map that is always seen at an angle). */
+export const REAL_BUILDING_HEIGHT: ExpressionSpecification = ['coalesce', ['to-number', ['get', 'render_height']], 9];
+export const REAL_BUILDING_BASE: ExpressionSpecification = ['coalesce', ['to-number', ['get', 'render_min_height']], 0];
 /** Constant roof lift in metres, independent of the tilt: the 3D terrain is only sampled at the footprint vertices, so with a
  *  few decimetres of height the terrain in between pokes through the roof. Stored as the stop offset: mix(min, max, t) keeps it
  *  unscaled (c + t*v), so height = MIN_HEIGHT_M + k*H. */
@@ -77,8 +78,8 @@ export const MIN_HEIGHT_M = 3;
 const tiltExpr = (v: ExpressionSpecification, c = 0): ExpressionSpecification => ['interpolate', ['linear'], ['zoom'], 0, c, MAX_Z, ['+', c, ['*', MAX_Z, v]]];
 
 /** fill-extrusion-height / -base for the style (zoom-linear, see above; the tilt factor is applied at draw time). */
-export const BUILDING_HEIGHT = tiltExpr(HEIGHT, MIN_HEIGHT_M);
-export const BUILDING_BASE = tiltExpr(BASE);
+export const BUILDING_HEIGHT = tiltExpr(REAL_BUILDING_HEIGHT, MIN_HEIGHT_M);
+export const BUILDING_BASE = tiltExpr(REAL_BUILDING_BASE);
 
 /** Draws building:part features and hides the outlines that have parts inside (OpenMapTiles marks those with hide_3d), otherwise the
  *  outline covers its parts and they never show up at their own height. */
@@ -154,8 +155,8 @@ function applyStaticHeights(ml: MlMap) {
   for (const id of extrusionIds(ml)) {
     if (staticApplied.has(id)) continue;
     staticApplied.add(id);
-    ml.setPaintProperty(id, 'fill-extrusion-height', HEIGHT);
-    ml.setPaintProperty(id, 'fill-extrusion-base', BASE);
+    ml.setPaintProperty(id, 'fill-extrusion-height', REAL_BUILDING_HEIGHT);
+    ml.setPaintProperty(id, 'fill-extrusion-base', REAL_BUILDING_BASE);
   }
 }
 

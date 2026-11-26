@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "Orbis Find",
+  "short_name": "Find",
+  "description": "Findet den nächsten Fahrradständer",
+  "lang": "de",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0f18",
+  "theme_color": "#0a0f18",
+  "icons": [
+    { "src": "/find/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

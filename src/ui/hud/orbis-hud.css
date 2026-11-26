@@ -115,6 +115,17 @@
 .ohud-mini[data-switcher='open'] .ohud-chev { transform: rotate(180deg); }
 .ohud-mini-title:hover .ohud-chev { color: var(--text-1); }
 
+/* the capsule and the app's own pill side by side (`beside`) */
+.ohud-minirow { position: absolute; top: calc(-1 * (var(--hud-mini-h) + var(--hud-gap))); left: 0; display: flex; align-items: flex-start; gap: var(--hud-gap); width: max-content; max-width: calc(100vw - 2 * var(--hud-edge)); }
+.ohud-minirow > .ohud-mini { position: relative; top: auto; }
+.ohud-minirow[inert] { visibility: hidden; }
+.ohud-pill { min-width: 0; }
+.ohud-pill .ohud-mini-bar { padding-right: 12px; }
+.ohud-pill .ohud-mini-title { min-width: 0; }
+.ohud-pill .ohud-mini-title svg { flex: none; }
+.ohud-pill .ohud-name { overflow: hidden; text-overflow: ellipsis; }
+.ohud-pill .ohud-chev { margin-left: -4px; }
+
 /* the capsule grows downward: the row height animates from 0 to its content */
 .ohud-switch { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 240ms var(--ease); }
 .ohud-mini[data-switcher='open'] .ohud-switch { grid-template-rows: 1fr; }

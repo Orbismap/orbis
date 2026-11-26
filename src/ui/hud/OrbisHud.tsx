@@ -23,6 +23,8 @@ export interface OrbisHudProps {
   rootClass?: string;
   /** Sits inside the sliding menu wrapper after the panel (resize grip). */
   mainExtra?: ComponentChildren;
+  /** A further capsule beside the closed menu (see HudPill). */
+  beside?: ComponentChildren;
   /** Rendered next to the menu (detail panels); stays when the menu is hidden. */
   aside?: ComponentChildren;
   /** `fixed` to the viewport instead of absolute in its parent. */
@@ -34,8 +36,9 @@ export interface OrbisHudProps {
  * The left menu shared by all Orbis apps: glass panel with logo, app name and hide button, and – when hidden – the
  * capsule that slides down in its place. A click on the logo (header or capsule) opens the list of the other Orbis apps.
  */
-export function OrbisHud({ project, open, onOpenChange, children, panelClass, rootClass, mainExtra, aside, fixed, style }: OrbisHudProps) {
+export function OrbisHud({ project, open, onOpenChange, children, panelClass, rootClass, mainExtra, beside, aside, fixed, style }: OrbisHudProps) {
   const name = PROJECTS.find((p) => p.id === project)?.name ?? '';
+  const capsule = <Capsule project={project} name={name} hidden={open} onShow={() => onOpenChange(true)} />;
   return (
     <div class={['ohud', rootClass].filter(Boolean).join(' ')} data-main={open ? 'open' : 'closed'} data-fixed={fixed ? 'true' : undefined} style={style}>
       <div class="ohud-main" {...(open ? {} : ({ inert: '' } as object))}>
@@ -46,7 +49,28 @@ export function OrbisHud({ project, open, onOpenChange, children, panelClass, ro
         {mainExtra}
       </div>
       {aside}
-      <Capsule project={project} name={name} hidden={open} onShow={() => onOpenChange(true)} />
+      {beside ? <div class="ohud-minirow" {...(open ? ({ inert: '' } as object) : {})}>{capsule}{beside}</div> : capsule}
+    </div>
+  );
+}
+
+const Chevron = () => (
+  <svg class="ohud-chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+    <path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+);
+
+/** A capsule with the look of the closed menu that opens something of the app's own; for `beside`. */
+export function HudPill({ icon, label, title, expanded, onClick }: { icon: ComponentChildren; label: string; /** what a screen reader says */ title: string; expanded: boolean; onClick: () => void }) {
+  return (
+    <div class="ohud-mini ohud-pill">
+      <div class="ohud-mini-bar">
+        <button type="button" class="ohud-mini-title" aria-haspopup="dialog" aria-expanded={expanded} aria-label={title} onClick={onClick}>
+          {icon}
+          <span class="ohud-name">{label}</span>
+          <Chevron />
+        </button>
+      </div>
     </div>
   );
 }
@@ -125,9 +149,7 @@ function Capsule({ project, name, hidden, onShow }: { project: ProjectId; name: 
         <button type="button" class="ohud-mini-title" aria-haspopup="true" aria-expanded={switcher} aria-label="Orbis Apps" onClick={() => setSwitcher(!switcher)}>
           <OrbisLogo height={19} />
           <span class="ohud-name">{name}</span>
-          <svg class="ohud-chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
-            <path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
+          <Chevron />
         </button>
         <button type="button" class="ohud-btn" aria-label="Menü einblenden" aria-keyshortcuts="Meta+B Control+B" onClick={onShow}>
           <PanelIcon />

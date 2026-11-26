@@ -1,4 +1,4 @@
-/* Orbis Wetter und Orbis Bahn – Service Worker (eine Vorlage; vite.pwa.ts setzt beim Build je App `const CONFIG = {...}` davor
+/* Orbis Wetter, Orbis Bahn und Orbis Find – Service Worker (eine Vorlage; vite.pwa.ts setzt beim Build je App `const CONFIG = {...}` davor
  * und registriert wird er nur auf der eigenen Origin der App).
  *
  * Er macht die App ohne Netz startbar: Die App-Shell (HTML, JS, CSS, Icons) wird beim Install vorgehalten. Kacheln, Schriften
@@ -20,6 +20,10 @@ const LIVE = [
   /^https:\/\/air-quality-api\.open-meteo\.com\//,
   /^https:\/\/maps\.dwd\.de\/.*typeName=dwd(:|%3A)Warnungen/i,
   /^https:\/\/api\.transitous\.org\//,
+  // Routen vom eigenen Standort aus: nicht aufheben
+  /^https:\/\/routing\.openstreetmap\.de\//,
+  // was gerade in OpenStreetMap steht (Orbis Find beim Eintragen)
+  /^https:\/\/(api|master\.apis\.dev)\.openstreetmap\.org\//,
 ];
 
 /** Eine umgeleitete Antwort darf keine Seitennavigation beantworten: ohne den Vermerk speichern. */
