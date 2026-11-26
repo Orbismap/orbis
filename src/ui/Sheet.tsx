@@ -2,7 +2,7 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { cx, useLatest } from './hooks';
 import { ScrollArea } from './ScrollArea';
-import { rubber, settled, snapIndex, stepSpring } from './sheet-physics';
+import { claimsGesture, keyboardInset, rubber, settled, snapIndex, stepSpring } from './sheet-physics';
 import './sheet.css';
 
 export type Detent = 'peek' | 'half' | 'full';
@@ -22,6 +22,11 @@ export interface SheetProps {
   children?: ComponentChildren;
   label: string;
   reducedMotion?: boolean;
+  /** Identifies the content: another key starts at the top, unless `keepScroll` asks for the position it had before. */
+  scrollKey?: string;
+  keepScroll?: boolean;
+  /** The content brings its own scrolling list and fills the body. */
+  fill?: boolean;
 }
 
 /** Measures env(safe-area-inset-*) once and on resize. */
@@ -60,14 +65,38 @@ function useViewportHeight() {
   return h;
 }
 
+/** Keyboard height at the bottom edge; also published as `--kb-inset` for dialogs outside the sheet. */
+function useKeyboardInset() {
+  const [inset, set] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement.style;
+    const on = () => {
+      const px = keyboardInset(innerHeight, vv);
+      root.setProperty('--kb-inset', `${px}px`);
+      set(px);
+    };
+    on();
+    vv.addEventListener('resize', on);
+    vv.addEventListener('scroll', on);
+    return () => (vv.removeEventListener('resize', on), vv.removeEventListener('scroll', on), root.removeProperty('--kb-inset'));
+  }, []);
+  return inset;
+}
+
+/** Touches that start here keep their own gesture and never move the sheet. */
+const OWN_GESTURE = '[data-nodrag], [role="slider"], .tband, input, select, textarea, .lrow-grip, .is-draggable';
+
 /**
  * Bottom sheet with three detents. Follows the finger, snaps by projected velocity, settles with a spring.
- * The body scrolls natively in "half" and "full" (its viewport is exactly the visible part); pulling down while the
- * body is at its scroll top hands the gesture over to the sheet. The grip and peek row always drag the sheet.
+ * The body's viewport is exactly the visible part. A touch on it moves the sheet or scrolls the content, see
+ * `claimsGesture`. The grip and peek row always drag the sheet.
  */
-export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64, onVisible, children, label, reducedMotion }: SheetProps) {
+export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64, onVisible, children, label, reducedMotion, scrollKey = '', keepScroll, fill }: SheetProps) {
   const safe = useSafeArea();
   const vh = useViewportHeight();
+  const keyboard = useKeyboardInset();
   const root = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement | null>(null);
 
@@ -157,19 +186,20 @@ export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64,
     dragging.current = false;
     root.current?.classList.remove('is-dragging');
     const { points: p, detent: d } = latest.current;
-    const idx = snapIndex(p, cur.current.x, g.current.v, ORDER.indexOf(d));
+    const v = performance.now() - g.current.lastT > 100 ? 0 : g.current.v; // held still before letting go: no flick
+    const idx = snapIndex(p, cur.current.x, v, ORDER.indexOf(d));
     const next = ORDER[idx]!;
-    animateTo(p[idx]!, g.current.v);
+    animateTo(p[idx]!, v);
     if (next !== d) latest.current.onDetent(next);
   };
 
   const onDown = (e: PointerEvent) => {
-    if (e.button > 0 || (e.target as HTMLElement).closest('[data-nodrag]')) return;
+    if (e.button > 0 || (e.target as HTMLElement).closest(OWN_GESTURE)) return;
     g.current.id = e.pointerId;
     g.current.y0 = e.clientY;
     g.current.x0 = e.clientX;
     // touch on the body is native scrolling plus the pull-down hand-over below; only grip and peek drag via pointer events
-    g.current.fromBody = !!(e.target as HTMLElement).closest('.sheet-body-wrap');
+    g.current.fromBody = latest.current.detent !== 'peek' && !!(e.target as HTMLElement).closest('.sheet-body-wrap');
     g.current.active = false;
     if (g.current.fromBody) g.current.id = -1;
   };
@@ -190,38 +220,39 @@ export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64,
     end();
   };
 
-  // touch on the body: scrolls natively; a downward pull while everything under the finger is at its scroll top
-  // (sheet body and any nested scroller) hands over to the sheet, which then follows the finger
+  // touch on the body: the first movement decides between moving the sheet and native scrolling
   useEffect(() => {
     const el = root.current!;
+    let x0 = 0;
     let y0 = 0;
-    let prev = 0;
-    let owned = false;
+    let mode: 'undecided' | 'sheet' | 'native' = 'native';
     const atTop = (t: HTMLElement | null) => {
       for (let n = t; n && n !== el; n = n.parentElement) if (n.scrollTop > 0) return false;
       return true;
     };
     const start = (e: TouchEvent) => {
-      y0 = prev = e.touches[0]!.clientY;
-      owned = false;
+      const t = e.target as HTMLElement;
+      x0 = e.touches[0]!.clientX;
+      y0 = e.touches[0]!.clientY;
+      mode = e.touches.length === 1 && t.closest('.sheet-body') && !t.closest(OWN_GESTURE) ? 'undecided' : 'native';
     };
     const move = (e: TouchEvent) => {
-      const t = e.target as HTMLElement;
-      if (latest.current.detent === 'peek' || !t.closest('.sheet-body')) return;
+      if (mode === 'native') return;
+      const x = e.touches[0]!.clientX;
       const y = e.touches[0]!.clientY;
-      if (!owned && y - prev > 0 && y - y0 > 8 && atTop(t)) {
-        owned = true;
-        begin(y); // takeover point is the reference, so the sheet does not jump
+      if (mode === 'undecided') {
+        if (x === x0 && y === y0) return;
+        mode = e.cancelable && claimsGesture(latest.current.detent, x - x0, y - y0, atTop(e.target as HTMLElement)) ? 'sheet' : 'native';
+        if (mode === 'native') return;
       }
-      prev = y;
-      if (owned) {
-        e.preventDefault();
-        moveTo(y);
-      }
+      if (e.cancelable) e.preventDefault();
+      // a few px of slack, so that a tap with a shaky finger stays a tap; the takeover point is the reference, no jump
+      if (!g.current.active && Math.abs(y - y0) > 6) begin(y);
+      if (g.current.active) moveTo(y);
     };
     const stop = () => {
-      if (owned) end();
-      owned = false;
+      if (mode === 'sheet') end();
+      mode = 'native';
     };
     el.addEventListener('touchstart', start, { passive: true });
     el.addEventListener('touchmove', move, { passive: false });
@@ -237,15 +268,27 @@ export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // every content has its own scroll position
+  const scrolled = useRef(new Map<string, number>());
+  const keyRef = useRef(scrollKey);
+  useLayoutEffect(() => {
+    keyRef.current = scrollKey;
+    const top = keepScroll ? scrolled.current.get(scrollKey) ?? 0 : 0;
+    const place = () => body.current && (body.current.scrollTop = top);
+    place();
+    const frame = requestAnimationFrame(place); // nested components may render the new content after this effect
+    return () => cancelAnimationFrame(frame);
+  }, [scrollKey]);
+
   const cycle = () => latest.current.onDetent(ORDER[(ORDER.indexOf(detent) + 1) % 3]!);
 
   return (
     <div
       ref={root}
-      class={cx('sheet', `sheet-${detent}`)}
+      class={cx('sheet', `is-${detent}`)}
       role="region"
       aria-label={label}
-      style={{ height: `${fullH}px`, transform: `translate3d(0, ${fullH - cur.current.x}px, 0)`, ['--peek-h' as string]: `${peekH}px` }}
+      style={{ height: `${fullH}px`, bottom: `${keyboard}px`, transform: `translate3d(0, ${fullH - cur.current.x}px, 0)`, ['--peek-h' as string]: `${peekH}px` }}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
@@ -254,15 +297,17 @@ export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64,
       <button type="button" class="sheet-grab" aria-label={detent === 'full' ? 'Leiste verkleinern' : 'Leiste vergrößern'} aria-expanded={detent !== 'peek'} onClick={cycle}>
         <span class="sheet-grip" />
       </button>
-      <div class="sheet-peek" style={{ height: `${peekHeight - 20 + safe.bottom}px` }}>
+      <div class="sheet-peek" style={{ height: `${peekHeight - 20}px` }}>
         {peek}
       </div>
       <div
         class="sheet-body-wrap"
         style={{ paddingBottom: `${Math.max(0, fullH - targetFor(detent))}px` }}
         {...(detent === 'peek' ? ({ inert: '' } as object) : {})}
+        // typing needs room above the keyboard
+        onFocusIn={(e: FocusEvent) => (e.target as HTMLElement).matches('input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea') && latest.current.onDetent('full')}
       >
-        <ScrollArea class="sheet-body" viewportRef={body} locked={detent === 'peek'}>
+        <ScrollArea class={cx('sheet-body', fill && 'is-fill')} viewportRef={body} locked={detent === 'peek'} onScroll={(el) => scrolled.current.set(keyRef.current, el.scrollTop)}>
           {children}
           <div class="sheet-safe" />
         </ScrollArea>

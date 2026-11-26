@@ -2,11 +2,11 @@ import { computed, effect } from '@preact/signals';
 import { activeKarte } from '../state/session';
 import { feedEntries } from '../features/feed/Feed';
 import { Feed } from '../features/feed/Feed';
+import { detailPage } from '../features/layers-panel/themes-state';
 import { Catalog } from '../features/catalog/Catalog';
 import { LayersList } from '../features/layers-panel/LayersList';
 import { SettingsView } from '../features/settings/Settings';
 import { leftTab, leftView, isMobile, type LeftView } from '../state/ui';
-import { Button } from '../ui/Button';
 import { cx } from '../ui/hooks';
 import { Segmented } from '../ui/Segmented';
 import { ScrollArea } from '../ui/ScrollArea';
@@ -27,6 +27,9 @@ function Tabs() {
   const n = feedEntries.value.length;
   const showTabs = hasFeed.value;
   const active = visibleCount.value;
+  // phones add layers from the bar of the sheet: without a second tab there is nothing to show here,
+  // and a layer page has its own header with the way back
+  if (mobile && (!showTabs || detailPage.value)) return null;
   return (
     <div class="ltabs">
       {!mobile && (
@@ -46,11 +49,6 @@ function Tabs() {
           { value: 'feed', label: <>Aktuell {n ? <span class="ltab-n num">{formatCompact(n)}</span> : null}</> },
         ]}
       />
-      )}
-      {mobile && (
-        <Button class="ltabs-add" variant="secondary" icon="plus" onClick={() => (leftView.value = 'catalog')}>
-          Hinzufügen
-        </Button>
       )}
     </div>
   );

@@ -240,9 +240,6 @@
     min-height: var(--hit-touch);
     padding: 0 var(--s-2);
   }
-  .tl-compact-idle {
-    justify-content: flex-start;
-  }
   .tl-skip {
     margin-left: auto;
     padding: 0 10px;

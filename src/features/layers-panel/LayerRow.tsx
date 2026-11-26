@@ -11,6 +11,7 @@ import { camera } from '../../state/view';
 import { hasKey } from '../../keys';
 import { setLayerVisible } from '../../karten/active';
 import { useEscape } from '../../ui/hooks';
+import { Popover } from '../../ui/Popover';
 import { multiValues } from '../../layers/multi';
 import { OptionFields, shownOptions } from './LayerDetails';
 import { Icon } from '../../ui/icons/Icon';
@@ -193,7 +194,8 @@ function FilterButton({ def, layer, karteId, onSettings }: { def: LayerDef; laye
   const pop = useRef<HTMLDivElement>(null);
   const open = pos !== null;
   const close = () => setPos(null);
-  useEscape(open, close);
+  const phone = isMobile.value; // there the shared popover is an action sheet and closes itself
+  useEscape(open && !phone, close);
   // not enough room below the row: open upwards instead (anchored at the bottom edge, so the height does not matter)
   useLayoutEffect(() => {
     if (!pos || pos.up !== undefined || !pop.current || !btn.current) return;
@@ -202,7 +204,7 @@ function FilterButton({ def, layer, karteId, onSettings }: { def: LayerDef; laye
     if (pos.top + h > window.innerHeight - 8 && r.top > window.innerHeight - r.bottom) setPos({ ...pos, up: window.innerHeight - r.top + 6 });
   }, [pos]);
   useEffect(() => {
-    if (!open) return;
+    if (!open || phone) return;
     const on = (e: PointerEvent) => {
       const t = e.target as Node;
       if (!pop.current?.contains(t) && !btn.current?.contains(t)) close();
@@ -221,25 +223,35 @@ function FilterButton({ def, layer, karteId, onSettings }: { def: LayerDef; laye
       document.removeEventListener('pointerdown', on, true);
       window.removeEventListener('resize', close);
     };
-  }, [open]);
+  }, [open, phone]);
   const toggle = () => {
     if (open) return close();
     const r = btn.current!.getBoundingClientRect();
     setPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right - 4) });
   };
+  const body = (
+    <>
+      <OptionFields layer={layer} def={def} karteId={karteId} />
+      <button type="button" class="lrow-pop-foot" onClick={() => { close(); onSettings(); }}>
+        <Icon name="gear" size={16} />
+        Einstellungen
+      </button>
+    </>
+  );
   return (
     <>
       <button ref={btn} type="button" class={cx('lrow-filter', open && 'is-open')} data-nav aria-haspopup="dialog" aria-expanded={open} aria-label={`Optionen ${def.title}`} title="Optionen" onClick={toggle}>
         <Icon name={customPage(def.id) ? 'sliders' : 'filter'} size={16} />
       </button>
-      {open &&
+      {phone && (
+        <Popover open={open} onClose={close} label={def.title} class="lrow-pop" anchorRef={btn}>
+          {body}
+        </Popover>
+      )}
+      {!phone && open &&
         createPortal(
           <div ref={pop} class="popover lrow-pop" role="dialog" aria-label={`Optionen ${def.title}`} style={pos.up !== undefined ? { position: 'fixed', bottom: `${pos.up}px`, top: 'auto', right: `${pos.right}px`, left: 'auto', transformOrigin: 'bottom right' } : { position: 'fixed', top: `${pos.top}px`, right: `${pos.right}px`, left: 'auto' }}>
-            <OptionFields layer={layer} def={def} karteId={karteId} />
-            <button type="button" class="lrow-pop-foot" onClick={() => { close(); onSettings(); }}>
-              <Icon name="gear" size={16} />
-              Einstellungen
-            </button>
+            {body}
           </div>,
           document.body,
         )}

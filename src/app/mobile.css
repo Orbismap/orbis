@@ -1,0 +1,304 @@
+/* Phone look of the map app: type, touch targets and the content of the bottom sheet.
+   Unlayered on purpose, so that it wins over the desktop-first sizes of the feature styles. Layout of the HUD: app.css. */
+
+:root[data-bp='mobile'] {
+  --fs-axis: 0.75rem;
+  --fs-small: 0.8125rem;
+  --fs-ui: 0.9375rem;
+  --fs-title: 1.0625rem;
+  --r-sheet: 24px;
+}
+
+/* defaults only: anything with a gesture of its own (row dragging, sliders) says otherwise in a later layer */
+@layer reset {
+  [data-bp='mobile'] button,
+  [data-bp='mobile'] a,
+  [data-bp='mobile'] summary {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* below 16 px iOS zooms into a field on focus and leaves the whole app zoomed */
+[data-bp='mobile'] :is(input:not([type='checkbox'], [type='radio'], [type='range']), select, textarea) {
+  font-size: 16px;
+}
+
+/* pinching belongs to the map, not to the controls on it */
+.hud-mobile {
+  touch-action: pan-x pan-y;
+}
+
+/* no room beside the half-open sheet on short phones */
+@media (max-height: 700px) {
+  .hud-mobile[data-detent='half'] .rail-pos {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* ---------- sheet ---------- */
+/* solid: content stays readable over any map, and nothing has to be blurred anew while the sheet moves */
+.hud-mobile .sheet {
+  background-color: var(--ink-1);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.hud-mobile .sheet-grip {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+}
+.hud-mobile .sheet-body {
+  -webkit-mask-image: none;
+  mask-image: none;
+  -webkit-overflow-scrolling: touch;
+}
+/* one scroll area only: panels that scroll by themselves on the desktop flow in the sheet's */
+.hud-mobile .sheet-body .lbody {
+  flex: none;
+  overflow: visible;
+  overscroll-behavior: auto;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+/* except for long lists, which fill the sheet and scroll on their own */
+.hud-mobile .sheet-body.is-fill {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.hud-mobile .sheet-body.is-fill > * {
+  flex: none;
+}
+.hud-mobile .sheet-body.is-fill > :is(.cat, .feed) {
+  flex: 1;
+  min-height: 0;
+}
+.hud-mobile .sheet-body.is-fill > .sheet-safe {
+  display: none;
+}
+.hud-mobile .sheet-body.is-fill :is(.cat-scroll, .feed) {
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--s-4));
+}
+/* headers with the way back stay in reach */
+.hud-mobile .sheet-body :is(.lpage-bar, .set-head, .ltabs) {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--ink-1);
+}
+.hud-mobile .sheet-body .ltabs {
+  padding: var(--s-2) var(--s-3);
+}
+.hud-mobile .lpage-bar {
+  min-height: 56px;
+  margin: 0 calc(var(--s-4) * -1);
+  padding: 0 var(--s-4);
+}
+.hud-mobile .lpage-back {
+  align-self: center;
+  min-height: var(--hit-touch);
+}
+.hud-mobile .set-head {
+  min-height: 56px;
+}
+
+/* ---------- layer list: grouped cards with large rows ---------- */
+.hud-mobile .llist {
+  margin: 0 var(--s-3);
+  border-radius: var(--r-inner);
+  background: var(--g-fill);
+}
+.hud-mobile .lrow-main {
+  height: 54px;
+  padding: 0 var(--s-1) 0 var(--s-2);
+}
+.hud-mobile :is(.lrow.is-on, .lfield.is-selected) {
+  border-radius: 0;
+}
+.hud-mobile .lrow + .lrow::before {
+  left: 52px;
+}
+.hud-mobile .lrow-badge {
+  width: 32px;
+  height: 32px;
+  margin: 0 var(--s-3) 0 0;
+  border-radius: 9px;
+}
+.hud-mobile .lfield-radio {
+  gap: 0;
+}
+.hud-mobile .lrow-title {
+  font-size: 1rem;
+}
+.hud-mobile :is(.lrow-sub, .lrow-trail) {
+  font-size: var(--fs-small);
+}
+.hud-mobile .lrow-trail {
+  padding-left: var(--s-2);
+}
+/* beside a title the chosen options are only a cut-off stump; the filter button shows them in full */
+.hud-mobile .lrow-opts {
+  display: none;
+}
+.hud-mobile .lfield-check {
+  width: var(--hit-touch);
+}
+.hud-mobile :is(.lrow-set, .lrow-filter) {
+  width: var(--hit-touch);
+  min-width: var(--hit-touch);
+  height: var(--hit-touch);
+  border-radius: 12px;
+}
+.hud-mobile .lrow-keybtn {
+  height: 36px;
+  min-width: 36px;
+  justify-content: center;
+}
+.hud-mobile .lsec {
+  margin-top: var(--s-4);
+}
+.hud-mobile :is(.lsec-title, .lgrp-title) {
+  margin: 0 var(--s-5) 6px;
+  font-size: var(--fs-small);
+}
+.hud-mobile .lgrp + .lgrp {
+  margin-top: var(--s-4);
+}
+.hud-mobile .lgrp-head .lgrp-title {
+  margin-left: var(--s-5);
+}
+.hud-mobile .lgrp-head .lgrp-grip {
+  width: var(--hit-touch);
+  height: 28px;
+  margin-top: 0;
+}
+.hud-mobile .lgrp-head .lgrp-grip + .lgrp-title {
+  margin-left: 0;
+}
+.hud-mobile :is(.lmore, .ladd) {
+  width: calc(100% - var(--s-3) * 2);
+  min-height: 52px;
+  margin: 0 var(--s-3);
+  padding: 0 var(--s-3);
+  border-radius: var(--r-inner);
+  background: var(--g-fill);
+  font-size: 1rem;
+}
+.hud-mobile .lmore {
+  margin-top: var(--s-2);
+}
+.hud-mobile :is(.lsec-empty, .lsec-hint) {
+  margin: 0 var(--s-5) var(--s-2);
+  font-size: var(--fs-ui);
+}
+.hud-mobile .kchange {
+  padding: 0 var(--s-3);
+}
+.hud-mobile .kchange-row {
+  min-height: 52px;
+  margin-top: var(--s-2);
+}
+
+/* ---------- controls, in the sheet and in action sheets ---------- */
+:is(.hud-mobile, .popover-sheet) .seg-sm .seg-opt {
+  min-height: 36px;
+  font-size: var(--fs-small);
+}
+:is(.hud-mobile, .popover-sheet) .choices {
+  --choice-h: 48px;
+  overflow: clip;
+}
+/* full length: a list that scrolls inside a scrolling sheet catches the finger */
+:is(.hud-mobile, .popover-sheet) .choices.is-scroll {
+  max-height: none;
+  overscroll-behavior: auto;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+:is(.hud-mobile, .popover-sheet) .choice {
+  font-size: 1rem;
+}
+:is(.hud-mobile, .popover-sheet) :is(.ld-label, .ld-value) {
+  font-size: var(--fs-ui);
+}
+.popover.popover-sheet.lrow-pop {
+  width: 100%;
+  gap: var(--s-4);
+  padding: 0 var(--s-4) var(--s-4);
+}
+.popover.popover-sheet.lrow-pop .popover-head {
+  margin: 0 calc(var(--s-4) * -1) calc(var(--s-2) * -1);
+}
+.popover-sheet .lrow-pop-foot {
+  min-height: 52px;
+  margin: 0;
+  padding: 0 var(--s-1);
+  font-size: 1rem;
+}
+.popover.popover-sheet.bm-pop {
+  padding: 0 var(--s-4) var(--s-3);
+}
+/* on short phones the whole sheet scrolls instead of squeezing the folded list of maps further */
+.popover.popover-sheet.bm-pop > * {
+  flex: none;
+}
+.popover.popover-sheet.bm-pop .popover-head {
+  margin: 0 calc(var(--s-4) * -1) var(--s-1);
+}
+.popover.popover-sheet.attr-pop {
+  padding: 0 var(--s-4) var(--s-4);
+}
+.popover.popover-sheet.attr-pop .popover-head {
+  margin: 0 calc(var(--s-4) * -1);
+}
+.popover.popover-sheet.attr-pop .attr-body {
+  max-height: none;
+  overflow: visible;
+}
+.popover-sheet .nameform-pick {
+  width: var(--hit-touch);
+  height: var(--hit-touch);
+}
+.popover-sheet .nameform-label,
+.popover-sheet .kall-head {
+  font-size: var(--fs-small);
+}
+
+/* ---------- selection, settings, catalog ---------- */
+.hud-mobile .insp-actions .btn {
+  flex: 1 1 calc(50% - var(--s-2));
+  min-height: 48px;
+}
+.hud-mobile .set-row {
+  min-height: 56px;
+}
+.hud-mobile .set-label {
+  font-size: 1rem;
+}
+.hud-mobile .crow {
+  height: 52px;
+}
+.hud-mobile .crow.has-snippet {
+  height: 68px;
+}
+.hud-mobile .crow-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+.hud-mobile .crow-title {
+  font-size: 1rem;
+}
+.hud-mobile .crow-snippet {
+  font-size: var(--fs-small);
+}
+/* the highlight of the keyboard cursor means nothing to a finger */
+.hud-mobile .crow.is-active {
+  background: transparent;
+  box-shadow: none;
+}
+.hud-mobile .cat-input {
+  min-height: var(--hit-touch);
+}
