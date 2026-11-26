@@ -51,7 +51,7 @@ function Notice({ title, text, action, onAction, search: second }: { title: stri
 
 function content(): ComponentChildren {
   const state = positionState.value;
-  if (state === 'off') return <Notice title="Orbis Find" text={`Findet den nächsten ${kind.name}.`} action="Los geht’s" onAction={useMyPosition} search />;
+  if (state === 'off') return <Notice title="Orbis Find" text={`Findet ${kind.value.next}.`} action="Los geht’s" onAction={useMyPosition} search />;
   if (state === 'denied') return <Notice title="Kein Zugriff auf den Standort" text="Erlaube ihn in den Einstellungen deines Browsers und versuche es noch einmal." action="Erneut versuchen" onAction={useMyPosition} search />;
   if (state === 'unavailable') return <Notice title="Standort nicht verfügbar" text="Prüfe, ob die Ortung deines Geräts eingeschaltet ist." action="Erneut versuchen" onAction={useMyPosition} search />;
   const here = position.value;
@@ -61,7 +61,7 @@ function content(): ComponentChildren {
   if (!to || !w) {
     if (search.value === 'error') return <Notice title="Daten nicht ladbar" text="Prüfe deine Verbindung." action="Erneut versuchen" onAction={retry} />;
     if (search.value !== 'ready') return <Notice title="Suche in der Nähe …" />;
-    return <Notice title="Nichts in der Nähe" text={`Kein ${kind.name} im Umkreis von ${formatDistance(searchRadius.value)}.`} />;
+    return <Notice title="Nichts in der Nähe" text={`${kind.value.none} im Umkreis von ${formatDistance(searchRadius.value)}.`} />;
   }
 
   // a searched place is not where one is: nobody arrives from there
@@ -81,7 +81,7 @@ function content(): ComponentChildren {
       )}
       <div class="find-actions">
         {compass.value === 'ask' && <button type="button" class="find-button" onClick={() => void startCompass()}>Kompass einschalten</button>}
-        {chosen.value && <button type="button" class="find-button find-quiet" onClick={() => (chosen.value = null)}>Zum nächsten</button>}
+        {chosen.value && <button type="button" class="find-button find-quiet" onClick={() => (chosen.value = null)}>Zum nächsten Ziel</button>}
       </div>
       <Elsewhere />
     </>

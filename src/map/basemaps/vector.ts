@@ -2,12 +2,13 @@
 // Palette from docs/DESIGN.md: land ≈ ink-1/ink-2, water a little deeper and bluer, roads barely there,
 // so that data layers carry the picture.
 import type { ExpressionSpecification, LayerSpecification, SourceSpecification } from 'maplibre-gl';
+import { OFM_URL } from '../../data/endpoints';
 import type { BasemapDef, LabelVariant } from './types';
 import type { BasemapId } from '../types';
 import { BUILDING_BASE, BUILDING_FILTER, BUILDING_HEIGHT, OFM_BUILDINGS_SOURCE_ID } from '../buildings-tilt';
 import { karteLabelLayers } from './karte-labels';
 
-export const OFM_URL = 'https://tiles.openfreemap.org/planet';
+export { OFM_URL };
 export const OFM_GLYPHS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
 export const OFM_ATTRIBUTION =
   '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';

@@ -37,25 +37,26 @@ export interface Search { places: Place[]; radius: number }
  * as a place lies within the completely covered radius.
  */
 export async function searchPlaces(kind: Kind, at: LngLat, read: (x: number, y: number) => Promise<TilePoint[]>): Promise<Search> {
-  const [x, y] = tilePosition(at[0], at[1], kind.zoom).map(Math.floor) as [number, number];
+  const zoom = kind.tiles.zoom;
+  const [x, y] = tilePosition(at[0], at[1], zoom).map(Math.floor) as [number, number];
   const found = new Map<string, Place>();
   let nearest = Infinity;
   let radius = 0;
   for (let r = 0; r <= MAX_RING; r++) {
-    const tiles = await Promise.all(ringTiles(x, y, r, kind.zoom).map(([tx, ty]) => read(tx, ty)));
+    const tiles = await Promise.all(ringTiles(x, y, r, zoom).map(([tx, ty]) => read(tx, ty)));
     for (const point of tiles.flat()) {
-      const place = kind.place(point.properties, point.lng, point.lat);
+      const place = kind.place(point.properties, point.lng, point.lat, point.id);
       if (!place || found.has(place.key)) continue;
       found.set(place.key, place);
       nearest = Math.min(nearest, metres(at, [place.lng, place.lat]));
     }
-    radius = coveredRadius(at, r, kind.zoom);
+    radius = coveredRadius(at, r, zoom);
     if (r >= 1 && nearest <= radius) break;
   }
   return { places: [...found.values()], radius };
 }
 
-/** An object entered from this app, as the tile set would carry it. */
+/** An object entered from this app, as the tile set would carry it; `set`: the id of its kind. */
 export interface OwnEntry { set: string; lng: number; lat: number; properties: Record<string, unknown>; at: number }
 /** Own entries further away than this are not "around". */
 export const OWN_RANGE_M = 5000;
@@ -65,7 +66,7 @@ export function withOwn(kind: Kind, found: Place[], own: readonly OwnEntry[], at
   if (!at) return found;
   const known = new Set(found.map((p) => p.key));
   const extra = own
-    .filter((e) => e.set === kind.set && metres(at, [e.lng, e.lat]) <= OWN_RANGE_M)
+    .filter((e) => e.set === kind.id && metres(at, [e.lng, e.lat]) <= OWN_RANGE_M)
     .map((e) => kind.place(e.properties, e.lng, e.lat))
     .filter((p): p is Place => !!p && !known.has(p.key));
   return extra.length ? [...found, ...extra] : found;

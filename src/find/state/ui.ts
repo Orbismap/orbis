@@ -1,6 +1,8 @@
 // What is open, and the actions that more than one part of the app offers.
 import { signal } from '@preact/signals';
+import type { Kind } from '../data/kinds';
 import { startAdding, stopAdding } from './add';
+import { chooseKind, kind } from './finder';
 import { startCompass, startPosition, usePlace } from './sensors';
 
 export const menuOpen = signal(false);
@@ -15,6 +17,14 @@ export const augmented = signal(false);
 export function openCameraView(): void {
   augmented.value = true;
   void startCompass();
+}
+
+/** Picked in the catalogue. */
+export function lookFor(next: Kind): void {
+  browsing.value = false;
+  if (next === kind.peek()) return;
+  stopAdding(); // an entry belongs to the kind it was begun for
+  chooseKind(next);
 }
 
 /** Enter a new object where one stands. */

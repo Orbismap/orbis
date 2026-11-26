@@ -13,6 +13,9 @@ export const BASE = {
   assets: slash(env.VITE_ASSETS_BASE, 'https://orbis-assets.maltee.dev/'),
 } as const;
 
+/** OpenFreeMap (free, no key): the TileJSON of its OpenMapTiles vector tiles. */
+export const OFM_URL = 'https://tiles.openfreemap.org/planet';
+
 export type Bucket = keyof typeof BASE;
 export const bucketUrl = (b: Bucket, key: string) => BASE[b] + key.replace(/^\//, '');
 

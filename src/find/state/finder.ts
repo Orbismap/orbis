@@ -1,17 +1,23 @@
 // What the app does with the position: find the places around it, head for one of them, keep a route to it.
 import { batch, computed, effect, signal, untracked } from '@preact/signals';
-import { PMTiles } from 'pmtiles';
 import type { LngLat } from '@/core/geo';
-import { osmPmtilesUrl } from '@/data/osmfiles';
-import { readTilePoints, type TilePoint } from '@/data/tilePoints';
 import { fetchRoutes } from '@/features/routes/osrm';
 import { OFF_ROUTE_M, guide, pickTarget, progress } from '../data/guide';
-import { BIKE_PARKING, type Place } from '../data/kinds';
+import { BIKE_PARKING, KINDS, type Kind, type Place } from '../data/kinds';
 import { metres, searchPlaces, withOwn } from '../data/places';
 import { own } from './own';
 import { position } from './sensors';
+import { forgetTiles, tileReader } from './tiles';
 
-export const kind = BIKE_PARKING;
+const KIND_KEY = 'find.kind';
+const storedKind = (): Kind => {
+  try {
+    const id = localStorage.getItem(KIND_KEY);
+    return KINDS.find((k) => k.id === id) ?? BIKE_PARKING;
+  } catch {
+    return BIKE_PARKING;
+  }
+};
 /** After this many metres the surroundings are searched anew. */
 const SEARCH_AGAIN_M = 300;
 /** Pauses between two route requests (the routing server is a free public one). */
@@ -23,6 +29,8 @@ const JUMP_M = 2000;
 /** After a failed search the next position tries again only after this pause. */
 const SEARCH_RETRY_MS = 10_000;
 
+/** What is looked for. */
+export const kind = signal<Kind>(storedKind());
 /** what the last search read from the data */
 const found = signal<Place[]>([]);
 export const search = signal<'waiting' | 'loading' | 'ready' | 'error'>('waiting');
@@ -36,7 +44,7 @@ export const route = signal<{ key: string; line: LngLat[]; junctions: LngLat[] }
 
 const at = computed<LngLat | null>(() => (position.value ? [position.value.lng, position.value.lat] : null));
 /** The places to choose from: what was found and what one has just entered oneself. */
-export const places = computed(() => withOwn(kind, found.value, own.value, at.value));
+export const places = computed(() => withOwn(kind.value, found.value, own.value, at.value));
 
 /** The way from the position to the target, null while either is missing. */
 export const way = computed(() => {
@@ -46,15 +54,6 @@ export const way = computed(() => {
 });
 
 // ---- search -------------------------------------------------------------------------------------------------------------
-
-let archive: { url: string; pm: PMTiles } | undefined;
-async function reader(signal: AbortSignal): Promise<(x: number, y: number) => Promise<TilePoint[]>> {
-  const url = await osmPmtilesUrl(kind.set);
-  if (archive?.url !== url) archive = { url, pm: new PMTiles(url) };
-  const { pm } = archive;
-  await pm.getHeader(); // a missing file fails here, not as 81 empty tiles
-  return (x, y) => readTilePoints(pm, kind.layer, kind.zoom, x, y, signal);
-}
 
 let searchedAt: LngLat | undefined;
 let searching: AbortController | undefined;
@@ -75,7 +74,8 @@ async function searchAround(here: LngLat): Promise<void> {
   lastCentre = here;
   if (!found.peek().length) search.value = 'loading';
   try {
-    const result = await searchPlaces(kind, here, await reader(signal));
+    const wanted = kind.peek();
+    const result = await searchPlaces(wanted, here, await tileReader(wanted, signal));
     if (ctl.signal.aborted) return;
     batch(() => {
       found.value = result.places;
@@ -86,7 +86,7 @@ async function searchAround(here: LngLat): Promise<void> {
     if (ctl.signal.aborted) return;
     searchedAt = undefined; // a later position tries again
     failedAt = Date.now();
-    archive = undefined;
+    forgetTiles();
     if (!found.peek().length) search.value = 'error';
   }
 }
@@ -108,19 +108,43 @@ async function routeTo(here: LngLat, to: Place): Promise<void> {
   routedAt = Date.now();
   routedKey = to.key;
   try {
-    const [best] = await fetchRoutes(kind.mode, [{ lng: here[0], lat: here[1] }, to], AbortSignal.any([ctl.signal, AbortSignal.timeout(TIMEOUT_MS)]));
+    const [best] = await fetchRoutes(kind.peek().mode, [{ lng: here[0], lat: here[1] }, to], AbortSignal.any([ctl.signal, AbortSignal.timeout(TIMEOUT_MS)]));
     if (!ctl.signal.aborted && best) route.value = { key: to.key, line: best.coords, junctions: best.steps.slice(1, -1).map((s) => [s.lng, s.lat]) };
   } catch {
     /* without a route the arrow points straight at the target; a later position tries again */
   }
 }
 
+/** Looks for something else: what was found is dropped and the surroundings are searched anew. */
+export function chooseKind(next: Kind): void {
+  if (next === kind.peek()) return;
+  searching?.abort();
+  routing?.abort();
+  searchedAt = undefined;
+  failedAt = 0;
+  routedKey = '';
+  try {
+    localStorage.setItem(KIND_KEY, next.id);
+  } catch {
+    /* without storage the choice lasts as long as the page */
+  }
+  batch(() => {
+    found.value = [];
+    chosen.value = null;
+    target.value = null;
+    route.value = null;
+    search.value = 'waiting';
+    kind.value = next;
+  });
+}
+
 /** Wires the three steps to the position. Returns the cleanup. */
 export function startFinder(): () => void {
   const stops = [
-    // search anew once the person has moved on
+    // search anew once the person has moved on, or looks for something else
     effect(() => {
       const here = at.value;
+      void kind.value; // another kind is searched at once
       const due = here && (searchedAt ? metres(searchedAt, here) > SEARCH_AGAIN_M : Date.now() - failedAt >= SEARCH_RETRY_MS);
       if (here && due) untracked(() => void searchAround(here));
     }),

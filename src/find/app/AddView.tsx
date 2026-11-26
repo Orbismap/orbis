@@ -88,7 +88,7 @@ function Choices({ field, chosen }: { field: Field; chosen?: string }) {
 }
 
 function Form() {
-  const add = kind.add!, d = draft.value!, send = sending.value;
+  const add = kind.value.add!, d = draft.value!, send = sending.value;
   const state = check();
   const busy = send.state === 'sending';
   // the sign-in only returns to an address OpenStreetMap accepts: over plain HTTP that is 127.0.0.1, not localhost

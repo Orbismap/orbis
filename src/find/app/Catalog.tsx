@@ -4,6 +4,7 @@ import { Icon } from '@/ui/icons/Icon';
 import { ART } from '../data/art';
 import { CATALOG } from '../data/catalog';
 import { kind } from '../state/finder';
+import { lookFor } from '../state/ui';
 import { PictureTile } from './PictureTile';
 
 export function Catalog({ onClose }: { onClose(): void }) {
@@ -24,7 +25,7 @@ export function Catalog({ onClose }: { onClose(): void }) {
             <ul>
               {group.entries.map((e) => (
                 <li key={e.art}>
-                  <PictureTile art={ART[e.art]} colour={e.colour} name={e.name} soon={!e.kind} selected={e.kind === kind} onClick={() => { if (e.kind) onClose(); }} />
+                  <PictureTile art={ART[e.art]} colour={e.colour} name={e.name} soon={!e.kind} selected={e.kind === kind.value} onClick={() => { if (e.kind) lookFor(e.kind); }} />
                 </li>
               ))}
             </ul>

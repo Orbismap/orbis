@@ -87,11 +87,12 @@ export function FindMap() {
       frame();
     };
     recentre.current = follow;
-    // a searched place (or the way back from it) moves the view, even after the map was moved by hand
-    let from = manual.peek();
+    // a searched place (or the way back from it) and another kind move the view, even after the map was moved by hand
+    let from = manual.peek(), looked = kind.peek();
     cleanup.push(effect(() => {
-      if (manual.value === from) return;
+      if (manual.value === from && kind.value === looked) return;
       from = manual.value;
+      looked = kind.value;
       follow();
     }));
 
@@ -112,7 +113,7 @@ export function FindMap() {
       {failed && <p class="find-map-failed" role="status">Die Karte kann auf diesem Gerät nicht angezeigt werden. Der Pfeil funktioniert trotzdem.</p>}
       <div class="find-corner">
         {away && <button type="button" class="find-pill" onClick={() => recentre.current()}>Zentrieren</button>}
-        {canEdit && kind.add && position.value && manual.value === null && <button type="button" class="find-pill find-pill-add" aria-label={`${kind.name} eintragen`} onClick={openAdding}><Icon name="plus" size={18} /></button>}
+        {canEdit && kind.value.add && position.value && manual.value === null && <button type="button" class="find-pill find-pill-add" aria-label={`${kind.value.name} eintragen`} onClick={openAdding}><Icon name="plus" size={18} /></button>}
         {position.value && manual.value === null && <button type="button" class="find-pill" aria-label="Kameraansicht (AR)" onClick={openCameraView}>AR</button>}
       </div>
     </section>

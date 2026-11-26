@@ -21,7 +21,7 @@ let looking: AbortController | undefined;
 
 /** Reads what is mapped around the draft, anew once it has moved out of the middle of what was read. */
 export function lookAround(again = false): void {
-  const d = draft.peek(), add = kind.add;
+  const d = draft.peek(), add = kind.peek().add;
   if (!d || !add) return;
   if (!again && lookedAt && metres(lookedAt, [d.lng, d.lat]) < LOOK_AROUND_M / 2) return;
   looking?.abort();
@@ -48,7 +48,7 @@ function begin(next: Draft): void {
 /** Starts where one stands; without an own position there is nothing to add. */
 export function startAdding(): void {
   const here = position.peek();
-  if (here && manual.peek() === null && kind.add) begin({ lng: here.lng, lat: here.lat, values: {} });
+  if (here && manual.peek() === null && kind.peek().add) begin({ lng: here.lng, lat: here.lat, values: {} });
 }
 
 export function stopAdding(): void {
@@ -68,14 +68,14 @@ export function setValue(key: string, value: string): void {
 
 /** Signs in first if needed; the draft comes along and is sent with a further tap. */
 export async function submit(): Promise<void> {
-  const d = draft.peek(), add = kind.add;
+  const d = draft.peek(), { id: set, add } = kind.peek();
   if (!d || !add || sending.peek().state === 'sending') return;
   sending.value = { state: 'sending' };
   try {
     if (!token.peek()) return await signIn(d);
     const tags = entryTags(add.tags, d.values);
     const id = await createNode([d.lng, d.lat], tags, add.comment);
-    addOwn({ set: kind.set, lng: d.lng, lat: d.lat, properties: add.properties(tags, id), at: Date.now() });
+    addOwn({ set, lng: d.lng, lat: d.lat, properties: add.properties(tags, id), at: Date.now() });
     sending.value = { state: 'done', id };
   } catch (error) {
     sending.value = { state: 'error', text: error instanceof SignedOut ? 'Die Anmeldung ist abgelaufen. Melde dich neu an.' : 'Das hat nicht geklappt. Prüfe auf der Karte, ob der Eintrag schon da ist.' };
@@ -87,7 +87,7 @@ export async function submit(): Promise<void> {
 export async function resumeAdding(): Promise<void> {
   const back = await finishSignIn();
   const carried = back?.carry as Draft | undefined;
-  if (!back || !carried || !Number.isFinite(carried.lng) || !Number.isFinite(carried.lat)) return;
+  if (!back || !kind.peek().add || !carried || !Number.isFinite(carried.lng) || !Number.isFinite(carried.lat)) return;
   begin(carried);
   if (!back.signedIn) sending.value = { state: 'error', text: 'Die Anmeldung wurde nicht abgeschlossen.' };
 }
