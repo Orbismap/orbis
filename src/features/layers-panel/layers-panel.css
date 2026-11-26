@@ -454,20 +454,42 @@
     color: var(--limb);
     font-size: var(--fs-title);
   }
-  /* the title stands under the back button, left-aligned */
   .lpage-bar {
+    position: relative;
     display: flex;
+    align-items: center;
+    min-height: max(44px, var(--hit, 28px));
+  }
+  .lpage-bartitle {
+    position: absolute;
+    inset: 0 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    font-size: var(--fs-inspector);
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    pointer-events: none;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  /* desktop: the title stands under the back button, left-aligned (the phone keeps back, title and close in one row) */
+  .hud-desktop .lpage-bar {
     flex-direction: column;
     align-items: flex-start;
     gap: 2px;
   }
-  .lpage-bartitle {
-    margin: 0;
+  .hud-desktop .lpage-bartitle {
+    position: static;
+    display: block;
     font-size: 1.375rem;
     font-weight: 700;
     letter-spacing: -0.01em;
-    line-height: 1.2;
     text-align: left;
+    white-space: normal;
     overflow-wrap: anywhere;
   }
   .lpage-head {
