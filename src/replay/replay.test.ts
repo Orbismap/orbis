@@ -6,6 +6,7 @@ import { FLIGHT_TESTS } from './events/starship-tests';
 import { buildFalconHeavyDemo } from './events/falcon-heavy-demo';
 import { buildTestFlight } from './events/test-flight';
 import { buildFlight, buildStarship15, PAD, returnMiss, T } from './events/starship15';
+import { airFactor, distanceGain, mixAt, speedGain } from './sound-mix';
 import { orbitPosition, orbitThrough, periodOf } from './orbit';
 
 describe('curve', () => {
@@ -305,5 +306,26 @@ describe('Falcon Heavy demo flight', () => {
     const [l, r] = [ev.actors[1]!.at(10)!, ev.actors[2]!.at(10)!];
     expect(haversine([l.lng, l.lat], [r.lng, r.lat]) * 1000).toBeGreaterThan(5);
     expect(haversine([l.lng, l.lat], [r.lng, r.lat]) * 1000).toBeLessThan(12);
+  });
+});
+
+describe('replay sound', () => {
+  const ev = buildFalconHeavyDemo();
+  it('has no air to carry sound in space and falls with the distance', () => {
+    expect(airFactor(0)).toBe(1);
+    expect(airFactor(150_000)).toBe(0);
+    expect(distanceGain(2000)).toBeLessThan(distanceGain(300));
+    expect(speedGain(1)).toBe(1);
+    expect(speedGain(60)).toBe(0);
+  });
+  it('roars while the engines burn near the camera and is silent when coasting or fast-forwarded', () => {
+    const t = 60;
+    const view = shotAt(ev, t)!;
+    expect(mixAt(ev, t, view, 1).rumble).toBeGreaterThan(0.05);
+    expect(mixAt(ev, t, view, 60).master).toBe(0);
+    const coast = ev.end - 5;
+    const v2 = shotAt(ev, coast);
+    expect(mixAt(ev, coast, v2, 1).rumble).toBe(0);
+    expect(mixAt(ev, t, null, 1).master).toBe(0);
   });
 });
