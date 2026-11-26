@@ -1,7 +1,8 @@
-// vectorTileLayer: one remote vector tile source (z/x/y .pbf) drawn by several parts (line, circle or fill per source layer).
-// Hover widening and the selection highlight follow the other kits; features are identified by `idKey` (default osm_id).
+// vectorTileLayer: one remote vector tile source (z/x/y .pbf, or PMTiles through pmtiles://) drawn by several parts (line, circle,
+// fill or text per source layer). Hover widening and the selection highlight follow the other kits; features are identified by
+// `idKey` (default osm_id).
 import { effect, signal, type ReadonlySignal } from '@preact/signals';
-import type { FilterSpecification, LayerSpecification } from 'maplibre-gl';
+import type { FilterSpecification, LayerSpecification, SymbolLayerSpecification } from 'maplibre-gl';
 import type { InspectCard, LayerContext, LayerHandle } from '../layers/types';
 import type { SlotId } from '../map/types';
 import { Cleanup, DARK_HALO, HOVER, LIMB, bindOpacity, idBase, isSignal, mapOutputs, type AnyFeature, type Expr, type NumOrExpr } from './common';
@@ -11,18 +12,27 @@ export interface VtPart {
   /** Unique within the layer. */
   id: string;
   sourceLayer: string;
-  kind: 'line' | 'circle' | 'fill';
+  kind: 'line' | 'circle' | 'fill' | 'text';
   filter?: FilterSpecification | ReadonlySignal<FilterSpecification | undefined>;
   minZoom?: number;
   maxZoom?: number;
+  /** line, circle, fill: its colour; text: the text colour. */
   color: string | Expr;
-  /** line: width in px, circle: radius in px (number or zoom expression). Unused for fill. */
+  /** line: width in px, circle: radius in px (number or zoom expression). Unused for fill and text. */
   size?: NumOrExpr;
   opacity?: number;
   /** line only */
   dash?: number[];
-  /** Dark outline under a line / around a circle. */
-  casing?: boolean;
+  /** line only: px to the side of the line (positive: right of its direction), for lines running side by side */
+  offset?: NumOrExpr;
+  /** Dark outline under a line / around a circle; a line also takes the outline's colour. */
+  casing?: boolean | string;
+  /** text only (never picked) */
+  layout?: NonNullable<SymbolLayerSpecification['layout']>;
+  /** text only: colour and width of the halo */
+  halo?: { color: string; width: number };
+  /** Map slot, if the default of the kind does not fit (text: 'labels'). */
+  slot?: SlotId;
   /** Default true. false = decoration without hover or card. */
   pick?: boolean;
   sortKey?: NumOrExpr;
@@ -40,13 +50,15 @@ export interface VectorTileOptions {
   name?: string;
   /** While `when` is true, these parts (with casing and selection) are hidden: an extension draws their objects in 3D. The data stays; what is hidden cannot be picked. */
   hideWhenPresented?: { when: ReadonlySignal<boolean>; parts: string[] };
+  /** Status note while no tile could be loaded. */
+  errorNote?: string;
   describe(feature: AnyFeature, part: VtPart): InspectCard;
 }
 
-const SLOT: Record<VtPart['kind'], SlotId> = { line: 'lines', circle: 'points', fill: 'areas' };
+const SLOT: Record<VtPart['kind'], SlotId> = { line: 'lines', circle: 'points', fill: 'areas', text: 'labels' };
 const widen: (e: NumOrExpr) => NumOrExpr = (e) => ['*', e, ['case', HOVER, 1.6, 1]] as Expr;
 const plus2 = (e: NumOrExpr): NumOrExpr => ['+', e, 2] as Expr;
-const OPACITY_PROP = { line: 'line-opacity', circle: 'circle-opacity', fill: 'fill-opacity' } as const;
+const OPACITY_PROP = { line: 'line-opacity', circle: 'circle-opacity', fill: 'fill-opacity', text: 'text-opacity' } as const;
 
 export function vectorTileLayer(ctx: LayerContext, o: VectorTileOptions): LayerHandle {
   const engine = ctx.map;
@@ -68,7 +80,7 @@ export function vectorTileLayer(ctx: LayerContext, o: VectorTileOptions): LayerH
   });
 
   for (const p of o.parts) {
-    const slot = SLOT[p.kind];
+    const slot = p.slot ?? SLOT[p.kind];
     const zoom = { ...(p.minZoom !== undefined ? { minzoom: p.minZoom } : {}), ...(p.maxZoom !== undefined ? { maxzoom: p.maxZoom } : {}) };
     const filter0 = isSignal<FilterSpecification | undefined>(p.filter) ? p.filter.peek() : p.filter;
     const f = (flt: FilterSpecification | undefined) => (flt ? { filter: flt } : {});
@@ -85,17 +97,18 @@ export function vectorTileLayer(ctx: LayerContext, o: VectorTileOptions): LayerH
     const noSel = ['==', ['get', idKey], '\u0000'] as FilterSpecification;
 
     if (p.kind === 'line') {
-      mk({ id: sel, type: 'line', ...common, filter: noSel, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': LIMB, 'line-width': mapOutputs(size, (e) => ['+', e, 5] as Expr), 'line-opacity': 0.55 } });
+      const side = p.offset !== undefined ? { 'line-offset': p.offset } : {};
+      mk({ id: sel, type: 'line', ...common, filter: noSel, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { ...side, 'line-color': LIMB, 'line-width': mapOutputs(size, (e) => ['+', e, 5] as Expr), 'line-opacity': 0.55 } });
       targets.push({ layer: sel, prop: 'line-opacity', base: 0.55 });
       if (p.casing) {
         const c = `${base}.${p.id}-casing`;
-        mk({ id: c, type: 'line', ...common, ...f(filter0), layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': DARK_HALO, 'line-width': mapOutputs(size, plus2), 'line-opacity': 0.8 } });
+        mk({ id: c, type: 'line', ...common, ...f(filter0), layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { ...side, 'line-color': typeof p.casing === 'string' ? p.casing : DARK_HALO, 'line-width': mapOutputs(size, plus2), 'line-opacity': 0.8 } });
         targets.push({ layer: c, prop: 'line-opacity', base: 0.8 });
         if (isSignal<FilterSpecification | undefined>(p.filter)) { const fs = p.filter; clean.add(effect(() => { if (ml.getLayer(c)) ml.setFilter(c, fs.value ?? null); })); }
       }
       mk({
         id: main, type: 'line', ...common, ...f(filter0), layout: { 'line-cap': 'round', 'line-join': 'round', ...(p.sortKey !== undefined ? { 'line-sort-key': p.sortKey } : {}) },
-        paint: { 'line-color': p.color, 'line-width': p.pick === false ? size : mapOutputs(size, widen), 'line-opacity': opacity, ...(p.dash ? { 'line-dasharray': p.dash } : {}) },
+        paint: { ...side, 'line-color': p.color, 'line-width': p.pick === false ? size : mapOutputs(size, widen), 'line-opacity': opacity, ...(p.dash ? { 'line-dasharray': p.dash } : {}) },
       });
     } else if (p.kind === 'circle') {
       mk({
@@ -109,6 +122,11 @@ export function vectorTileLayer(ctx: LayerContext, o: VectorTileOptions): LayerH
           'circle-stroke-color': p.casing === false ? 'rgba(0,0,0,0)' : DARK_HALO, 'circle-stroke-width': 1,
         },
       });
+    } else if (p.kind === 'text') {
+      mk({
+        id: main, type: 'symbol', ...common, ...f(filter0), layout: p.layout,
+        paint: { 'text-color': p.color, 'text-opacity': opacity, ...(p.halo ? { 'text-halo-color': p.halo.color, 'text-halo-width': p.halo.width } : {}) },
+      });
     } else {
       mk({ id: sel, type: 'line', ...common, filter: noSel, paint: { 'line-color': LIMB, 'line-width': 3, 'line-opacity': 0.8 } });
       targets.push({ layer: sel, prop: 'line-opacity', base: 0.8 });
@@ -117,6 +135,7 @@ export function vectorTileLayer(ctx: LayerContext, o: VectorTileOptions): LayerH
     targets.push({ layer: main, prop: OPACITY_PROP[p.kind], base: p.kind === 'fill' ? opacity * 0.55 : opacity });
     if (p.kind === 'circle') targets.push({ layer: sel, prop: 'circle-stroke-opacity', base: 0.85 });
     if (isSignal<FilterSpecification | undefined>(p.filter)) { const fs = p.filter; clean.add(effect(() => { if (ml.getLayer(main)) ml.setFilter(main, fs.value ?? null); })); }
+    if (p.kind === 'text') continue;
     selLayers.set(p.id, sel);
     if (p.pick !== false) { pickIds.push(main); partOf.set(main, p); }
   }
@@ -140,7 +159,7 @@ export function vectorTileLayer(ctx: LayerContext, o: VectorTileOptions): LayerH
     ctx.status({ state: 'ready' });
   };
   const onError = (e: { sourceId?: string }) => {
-    if (e.sourceId === src && !loaded) ctx.status({ state: 'error', note: 'Kacheln von OpenInfraMap nicht ladbar' });
+    if (e.sourceId === src && !loaded) ctx.status({ state: 'error', note: o.errorNote ?? 'Kacheln von OpenInfraMap nicht ladbar' });
   };
   ml.on('sourcedata', onData as never);
   ml.on('error', onError as never);

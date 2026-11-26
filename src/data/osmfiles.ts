@@ -35,7 +35,7 @@ export function osmFiles(now = Date.now()): Promise<Record<string, string>> {
   return cached.files;
 }
 
-/** Full URL of the PMTiles file of a set (`cctv`, `blitzer`, `alpr`, `webcam`, `wind`, `resource`, `trees`, `roofs`). */
+/** Full URL of the PMTiles file of a set (`cctv`, `blitzer`, `alpr`, `webcam`, `wind`, `resource`, `trees`, `roofs`, `netz-region` …). */
 export const osmPmtilesUrl = (set: string): Promise<string> => osmFiles().then((files) => bucketUrl('osm', files[set] ?? `${set}.pmtiles`));
 
 /** For tests. */

@@ -8,7 +8,7 @@ const slash = (v: string | undefined, fallback: string) => {
 export const BASE = {
   live: slash(env.VITE_LIVE_BASE, 'https://orbis-live.maltee.dev/'), // minute snapshots (quakes, GDACS, FIRMS, TLE …)
   data: slash(env.VITE_DATA_BASE, 'https://orbis-data.maltee.dev/'), // daily/weekly (volcanoes, plants, cables, cams, radio …)
-  osm: slash(env.VITE_OSM_BASE, 'https://orbis-osm.maltee.dev/'), // PMTiles (cctv, blitzer, alpr, webcam, wind, resource) + heat/
+  osm: slash(env.VITE_OSM_BASE, 'https://orbis-osm.maltee.dev/'), // PMTiles (cctv, blitzer, alpr, webcam, wind, resource, netz-* …) + heat/
   wetter: slash(env.VITE_WETTER_BASE, 'https://orbis-wetter.maltee.dev/'), // ICON fields (OWX), v1/latest.json
   assets: slash(env.VITE_ASSETS_BASE, 'https://orbis-assets.maltee.dev/'),
 } as const;
