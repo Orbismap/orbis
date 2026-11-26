@@ -119,10 +119,13 @@ export function createPicking(ml: MlMap, onMiss: (at: { lng: number; lat: number
     }
     const { feature, entry } = hit;
     const p = feature.properties as Record<string, unknown> | null;
-    if (p?.cluster && typeof p.cluster_id === 'number') {
-      const src = ml.getSource(feature.source) as GeoJSONSource | undefined;
+    if (p?.cluster === true) {
       const c = feature.geometry.type === 'Point' ? (feature.geometry.coordinates as [number, number]) : undefined;
-      void src?.getClusterExpansionZoom(p.cluster_id).then((zoom) => c && ml.easeTo({ center: c, zoom: zoom + 0.5, duration: 500 }));
+      const zoomTo = (zoom: number) => c && ml.easeTo({ center: c, zoom, duration: 500 });
+      if (typeof p.cluster_id === 'number') {
+        const src = ml.getSource(feature.source) as GeoJSONSource | undefined;
+        void src?.getClusterExpansionZoom(p.cluster_id).then((zoom) => zoomTo(zoom + 0.5));
+      } else zoomTo(ml.getZoom() + 2); // precomputed clusters of vector tiles carry no expansion zoom
       return;
     }
     onMiss(null);

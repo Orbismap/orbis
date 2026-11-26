@@ -106,19 +106,41 @@ export function pointSpecs(id: string, source: string, sourceLayer: string | und
 export const ringFilter = (idKey: string, id: unknown): FilterSpecification =>
   ['==', ['get', idKey], id === null || id === undefined ? '\u0000' : (id as string | number)] as FilterSpecification;
 
-export const clusterSpecs = (id: string, source: string, minzoom?: number): LayerSpecification[] => [
-  {
-    id: `${id}-cluster`, type: 'circle', source, filter: ['has', 'point_count'], ...(minzoom !== undefined ? { minzoom } : {}),
-    paint: {
-      'circle-color': 'rgba(36, 48, 68, 0.92)',
-      'circle-radius': ['step', ['get', 'point_count'], 14, 25, 17, 100, 21, 750, 26],
-      'circle-stroke-color': LIMB,
-      'circle-stroke-width': 1.5,
+/** `n` as "850", "1,2k", "12k" */
+const shortCount = (n: unknown[]): unknown[] => {
+  const thousands = (digits: number) => ['concat', ['number-format', ['/', n, 1000], { locale: 'de-DE', 'max-fraction-digits': digits }], 'k'];
+  return ['case', ['<', n, 1000], ['to-string', n], ['<', n, 10_000], thousands(1), thousands(0)];
+};
+
+/**
+ * What depends on the property that counts a cluster's points: MapLibre's own `point_count` (GeoJSON sources), or a counter of
+ * precomputed clusters in vector tiles (features without it are no cluster for this count).
+ */
+export const clusterCount = (key = 'point_count') => ({
+  filter: ['has', key] as FilterSpecification,
+  radius: ['step', ['get', key], 14, 25, 17, 100, 21, 750, 26] as unknown as ExpressionSpecification,
+  text: (key === 'point_count' ? ['get', 'point_count_abbreviated'] : shortCount(['get', key])) as unknown as ExpressionSpecification,
+});
+
+export const clusterSpecs = (
+  id: string, source: string, minzoom?: number,
+  /** clusters from a vector tile layer: its name, the counting property and the zoom from which they disappear */
+  tiles?: { sourceLayer: string; count: string; maxzoom: number },
+): LayerSpecification[] => {
+  const count = clusterCount(tiles?.count);
+  const common = {
+    source, filter: count.filter, ...(minzoom !== undefined ? { minzoom } : {}),
+    ...(tiles ? { 'source-layer': tiles.sourceLayer, maxzoom: tiles.maxzoom } : {}),
+  };
+  return [
+    {
+      id: `${id}-cluster`, type: 'circle', ...common,
+      paint: { 'circle-color': 'rgba(36, 48, 68, 0.92)', 'circle-radius': count.radius, 'circle-stroke-color': LIMB, 'circle-stroke-width': 1.5 },
     },
-  },
-  {
-    id: `${id}-cluster-count`, type: 'symbol', source, filter: ['has', 'point_count'], ...(minzoom !== undefined ? { minzoom } : {}),
-    layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Regular'], 'text-size': 12, 'text-allow-overlap': true },
-    paint: { 'text-color': '#EDF1F6' },
-  },
-];
+    {
+      id: `${id}-cluster-count`, type: 'symbol', ...common,
+      layout: { 'text-field': count.text, 'text-font': ['Noto Sans Regular'], 'text-size': 12, 'text-allow-overlap': true },
+      paint: { 'text-color': '#EDF1F6' },
+    },
+  ] as LayerSpecification[];
+};

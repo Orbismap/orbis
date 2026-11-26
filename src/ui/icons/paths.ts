@@ -4,7 +4,7 @@
 import type { IconName } from './names';
 
 /** Icons the UI needs in addition to the names layers may reference. */
-export type UiIconName = IconName | 'chevron-left' | 'chevron-up' | 'compass' | 'copy' | 'pencil' | 'plus-square' | 'panel-left' | 'more' | 'keyboard' | 'link' | 'north' | 'key' | 'boost' | 'route' | 'bookmark' | 'walk' | 'bike' | 'swap' | 'filter' | 'gear' | 'expand' | 'collapse' | 'distance';
+export type UiIconName = IconName | 'chevron-left' | 'chevron-up' | 'compass' | 'copy' | 'pencil' | 'plus-square' | 'panel-left' | 'more' | 'keyboard' | 'link' | 'north' | 'key' | 'boost' | 'route' | 'bookmark' | 'walk' | 'swap' | 'filter' | 'gear' | 'expand' | 'collapse' | 'distance';
 
 const cloud = (y: number) => `M5.5 ${y}a3.25 3.25 0 0 1-.3-6.49 4.75 4.75 0 0 1 9.2-.6 3.55 3.55 0 0 1 .1 7.09z`;
 

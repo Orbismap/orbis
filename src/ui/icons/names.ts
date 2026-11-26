@@ -5,4 +5,4 @@ export type IconName =
   | 'anchor' | 'power' | 'turbine' | 'sun' | 'cable' | 'server' | 'mine' | 'camera' | 'radio' | 'leaf' | 'mountain'
   | 'drop' | 'globe' | 'map' | 'layers' | 'pin' | 'search' | 'settings' | 'sliders' | 'locate' | 'navigate' | 'plus' | 'minus' | 'close'
   | 'chevron-down' | 'chevron-right' | 'eye' | 'eye-off' | 'grip' | 'play' | 'pause' | 'clock' | 'info' | 'external'
-  | 'share' | 'reset' | 'trash' | 'check' | 'people' | 'vote' | 'radiation' | 'aurora' | 'buoy' | 'fish' | 'ice' | 'moon' | 'building';
+  | 'share' | 'reset' | 'trash' | 'check' | 'people' | 'vote' | 'radiation' | 'aurora' | 'buoy' | 'fish' | 'ice' | 'moon' | 'building' | 'bike';
