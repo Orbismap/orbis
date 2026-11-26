@@ -38,14 +38,27 @@ export const landmarkMask = signal<LandmarkMask>(EMPTY_MASK);
 export const FOOTPRINTS_URL = 'https://cdn.jsdelivr.net/gh/alexwohlbruck/landmarks@a5945afdc50d14bb02bae0c41f42afa3c7451063/web/replacement-footprints.json';
 let footprints: Promise<Record<string, MultiPolygon>> | undefined;
 export function loadFootprints(): Promise<Record<string, MultiPolygon>> {
-  footprints ??= fetch(FOOTPRINTS_URL).then((r) => r.json()).then((j: { assets?: Record<string, MultiPolygon> }) => j.assets ?? {});
+  footprints ??= getJson<{ assets?: Record<string, MultiPolygon> }>(FOOTPRINTS_URL).then((j) => j.assets ?? {});
   footprints.catch(() => { footprints = undefined; });
   return footprints;
 }
 
 export interface Catalogue {
+  /** the release the catalogue belongs to: its files vanish when a newer release replaces it */
+  release: string;
   template: string;
   occupied: ReadonlySet<string>;
+}
+
+class HttpError extends Error {
+  constructor(readonly status: number, url: string) { super(`landmarks: ${status} ${url}`); }
+}
+
+/** JSON of a URL; a non-2xx answer (404 page, 503 of the CDN) is an error, not something to parse. */
+async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const r = await fetch(url, init);
+  if (!r.ok) throw new HttpError(r.status, url);
+  return (await r.json()) as T;
 }
 
 interface RawOsm { type?: string; id?: number }
@@ -131,29 +144,55 @@ export function tilesInView(cat: Catalogue, west: number, south: number, east: n
 }
 
 let catalogue: Promise<Catalogue> | undefined;
+let current: Catalogue | undefined;
 /** The release catalogue, once (a few kB). A failure is not remembered, the next call tries again. */
 export function loadCatalogue(): Promise<Catalogue> {
   catalogue ??= (async () => {
-    const latest = (await (await fetch(`${LANDMARKS_BASE}/api/v1/latest.json`)).json()) as { catalogue?: string };
+    // `no-cache`: always ask whether `latest` moved on, a stale pointer leads to files of a release that is gone
+    const latest = await getJson<{ catalogue?: string; release?: string }>(`${LANDMARKS_BASE}/api/v1/latest.json`, { cache: 'no-cache' });
     if (!latest.catalogue) throw new Error('landmarks: no catalogue');
-    const cat = (await (await fetch(LANDMARKS_BASE + latest.catalogue)).json()) as { index?: { template?: string; occupied?: string[] } };
+    const cat = await getJson<{ release?: string; index?: { template?: string; occupied?: string[] } }>(LANDMARKS_BASE + latest.catalogue);
     if (!cat.index?.template || !Array.isArray(cat.index.occupied)) throw new Error('landmarks: no index');
-    return { template: cat.index.template, occupied: new Set(cat.index.occupied) };
+    return (current = { release: cat.release ?? latest.release ?? latest.catalogue, template: cat.index.template, occupied: new Set(cat.index.occupied) });
   })();
   catalogue.catch(() => { catalogue = undefined; });
   return catalogue;
 }
 
+let refreshing: Promise<Catalogue> | undefined;
+/** After a 404 of a release's file: fetch `latest` again (once for all callers); resolves to the newer catalogue, or the same release if none. */
+function refreshCatalogue(stale: Catalogue): Promise<Catalogue> {
+  if (current && current.release !== stale.release) return Promise.resolve(current);
+  refreshing ??= (() => { catalogue = undefined; return loadCatalogue(); })().finally(() => { refreshing = undefined; });
+  return refreshing;
+}
+
 const tiles = new Map<string, Promise<LandmarkSample[]>>();
+const tileUrl = (cat: Catalogue, key: string) => {
+  const [x, y] = key.split('/');
+  return LANDMARKS_BASE + cat.template.replace('{x}', x!).replace('{y}', y!);
+};
+
+async function fetchTile(cat: Catalogue, key: string): Promise<LandmarkSample[]> {
+  try {
+    return parseLandmarks(await getJson(tileUrl(cat, key)));
+  } catch (e) {
+    if (!(e instanceof HttpError) || e.status !== 404) throw e;
+    // the release this session started with was replaced: go on with the new one (its tile, if it has one)
+    const fresh = await refreshCatalogue(cat);
+    if (fresh.release === cat.release || !fresh.occupied.has(key)) return [];
+    return parseLandmarks(await getJson(tileUrl(fresh, key)));
+  }
+}
+
 /** The landmarks of one index tile (`x/y`); cached, failed tiles are asked again next time. */
 export function loadTile(cat: Catalogue, key: string): Promise<LandmarkSample[]> {
-  let hit = tiles.get(key);
+  const id = `${cat.release}/${key}`;
+  let hit = tiles.get(id);
   if (!hit) {
-    const [x, y] = key.split('/');
-    const url = LANDMARKS_BASE + cat.template.replace('{x}', x!).replace('{y}', y!);
-    hit = fetch(url).then((r) => r.json()).then((j) => parseLandmarks(j));
-    hit.catch(() => tiles.delete(key));
-    tiles.set(key, hit);
+    hit = fetchTile(cat, key);
+    hit.catch(() => tiles.delete(id));
+    tiles.set(id, hit);
   }
   return hit;
 }
