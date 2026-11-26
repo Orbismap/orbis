@@ -6,6 +6,7 @@ import type { ModeGroup } from '../data/types';
 import { favorites } from '../state/places';
 import { boardStop, push } from '../state/nav';
 import { useDepartures, useNow } from '../state/hooks';
+import { useScene } from '../ui/scene';
 
 const FILTERS: { id: string; label: string; modes: ModeGroup[] }[] = [
   { id: 'all', label: 'Alle', modes: [] },
@@ -21,6 +22,7 @@ export function Board() {
   const [filter, setFilter] = useState('all');
   const now = useNow(15_000);
   const { list, loading, error, updated } = useDepartures(stop, 40);
+  useScene(stop ? { center: [stop.lng, stop.lat], zoom: 15, markers: [{ id: stop.id, lng: stop.lng, lat: stop.lat, kind: 'selected' }] } : {});
 
   if (!stop) {
     return (

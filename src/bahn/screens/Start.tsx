@@ -1,8 +1,9 @@
+import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { haversine } from '@/core/geo';
 import { Icon } from '../ui/icons';
 import { MapSheet } from '../ui/MapSheet';
-import { NetMap } from '../ui/NetMap';
+import { useScene, type Scene } from '../ui/scene';
 import { DepartureRow } from '../ui/Departures';
 import { distance } from '../ui/format';
 import { MODE_GROUPS } from '../data';
@@ -16,6 +17,8 @@ import { useAsync, useDepartures, useNow } from '../state/hooks';
 /** Start: Karte (nur mit bekanntem Standort), Von/Nach, Zeit und Filter, darunter Abfahrten in der Nähe. */
 export function Start() {
   const o = origin.value;
+  const mine: [number, number] | null = position.value && !from.value ? [position.value.lng, position.value.lat] : null;
+  const scene = o ? { center: [o.lng, o.lat] as [number, number], zoom: 15, me: mine, markers: from.value ? [{ id: 'from', lng: o.lng, lat: o.lat, kind: 'start' as const }] : [], interactive: true } : {};
   const content = (
     <>
       <RouteCard />
@@ -26,27 +29,24 @@ export function Start() {
     </>
   );
 
-  if (!o) {
-    return (
-      <div class="bn-start">
-        <div class="bn-sheet">
-          <h1 class="bn-title">Bus &amp; Bahn</h1>
-          {content}
-        </div>
-      </div>
-    );
-  }
+  if (!o) return <NoLocationStart scene={scene}>{content}</NoLocationStart>;
   return (
-    <MapSheet
-      map={
-        <>
-          <NetMap center={[o.lng, o.lat]} zoom={15} me={position.value && !from.value ? [position.value.lng, position.value.lat] : null} markers={from.value ? [{ id: 'from', lng: o.lng, lat: o.lat, kind: 'start' }] : []} />
-          <div class="bn-brand">Bus &amp; Bahn</div>
-        </>
-      }
-    >
+    <MapSheet scene={scene} overlay={<div class="bn-brand">Bus &amp; Bahn</div>}>
       {content}
     </MapSheet>
+  );
+}
+
+/** Ohne Standort gibt es auf dem Handy keine Karte: Das Blatt reicht bis ganz nach oben. Auf dem Desktop zeigt die Karte Deutschland. */
+function NoLocationStart({ scene, children }: { scene: Scene; children: ComponentChildren }) {
+  useScene(scene);
+  return (
+    <div class="bn-start">
+      <div class="bn-sheet">
+        <h1 class="bn-title">Bus &amp; Bahn</h1>
+        {children}
+      </div>
+    </div>
   );
 }
 

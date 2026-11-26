@@ -42,6 +42,13 @@ für Züge und Busse.
 - Zurück-Taste und Wischgeste: jeder geöffnete Bildschirm ist ein Historieneintrag (`state/nav.ts`). Reiterwechsel erzeugen keine Einträge.
 - Noch nicht: Service Worker, Domain, Orbis-Ebenen, Hellmodus-Feinschliff.
 
+## Desktop (ab 960 px Breite)
+
+- Layout: Leiste links (Reiter, 88 px) | Panel (440 px) | Karte füllt den Rest. Darunter, bis 959 px, bleibt die Handy-Ansicht (ab 720 px auf 520 px begrenzt).
+- Eine einzige Karte neben dem Panel statt einer pro Bildschirm: Die Bildschirme melden ihre Szene (`ui/scene.ts`, `useScene`), die Karte fliegt sanft dorthin und bleibt beim Navigieren stehen. Auf dem Handy zeigt `MapSheet` weiter eine eigene Karte im ziehbaren Blatt.
+- Auch ohne Standort zeigt die Desktop-Karte Deutschland (das Panel allein wäre leer).
+- Verbindungsliste: Mit der Maus über eine Verbindung zeigt die Karte deren Strecke. Karten-Reiter: Haltestellen als Liste im Panel, Auswahl mit Abfahrten.
+
 ## Offen
 
 1. Umfang (Deutschland oder Europa). Quelle ist entschieden: Transitous plus DB-Worker.
