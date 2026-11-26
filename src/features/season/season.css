@@ -41,7 +41,7 @@
   }
   /* below the scale bar, left of the map controls */
   .hud-mobile .season-pos {
-    top: calc(env(safe-area-inset-top, 0px) + 56px);
+    top: calc(env(safe-area-inset-top, 0px) + 88px);
     left: 12px;
     right: calc(var(--rail-inset) + var(--rail-w) + 12px);
     transform: none;

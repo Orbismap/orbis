@@ -177,10 +177,11 @@
   .hud-mobile .attr-pos,
   .hud-mobile .maplegend-pos,
   .hud-mobile .scalebar-pos,
-  .hud-mobile .season-pos {
+  .hud-mobile .season-pos,
+  .hud-mobile .ohud-solo {
     transition: opacity var(--t-panel) var(--ease);
   }
-  .hud-mobile[data-detent='full'] :is(.rail-pos, .locate-pos, .attr-pos, .maplegend-pos, .scalebar-pos, .season-pos) {
+  .hud-mobile[data-detent='full'] :is(.rail-pos, .locate-pos, .attr-pos, .maplegend-pos, .scalebar-pos, .season-pos, .ohud-solo) {
     opacity: 0;
     pointer-events: none;
   }

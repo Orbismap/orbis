@@ -183,8 +183,9 @@ Eine Karte, **ein** Sheet, Bedienung in Daumenreichweite (wie Apple Karten).
 
 ```
 ┌───────────────────────┐
-│       Maßstab    [🌐] │  oben rechts: Grundkarte, 3D, Kompass, externe Karte
-│        Karte     [3D] │
+│ [Orbis Karten ▾] [🌐] │  oben links: Mini-Hub (App-Wechsler), darunter der Maßstab
+│ Maßstab          [3D] │  oben rechts: Grundkarte, 3D, Kompass, externe Karte
+│        Karte          │
 │ Legende          [➤]  │  Standort unten rechts, über dem Sheet
 │ ┌────────────────────┐ │
 │ │ ▬                  │ │  Sheet, drei Stufen:

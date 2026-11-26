@@ -15,8 +15,7 @@
 .bn-mapwrap { position: absolute; inset: 0; }
 .bn-map { width: 100%; height: 100%; background: #101a29; }
 .bn-map .maplibregl-ctrl-attrib { font-size: 10px; }
-.bn-main > .ohud-solo { left: 8px; top: 8px; z-index: 4; } /* unter dem Blatt, aufgeklappt darüber */
-.bn-main > .ohud-solo:has([data-switcher='open']) { z-index: 9; }
+.bn-main > .ohud-solo { top: 8px; z-index: 4; } /* unter dem Blatt; die Safe Area oben hält schon .bn-app frei */
 .bn-map-error { position: absolute; left: 16px; right: 16px; top: 104px; margin: 0; padding: 12px 14px; border-radius: var(--r-field); background: var(--ink-2); color: var(--alert); }
 .bn-me { width: 18px; height: 18px; border-radius: 50%; background: #72c8f0; border: 3px solid #fff; box-shadow: 0 0 0 9px rgba(114, 200, 240, 0.25), 0 1px 4px rgba(0, 0, 0, 0.5); }
 .bn-fab {

@@ -68,8 +68,11 @@
     left: var(--map-left, 0px);
     transition: left var(--t-panel) var(--ease);
   }
-  /* mobile: at the top edge, clear of the map controls at the right */
+  /* mobile: at the left, below the Orbis capsule (ui/hud) */
   .hud-mobile .scalebar-pos {
-    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    top: calc(env(safe-area-inset-top, 0px) + 56px);
+    left: 12px;
+    right: auto;
+    align-items: flex-start;
   }
 }

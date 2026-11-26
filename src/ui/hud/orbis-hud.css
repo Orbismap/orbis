@@ -126,8 +126,9 @@
 .ohud-pill .ohud-name { overflow: hidden; text-overflow: ellipsis; }
 .ohud-pill .ohud-chev { margin-left: -4px; }
 
-/* the switcher without a menu (OrbisSwitcher); the app positions the wrapper */
-.ohud-solo { --hud-mini-h: 40px; position: absolute; }
+/* the switcher without a menu (OrbisSwitcher): top left unless the app places the wrapper elsewhere; open, it lies above sheets */
+.ohud-solo { --hud-mini-h: 40px; position: absolute; top: calc(env(safe-area-inset-top, 0px) + 8px); left: calc(env(safe-area-inset-left, 0px) + 8px); }
+.ohud-solo:has(.ohud-mini[data-switcher='open']) { z-index: 30; }
 .ohud-solo > .ohud-mini { position: relative; top: auto; }
 .ohud-solo .ohud-mini-bar { padding-right: 12px; }
 

@@ -21,6 +21,7 @@ import { sheetDetent, leftTab } from '../state/ui';
 import { sheetCover } from '../state/view';
 import { hasTimeLayers } from '../state/time';
 import { feedEntries } from '../features/feed/Feed';
+import { OrbisSwitcher } from '../ui/hud/OrbisHud';
 import { Icon } from '../ui/icons/Icon';
 import { Sheet } from '../ui/Sheet';
 import { PageContent, PanelPage } from './SheetPage';
@@ -82,6 +83,7 @@ export function MobileLayout() {
 
   return (
     <div class="hud hud-mobile" data-detent={detent} data-behind-modal>
+      <OrbisSwitcher project="map" />
       <div class="rail-pos">
         <ToolRail popoverUp locate={false} />
       </div>
