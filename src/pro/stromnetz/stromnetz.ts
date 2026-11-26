@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Map as MlMap } from 'maplibre-gl';
 import type { PowerGridSample } from '../../ext/types';
 import type { GeoFrame } from '../world3d/frame';
+import { ViewGate, gateCamera } from '../world3d/gate';
 import { GeoInstances } from '../world3d/instances';
 import type { Stage, StagePart } from '../world3d/stage';
 import { towerGeometries, towerMaterial } from './models';
@@ -33,6 +34,7 @@ export class StromnetzPart implements StagePart {
   private active = false;
   private drawn = 0;
   private matrix = new THREE.Matrix4();
+  private gate = new ViewGate();
 
   constructor(private map: MlMap, private stage: Stage) {
     this.object.add(this.models.object, this.wires.object);
@@ -49,6 +51,7 @@ export class StromnetzPart implements StagePart {
     if (on === this.active) return;
     this.active = on;
     this.object.visible = on;
+    this.gate.reset();
     if (on) this.map.on('idle', this.onIdle);
     else {
       this.map.off('idle', this.onIdle);
@@ -62,6 +65,7 @@ export class StromnetzPart implements StagePart {
     this.network = buildNetwork(items);
     this.ground = this.network.towers.map((t) => this.terrainAt(t.lng, t.lat));
     this.buildWires();
+    this.gate.reset();
     this.stage.wake();
   }
 
@@ -85,6 +89,7 @@ export class StromnetzPart implements StagePart {
     });
     if (!changed) return;
     this.buildWires();
+    this.gate.reset();
     this.stage.wake();
   });
 
@@ -111,6 +116,14 @@ export class StromnetzPart implements StagePart {
 
   update(frame: GeoFrame): boolean {
     if (!this.active) return false;
+    if (this.gate.due(frame, gateCamera(this.map))) this.build(frame);
+    this.models.update(frame);
+    this.wires.update(frame);
+    return false;
+  }
+
+  /** The instances of the towers in sight. */
+  private build(frame: GeoFrame) {
     const b = this.map.getBounds();
     const centre = this.map.getCenter();
     const padLon = (b.getEast() - b.getWest()) * VIEW_MARGIN;
@@ -129,10 +142,7 @@ export class StromnetzPart implements StagePart {
       drawn++;
     }
     this.models.finish();
-    this.models.update(frame);
-    this.wires.update(frame);
     this.drawn = drawn;
-    return false;
   }
 
   dispose() {

@@ -5,9 +5,10 @@
 import type { ExpressionSpecification } from 'maplibre-gl';
 import { formatNumber } from '../../core/format';
 import { osmPmtilesUrl } from '../../data/osmfiles';
-import { LEAF_CYCLES, LEAF_TYPES, buildTreeSamples, type RawTree, type RawTreeLine } from '../../data/parsers/trees';
+import { LEAF_CYCLES, LEAF_TYPES, MAX_TREES, VIEW_MARGIN, buildTreeSamples, type RawTree, type RawTreeLine } from '../../data/parsers/trees';
 import { treesChannel } from '../../ext/channels';
 import type { AnyFeature } from '../../render/common';
+import { boxInside, type Box } from '../../map/view-reach';
 import { pmtilesLayer } from '../../render/pmtiles';
 import { defineLayer } from '../define';
 
@@ -93,17 +94,23 @@ export default defineLayer({
     const src = `${ctx.id}-src`;
     let published = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    /** new tiles since the last publish; and the ground that publish covered (unset where the cap cut it, so a move publishes again) */
+    let dirty = true;
+    let covered: Box | undefined;
 
     const scan = () => {
       timer = undefined;
       if (!ml.getSource(src) || !treesChannel.listening) return;
       if (ml.getZoom() < PUBLISH_ZOOM) {
-        if (published) { published = false; treesChannel.reset(); }
+        if (published) { published = false; dirty = true; treesChannel.reset(); }
         return;
       }
       // While tiles are loading the query sees few or no trees: publishing that would switch Pro's 3D trees off and the
       // 2D dots on for a moment (flicker). The source fires again when it has loaded, which scans again.
       if (!ml.isSourceLoaded(src)) return;
+      const b = ml.getBounds();
+      // nothing arrived and the view is still inside what the last publish covered: the same trees would come out
+      if (!dirty && covered && boxInside(covered, [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()])) return;
       const raw: RawTree[] = [];
       for (const f of ml.querySourceFeatures(src, { sourceLayer: 'trees' })) {
         const g = f.geometry;
@@ -118,19 +125,25 @@ export default defineLayer({
         const parts = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
         for (const coords of parts) lines.push({ coords: coords.map((c) => [c[0]!, c[1]!] as [number, number]), props: (f.properties ?? {}) as Record<string, unknown> });
       }
-      const b = ml.getBounds();
       const c = ml.getCenter();
       const samples = buildTreeSamples(raw, lines, { west: b.getWest(), east: b.getEast(), south: b.getSouth(), north: b.getNorth(), centreLng: c.lng, centreLat: c.lat });
       published = true;
+      dirty = false;
+      const padLon = (b.getEast() - b.getWest()) * VIEW_MARGIN, padLat = (b.getNorth() - b.getSouth()) * VIEW_MARGIN;
+      covered = samples.length < MAX_TREES ? [b.getWest() - padLon, b.getSouth() - padLat, b.getEast() + padLon, b.getNorth() + padLat] : undefined;
       treesChannel.publish(() => samples);
     };
     const schedule = () => {
       if (timer === undefined) timer = setTimeout(scan, SCAN_DELAY_MS);
     };
-    const onSource = (e: { sourceId?: string }) => { if (e.sourceId === src) schedule(); };
+    const onSource = (e: { sourceId?: string; sourceDataType?: string }) => {
+      if (e.sourceId !== src) return;
+      if (e.sourceDataType !== 'metadata') dirty = true;
+      schedule();
+    };
     ml.on('sourcedata', onSource as never);
     ml.on('moveend', schedule);
-    const stopWatching = treesChannel.onListener(schedule);
+    const stopWatching = treesChannel.onListener(() => { dirty = true; schedule(); });
     schedule();
 
     return {
