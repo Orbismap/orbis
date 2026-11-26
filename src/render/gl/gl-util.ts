@@ -74,15 +74,36 @@ export class ProgramCache {
   }
 }
 
-/** Sets the uniforms MapLibre's `projectTile` needs (see CustomRenderMethodInput.defaultProjectionData). */
-export function setProjectionUniforms(p: Program, args: RenderArgs): void {
+/** `m` times a shift by (x, y), column-major, in double precision: the matrix then takes positions relative to (x, y). */
+export function shiftedMatrix(m: ArrayLike<number>, x: number, y: number): Float64Array {
+  const out = Float64Array.from(m);
+  for (let i = 0; i < 4; i++) out[12 + i] = m[i]! * x + m[4 + i]! * y + m[12 + i]!;
+  return out;
+}
+
+/**
+ * Sets the uniforms MapLibre's `projectTile` needs (see CustomRenderMethodInput.defaultProjectionData). With `origin`
+ * (mercator), `projectTile` takes positions relative to it: close up, absolute mercator coordinates are too coarse for the
+ * 32-bit floats of the GPU, small offsets are not.
+ */
+export function setProjectionUniforms(p: Program, args: RenderArgs, origin?: readonly [number, number]): void {
   const gl = p.gl;
   const pd = args.defaultProjectionData;
-  gl.uniformMatrix4fv(p.u('u_projection_matrix'), false, pd.mainMatrix as unknown as Float32List);
-  gl.uniform4f(p.u('u_projection_tile_mercator_coords'), ...pd.tileMercatorCoords);
+  let main = pd.mainMatrix as unknown as Float32List;
+  let fallback = pd.fallbackMatrix as unknown as Float32List;
+  let tile: [number, number, number, number] = [...pd.tileMercatorCoords];
+  if (origin) {
+    const [x, y] = origin;
+    fallback = shiftedMatrix(pd.fallbackMatrix as ArrayLike<number>, x, y) as unknown as Float32List;
+    // on the globe the main matrix takes points of the sphere, which the shader works out from the tile coordinates
+    if (pd.projectionTransition === 0) main = shiftedMatrix(pd.mainMatrix as ArrayLike<number>, x, y) as unknown as Float32List;
+    tile = [tile[0] + tile[2] * x, tile[1] + tile[3] * y, tile[2], tile[3]];
+  }
+  gl.uniformMatrix4fv(p.u('u_projection_matrix'), false, main);
+  gl.uniform4f(p.u('u_projection_tile_mercator_coords'), ...tile);
   gl.uniform4f(p.u('u_projection_clipping_plane'), ...pd.clippingPlane);
   gl.uniform1f(p.u('u_projection_transition'), pd.projectionTransition);
-  gl.uniformMatrix4fv(p.u('u_projection_fallback_matrix'), false, pd.fallbackMatrix as unknown as Float32List);
+  gl.uniformMatrix4fv(p.u('u_projection_fallback_matrix'), false, fallback);
 }
 
 /**
