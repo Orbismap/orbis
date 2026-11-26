@@ -38,6 +38,8 @@ describe('point specs', () => {
   it('circle layers with zoom curve and hover scaling validate', () => {
     const s = pointSpecs('x', 't', undefined, { radius: zoomRadius, color: ['interpolate', ['linear'], ['-', 1000, ['get', 'time']], 0, '#fff', 100, '#000'] as never }, ['>=', ['get', 'mag'], 2], 'id');
     expect(validateStyleMin(withLayers([...clusterSpecs('x', 't'), s.main, s.ring])).map((e) => e.message)).toEqual([]);
+    const tiles = { version: 8, glyphs: 'https://x/{fontstack}/{range}.pbf', sources: { v: { type: 'vector', tiles: ['https://x/{z}/{x}/{y}'] } }, layers: clusterSpecs('y', 'v', undefined, { sourceLayer: 'c', count: 'ncp10', maxzoom: 10 }) };
+    expect(validateStyleMin(tiles as never).map((e) => e.message)).toEqual([]);
   });
   it('symbol layers validate', () => {
     const s = pointSpecs('y', 't', undefined, { radius: 8, color: '#f00', symbol: { icon: 'plane', size: 0.6, rotate: ['get', 'heading'] as never } }, undefined, 'id');

@@ -6,7 +6,7 @@ import type { FilterSpecification, LayerSpecification, SymbolLayerSpecification 
 import type { InspectCard, LayerContext, LayerHandle } from '../layers/types';
 import type { SlotId } from '../map/types';
 import { Cleanup, DARK_HALO, HOVER, LIMB, bindOpacity, idBase, isSignal, mapOutputs, type AnyFeature, type Expr, type NumOrExpr } from './common';
-import { hoverScale } from './pointstyle';
+import { clusterCount, clusterSpecs, hoverScale } from './pointstyle';
 
 export interface VtPart {
   /** Unique within the layer. */
@@ -50,6 +50,11 @@ export interface VectorTileOptions {
   name?: string;
   /** While `when` is true, these parts (with casing and selection) are hidden: an extension draws their objects in 3D. The data stays; what is hidden cannot be picked. */
   hideWhenPresented?: { when: ReadonlySignal<boolean>; parts: string[] };
+  /**
+   * Precomputed clusters for the low zooms (below `maxZoom`): points of `sourceLayer` with `cluster: true` and counters. `count`
+   * names the counter shown (e.g. one per filter combination). A click zooms in (map/picking.ts).
+   */
+  clusters?: { sourceLayer: string; count: ReadonlySignal<string>; maxZoom: number };
   /** Status note while no tile could be loaded. */
   errorNote?: string;
   describe(feature: AnyFeature, part: VtPart): InspectCard;
@@ -138,6 +143,24 @@ export function vectorTileLayer(ctx: LayerContext, o: VectorTileOptions): LayerH
     if (p.kind === 'text') continue;
     selLayers.set(p.id, sel);
     if (p.pick !== false) { pickIds.push(main); partOf.set(main, p); }
+  }
+  const clusters = o.clusters;
+  if (clusters) {
+    const [circle, label] = clusterSpecs(base, src, undefined, { sourceLayer: clusters.sourceLayer, count: clusters.count.peek(), maxzoom: clusters.maxZoom });
+    for (const spec of [circle!, label!]) {
+      engine.addLayer(spec, 'points');
+      layerIds.push(spec.id);
+    }
+    pickIds.push(circle!.id);
+    targets.push({ layer: circle!.id, prop: 'circle-opacity', base: 1 }, { layer: circle!.id, prop: 'circle-stroke-opacity', base: 1 }, { layer: label!.id, prop: 'text-opacity', base: 1 });
+    clean.add(effect(() => {
+      const c = clusterCount(clusters.count.value);
+      if (!ml.getLayer(circle!.id)) return;
+      ml.setFilter(circle!.id, c.filter);
+      ml.setFilter(label!.id, c.filter);
+      ml.setPaintProperty(circle!.id, 'circle-radius', c.radius);
+      ml.setLayoutProperty(label!.id, 'text-field', c.text);
+    }));
   }
   clean.add(bindOpacity(ctx, ml, targets));
 

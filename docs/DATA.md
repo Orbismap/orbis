@@ -8,7 +8,7 @@ Konfiguration in `src/data/endpoints.ts`, überschreibbar per `.env` (`.env.exam
 |---|---|---|---|
 | `live` | `orbis-live.maltee.dev` | Minuten-Snapshots: `events/usgs-2.5_week.geojson`, `events/emsc-europe.json`, GDACS, FIRMS, TLE … | ja |
 | `data` | `orbis-data.maltee.dev` | täglich/wöchentlich: Vulkane, Kraftwerke, Cams, Radio … | ja |
-| `osm` | `orbis-osm.maltee.dev` | PMTiles (`cctv`, `blitzer`, `alpr`, `webcam`, `wind`, `resource`) und `heat/` | ja |
+| `osm` | `orbis-osm.maltee.dev` | PMTiles (`cctv`, `blitzer`, `alpr`, `webcam`, `wind`, `resource`, `fahrradparken`) und `heat/` | ja |
 | `wetter` | `orbis-wetter.maltee.dev` | ICON-Felder im Format OWX, `v1/latest.json` | nein |
 | `assets` | `orbis-assets.maltee.dev` | statische Dateien | nein |
 

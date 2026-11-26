@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Anmeldung – Orbis Find</title>
+<style>html { background: #0a0f18; color: #f2f5f9; font-family: system-ui, sans-serif; } body { padding: 24px; }</style>
+</head>
+<body>
+<p>Zurück zu Orbis Find …</p>
+<script>
+  // OpenStreetMap sends the browser here after the sign-in: keep its answer and return to the app (src/find/state/osm.ts).
+  (function () {
+    var back = '/?mode=find';
+    try {
+      localStorage.setItem('find.osm.answer', location.search);
+      var kept = JSON.parse(localStorage.getItem('find.osm.pending') || '{}').back;
+      if (typeof kept === 'string' && /^\/(?![\/\\])/.test(kept)) back = kept;
+    } catch (e) { /* without storage the app asks to sign in again */ }
+    location.replace(back);
+  })();
+</script>
+</body>
+</html>

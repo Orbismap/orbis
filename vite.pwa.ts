@@ -8,7 +8,7 @@ import { precacheUrls } from './src/pwa/precache';
 const publicDir = fileURLToPath(new URL('./public', import.meta.url));
 const swSource = fileURLToPath(new URL('./src/pwa/sw.js', import.meta.url));
 /** The apps that work offline: `src/<app>/main.tsx`, their public files in `public/<app>/`. */
-const APPS = ['wetter', 'bahn'] as const;
+const APPS = ['wetter', 'bahn', 'find'] as const;
 const SHARED_PUBLIC = ['favicon.svg', 'apple-touch-icon.png'];
 
 const listPublic = (dir: string, prefix = ''): string[] =>
@@ -23,7 +23,7 @@ const isMapApp = (item: { type: string; moduleIds?: string[] } | undefined): boo
   item?.type === 'chunk' && !!item.moduleIds?.some((id) => id.replace(/\\/g, '/').endsWith('/src/boot.tsx'));
 
 /**
- * Offline shells of the weather and the Bahn PWA. The build is shared with the map, so each app precaches only what it needs:
+ * Offline shells of the small apps (weather, Bahn, Find). The build is shared with the map, so each app precaches only what it needs:
  * the entry chunk, its own chunk with everything it imports (plus CSS and worker assets), index.html and its public files.
  * Everything else of the map never reaches these caches.
  */

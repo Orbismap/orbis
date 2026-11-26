@@ -1,11 +1,10 @@
 // Speed cameras along the route shown in the planner: fixed ones from the OpenStreetMap set of the Blitzer layer
 // (blitzer.pmtiles, read directly at one zoom level) and reported mobile checks (Blitzer.de, same source as the layer).
-import { VectorTile } from '@mapbox/vector-tile';
-import { PbfReader } from 'pbf';
 import { PMTiles } from 'pmtiles';
 import { batch, effect, signal } from '@preact/signals';
 import type { FeatureCollection } from 'geojson';
 import { osmPmtilesUrl } from '../../data/osmfiles';
+import { readTilePoints, tileOf } from '../../data/tilePoints';
 import { proxied } from '../../data/endpoints';
 import { fetchRaw } from '../../data/http';
 import type { FixedCameraProps } from '../../layers/verkehr/blitzer-cards';
@@ -41,13 +40,6 @@ export function distanceToLine(p: P, line: readonly P[]): number {
   }
   return best;
 }
-
-const tileOf = (lng: number, lat: number, z: number): [number, number] => {
-  const n = 2 ** z;
-  const x = Math.floor(((lng + 180) / 360) * n);
-  const y = Math.floor(((1 - Math.asinh(Math.tan((lat * Math.PI) / 180)) / Math.PI) / 2) * n);
-  return [Math.min(n - 1, Math.max(0, x)), Math.min(n - 1, Math.max(0, y))];
-};
 
 /** Points along a line at most `step` degrees apart (the vertices included). */
 function* samples(line: readonly P[], step: number): Generator<P> {
@@ -97,16 +89,10 @@ async function fixedCameras(line: P[], signal: AbortSignal): Promise<RouteCamera
   if (tiles.length > MAX_TILES) throw new Error('Route zu lang');
   const found = new Map<string, RouteCamera>();
   await Promise.all(tiles.map(async ([x, y]) => {
-    const t = await pm.getZxy(z, x, y, signal);
-    if (!t) return;
-    const layer = new VectorTile(new PbfReader(new Uint8Array(t.data))).layers.blitzer;
-    for (let i = 0; layer && i < layer.length; i++) {
-      const f = layer.feature(i);
-      const g = f.toGeoJSON(x, y, z).geometry;
-      if (g.type !== 'Point') continue;
-      const c = g.coordinates as P;
+    for (const point of await readTilePoints(pm, 'blitzer', z, x, y, signal)) {
+      const c: P = [point.lng, point.lat];
       if (distanceToLine(c, line) > NEAR_M) continue;
-      const p = f.properties as FixedCameraProps;
+      const p = point.properties as unknown as FixedCameraProps;
       const id = `o${p.id ?? c.join(',')}`;
       const speed = p.speed && /^\d+$/.test(p.speed) ? Number(p.speed) : undefined;
       found.set(id, { id, lng: c[0], lat: c[1], kind: 'fixed', title: fixedCameraTitle(p.kind), ...(speed ? { speed } : {}), card: { ...fixedCameraCard(p), location: c } });

@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
 
 /** The Orbis apps. One build serves all of them; the hostname (or `?mode=`) decides which one boots, see `src/entry.ts`. */
-export type ProjectId = 'map' | 'wetter';
+export type ProjectId = 'map' | 'wetter' | 'find';
 
 export interface Project {
   id: ProjectId;
@@ -26,7 +26,15 @@ export const PROJECTS: readonly Project[] = [
     name: 'Wetter',
     icon: () => svg(<path d="M5.5 15.5a3.5 3.5 0 0 1-.4-6.98 4.5 4.5 0 0 1 8.7-.52A3.75 3.75 0 0 1 14 15.5z" />),
   },
+  {
+    id: 'find',
+    name: 'Find',
+    icon: () => svg(<path d="M16.5 3.5 3.5 9l5.5 2 2 5.5z" />),
+  },
 ];
+
+/** The subdomain of each app on the real hosts. */
+const HOSTS: Record<ProjectId, string> = { map: 'maps', wetter: 'wetter', find: 'find' };
 
 /** Address of another Orbis app: swaps the subdomain on the real hosts, uses `?mode=` everywhere else (local, previews). */
 export function projectUrl(id: ProjectId): string {
@@ -34,7 +42,8 @@ export function projectUrl(id: ProjectId): string {
   url.search = '';
   url.hash = '';
   const { hostname } = url;
-  if (/^(wetter|maps)\./.test(hostname)) url.hostname = hostname.replace(/^(wetter|maps)\./, id === 'wetter' ? 'wetter.' : 'maps.');
+  const own = new RegExp(`^(${Object.values(HOSTS).join('|')})\\.`);
+  if (own.test(hostname)) url.hostname = hostname.replace(own, `${HOSTS[id]}.`);
   else url.searchParams.set('mode', id);
   return url.toString();
 }

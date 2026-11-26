@@ -1,0 +1,155 @@
+/* Orbis Find: map above, guide below; side by side when the screen is wide. Same ground colours as the other Orbis apps. */
+:root[data-app='find'] {
+  color-scheme: dark;
+  --ink-0: #0a0f18;
+  --ink-2: #182132;
+  --ink-3: #243044;
+  --text-1: #f2f5f9;
+  --text-3: #9fb0c6;
+  --limb: #72c8f0;
+  --on-limb: #06121c;
+  /* places that are not the target (the map paints them in the same grey) */
+  --other: #8d98a8;
+  --ok: #58d0a0;
+  /* what the shared Orbis menu (ui/hud) needs, as in the weather app */
+  --text-2: #d0d8e5;
+  --g-panel: rgba(22, 26, 34, 0.82);
+  --g-fill: rgba(255, 255, 255, 0.06);
+  --g-fill-hover: rgba(255, 255, 255, 0.09);
+  --g-rim: rgba(255, 255, 255, 0.09);
+  --g-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  --g-pop: rgba(22, 26, 34, 0.97);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --hud-main-w: 240px;
+}
+:root[data-app='find'] .ohud { color: var(--text-1); }
+:root[data-app='find'] body {
+  margin: 0;
+  background: var(--ink-0);
+  color: var(--text-1);
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+.find { display: grid; grid-template-rows: 1fr 1fr; height: 100dvh; overflow: hidden; }
+
+.find-map { position: relative; min-height: 0; }
+.find-map-canvas { position: absolute; inset: 0; }
+.find-map .maplibregl-ctrl-bottom-left { left: env(safe-area-inset-left); }
+.find-map-failed { position: absolute; inset: 0; display: grid; place-content: center; padding: 24px; margin: 0; text-align: center; color: var(--text-3); }
+.find-corner { position: absolute; z-index: 2; right: max(12px, env(safe-area-inset-right)); bottom: 12px; display: flex; gap: 8px; }
+.find-pill { min-width: 56px; min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--ink-3); color: var(--text-1); font: inherit; font-weight: 700; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); cursor: pointer; }
+.find-me { width: 20px; height: 20px; border-radius: 50%; background: var(--limb); border: 3px solid #fff; box-sizing: border-box; box-shadow: 0 0 0 6px rgba(114, 200, 240, 0.25); }
+/* the cone of sight, pointing up before the marker is rotated */
+.find-me-facing::before { content: ''; position: absolute; left: 50%; bottom: 100%; translate: -50% 0; border: 12px solid transparent; border-bottom: 16px solid var(--limb); border-top: 0; margin-bottom: 4px; }
+
+/* the camera view in the place of the map */
+.find-camera { position: relative; min-height: 0; overflow: hidden; background: #000; }
+.find-camera video, .find-camera > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.find-camera video { object-fit: cover; }
+.find-camera > svg { pointer-events: none; }
+.find-turn { fill: var(--limb); stroke: #fff; stroke-width: 3; stroke-linejoin: round; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55)); }
+.find-turn-later { opacity: 0.55; }
+.find-mark { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--text-2); font: inherit; translate: -50% -50%; cursor: pointer; }
+.find-mark i { width: 14px; height: 14px; border-radius: 50%; background: var(--other); opacity: 0.65; }
+.find-mark span { padding: 1px 7px; border-radius: 999px; background: rgba(10, 15, 24, 0.5); font-size: 0.6875rem; font-weight: 650; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.find-mark-target { z-index: 1; color: #fff; }
+.find-mark-target i { width: 28px; height: 28px; border: 4px solid #fff; opacity: 1; background: var(--limb); box-shadow: 0 0 0 5px rgba(114, 200, 240, 0.45), 0 2px 8px rgba(0, 0, 0, 0.5); }
+.find-mark-target span { padding: 4px 12px; background: rgba(10, 15, 24, 0.85); font-size: 0.9375rem; font-weight: 700; }
+.find-aside { position: absolute; top: 50%; translate: 0 -50%; display: grid; place-items: center; width: 44px; height: 64px; background: rgba(10, 15, 24, 0.72); color: var(--limb); pointer-events: none; }
+.find-aside-left { left: 0; border-radius: 0 16px 16px 0; }
+.find-aside-right { right: 0; border-radius: 16px 0 0 16px; }
+.find-camera .find-say { position: absolute; left: 50%; bottom: 68px; translate: -50% 0; width: max-content; max-width: calc(100% - 32px); margin: 0; padding: 8px 16px; border-radius: 16px; background: rgba(10, 15, 24, 0.82); text-align: center; font-weight: 600; }
+
+.find-guide {
+  display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 6px; min-height: 0; overflow-y: auto;
+  padding: 12px max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  border-top: 1px solid var(--ink-3); text-align: center;
+}
+.find-guide p, .find-guide h1 { margin: 0; }
+.find-add > * { flex: none; }
+.find-arrow { width: min(46vw, 20dvh); height: min(46vw, 20dvh); flex: none; color: var(--limb); }
+.find-arrow path { transition: transform 200ms linear; }
+.find-arrived { color: var(--ok); }
+.find-distance { font-size: clamp(2rem, 7dvh, 3.5rem); font-weight: 750; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.find-name { font-size: 1.125rem; font-weight: 650; }
+.find-title { font-size: 1.5rem; font-weight: 750; }
+.find-text { color: var(--text-3); max-width: 32ch; }
+.find-hint { color: var(--text-3); font-size: 0.8125rem; max-width: 34ch; }
+.find-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.find-actions:empty { display: none; }
+.find-button { min-height: 48px; margin-top: 6px; padding: 0 24px; border: 0; border-radius: 999px; background: var(--limb); color: var(--on-limb); font: inherit; font-weight: 700; cursor: pointer; }
+.find-quiet { background: var(--ink-3); color: var(--text-1); }
+.find :focus-visible { outline: 2px solid var(--limb); outline-offset: 2px; }
+
+/* entering a new object: the pin stays in the middle of the map, its tip on the spot */
+.find-pill-add { display: grid; place-items: center; padding: 0; background: var(--limb); color: var(--on-limb); }
+.find-pin { position: absolute; left: 50%; top: 50%; translate: -50% -50px; fill: var(--limb); stroke: #fff; stroke-width: 3; pointer-events: none; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5)); }
+.find-pin circle { fill: #fff; stroke: none; }
+.find-add { justify-content: flex-start; gap: 10px; padding-bottom: 0; }
+.find-add .find-title { font-size: 1.25rem; }
+.find-test { padding: 4px 12px; border-radius: 999px; background: rgba(245, 158, 11, 0.18); color: #fbbf24; font-size: 0.75rem; font-weight: 700; }
+.find-warn { color: #fbbf24; }
+.find-field { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; max-width: 480px; margin: 0; padding: 0; border: 0; }
+.find-field legend { margin: 0 auto 6px; padding: 0; font-size: 0.8125rem; font-weight: 700; color: var(--text-3); }
+.find-pictures { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px 10px; width: 100%; }
+.find-pictures .find-tile { gap: 6px; font-size: 0.8125rem; line-height: 1.25; justify-content: flex-start; }
+.find-pictures .find-tile > svg { border-radius: 14px; }
+.find-chip { min-height: 44px; padding: 0 14px; border: 1px solid var(--ink-3); border-radius: 999px; background: var(--ink-2); color: var(--text-1); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+.find-chip[aria-pressed='true'] { border-color: var(--limb); background: var(--limb); color: var(--on-limb); }
+.find-field input { width: 96px; min-height: 44px; border: 1px solid var(--ink-3); border-radius: 14px; background: var(--ink-2); color: var(--text-1); font: inherit; font-size: 1.125rem; text-align: center; }
+/* the way to send it stays in reach while the fields scroll */
+.find-send { position: sticky; bottom: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; width: 100%; margin-top: auto; padding: 8px 0 max(12px, env(safe-area-inset-bottom)); background: var(--ink-0); }
+.find-send .find-hint { overflow-wrap: anywhere; }
+.find-button:disabled { opacity: 0.45; cursor: default; }
+.find-button svg { vertical-align: -2px; }
+.find-guide a { color: var(--limb); }
+
+.find-search {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; gap: 12px; background: var(--ink-0);
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.find-search-bar { display: flex; gap: 8px; align-items: center; width: 100%; max-width: 560px; margin: 0 auto; }
+.find-search-bar input { flex: 1; min-width: 0; height: 48px; padding: 0 16px; border: 1px solid var(--ink-3); border-radius: 14px; background: var(--ink-2); color: var(--text-1); font: inherit; font-size: 1rem; }
+.find-search-bar .find-button { margin-top: 0; padding: 0 16px; }
+.find-results { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; width: 100%; max-width: 560px; margin: 0 auto; }
+.find-result { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex: none; min-height: 56px; padding: 10px 14px; border: 0; border-radius: 14px; background: var(--ink-2); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+
+.find-menu { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; padding: 4px 8px 12px; text-align: left; }
+.find-menu h2 { margin: 12px 8px 4px; font-size: 12px; font-weight: 700; color: var(--text-3); }
+.find-row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 12px; background: none; color: var(--text-1); font: inherit; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
+.find-row svg { flex: none; }
+.find-row span { flex: 1; min-width: 0; }
+.find-row small { display: block; overflow: hidden; font-size: 12px; color: var(--text-3); white-space: nowrap; text-overflow: ellipsis; }
+.find-row[aria-pressed='true'] { background: var(--g-fill); }
+@media (hover: hover) { .find-row:hover { background: var(--g-fill-hover); } }
+.find-menu p { margin: 16px 10px 0; font-size: 12px; color: var(--text-3); }
+.find-menu a { color: inherit; }
+.find-menu :focus-visible, .ohud :focus-visible { outline: 2px solid var(--limb); outline-offset: 2px; }
+
+.find-catalog { position: fixed; inset: 0; z-index: 50; overflow-y: auto; overscroll-behavior: contain; background: var(--ink-0); }
+.find-catalog-body { box-sizing: border-box; max-width: 760px; margin: 0 auto; padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.find-catalog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.find-catalog h1 { margin: 0; font-size: 1.5rem; }
+.find-catalog h2 { margin: 24px 0 10px; font-size: 0.9375rem; color: var(--text-3); }
+.find-catalog ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px 12px; margin: 0; padding: 0; list-style: none; }
+.find-close { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 0; border-radius: 50%; background: var(--ink-2); color: var(--text-1); cursor: pointer; }
+.find-free { box-sizing: border-box; width: 100%; height: 48px; margin-top: 12px; padding: 0 16px; border: 1px solid var(--ink-3); border-radius: 14px; background: var(--ink-2); color: var(--text-1); font: inherit; font-size: 1rem; opacity: 0.7; }
+.find-tile { position: relative; display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 0; border: 0; background: none; color: var(--text-1); font: inherit; font-weight: 650; text-align: center; cursor: pointer; }
+.find-tile > svg { display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 18px; }
+.find-tile[aria-pressed='true'] > svg { box-shadow: 0 0 0 3px var(--ink-0), 0 0 0 6px var(--limb); }
+.find-tile[aria-disabled='true'] { cursor: default; }
+.find-tile[aria-disabled='true'] > svg { filter: saturate(0.55) brightness(0.8); }
+.find-tile small { position: absolute; top: 8px; right: 8px; padding: 2px 9px; border-radius: 999px; background: rgba(10, 15, 24, 0.82); font-size: 0.75rem; font-weight: 700; }
+.find-tile i { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--limb); color: var(--on-limb); }
+.find-catalog :focus-visible { outline: 2px solid var(--limb); outline-offset: 3px; }
+
+@media (orientation: landscape) {
+  .find { grid-template-rows: 1fr; grid-template-columns: 1fr 1fr; }
+  .find-guide { border-top: 0; border-left: 1px solid var(--ink-3); }
+  .find-arrow { width: min(22vw, 36dvh); height: min(22vw, 36dvh); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .find-arrow path { transition: none; }
+}

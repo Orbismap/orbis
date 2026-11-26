@@ -1,7 +1,7 @@
-/** Registers the offline service worker of the weather or the Bahn app – production build on the app's own origin only.
+/** Registers the offline service worker of one of the small apps – production build on the app's own origin only.
  *  All apps share one build; a service worker scoped to "/" on the map's origin would take it over. */
 
-export function registerServiceWorker(app: 'wetter' | 'bahn'): void {
+export function registerServiceWorker(app: 'wetter' | 'bahn' | 'find'): void {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
   if (!window.location.hostname.startsWith(`${app}.`)) return;
 

@@ -16,10 +16,16 @@
 /bahn/manifest.webmanifest
   Cache-Control: no-cache
 
+/find/manifest.webmanifest
+  Cache-Control: no-cache
+
 /wetter-sw.js
   Cache-Control: no-cache
 
 /bahn-sw.js
+  Cache-Control: no-cache
+
+/find-sw.js
   Cache-Control: no-cache
 
 /*
