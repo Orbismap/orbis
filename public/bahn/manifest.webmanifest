@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "Orbis Bahn",
+  "short_name": "Bus & Bahn",
+  "description": "Züge und Busse: Verbindungen, Abfahrten und Karte",
+  "lang": "de",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0f18",
+  "theme_color": "#0a0f18",
+  "icons": [
+    { "src": "/bahn/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

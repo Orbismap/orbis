@@ -1,0 +1,55 @@
+* { box-sizing: border-box; }
+
+:root[data-app='bahn'] body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--ink-0);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-ui);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+:root[data-app='bahn'] button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+:root[data-app='bahn'] input { font: inherit; color: inherit; }
+:root[data-app='bahn'] :focus-visible { outline: 2px solid var(--limb); outline-offset: 2px; }
+
+/* ---------- Badges ---------- */
+.bn-badge {
+  display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px 0 7px;
+  border-radius: 8px; font-size: 12.5px; font-weight: 750; letter-spacing: 0.01em; white-space: nowrap;
+  background: var(--m-fuss); color: #fff;
+}
+.bn-badge i { width: 1.5px; height: 15px; background: currentColor; opacity: 0.45; border-radius: 1px; }
+.bn-m-fern { background: #262d3b; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.28); }
+.bn-m-regio { background: #c9ccd3; color: #1a2030; }
+.bn-m-sbahn { background: var(--m-sbahn); }
+.bn-m-ubahn { background: var(--m-ubahn); }
+.bn-m-tram { background: var(--m-tram); color: #1a1204; }
+.bn-m-bus { background: var(--m-bus); }
+.bn-m-fernbus { background: var(--m-fernbus); }
+.bn-m-faehre { background: var(--m-faehre); color: #04202e; }
+.bn-m-fuss, .bn-m-sonst { background: var(--ink-3); color: var(--text-2); }
+
+/* ---------- Gleisschild ---------- */
+.bn-gl {
+  display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 7px;
+  background: var(--gl); color: #fff; font-size: 12px; font-weight: 750; white-space: nowrap;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.6); font-variant-numeric: tabular-nums;
+}
+.bn-gl-chg { background: var(--gl-chg); padding-left: 6px; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.5); }
+
+/* ---------- Zeit und Status ---------- */
+.bn-late { color: var(--alert); font-weight: 650; }
+.bn-ok { color: var(--ok); font-weight: 650; }
+.bn-warn { color: var(--warn); font-weight: 650; }
+.bn-small { font-size: var(--fs-small); color: var(--text-3); }
+
+.bn-pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px;
+  background: var(--ink-2); border: 1px solid var(--line); font-size: 12.5px; color: var(--text-2); white-space: nowrap;
+}
+.bn-pill[aria-pressed='true'], .bn-pill.on { background: var(--limb-quiet); border-color: rgba(114, 200, 240, 0.5); color: var(--limb); font-weight: 650; }
+.bn-icon { flex: none; }

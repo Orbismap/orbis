@@ -1,0 +1,70 @@
+/* Tokens der Bus-&-Bahn-App. Gleiche Grundwerte wie Orbis Wetter/Karte, damit die Apps zusammengehören. */
+@layer tokens {
+  :root[data-app='bahn'] {
+    color-scheme: dark;
+
+    --ink-0: #0a0f18;
+    --ink-1: #101724;
+    --ink-2: #182132;
+    --ink-3: #243044;
+    --line: #2a3649;
+
+    --text-1: #f2f5f9;
+    --text-2: #d0d8e5;
+    --text-3: #9fb0c6;
+
+    --limb: #72c8f0;
+    --limb-quiet: rgba(114, 200, 240, 0.16);
+    --alert: #ff6b5e;
+    --warn: #f2b45a;
+    --ok: #58d0a0;
+
+    /* Verkehrsmittel: Badges und Linien */
+    --m-fern: #e5484d;
+    --m-regio: #8b8fa3;
+    --m-sbahn: #2f9a6c;
+    --m-ubahn: #3f78e6;
+    --m-tram: #d8921f;
+    --m-bus: #9a55c4;
+    --m-fernbus: #8d6e63;
+    --m-faehre: #29b6f6;
+    --m-fuss: #8a93a8;
+
+    --gl: #14247a;
+    --gl-chg: #b3261e;
+
+    --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, 'Segoe UI', Roboto, sans-serif;
+    --fs-small: 0.75rem;
+    --fs-ui: 0.9375rem;
+    --fs-title: 1.0625rem;
+    --fs-big: 1.75rem;
+
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 24px;
+
+    --r-card: 18px;
+    --r-round: 999px;
+    --hit-touch: 44px;
+    --tabbar-h: 62px;
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root[data-app='bahn'] {
+      color-scheme: light;
+      --ink-0: #f4f6f9;
+      --ink-1: #ffffff;
+      --ink-2: #e9edf2;
+      --ink-3: #dde3ec;
+      --line: #cdd5e0;
+      --text-1: #0f1826;
+      --text-2: #2a3448;
+      --text-3: #4a566c;
+      --limb: #0a5f94;
+      --limb-quiet: rgba(11, 111, 168, 0.1);
+    }
+  }
+}
