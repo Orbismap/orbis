@@ -4,7 +4,7 @@
 import { computed, signal } from '@preact/signals';
 import { autoSpeed, phaseAt, shotAt } from '../replay/director';
 import { mixAt, SILENT } from '../replay/sound-mix';
-import { setMix, stopSound } from './replay-sound';
+import { setMix, stopSound, videoShown } from './replay-sound';
 import { findReplay } from '../replay/events';
 import type { ReplayEvent } from '../replay/types';
 import { clearSelection } from './selection';
@@ -68,7 +68,7 @@ function loop(now: number) {
   }
   for (const fn of [...listeners]) fn(replayT.peek(), dt);
   const t = replayT.peek();
-  setMix(replayPlaying.peek() ? mixAt(ev, t, shotAt(ev, t, replayFocus.peek()), replayEffectiveSpeed.peek()) : SILENT);
+  setMix(replayPlaying.peek() && !videoShown.peek() ? mixAt(ev, t, shotAt(ev, t, replayFocus.peek()), replayEffectiveSpeed.peek()) : SILENT);
 }
 
 /** Opens a replay (loads its data) and starts it from the beginning, or from `at` seconds. */
@@ -116,6 +116,7 @@ export function closeReplay(): void {
   cameraBefore = null;
   if (back) mapEngine.peek()?.flyTo({ center: [back.lng, back.lat], zoom: back.zoom, bearing: back.bearing, pitch: back.pitch, duration: 1500 });
   stopSound();
+  videoShown.value = false;
   replayLook.value = false;
   replayEvent.value = null;
   replayFocus.value = null;

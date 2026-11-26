@@ -6,6 +6,7 @@ import { FLIGHT_TESTS } from './events/starship-tests';
 import { buildFalconHeavyDemo } from './events/falcon-heavy-demo';
 import { buildTestFlight } from './events/test-flight';
 import { buildFlight, buildStarship15, PAD, returnMiss, T } from './events/starship15';
+import { needsSeek, parseYouTubeId, videoPlays, videoTimeAt } from './video';
 import { airFactor, distanceGain, mixAt, speedGain } from './sound-mix';
 import { orbitPosition, orbitThrough, periodOf } from './orbit';
 
@@ -327,5 +328,25 @@ describe('replay sound', () => {
     const v2 = shotAt(ev, coast);
     expect(mixAt(ev, coast, v2, 1).rumble).toBe(0);
     expect(mixAt(ev, t, null, 1).master).toBe(0);
+  });
+});
+
+describe('replay video sync', () => {
+  it('reads YouTube ids from links', () => {
+    expect(parseYouTubeId('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=5')).toBe('dQw4w9WgXcQ');
+    expect(parseYouTubeId('https://youtu.be/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    expect(parseYouTubeId('https://www.youtube.com/live/dQw4w9WgXcQ?feature=share')).toBe('dQw4w9WgXcQ');
+    expect(parseYouTubeId('dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    expect(parseYouTubeId('https://example.com/watch?v=dQw4w9WgXcQ')).toBeNull();
+    expect(parseYouTubeId('javascript:alert(1)')).toBeNull();
+  });
+  it('maps the replay clock to the video clock and decides when to jump or play', () => {
+    const v = { id: 'u-x', label: 'x', videoId: 'dQw4w9WgXcQ', offset: 1800 };
+    expect(videoTimeAt(v, 10)).toBe(1810);
+    expect(needsSeek(1810.5, v, 10)).toBe(false);
+    expect(needsSeek(1900, v, 10)).toBe(true);
+    expect(videoPlays(true, 1)).toBe(true);
+    expect(videoPlays(true, 60)).toBe(false);
+    expect(videoPlays(false, 1)).toBe(false);
   });
 });

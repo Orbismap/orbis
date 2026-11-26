@@ -9,7 +9,8 @@ import { Icon } from '../../ui/icons/Icon';
 import { MenuItem, Popover } from '../../ui/Popover';
 import type { ReplayEvent } from '../../replay/types';
 import { EngineStatus } from './EngineStatus';
-import { replaySound, setReplaySound } from '../../state/replay-sound';
+import { VideoPane } from './VideoPane';
+import { replaySound, setReplaySound, videoShown } from '../../state/replay-sound';
 import './replay.css';
 
 const nf = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
@@ -146,6 +147,7 @@ export function ReplayBar({ mobile }: { mobile?: boolean }) {
   return (
     <div class={`rp-wrap ${mobile ? 'is-mobile' : ''}`}>
     <EngineStatus />
+    <VideoPane />
     <section class="cap replay-bar" aria-label={`Wiederholung: ${ev.title}`}>
       <div class="rp-head">
         <div class="rp-titles">
@@ -171,6 +173,7 @@ export function ReplayBar({ mobile }: { mobile?: boolean }) {
         </div>
         <div class="rp-end">
           <IconButton icon={replaySound.value ? 'volume' : 'volume-off'} label={replaySound.value ? 'Ton ausschalten' : 'Ton einschalten'} variant="ghost" pressed={replaySound.value} onClick={() => setReplaySound(!replaySound.value)} />
+          <IconButton icon="video" label="Originalvideo" variant="ghost" pressed={videoShown.value} onClick={() => { videoShown.value = !videoShown.value; }} />
           <CameraMenu ev={ev} />
           <SourcesMenu ev={ev} />
         </div>

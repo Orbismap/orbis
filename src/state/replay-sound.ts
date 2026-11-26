@@ -8,6 +8,8 @@ import { SILENT, type SoundMix } from '../replay/sound-mix';
 const KEY = 'orbis.replay.sound';
 /** the viewer's choice (default: on) */
 export const replaySound = signal(getJSON<boolean>(KEY, 1, (r) => (typeof r === 'boolean' ? r : undefined), true));
+/** a synced video with its own sound is on screen: the made-up engine sound steps aside */
+export const videoShown = signal(false);
 export function setReplaySound(on: boolean): void {
   replaySound.value = on;
   setJSON(KEY, 1, on);

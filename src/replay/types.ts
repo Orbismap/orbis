@@ -2,6 +2,7 @@
 // actors that move along modelled tracks, phases with their own camera shot, and links to the real footage. Pure types,
 // no DOM, no three.js (the drawing lives in pro/replay, the camera director in director.ts).
 import type { LngLat } from '../core/geo';
+import type { ReplayVideo } from './video';
 
 /** Where an actor is at one instant. All angles in degrees. */
 export interface ActorSample {
@@ -116,6 +117,8 @@ export interface ReplayEvent {
   /** moments to jump to */
   markers: { t: number; label: string }[];
   links: EventLink[];
+  /** footage synced to the timeline (embeds of the originals, never copies); the viewer can add more */
+  videos?: ReplayVideo[];
   /** one or two sentences for the details page */
   summary: string;
   /** key facts for the details page */
