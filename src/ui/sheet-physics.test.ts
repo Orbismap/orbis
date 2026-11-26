@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claimsGesture, keyboardInset, snapIndex } from './sheet-physics';
+import { claimsGesture, dismisses, keyboardInset, snapIndex } from './sheet-physics';
 
 describe('claimsGesture', () => {
   it('raises the sheet on an upward swipe below the top detent, even at the top of the content', () => {
@@ -42,5 +42,18 @@ describe('snapIndex', () => {
     expect(snapIndex(points, 430, 0, 1)).toBe(1);
     expect(snapIndex(points, 420, 1200, 1)).toBe(2);
     expect(snapIndex(points, 380, -1200, 1)).toBe(0);
+  });
+});
+
+describe('dismisses', () => {
+  it('closes after a long pull or a short flick', () => {
+    expect(dismisses(140, 0)).toBe(true);
+    expect(dismisses(40, 900)).toBe(true);
+  });
+
+  it('stays after a short or a hesitant pull', () => {
+    expect(dismisses(60, 100)).toBe(false);
+    expect(dismisses(10, 900)).toBe(false);
+    expect(dismisses(60, -900)).toBe(false);
   });
 });

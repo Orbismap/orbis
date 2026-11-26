@@ -136,6 +136,22 @@
   padding: 4px 8px 4px 18px;
   background: var(--ink-1);
 }
+.popover.popover-sheet:focus {
+  outline: none;
+}
+/* grabber: the sheet can be pulled down */
+.popover-head::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 36px;
+  height: 5px;
+  margin-left: -18px;
+  border-radius: 3px;
+  background: var(--text-3);
+  opacity: 0.45;
+}
 .popover-title {
   min-width: 0;
   overflow: hidden;

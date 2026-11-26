@@ -10,6 +10,8 @@ import { Legend } from '../features/legend/Legend';
 import { startedWithMap as startedFromWetter } from '../map/adopt';
 import { ReturnFromWetter } from './ReturnFromWetter';
 import { ProbeCard } from '../features/probe/ProbeCard';
+import { RoutePanel } from '../features/routes/RoutePanel';
+import { SavedPlaces } from '../features/routes/SavedPlaces';
 import { Readout } from '../features/timeline/Transport';
 import { TimelineCompact } from '../features/timeline/Timeline';
 import { TopBar, ToolRail } from '../features/tools/Tools';
@@ -20,6 +22,7 @@ import { showView } from '../state/sheet-view';
 import { currentUrlState } from '../state/url-sync';
 import { searchOpen, sheetDetent, leftTab, leftView } from '../state/ui';
 import { hasTimeLayers } from '../state/time';
+import { orteView } from '../state/hud';
 import { detailPage } from '../features/layers-panel/themes-state';
 import { feedEntries } from '../features/feed/Feed';
 import { Icon } from '../ui/icons/Icon';
@@ -65,6 +68,8 @@ export function MobileLayout() {
   const view = leftView.value;
   const page = detailPage.value?.layerId;
 
+  const orte = orteView.value;
+
   // a selection opens a lowered sheet at half, and closing it lowers the sheet again
   const raised = useRef(false);
   useEffect(() => {
@@ -75,9 +80,16 @@ export function MobileLayout() {
       }
     } else if (raised.current) {
       raised.current = false;
-      if (sheetDetent.peek() === 'half') sheetDetent.value = 'peek';
+      // not when the route planner took the selection's place: lowering and raising at once would upset the history
+      if (!orteView.peek() && sheetDetent.peek() === 'half') sheetDetent.value = 'peek';
     }
   }, [sel, p]);
+  // the route planner and the saved places show at half height, the map stays in view
+  useEffect(() => {
+    if (!orte) return;
+    raised.current = false;
+    sheetDetent.value = 'half';
+  }, [orte]);
   // catalog and settings need room; they and a layer page take the place of a selection
   useEffect(() => {
     if (view === 'layers') return;
@@ -88,17 +100,18 @@ export function MobileLayout() {
   useEffect(() => {
     if (!page) return;
     raised.current = false;
+    orteView.value = null;
     clearSelection();
     if (sheetDetent.peek() === 'peek') sheetDetent.value = 'half';
   }, [page]);
   useEffect(() => startSheetHistory(() => serializeHash(currentUrlState())), []);
 
-  const list = !sel && !p;
+  const list = !sel && !p && !orte;
   const feed = list && view === 'layers' && leftTab.value === 'feed' && feedEntries.value.length > 0;
-  const scrollKey = sel ? `sel:${sel.layerId}:${sel.card.title}` : p ? 'probe' : view !== 'layers' ? view : page ? `page:${page}` : leftTab.value;
+  const scrollKey = sel ? `sel:${sel.layerId}:${sel.card.title}` : p ? 'probe' : orte ? orte : view !== 'layers' ? view : page ? `page:${page}` : leftTab.value;
 
   return (
-    <div class="hud hud-mobile" data-detent={detent}>
+    <div class="hud hud-mobile" data-detent={detent} data-behind-modal>
       <Header />
       <div class="rail-pos">
         <ToolRail popoverUp />
@@ -128,7 +141,7 @@ export function MobileLayout() {
         fill={list && (view === 'catalog' || feed)}
         peek={<PeekRow timed={timed} />}
       >
-        {sel ? <InspectorCard key={`${sel.layerId}:${sel.card.title}`} card={sel.card} layerId={sel.layerId} /> : p ? <ProbeCard /> : (
+        {sel ? <InspectorCard key={`${sel.layerId}:${sel.card.title}`} card={sel.card} layerId={sel.layerId} /> : p ? <ProbeCard /> : orte === 'routes' ? <RoutePanel /> : orte === 'places' ? <SavedPlaces /> : (
           <>
             {view === 'layers' && <KartenChangeRow />}
             <LeftBody />

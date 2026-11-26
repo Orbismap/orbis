@@ -76,7 +76,7 @@ export function SettingsView({ modal }: { modal?: boolean } = {}) {
         <div class="setgroup">
           <div class="set-row">
             <span class="set-label">Debug-Infos</span>
-            <Switch checked={s.debug} onChange={(v) => updateSettings({ debug: v })} />
+            <Switch aria-label="Debug-Infos" checked={s.debug} onChange={(v) => updateSettings({ debug: v })} />
           </div>
         </div>
       </section>

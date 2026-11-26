@@ -54,14 +54,14 @@
     --_fg: var(--alert);
   }
   .btn-destructive {
-    --_bg: var(--alert);
+    --_bg: var(--alert-fill);
     --_fg: #fff;
   }
   :root[data-theme='light'] .btn-destructive {
     --_fg: #fff;
   }
   .btn-destructive:active:not(:disabled) {
-    background: color-mix(in srgb, var(--alert) 85%, #000);
+    background: color-mix(in srgb, var(--alert-fill) 85%, #000);
   }
   @media (hover: hover) {
   @media (hover: hover) {
@@ -78,7 +78,7 @@
         background: color-mix(in srgb, var(--alert) 14%, transparent);
       }
       .btn-destructive:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--alert) 90%, #fff);
+        background: color-mix(in srgb, var(--alert-fill) 92%, #000);
       }
     }
   }

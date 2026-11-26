@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { cx, useLatest } from './hooks';
 import { ScrollArea } from './ScrollArea';
 import { claimsGesture, keyboardInset, rubber, settled, snapIndex, stepSpring } from './sheet-physics';
+import { atTop, OWN_GESTURE } from './touch';
 import './sheet.css';
 
 export type Detent = 'peek' | 'half' | 'full';
@@ -84,9 +85,6 @@ function useKeyboardInset() {
   }, []);
   return inset;
 }
-
-/** Touches that start here keep their own gesture and never move the sheet. */
-const OWN_GESTURE = '[data-nodrag], [role="slider"], .tband, input, select, textarea, .lrow-grip, .is-draggable';
 
 /**
  * Bottom sheet with three detents. Follows the finger, snaps by projected velocity, settles with a spring.
@@ -226,10 +224,6 @@ export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64,
     let x0 = 0;
     let y0 = 0;
     let mode: 'undecided' | 'sheet' | 'native' = 'native';
-    const atTop = (t: HTMLElement | null) => {
-      for (let n = t; n && n !== el; n = n.parentElement) if (n.scrollTop > 0) return false;
-      return true;
-    };
     const start = (e: TouchEvent) => {
       const t = e.target as HTMLElement;
       x0 = e.touches[0]!.clientX;
@@ -242,7 +236,7 @@ export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64,
       const y = e.touches[0]!.clientY;
       if (mode === 'undecided') {
         if (x === x0 && y === y0) return;
-        mode = e.cancelable && claimsGesture(latest.current.detent, x - x0, y - y0, atTop(e.target as HTMLElement)) ? 'sheet' : 'native';
+        mode = e.cancelable && claimsGesture(latest.current.detent, x - x0, y - y0, atTop(e.target as HTMLElement, el)) ? 'sheet' : 'native';
         if (mode === 'native') return;
       }
       if (e.cancelable) e.preventDefault();

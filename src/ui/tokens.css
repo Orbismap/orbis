@@ -25,6 +25,7 @@
     --boost: #b9a2fd; /* violet = Boost (own keys), reserved */
     --boost-soft: rgba(185, 162, 253, 0.14);
     --alert: #ff6b5e;
+    --alert-fill: #c6382c; /* filled buttons with white text, both themes */
     --ok: #58d0a0;
 
     /* material tiers */
