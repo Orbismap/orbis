@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { haversine } from '@/core/geo';
 import { Icon } from '../ui/icons';
+import { SavedNote } from '../ui/SavedNote';
 import { NetMap, type MapMarker } from '../ui/NetMap';
 import { isDesktop, useScene } from '../ui/scene';
 import { modeIcon } from '../ui/icons';
@@ -67,7 +68,7 @@ export function MapTab() {
 
 function StopCard({ stop, from, onClose, inline = false }: { stop: Stop; from: Stop | null; onClose: () => void; inline?: boolean }) {
   const now = useNow();
-  const { list } = useDepartures(stop, 6);
+  const { list, saved, updated } = useDepartures(stop, 6);
   return (
     <div class={`bn-stopcard ${inline ? 'bn-stopcard-inline' : ''}`}>
       <div class="bn-between">
@@ -75,6 +76,7 @@ function StopCard({ stop, from, onClose, inline = false }: { stop: Stop; from: S
         <button type="button" class="bn-iconbtn" aria-label="Schließen" onClick={onClose}><Icon name="close" size={18} /></button>
       </div>
       <div class="bn-small">{stop.area ?? 'Haltestelle'}{from ? ` · ${distance(haversine([from.lng, from.lat], [stop.lng, stop.lat]))}` : ''}</div>
+      {saved && updated && <SavedNote at={updated} now={now} />}
       {list.slice(0, 3).map((d, i) => <DepartureRow key={i} d={d} now={now} />)}
       <button type="button" class="bn-cta" onClick={() => openBoard(stop)}>Alle Abfahrten</button>
     </div>

@@ -1,10 +1,12 @@
 /** Orchestrates the sources and maps them into the view model the widgets already know. */
+import { formatAge } from '@/core/format';
 import { sample } from '../features/forecast/sample';
 import type { WeatherNow } from '../features/forecast/model';
 import { describe } from '../features/wmo/weather';
 import { loadIconSeries } from './icon';
 import { moonInfo } from './moon';
 import { loadOpenMeteoSeries, loadSupplements } from './openMeteo';
+import { readSnapshot, saveSnapshot } from './saved';
 import type { DailyInfo, PointSeries, SourceInfo, SunInfo, WeatherSupplements } from './types';
 
 export interface WeatherLocation {
@@ -244,7 +246,23 @@ function dailyFromSeries(series: PointSeries, location: WeatherLocation): DailyI
 /** ICON mirror in R2 may lag behind – Open-Meteo is the default, R2 only a freshness-checked fallback. */
 const MAX_ICON_AGE = 12 * 3_600_000;
 
+/** The saved forecast of a place, built for the time it is now; its source line says how old it is. */
+export function savedWeather(location: WeatherLocation, now = Date.now()): WeatherResult | undefined {
+  const kept = readSnapshot(location.lat, location.lng, now);
+  if (!kept) return undefined;
+  const { series, supplements } = kept.data;
+  return {
+    weather: buildWeather(series, supplements, location),
+    source: { label: 'Gespeichert', detail: `${formatAge(kept.at, now)} · ${series.label}` },
+  };
+}
+
+/**
+ * Live sources first, then the R2 mirror. What arrives is saved for the place; when neither answers (offline), the saved
+ * forecast is the result, and only a place never loaded shows the sample.
+ */
 export async function loadWeather(location: WeatherLocation, signal?: AbortSignal): Promise<WeatherResult> {
+  const kept = () => readSnapshot(location.lat, location.lng);
   let series: PointSeries | undefined;
   let source: SourceInfo = { label: 'Beispieldaten', detail: 'Live-Quellen nicht erreichbar' };
   try {
@@ -255,6 +273,8 @@ export async function loadWeather(location: WeatherLocation, signal?: AbortSigna
     try {
       const fallback = await loadIconSeries(location.lat, location.lng, { signal });
       if (Date.now() - fallback.issued > MAX_ICON_AGE) throw new Error('ICON-Lauf veraltet');
+      // offline the mirror may answer from the browser cache: a saved forecast newer than its run is the better one
+      if ((kept()?.data.series.issued ?? 0) > fallback.issued) throw new Error('gespeicherte Vorhersage ist neuer');
       series = fallback;
       source = { label: fallback.label, detail: fallback.detail };
     } catch (fallbackError) {
@@ -262,17 +282,27 @@ export async function loadWeather(location: WeatherLocation, signal?: AbortSigna
     }
   }
 
-  let supplements: WeatherSupplements = {};
-  if (series) {
-    try {
-      supplements = await loadSupplements(location.lat, location.lng, { signal });
-    } catch (error) {
-      if (signal?.aborted) throw error;
-    }
+  if (!series) {
+    return savedWeather(location)
+      ?? { weather: { ...sample, place: { name: location.name, eyebrow: location.eyebrow, lat: location.lat, lng: location.lng } }, source };
   }
 
-  const weather = series
-    ? buildWeather(series, supplements, location)
-    : { ...sample, place: { name: location.name, eyebrow: location.eyebrow, lat: location.lat, lng: location.lng } };
-  return { weather, source };
+  let fresh: WeatherSupplements = {};
+  try {
+    fresh = await loadSupplements(location.lat, location.lng, { signal });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+  }
+  // what did not arrive this time stays as last known (not the visibility: it belongs to the hours of its own forecast)
+  const { daily, sun, aqi, warning } = kept()?.data.supplements ?? {};
+  const supplements: WeatherSupplements = {
+    ...fresh,
+    daily: fresh.daily ?? daily,
+    sun: fresh.sun ?? sun,
+    aqi: fresh.aqi ?? aqi,
+    warning: fresh.warning ?? warning,
+  };
+  saveSnapshot(location.lat, location.lng, { series, supplements });
+
+  return { weather: buildWeather(series, supplements, location), source };
 }

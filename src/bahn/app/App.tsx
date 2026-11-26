@@ -1,4 +1,5 @@
 import { useEffect } from 'preact/hooks';
+import { online } from '@/core/online';
 import { Icon, type IconName } from '../ui/icons';
 import { NetMap } from '../ui/NetMap';
 import { isDesktop, scene } from '../ui/scene';
@@ -42,6 +43,7 @@ export function App() {
           <NetMap center={sc.center ?? [10.4, 51.1]} zoom={sc.zoom ?? (sc.center ? 15 : 5.2)} me={sc.me} markers={sc.markers} routes={sc.routes} fit={sc.fit} onMarker={sc.onMarker} animate />
         </div>
       )}
+      {!online.value && <div class="bn-offline" role="status">Offline · gespeicherte Daten</div>}
       <nav class="bn-tabs" aria-label="Hauptnavigation">
         <img class="bn-rail-logo" src="./bahn/favicon.svg" alt="Bus &amp; Bahn" width="40" height="40" />
         {TABS.map((t) => (

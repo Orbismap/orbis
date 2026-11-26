@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { lastKnown } from '@/core/lastKnown';
+import { online } from '@/core/online';
 import { OrbisHud } from '../../ui/hud/OrbisHud';
 import { Dashboard } from '../dashboard/Dashboard';
 import { loadWarning } from '../data/openMeteo';
-import { loadWeather, type WeatherResult } from '../data/weather';
+import { loadWeather, savedWeather, type WeatherResult } from '../data/weather';
+import { saveWarning } from '../data/saved';
 import { WeatherProvider } from '../features/forecast/context';
 import { Hero } from '../features/forecast/Hero';
 import { sample } from '../features/forecast/sample';
@@ -15,9 +18,15 @@ const INITIAL: WeatherResult = {
   source: { label: 'Beispieldaten', detail: 'lädt …' },
 };
 
+const lastPlace = lastKnown<Place>('wetter:place', 1);
+const locationOf = (city: Place) => ({ name: city.name, eyebrow: city.region || city.country, lat: city.lat, lng: city.lng });
+/** Offline the app opens with the place looked at last: its forecast is the one most surely saved. */
+const startPlace = (): Place => (online.peek() ? DEFAULT_PLACE : lastPlace.get('last')?.data ?? DEFAULT_PLACE);
+
 export function App() {
-  const [city, setCity] = useState<Place>(DEFAULT_PLACE);
-  const [data, setData] = useState<WeatherResult>(INITIAL);
+  const [city, setCity] = useState<Place>(startPlace);
+  const [data, setData] = useState<WeatherResult>(() => savedWeather(locationOf(city)) ?? INITIAL);
+  const net = online.value;
   const [listOpen, setListOpen] = useState(false);
   const searchInput = useRef<HTMLInputElement>(null);
   const [focusSearch, setFocusSearch] = useState(false);
@@ -25,6 +34,7 @@ export function App() {
   // On phones the menu covers the screen – close it once a place was picked so the forecast is visible.
   const selectCity = (place: Place) => {
     setCity(place);
+    lastPlace.put('last', place);
     if (isMobileViewport()) setListOpen(false);
   };
 
@@ -64,7 +74,10 @@ export function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const location = { name: city.name, eyebrow: city.region || city.country, lat: city.lat, lng: city.lng };
+    const location = locationOf(city);
+    // the saved forecast at once, the fresh one replaces it
+    const saved = savedWeather(location);
+    if (saved) setData(saved);
     loadWeather(location, controller.signal)
       .then((result) => {
         if (controller.signal.aborted) return;
@@ -73,6 +86,7 @@ export function App() {
         loadWarning(location.lat, location.lng, { signal: controller.signal })
           .then((warning) => {
             if (controller.signal.aborted) return;
+            saveWarning(location.lat, location.lng, warning);
             setData((current) => ({
               ...current,
               weather: { ...current.weather, current: { ...current.weather.current, warning } },
@@ -83,12 +97,12 @@ export function App() {
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         setData({
-          weather: { ...sample, place: { name: city.name, eyebrow: city.region || city.country, lat: city.lat, lng: city.lng } },
+          weather: { ...sample, place: location },
           source: { label: 'Beispieldaten', detail: error instanceof Error ? error.message : 'Fehler' },
         });
       });
     return () => controller.abort();
-  }, [city]);
+  }, [city, net]);
 
   return (
     <WeatherProvider value={data.weather}>
