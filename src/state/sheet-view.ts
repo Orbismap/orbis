@@ -1,15 +1,16 @@
 import { batch } from '@preact/signals';
-import { orteView } from './hud';
-import { clearSelection } from './selection';
-import { isMobile, leftView, sheetDetent, type LeftView } from './ui';
+import { bringToFront, dismissAll } from './sheet-pages';
+import { isMobile, leftView, searchOpen, type LeftView } from './ui';
 
-/** Opens a view of the left panel; on phones also brings it to the front when the sheet is lowered or shows a selection. */
+/** Opens a view of the left panel; on phones it comes to the front of the sheet. */
 export function showView(view: LeftView): void {
+  const phone = isMobile.peek();
   batch(() => {
+    if (phone) {
+      searchOpen.value = false;
+      if (view === 'layers') dismissAll();
+    }
     leftView.value = view;
-    if (!isMobile.peek()) return;
-    orteView.value = null; // the planner would stay in front of the view
-    clearSelection();
-    sheetDetent.value = 'full';
   });
+  if (phone && view !== 'layers') bringToFront(view);
 }

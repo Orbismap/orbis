@@ -143,42 +143,16 @@
   }
 
   /* ---------- mobile ---------- */
-  .mhead {
-    position: absolute;
-    top: calc(env(safe-area-inset-top) + 8px);
-    left: 12px;
-    right: 12px;
-    display: flex;
-    gap: var(--s-2);
-    align-items: center;
-  }
-  .msearch {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--s-2);
-    height: var(--hit-touch);
-    padding: 0 var(--s-4);
-    border-radius: var(--r-round);
-    background: var(--panel-bg);
-    backdrop-filter: var(--panel-blur);
-    -webkit-backdrop-filter: var(--panel-blur);
-    border: var(--panel-border);
-    box-shadow: var(--shadow);
-    color: var(--text-2);
-    text-align: left;
-  }
-  .msearch span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  /* the map controls stay at the top right, clear of the sheet at every height; pinching zooms, so no zoom buttons */
+  /* map choice and 3D at the top right, clear of the sheet at every height; "my location" at the thumb, above the sheet */
   .hud-mobile .rail-pos {
     position: absolute;
     right: var(--rail-inset);
-    top: calc(env(safe-area-inset-top) + var(--hit-touch) + 20px);
+    top: calc(env(safe-area-inset-top) + 8px);
+  }
+  .hud-mobile .locate-pos {
+    position: absolute;
+    right: var(--rail-inset);
+    bottom: calc(var(--sheet-h, 128px) + 8px);
   }
   /* no zoom buttons to see, but VoiceOver and Switch Control still reach them; focused, they appear */
   .hud-mobile .rail-zoom:not(:focus-within) {
@@ -195,17 +169,18 @@
   /* mobile: above the attribution button, over the sheet */
   .hud-mobile .maplegend-pos {
     left: 12px;
-    right: 12px;
+    right: calc(var(--rail-inset) + var(--hit-touch) + 16px);
     bottom: calc(var(--sheet-h, 128px) + 44px);
   }
   .hud-mobile .rail-pos,
+  .hud-mobile .locate-pos,
   .hud-mobile .attr-pos,
   .hud-mobile .maplegend-pos,
   .hud-mobile .scalebar-pos,
   .hud-mobile .season-pos {
     transition: opacity var(--t-panel) var(--ease);
   }
-  .hud-mobile[data-detent='full'] :is(.rail-pos, .attr-pos, .maplegend-pos, .scalebar-pos, .season-pos) {
+  .hud-mobile[data-detent='full'] :is(.rail-pos, .locate-pos, .attr-pos, .maplegend-pos, .scalebar-pos, .season-pos) {
     opacity: 0;
     pointer-events: none;
   }

@@ -44,7 +44,7 @@ export function App() {
     <div class={startedWithMap ? 'app app--enter' : 'app'}>
       <MapView />
       {isMobile.value ? <MobileLayout /> : <DesktopLayout />}
-      {searchOpen.value && <Search />}
+      {searchOpen.value && !isMobile.value && <Search />}
       {shortcutsOpen.value && <Shortcuts />}
       <WarningDialog />
       <Toasts />

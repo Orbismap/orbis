@@ -53,6 +53,9 @@ export const viewport = signal<Viewport | undefined>(undefined);
 /** Area of the map covered by panels/sheet; the camera keeps targets inside the rest. */
 export const padding = signal<Padding>({ top: 0, right: 0, bottom: 0, left: 0 });
 
+/** px of the map that the phone sheet lies over when it rests (app/Mobile.tsx; 0 elsewhere). */
+export const sheetCover = signal(0);
+
 /** Moves the map from outside (URL, search, buttons). Engine applies it without echoing it back. */
 export function setCamera(patch: Partial<CameraState>): void {
   camera.value = { ...camera.value, ...patch };

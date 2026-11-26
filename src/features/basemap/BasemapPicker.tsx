@@ -16,13 +16,13 @@ const EDGE = 12;
  * Top rail button (icon shows the current projection) that opens the basemap popover: the modes in the first row, the maps of the
  * shown mode below, then the regional maps and the view switches. Applies to the active Karte.
  */
-export function BasemapPicker({ side = 'down' }: { side?: 'down' | 'left' }) {
+export function BasemapPicker({ side = 'down', locate = true }: { side?: 'down' | 'left'; /** The location button in the same capsule; phones have it on its own, above the sheet. */ locate?: boolean }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const globe = projection.value === 'globe';
   const pv = usePickerState(open);
-  // a locked map leads to the key field in the settings: on phones the action sheet would cover it
+  // a locked map leads to the key field in the settings: on phones the page of the picker would stay behind them
   const keyAsked = settingsKeyFocus.value;
   useEffect(() => {
     if (keyAsked && isMobile.peek()) setOpen(false);
@@ -52,12 +52,16 @@ export function BasemapPicker({ side = 'down' }: { side?: 'down' | 'left' }) {
         >
           <Icon name={globe ? 'globe' : 'map'} size={20} />
         </button>
-        <span class="rail-hair" aria-hidden="true" />
-        <button type="button" class="railbtn" aria-label="Zum eigenen Standort" onClick={goToMyLocation} {...tipProps('Mein Standort', undefined, 'left')}>
-          <Icon name="navigate" size={20} />
-        </button>
+        {locate && (
+          <>
+            <span class="rail-hair" aria-hidden="true" />
+            <button type="button" class="railbtn" aria-label="Zum eigenen Standort" onClick={goToMyLocation} {...tipProps('Mein Standort', undefined, 'left')}>
+              <Icon name="navigate" size={20} />
+            </button>
+          </>
+        )}
       </div>
-      <Popover open={open} onClose={close} align="end" class={cx('bm-pop', 'bm-left', side === 'left' && 'bm-up')} style={style} label="Grundkarte und Ansicht" anchorRef={wrap}>
+      <Popover page open={open} onClose={close} align="end" class={cx('bm-pop', 'bm-left', side === 'left' && 'bm-up')} style={style} label="Grundkarte und Ansicht" anchorRef={wrap}>
         {pv && <PickerBody pv={pv} />}
       </Popover>
     </div>

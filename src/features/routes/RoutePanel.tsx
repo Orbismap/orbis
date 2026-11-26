@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { orteView } from '../../state/hud';
+import { closeCard, sheetPages } from '../../state/sheet-pages';
+import { SheetBack } from '../shared/SheetNav';
 import { activeStop, addStop, clearRoute, coordStop, isRouteSaved, removeStop, routeChoice, backfillRoute, routeMode, routeState, routeView, saveCurrentRoute, savedPlaces, savedRoutes, setStop, stops, swapStops, type Stop } from '../../state/routes';
 import { isMobile, mapEngine } from '../../state/ui';
 import { Button, IconButton } from '../../ui/Button';
@@ -279,13 +281,15 @@ export function RoutePanel() {
   const anyStop = stops.value.some((s) => s);
   useEffect(() => void (anyStop && (routeView.value = 'plan')), [anyStop]);
   const planning = routeView.value === 'plan';
+  const below = isMobile.value && sheetPages.value.length > 1;
   return (
     <Panel as="section" class="hudd rt" aria-label="Routen">
       <header class="hudd-head">
-        {planning && <IconButton icon="chevron-left" label="Zurück zu den Routen" size={16} class="hud-rbtn" onClick={() => (clearRoute(), (routeView.value = 'list'))} />}
+        {/* phones: with a page below (the card the route started from) back leads there */}
+        {planning && !below ? <IconButton icon="chevron-left" label="Zurück zu den Routen" size={16} class="hud-rbtn" onClick={() => (clearRoute(), (routeView.value = 'list'))} /> : <SheetBack />}
         <h2>{planning ? 'Neue Route' : 'Routen'}</h2>
         <span class="hudd-btns">
-          <IconButton icon="close" label="Schließen" shortcut="Esc" class="hud-rbtn" onClick={() => (orteView.value = null)} />
+          <IconButton icon="close" label="Schließen" shortcut="Esc" class="hud-rbtn" onClick={() => closeCard(() => (orteView.value = null))} />
         </span>
       </header>
       <ScrollArea class="hudd-scroll">{planning ? <Planner /> : <SavedList />}</ScrollArea>

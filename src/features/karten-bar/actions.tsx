@@ -5,6 +5,7 @@ import { DEFAULT_KARTE_ID } from '../../karten/standard';
 import { createKarte, customKarten, deleteKarte, isBuiltin, listedKarten, saveAs, setKarteView, updateKarteMeta } from '../../karten/store';
 import type { Karte } from '../../karten/types';
 import { activeKarte, browsedKarte } from '../../state/session';
+import { isMobile } from '../../state/ui';
 import { camera } from '../../state/view';
 import { Button } from '../../ui/Button';
 import { cx } from '../../ui/hooks';
@@ -144,7 +145,7 @@ export function KartenPopover({ open, onClose, anchor, align = 'end', up, class:
   );
   const target = 'id' in view ? list.find((k) => k.id === view.id) : undefined;
   return (
-    <Popover open={open} onClose={close} align={align} up={up} label={only ? 'Kartenaktionen' : 'Alle Karten'} menu={view.kind === 'list' || view.kind === 'actions'} anchorRef={anchor} style={style} class={cx('kbar-all', cls)}>
+    <Popover open={open} onClose={close} align={align} up={up} label={only ? 'Kartenaktionen' : 'Alle Karten'} menu={view.kind === 'list' || view.kind === 'actions'} actions={view.kind === 'delete'} anchorRef={anchor} style={style} class={cx('kbar-all', cls)}>
       {view.kind === 'list' && (
         <>
           <div role="group" aria-label="Standardkarten">
@@ -253,7 +254,8 @@ export function KartenPopover({ open, onClose, anchor, align = 'end', up, class:
         <div class="nameform">
           <p class="kall-confirm">„{target.name}“ wirklich löschen?</p>
           <div class="nameform-actions">
-            <Button variant="ghost" onClick={() => setView({ kind: 'actions', id: target.id })}>
+            {/* phones: an action sheet, "Abbrechen" leaves it; elsewhere it leads back to the actions */}
+            <Button variant="ghost" onClick={() => (isMobile.peek() ? close() : setView({ kind: 'actions', id: target.id }))}>
               Abbrechen
             </Button>
             <Button variant="destructive" icon="trash" onClick={() => remove(target)}>

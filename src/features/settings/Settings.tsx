@@ -1,7 +1,8 @@
 import type { Settings as S } from '../../state/settings';
 import { settings, updateSettings } from '../../state/settings';
-import { leftView, shortcutsOpen } from '../../state/ui';
-import { Button, IconButton } from '../../ui/Button';
+import { shortcutsOpen } from '../../state/ui';
+import { Button } from '../../ui/Button';
+import { SheetBack, SheetClose } from '../shared/SheetNav';
 import { Segmented } from '../../ui/Segmented';
 import { Switch } from '../../ui/Switch';
 import { BoostSection } from '../boost/BoostSection';
@@ -26,8 +27,9 @@ export function SettingsView({ modal }: { modal?: boolean } = {}) {
   return (
     <div class="set">
       <div class={modal ? 'set-head set-head-modal' : 'set-head'}>
-        {!modal && <IconButton icon="chevron-left" label="Zurück zu den Ebenen" onClick={() => (leftView.value = 'layers')} />}
+        {!modal && <SheetBack always />}
         <h2>Einstellungen</h2>
+        {!modal && <SheetClose />}
       </div>
       <section class="set-sec" aria-labelledby="set-units">
         <h3 id="set-units">Einheiten</h3>

@@ -1,6 +1,8 @@
 import { orteView } from '../../state/hud';
 import { routeTo, savedPlaces } from '../../state/routes';
 import { selectPlace } from '../../state/selection';
+import { closeCard } from '../../state/sheet-pages';
+import { SheetBack } from '../shared/SheetNav';
 import { IconButton } from '../../ui/Button';
 import { Icon } from '../../ui/icons/Icon';
 import { Panel } from '../../ui/Panel';
@@ -14,9 +16,10 @@ export function SavedPlaces() {
   return (
     <Panel as="section" class="hudd rt" aria-label="Gespeicherte Orte">
       <header class="hudd-head">
+        <SheetBack />
         <h2>Gespeicherte Orte</h2>
         <span class="hudd-btns">
-          <IconButton icon="close" label="Schließen" shortcut="Esc" class="hud-rbtn" onClick={() => (orteView.value = null)} />
+          <IconButton icon="close" label="Schließen" shortcut="Esc" class="hud-rbtn" onClick={() => closeCard(() => (orteView.value = null))} />
         </span>
       </header>
       <ScrollArea class="hudd-scroll">

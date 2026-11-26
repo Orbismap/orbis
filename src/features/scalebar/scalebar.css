@@ -68,8 +68,8 @@
     left: var(--map-left, 0px);
     transition: left var(--t-panel) var(--ease);
   }
-  /* mobile: directly under the search header */
+  /* mobile: at the top edge, clear of the map controls at the right */
   .hud-mobile .scalebar-pos {
-    top: calc(env(safe-area-inset-top, 0px) + 8px + var(--hit-touch, 44px) + 6px);
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
   }
 }

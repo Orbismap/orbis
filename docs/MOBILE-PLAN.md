@@ -80,7 +80,7 @@ Jede Etappe ist ein eigener PR und für sich nutzbar. Aufwand: S bis halber Tag,
 - Zoom-Knöpfe unsichtbar, für VoiceOver und Schaltersteuerung vorhanden; Cesium-Schlüsselknopf 44 px.
 - Offen für Etappe 2: Die Route liegt zur Hälfte hinter dem Sheet (Befund 7). VoiceOver am Gerät ist nicht geprüft.
 
-### 2. Gerüst wie Apple Karten (L) · Befunde 6–9
+### 2. Gerüst wie Apple Karten (L) · Befunde 6–9 · erledigt, Test am iPhone offen
 
 - Suchfeld in die Blick-Zeile des Sheets; Tippen öffnet Voll mit Verlauf, Vorschlägen und „Abbrechen“. Ohne
   Tastaturbefehle. Der Kopfbereich oben entfällt, Einstellungen wandern neben die Suche.
@@ -91,6 +91,10 @@ Jede Etappe ist ein eigener PR und für sich nutzbar. Aufwand: S bis halber Tag,
 - Karte bekommt unten den Sheet-Rand, damit die Auswahl sichtbar bleibt.
 - Glas in Blick und Halb; Knöpfe neu verteilen.
 - `docs/DESIGN.md`, Abschnitt „Aufbau Mobil“, anpassen.
+- Aus Etappe 3 vorgezogen: Die Ortskarte erscheint am Handy für Suche, Ortsnamen auf der Karte, gespeicherte Orte und
+  Links.
+- Offen: Zeigt nur ein iPhone — Tastatur beim Antippen des Suchfelds, langes Drücken, Zurück-Wischen, Glas beim
+  Ziehen (Leistung). Die Leiste mit Zeitleiste ist in „Halb“ hoch; „Halb“ reicht deshalb etwas weiter (Etappe 4).
 
 ### 3. Gleicher Funktionsumfang (L) · Befund 5
 

@@ -19,19 +19,20 @@ import { record } from '../../state/history';
 import { karteLayerIds, parseTag } from './tags';
 import { coordinateLabel, parseCoordinate, type Place, type Result } from './sources';
 
-interface Command { id: string; title: string; subtitle?: string; icon: Result['icon']; words: string[]; run(): void }
+/** `desktop`: not offered on phones (no keyboard there, and the system decides about light and dark). */
+interface Command { id: string; title: string; subtitle?: string; icon: Result['icon']; words: string[]; desktop?: boolean; run(): void }
 
 const COMMANDS: Command[] = [
   { id: 'route-new', title: 'Neue Route', subtitle: 'Route planen', icon: 'route', words: ['routen', 'navigation', 'weg', 'planen', 'wegbeschreibung', 'anfahrt'], run: newRoute },
   { id: 'globe', title: 'Globus anzeigen', icon: 'globe', words: ['3d', 'kugel', 'erde'], run: () => setProjection('globe') },
   { id: 'flat', title: 'Flache Karte anzeigen', icon: 'map', words: ['2d', 'mercator', 'karte'], run: () => setProjection('mercator') },
   { id: 'now', title: 'Jetzt', subtitle: 'Zur aktuellen Zeit springen', icon: 'clock', words: ['live', 'zeit', 'aktuell'], run: goLive },
-  { id: 'theme-dark', title: 'Thema: Dunkel', icon: 'moon', words: ['design', 'nacht'], run: () => updateSettings({ theme: 'dark' }) },
-  { id: 'theme-light', title: 'Thema: Hell', icon: 'sun', words: ['design', 'tag'], run: () => updateSettings({ theme: 'light' }) },
-  { id: 'theme-auto', title: 'Thema: Automatisch', icon: 'settings', words: ['design', 'system'], run: () => updateSettings({ theme: 'auto' }) },
+  { id: 'theme-dark', desktop: true, title: 'Thema: Dunkel', icon: 'moon', words: ['design', 'nacht'], run: () => updateSettings({ theme: 'dark' }) },
+  { id: 'theme-light', desktop: true, title: 'Thema: Hell', icon: 'sun', words: ['design', 'tag'], run: () => updateSettings({ theme: 'light' }) },
+  { id: 'theme-auto', desktop: true, title: 'Thema: Automatisch', icon: 'settings', words: ['design', 'system'], run: () => updateSettings({ theme: 'auto' }) },
   { id: 'add', title: 'Ebene hinzufügen', icon: 'layers', words: ['katalog', 'ebenen'], run: () => ((leftPanelOpen.value = true), showView('catalog')) },
   { id: 'settings', title: 'Einstellungen', icon: 'settings', words: ['einheiten', 'optionen'], run: () => ((leftPanelOpen.value = true), showView('settings')) },
-  { id: 'keys', title: 'Tastenkürzel', icon: 'keyboard', words: ['hilfe', 'shortcuts'], run: () => (shortcutsOpen.value = true) },
+  { id: 'keys', desktop: true, title: 'Tastenkürzel', icon: 'keyboard', words: ['hilfe', 'shortcuts'], run: () => (shortcutsOpen.value = true) },
 ];
 
 export function placeResult(p: Place): Result {
@@ -43,7 +44,7 @@ export function placeResult(p: Place): Result {
     subtitle: p.subtitle,
     run: () => {
       record({ key: `s:${p.id}`, kind: 'search', title: p.title, sub: p.subtitle ?? 'Suche', icon: 'search', color: '#72C8F0', lng: p.lng, lat: p.lat, placeKind: p.kind, ...(p.bounds ? { bounds: p.bounds as [number, number, number, number] } : {}) });
-      if (!isMobile.peek()) selectPlace({ id: p.id, title: p.title, subtitle: p.subtitle, lng: p.lng, lat: p.lat, kind: p.kind });
+      selectPlace({ id: p.id, title: p.title, subtitle: p.subtitle, lng: p.lng, lat: p.lat, kind: p.kind });
       flyToPlace(p.bounds, p.lng, p.lat);
     },
   };
@@ -73,7 +74,8 @@ export function localResults(input: string): Result[] {
       },
     });
 
-  const cmds = COMMANDS.map((c) => ({ c, s: scoreText(c.title, query, [...c.words, c.subtitle ?? '']) }))
+  const cmds = COMMANDS.filter((c) => !(c.desktop && isMobile.peek()))
+    .map((c) => ({ c, s: scoreText(c.title, query, [...c.words, c.subtitle ?? '']) }))
     .filter((r) => r.s > 0 && !(r.c.id === 'globe' && projection.value === 'globe') && !(r.c.id === 'flat' && projection.value === 'mercator'))
     .sort((a, b) => b.s - a.s)
     .slice(0, tag === 'befehle' ? COMMANDS.length : query ? 4 : 5);
