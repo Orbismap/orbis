@@ -1,9 +1,13 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { NetMap } from './NetMap';
+import { isDesktop, useScene, type Scene } from './scene';
 
 interface Props {
-  /** Die Karte (und was auf ihr schwebt). */
-  map: ComponentChildren;
+  /** Was die Karte zeigt. */
+  scene: Scene;
+  /** Auf der Karte schwebende Elemente (nur Handy). */
+  overlay?: ComponentChildren;
   /** Kopf des Blatts, gehört zur Zieh-Fläche (Zurück-Knopf, Titel …). */
   header?: ComponentChildren;
   /** Anteil der Höhe, den die Karte im Ruhezustand sichtbar ist. */
@@ -16,11 +20,26 @@ const OVERLAP = 24;
 const DRAG_START = 6;
 const FLICK = 0.35; // px/ms
 
+/** Handy: Karte oben und ziehbares Blatt. Desktop: nur das Panel, die Karte steht daneben (siehe `scene`). */
+export function MapSheet(props: Props) {
+  useScene(props.scene);
+  return isDesktop.value ? <DesktopPanel {...props} /> : <MobileSheet {...props} />;
+}
+
+function DesktopPanel({ header, children, class: cls }: Props) {
+  return (
+    <div class={`bn-dpanel ${cls ?? ''}`}>
+      {header && <div class="bn-dhead">{header}</div>}
+      <div class="bn-dbody">{children}</div>
+    </div>
+  );
+}
+
 /**
  * Karte oben, darunter ein Blatt mit dem Inhalt. Das Blatt lässt sich an Griff und Kopf nach oben ziehen und deckt
  * dann die Karte ganz ab; nach unten ziehen oder auf den Griff tippen bringt die Karte zurück.
  */
-export function MapSheet({ map, header, peek = 0.4, children, class: cls }: Props) {
+function MobileSheet({ scene: s, overlay, header, peek = 0.4, children, class: cls }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(0);
@@ -74,7 +93,10 @@ export function MapSheet({ map, header, peek = 0.4, children, class: cls }: Prop
 
   return (
     <div ref={root} class={`bn-ms ${cls ?? ''}`}>
-      <div class="bn-ms-map" style={{ height: restTop + OVERLAP }}>{map}</div>
+      <div class="bn-ms-map" style={{ height: restTop + OVERLAP }}>
+        <NetMap center={s.center} zoom={s.zoom} me={s.me} markers={s.markers} routes={s.routes} fit={s.fit} interactive={s.interactive ?? false} onMarker={s.onMarker} />
+        {overlay}
+      </div>
       <div ref={sheet} class={`bn-ms-sheet ${full ? 'bn-ms-full' : ''}`} style={{ top: restTop }}>
         <div class="bn-ms-drag-zone" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
           <button type="button" class="bn-ms-grab" aria-label={full ? 'Karte zeigen' : 'Karte ausblenden'} onClick={() => setFull(!full)}><i /></button>

@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { Icon } from '../ui/icons';
 import { LineBadge, PlatformSign } from '../ui/Badges';
 import { MapSheet } from '../ui/MapSheet';
-import { NetMap } from '../ui/NetMap';
+import { useMemo } from 'preact/hooks';
 import { journeyEnds, journeyRoutes, modeColor } from '../ui/routes';
 import { clock, delayState, delayText, duration } from '../ui/format';
 import type { Call, Journey, Leg } from '../data/types';
@@ -12,6 +12,7 @@ import { pop } from '../state/nav';
 export function JourneyDetail({ journey: j }: { journey: Journey }) {
   const first = j.legs[0]!;
   const last = j.legs[j.legs.length - 1]!;
+  const routes = useMemo(() => journeyRoutes(j), [j]);
   const delay = delayText(j.arrival) || delayText(j.departure);
   const late = delayState(j.arrival) === 'late' || delayState(j.departure) === 'late';
   const share = () => {
@@ -24,7 +25,7 @@ export function JourneyDetail({ journey: j }: { journey: Journey }) {
     <div class="bn-screen bn-detail">
       <MapSheet
         peek={0.3}
-        map={<NetMap routes={journeyRoutes(j)} markers={journeyEnds(j)} fit interactive={false} />}
+        scene={{ routes, markers: journeyEnds(j), fit: true }}
         header={
           <>
             <div class="bn-ms-head">

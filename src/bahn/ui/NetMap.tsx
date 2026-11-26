@@ -27,6 +27,8 @@ interface Props {
   /** Karte auf alle Marker und Routen einpassen. */
   fit?: boolean;
   interactive?: boolean;
+  /** Ausschnittwechsel sanft fliegen statt springen (Desktop-Karte, die zwischen Bildschirmen bleibt). */
+  animate?: boolean;
   onMarker?: (id: string) => void;
   class?: string;
 }
@@ -42,7 +44,7 @@ const dom = (cls: string, text?: string): HTMLDivElement => {
  * Karte der Bus-&-Bahn-App (MapLibre, dunkler OpenFreeMap-Stil mit Schienennetz). Der Code lädt MapLibre erst,
  * wenn eine Karte gebraucht wird. Später übernimmt hier die Orbis-Engine mit ihren Ebenen.
  */
-export function NetMap({ center = [10.4, 51.1], zoom = 15, me, markers = [], routes = [], fit = false, interactive = true, onMarker, class: cls }: Props) {
+export function NetMap({ center = [10.4, 51.1], zoom = 15, me, markers = [], routes = [], fit = false, interactive = true, animate = false, onMarker, class: cls }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
   const ready = useRef<Promise<MlMap> | null>(null);
@@ -123,7 +125,9 @@ export function NetMap({ center = [10.4, 51.1], zoom = 15, me, markers = [], rou
       const pts: [number, number][] = [...routes.flatMap((r) => r.coords), ...markers.map((k): [number, number] => [k.lng, k.lat])];
       if (fit && pts.length > 1) {
         const b = pts.reduce((acc, p) => acc.extend(p), new ml.LngLatBounds(pts[0], pts[0]));
-        m.fitBounds(b, { padding: 36, duration: 0, maxZoom: 15 });
+        m.fitBounds(b, { padding: animate ? 64 : 36, duration: animate ? 700 : 0, maxZoom: 15 });
+      } else if (animate) {
+        m.easeTo({ center, zoom, duration: 700 });
       } else {
         m.jumpTo({ center, zoom });
       }

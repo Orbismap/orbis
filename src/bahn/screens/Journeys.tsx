@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { describeError } from '@/data/http';
 import { Icon } from '../ui/icons';
 import { MapSheet } from '../ui/MapSheet';
-import { NetMap, type MapMarker } from '../ui/NetMap';
+import type { MapMarker } from '../ui/NetMap';
 import { journeyRoutes, modeColor } from '../ui/routes';
 import { LineBadge, PlatformSign } from '../ui/Badges';
 import { clock, delayState, delayText, duration } from '../ui/format';
@@ -22,6 +22,8 @@ export function JourneysScreen() {
   const [cursors, setCursors] = useState<{ earlier?: string; later?: string }>({});
   const [state, setState] = useState<{ loading: boolean; error?: string }>({ loading: true });
   const [more, setMore] = useState<'earlier' | 'later' | null>(null);
+  // Desktop: Fährt man über eine Verbindung, zeigt die Karte deren Strecke.
+  const [hover, setHover] = useState<Journey | null>(null);
 
   const w = when.value;
 
@@ -72,9 +74,11 @@ export function JourneysScreen() {
     }
   };
 
+  const shown = hover ?? list[0];
+  const routes = useMemo(() => (shown ? journeyRoutes(shown) : []), [shown]);
+
   if (!from || !dest) return null;
   const routeSaved = favorites.has({ kind: 'route', from, to: dest });
-  const first = list[0];
   const ends: MapMarker[] = [
     { id: 'from', lng: from.lng, lat: from.lat, kind: 'start' },
     { id: 'to', lng: dest.lng, lat: dest.lat, kind: 'end' },
@@ -83,7 +87,7 @@ export function JourneysScreen() {
   return (
     <div class="bn-screen">
       <MapSheet
-        map={<NetMap markers={ends} routes={first ? journeyRoutes(first) : []} fit interactive={false} />}
+        scene={{ markers: ends, routes, fit: true }}
         header={
           <>
             <div class="bn-ms-head">
@@ -101,14 +105,14 @@ export function JourneysScreen() {
         {state.loading && <p class="bn-note">Suche Verbindungen …</p>}
         {state.error && <p class="bn-note bn-late">{state.error}</p>}
         {!state.loading && !state.error && list.length === 0 && <p class="bn-note">Keine Verbindung gefunden. Probiere andere Zeiten oder weniger Filter.</p>}
-        {list.map((j) => <JourneyCard key={keyOf(j)} j={j} onClick={() => push({ kind: 'journey', journey: j })} />)}
+        {list.map((j) => <JourneyCard key={keyOf(j)} j={j} onClick={() => push({ kind: 'journey', journey: j })} onHover={setHover} />)}
         {cursors.later && <button type="button" class="bn-more" disabled={!!more} onClick={() => void loadMore('later')}>{more === 'later' ? 'Lädt …' : 'Spätere Verbindungen ⬇'}</button>}
       </MapSheet>
     </div>
   );
 }
 
-function JourneyCard({ j, onClick }: { j: Journey; onClick: () => void }) {
+function JourneyCard({ j, onClick, onHover }: { j: Journey; onClick: () => void; onHover: (j: Journey | null) => void }) {
   const cancelled = j.legs.some((l) => l.cancelled);
   const rides = j.legs.filter((l) => l.mode !== 'fuss');
   const total = Math.max(1, j.arrival.actual - j.departure.actual);
@@ -116,7 +120,7 @@ function JourneyCard({ j, onClick }: { j: Journey; onClick: () => void }) {
   const arrState = delayState(j.arrival);
   const worst = Math.max(j.departure.delayMin ?? 0, j.arrival.delayMin ?? 0);
   return (
-    <button type="button" class={`bn-conn ${cancelled ? 'bn-cx' : ''}`} onClick={onClick}>
+    <button type="button" class={`bn-conn ${cancelled ? 'bn-cx' : ''}`} onClick={onClick} onMouseEnter={() => onHover(j)} onMouseLeave={() => onHover(null)} onFocus={() => onHover(j)} onBlur={() => onHover(null)}>
       <div class="bn-conn-t">
         <span class={depState === 'late' ? 'bn-late' : ''}>{clock(j.departure.actual)}</span>
         <span class="bn-ar">→</span>
