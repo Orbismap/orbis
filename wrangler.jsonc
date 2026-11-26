@@ -13,7 +13,9 @@
   "routes": [
     { "pattern": "maps.maltee.dev", "custom_domain": true },
     // Same build, weather mode (see src/entry.ts): its own origin, its own installable PWA.
-    { "pattern": "wetter.maltee.dev", "custom_domain": true }
+    { "pattern": "wetter.maltee.dev", "custom_domain": true },
+    // Bus & Bahn (see src/entry.ts: hostname bahn.*). Needs https://bahn.maltee.dev in ALLOWED_ORIGINS of the push worker.
+    { "pattern": "bahn.maltee.dev", "custom_domain": true }
   ],
   "workers_dev": false,
   "preview_urls": false

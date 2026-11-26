@@ -5,7 +5,7 @@ für Züge und Busse.
 
 - Einstieg: `src/entry.ts` wählt per Hostname `bahn.*` oder lokal `?mode=bahn` (`pnpm dev`, dann `/?mode=bahn`).
 - Code: `src/bahn/` (`app/` Oberfläche, `data/` Domänenmodell und Anbieter-Schnittstelle, `styles/` Tokens).
-- PWA: `public/bahn/manifest.webmanifest`, bisher nur SVG-Icon, noch kein Service Worker, keine eigene Domain in `wrangler.jsonc`.
+- PWA: `public/bahn/manifest.webmanifest`, bisher nur SVG-Icon, noch kein Service Worker, Domain `bahn.maltee.dev` in `wrangler.jsonc`.
 - Stand: leere Hülle mit vier Reitern (Verbindung, Abfahrten, Karte, Merkliste) und `TransitProvider`-Schnittstelle.
 
 ## Datenquellen (aus dem alten Orbis, `src/api/connections.ts`, `dbdelays.ts`, `transit.ts`)
@@ -24,7 +24,7 @@ für Züge und Busse.
 - `transitous.ts`: reine Parser plus `createTransitous()`. `delays.ts`: DB-Worker mit Pause bei Fehlern, `plannedJourney` / `plannedDepartures` für die Anzeige, bis die DB-Daten da sind. `modes.ts`: MOTIS-Modi ↔ Gruppen. `index.ts`: `createSources()`.
 - Ablauf in der Oberfläche: Transitous abfragen, Züge mit `plannedJourney` zeigen, `delays.journeys()` nachladen und ersetzen.
 - Worker-Adresse: `VITE_BAHN_DELAYS_URL` (`off` schaltet ab), Standard `https://orbis-trains.malte9799.workers.dev`.
-- **Offen im Worker:** `ALLOWED_ORIGINS` in `orbis-data/workers/push/wrangler.jsonc` kennt die neue Origin noch nicht (nur `maltee.dev`, `localhost:5173/4173`). Lokal geht es, auf der eigenen Domain erst nach Eintrag.
+- **Worker:** `https://bahn.maltee.dev` steht in `ALLOWED_ORIGINS` von `orbis-data/workers/push/wrangler.jsonc` (Branch `claude/bahn-origin`). Der Worker muss nach dem Merge neu deployt werden.
 
 ## Design-Entscheidungen (Mockups: `docs/mockups/bahn.html`)
 
