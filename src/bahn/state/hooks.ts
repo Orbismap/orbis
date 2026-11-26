@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useContext, useEffect, useRef, useState } from 'preact/hooks';
 import { online } from '@/core/online';
 import { describeError } from '@/data/http';
 import type { Departure, Stop } from '../data/types';
 import { plannedDepartures } from '../data';
 import { saveDepartures, savedDepartures } from '../data/offline';
 import { sources } from './sources';
+import { ActiveScreen } from '../ui/scene';
 
 /** Aktuelle Zeit, alle `ms` neu (für "in 5 min"). */
 export function useNow(ms = 20_000): number {
@@ -47,11 +48,15 @@ export interface Departures {
 
 /**
  * Abfahrten einer Haltestelle: sofort die zuletzt gespeicherten, dann der Fahrplan (Züge ohne unsichere Verspätung), dann die
- * DB-Echtzeit, alle 30 s neu. Ohne Netz bleiben die gespeicherten stehen, abgefahrene fallen heraus.
+ * DB-Echtzeit, alle 30 s neu (nur auf der sichtbaren Seite). Ohne Netz bleiben die gespeicherten stehen, abgefahrene
+ * fallen heraus.
  */
 export function useDepartures(stop: Stop | null, n = 30): Departures {
   const [state, setState] = useState<Departures>({ list: [], loading: !!stop });
   const net = online.value;
+  // verdeckte Seiten bleiben bestehen, fragen aber nicht weiter ab
+  const active = useRef(true);
+  active.current = useContext(ActiveScreen);
   useEffect(() => {
     if (!stop) {
       setState({ list: [], loading: false });
@@ -82,7 +87,7 @@ export function useDepartures(stop: Stop | null, n = 30): Departures {
       }
     };
     void run();
-    const id = setInterval(() => !document.hidden && void run(), 30_000);
+    const id = setInterval(() => !document.hidden && active.current && void run(), 30_000);
     return () => {
       alive = false;
       ctl.abort();

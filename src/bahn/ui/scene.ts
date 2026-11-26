@@ -1,42 +1,56 @@
+// Was die Karte gerade zeigt. Es gibt eine einzige Karte für die ganze App; die jeweils oberste Seite beschreibt ihre
+// Szene, die Karte bewegt sich dorthin und meldet Tipps auf Strecken und Halte zurück.
+import { createContext } from 'preact';
 import { signal } from '@preact/signals';
-import { useCallback, useEffect, useRef } from 'preact/hooks';
-import type { MapMarker, MapRoute } from './NetMap';
+import { useContext, useEffect, useRef } from 'preact/hooks';
+import type { Stop } from '../data/types';
 
-/** Ab dieser Breite gilt das Desktop-Layout (Leiste, Panel, Karte nebeneinander). Muss zu app.css passen. */
+/** Ab dieser Breite gilt das Desktop-Layout (Leiste, Seitenspalte, Karte). Muss zu app.css passen. */
 export const DESKTOP_QUERY = '(min-width: 960px)';
 const mq = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(DESKTOP_QUERY) : null;
 export const isDesktop = signal(!!mq?.matches);
 mq?.addEventListener('change', (e) => { isDesktop.value = e.matches; });
 
-/**
- * Was die Karte gerade zeigt. Auf dem Handy rendert jeder Bildschirm seine eigene Karte (im ziehbaren Blatt); auf dem
- * Desktop gibt es eine einzige Karte neben dem Panel, und die Bildschirme beschreiben nur ihre Szene.
- */
+export interface MapRoute {
+  id: string;
+  coords: [number, number][];
+  color: string;
+  dashed?: boolean;
+  /** Zurückgenommen, weil ein anderer Abschnitt hervorgehoben ist. */
+  dim?: boolean;
+}
+
+export interface MapStop {
+  stop: Stop;
+  /** start/end: Anfang und Ziel; transfer: Umstieg; via: Zwischenhalt; selected: die geöffnete Haltestelle */
+  kind: 'start' | 'end' | 'transfer' | 'via' | 'selected';
+  color?: string;
+}
+
 export interface Scene {
+  routes?: MapRoute[];
+  stops?: MapStop[];
+  /** Kameraziel: entweder alle Punkte in `fit` zeigen oder `center` mit `zoom`. Ohne beides bleibt der Ausschnitt. */
+  fit?: [number, number][];
   center?: [number, number];
   zoom?: number;
-  me?: [number, number] | null;
-  markers?: MapMarker[];
-  routes?: MapRoute[];
-  fit?: boolean;
-  /** Nur Handy: Karte im Blatt bedienbar (Start) oder nur zur Ansicht. */
-  interactive?: boolean;
-  onMarker?: (id: string) => void;
+  onRoute?: (id: string) => void;
 }
 
 export const scene = signal<Scene>({});
 
-/**
- * Meldet die Szene des Bildschirms an die Desktop-Karte; auf dem Handy ohne Wirkung. Der Marker-Handler wird über
- * eine stabile Funktion weitergereicht, damit eine neue Funktion pro Render nicht jedes Mal die Szene ersetzt.
- */
+/** Wahr in der obersten Seite: Nur sie bestimmt Karte und Rast des Blatts. */
+export const ActiveScreen = createContext(true);
+
+/** Setzt die Szene, solange die Seite oben liegt. */
 export function useScene(next: Scene): void {
-  const latest = useRef(next.onMarker);
-  latest.current = next.onMarker;
-  const onMarker = useCallback((id: string) => latest.current?.(id), []);
-  const key = JSON.stringify([next.center, next.zoom, next.me, next.markers, next.routes, next.fit]);
+  const active = useContext(ActiveScreen);
+  const latest = useRef(next);
+  latest.current = next;
+  const key = JSON.stringify([next.routes, next.stops, next.fit, next.center, next.zoom]);
   useEffect(() => {
-    if (isDesktop.value) scene.value = { ...next, onMarker: next.onMarker ? onMarker : undefined };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, !!next.onMarker, isDesktop.value]);
+    if (!active) return;
+    // der Handler läuft über die Referenz, damit eine neue Funktion pro Rendern die Szene nicht ersetzt
+    scene.value = { ...latest.current, onRoute: (id) => latest.current.onRoute?.(id) };
+  }, [active, key]);
 }

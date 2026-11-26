@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanStopName, dedupeStops, rankStops } from './stops';
+import { cleanStopName, dedupeStops, rankStops, clusterStops } from './stops';
 import type { Stop } from './types';
 
 const stop = (name: string, importance: number, area = 'Bad Kleinen', modes: Stop['modes'] = ['bus']): Stop => ({ id: name, name, lat: 0, lng: 0, area, importance, modes });
@@ -42,5 +42,18 @@ describe('Haltestellensuche', () => {
     expect(out).toHaveLength(2);
     const out2 = rankStops([stop('München Ost', 0.01, 'München'), stop('München Hbf', 0.03, 'München')], 'munchen hauptbahnhof');
     expect(out2[0]!.name).toBe('München Hbf');
+  });
+});
+
+describe('Haltestellen auf der Karte', () => {
+  const s = (id: string, name: string, lng: number, importance: number, modes: Stop['modes']): Stop => ({ id, name, lat: 53.9, lng, importance, modes });
+
+  it('fasst Bahnsteige und Quellen einer Haltestelle zusammen, gleiche Namen weiter weg nicht', () => {
+    const out = clusterStops([
+      s('bus', 'Wismar Bahnhof', 11.468, 0.1, ['bus']),
+      s('zug', 'Wismar, Bahnhof', 11.47, 0.5, ['regio']),
+      s('weit', 'Wismar Bahnhof', 11.6, 0.2, ['bus']),
+    ]);
+    expect(out.map((x) => [x.id, x.modes])).toEqual([['zug', ['regio', 'bus']], ['weit', ['bus']]]);
   });
 });

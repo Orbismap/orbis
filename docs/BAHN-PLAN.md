@@ -26,29 +26,23 @@ für Züge und Busse.
 - Worker-Adresse: `VITE_BAHN_DELAYS_URL` (`off` schaltet ab), Standard `https://orbis-trains.malte9799.workers.dev`.
 - **Worker:** `https://bahn.maltee.dev` steht in `ALLOWED_ORIGINS` von `orbis-data/workers/push/wrangler.jsonc` (Branch `claude/bahn-origin`). Der Worker muss nach dem Merge neu deployt werden.
 
-## Design-Entscheidungen (Mockups: `docs/mockups/bahn.html`)
+## Oberfläche
 
-- Reiter: Start, Abfahrten, Karte, Merkliste. Dunkel, Tokens wie Wetter/Map.
-- Start-Screen mit Karte oben, **nur wenn ein Standort bekannt ist** (Gerätestandort oder eingetragener Start). Sonst reicht das Blatt bis ganz nach oben (Suche, Favoriten, zuletzt gesucht, Hinweis „Standort verwenden“).
-- Orbis-Ebenen in der Bahn-Karte: Fahrzeuge live, Liniennetz im Detail, Störungen, Leihräder. **Kein Wetter.**
-- **Neue Orbis-Ebene nötig:** „Liniennetz im Detail“, Zugnetze einzelner ausgewählter Städte mit allen Linien und Haltestellen.
+Konzept, Befund und Gestaltungsregeln: [BAHN-UX.md](BAHN-UX.md).
 
-## Oberfläche (umgesetzt, `src/bahn/`)
-
-- `app/` Hülle mit Reitern, `screens/` Start, Suche, Abfahrtstafel, Verbindungen, Verbindungsdetail, Karte, Merkliste. `ui/` Badges, Gleisschild, Karte (`NetMap`), Formatierer. `state/` Signals für Navigation, Standort, Favoriten.
-- Start-Screen: Karte nur mit bekanntem Standort (Gerätestandort oder eingetragener Start).
-- Karte: MapLibre mit dem dunklen Stil der Wetterkarte, lädt erst bei Bedarf. Noch keine Orbis-Ebenen, keine Fahrzeuge live.
+- `app/` Hülle (eine Karte, ein Blatt, drei Reiter). `screens/` Start, Abfahrten, Merkliste, Suche, Verbindungen, Verbindungsdetail, Haltestelle, Linienlauf.
+- `ui/TransitMap.tsx` die eine Karte (MapLibre, dunkler Stil der Wetterkarte mit Schienennetz, lädt beim ersten Bild); Ebenen in `ui/mapLayers.ts`, Umrechnung von Verbindungen in `ui/mapData.ts`.
+- Seiten beschreiben nur ihre Szene (`ui/scene.ts`, `useScene`); die oberste gilt. `ui/Sheet.tsx` ist das Blatt mit drei Rasten (Geometrie in `ui/sheetState.ts`), `Screen` eine Seite darin. Verdeckte Seiten bleiben bestehen.
+- Antippen auf der Karte: Haltestelle → Abfahrten, Strecke → Abschnitt bzw. Verbindung. Haltestellen der Umgebung ab Zoom 14 aus Transitous (`/v1/map/stops`), darunter die Bahnhöfe des Grundstils. Linienläufe aus `/v5/trip`, Gleisverläufe aus `legGeometry`.
+- Orbis-Ebenen in der Bahn-Karte (geplant): Fahrzeuge live, Netzpläne, Störungen, Leihräder. **Kein Wetter.**
 - Lokal: `pnpm dev`, dann `/?mode=bahn`.
-- Zurück-Taste und Wischgeste: jeder geöffnete Bildschirm ist ein Historieneintrag (`state/nav.ts`). Reiterwechsel erzeugen keine Einträge.
-- Offline: Start ohne Netz und zuletzt bekannte Daten (`data/offline.ts`).
-- Noch nicht: Orbis-Ebenen, Hellmodus-Feinschliff.
+- Zurück-Taste und Wischgeste: jede geöffnete Seite ist ein Historieneintrag (`state/nav.ts`). Reiterwechsel erzeugen keine Einträge.
+- Offline: Start ohne Netz und zuletzt bekannte Daten (`data/offline.ts`; ohne Gleisverläufe).
+- Noch nicht: Orbis-Ebenen, helle Karte.
 
 ## Desktop (ab 960 px Breite)
 
-- Layout: Leiste links (Reiter, 88 px) | Panel (440 px) | Karte füllt den Rest. Darunter, bis 959 px, bleibt die Handy-Ansicht (ab 720 px auf 520 px begrenzt).
-- Eine einzige Karte neben dem Panel statt einer pro Bildschirm: Die Bildschirme melden ihre Szene (`ui/scene.ts`, `useScene`), die Karte fliegt sanft dorthin und bleibt beim Navigieren stehen. Auf dem Handy zeigt `MapSheet` weiter eine eigene Karte im ziehbaren Blatt.
-- Auch ohne Standort zeigt die Desktop-Karte Deutschland (das Panel allein wäre leer).
-- Verbindungsliste: Mit der Maus über eine Verbindung zeigt die Karte deren Strecke. Karten-Reiter: Haltestellen als Liste im Panel, Auswahl mit Abfahrten.
+Leiste links (88 px) | Blatt als Seitenspalte (420 px) | dieselbe Karte. Darunter Karte mit Blatt (ab 640 px Breite mittig). Verbindungsliste: Mit der Maus über eine Verbindung zeigt die Karte deren Strecke.
 
 ## Offen
 

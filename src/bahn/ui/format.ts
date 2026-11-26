@@ -31,6 +31,8 @@ export function delayState(time: Time): 'late' | 'ok' | 'unknown' {
   return d >= 2 ? 'late' : 'ok';
 }
 
+export const transfersText = (n: number): string => (n === 0 ? 'Direkt' : `${n} Umstieg${n > 1 ? 'e' : ''}`);
+
 /** Entfernung "320 m" / "1,4 km" (Meter auf 10 gerundet). */
 export function distance(km: number): string {
   return km < 1 ? `${Math.max(10, Math.round(km * 100) * 10)} m` : `${km.toFixed(1).replace('.', ',')} km`;

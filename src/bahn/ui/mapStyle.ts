@@ -3,7 +3,8 @@ import { wxStyle } from '@/wetter/features/forecast/map-style';
 
 /**
  * Kartenstil der Bus-&-Bahn-App: der dunkle Stil der Wetterkarte plus das Schienennetz aus den OpenFreeMap-Kacheln
- * (U-Bahn blau, S-Bahn grün, Tram orange, Zug grau) und Bahnhöfe/Haltestellen. Die Farben sind die der Linien-Badges.
+ * (U-Bahn blau, S-Bahn grün, Tram orange, Zug grau) und Bahnhöfe. Die Farben sind die der Linien-Badges. Die
+ * Haltestellen der Umgebung kommen ab Zoom 14 von der Fahrplanquelle (mapLayers.ts) und lösen die Bahnhofspunkte ab.
  */
 const SUBCLASSES = ['rail', 'light_rail', 'subway', 'tram', 'narrow_gauge', 'monorail', 'funicular'];
 const byClass = (value: (sub: string) => string, fallback: string): ExpressionSpecification =>
@@ -26,19 +27,11 @@ const transit: LayerSpecification[] = [
     paint: { 'line-color': byClass((s) => COLOR[s]!, '#8e9ab0'), 'line-width': WIDTH(1.7) },
   },
   {
-    id: 'rail-stations', type: 'circle', source: 'ofm', 'source-layer': 'poi', minzoom: 10,
+    id: 'rail-stations', type: 'circle', source: 'ofm', 'source-layer': 'poi', minzoom: 10, maxzoom: 14,
     filter: ['all', ['==', ['get', 'class'], 'railway'], ['in', ['get', 'subclass'], ['literal', ['station', 'halt']]]],
     paint: {
       'circle-color': '#ffffff', 'circle-stroke-color': '#0a0f18', 'circle-stroke-width': 2,
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 14, 5, 17, 8],
-    },
-  },
-  {
-    id: 'stop-dots', type: 'circle', source: 'ofm', 'source-layer': 'poi', minzoom: 15,
-    filter: ['any', ['==', ['get', 'subclass'], 'tram_stop'], ['==', ['get', 'subclass'], 'bus_stop']],
-    paint: {
-      'circle-color': ['match', ['get', 'subclass'], 'tram_stop', '#d8921f', '#9a55c4'], 'circle-stroke-color': '#0a0f18', 'circle-stroke-width': 1.5,
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 15, 3, 18, 6],
     },
   },
   {

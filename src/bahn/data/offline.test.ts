@@ -10,7 +10,10 @@ const ride = (planned: number): Journey => ({ departure: at(planned), arrival: a
 
 const source = (fail: boolean, found: Stop[] = []): TransitProvider => {
   const answer = () => (fail ? Promise.reject(new Error('offline')) : Promise.resolve(found));
-  return { searchStops: answer, nearbyStops: answer, departures: () => Promise.resolve([]), journeys: () => Promise.resolve({ journeys: [] }) };
+  return {
+    searchStops: answer, nearbyStops: answer, stopsIn: answer, departures: () => Promise.resolve([]),
+    journeys: () => Promise.resolve({ journeys: [] }), trip: () => Promise.reject(new Error('offline')),
+  };
 };
 
 describe('Bahn without a network', () => {

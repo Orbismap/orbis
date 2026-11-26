@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createDbDelays, plannedJourney } from './delays';
 import { modeGroup, motisModes } from './modes';
-import { makeTime, parseDepartures, parseJourneys, parseStops } from './transitous';
+import { makeTime, named, parseDepartures, parseJourneys, parseStops, parseTrip } from './transitous';
 
 const T = (min: number) => `2026-11-25T10:${String(min).padStart(2, '0')}:00Z`;
 const itinerary = {
@@ -109,5 +109,29 @@ describe('DB-Verspätungen', () => {
     expect(await delays.journeys(list)).toBe(list);
     expect(await delays.journeys(list)).toBe(list);
     expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Linienlauf und Verlauf', () => {
+  // "_p~iF~ps|U_ulLnnqC" ist das Beispiel der Polyline-Beschreibung (Genauigkeit 5)
+  const ride = (from: string, to: string) => ({ mode: 'REGIONAL_RAIL', from: { name: from, stopId: from }, to: { name: to, stopId: to }, startTime: T(1), endTime: T(9), tripId: 't1', legGeometry: { points: '_p~iF~ps|U_ulLnnqC', precision: 5 } });
+
+  it('liest Verlauf, Fahrt- und Haltestellen-IDs', () => {
+    const leg = parseJourneys([{ startTime: T(1), endTime: T(9), transfers: 0, legs: [ride('A', 'B')] }])[0]!.legs[0]!;
+    expect(leg.tripId).toBe('t1');
+    expect(leg.from.stopId).toBe('A');
+    expect(leg.path).toEqual([[-120.2, 38.5], [-120.95, 40.7]]);
+  });
+
+  it('hängt durchgebundene Teilstücke aneinander', () => {
+    const leg = parseTrip({ legs: [ride('A', 'B'), ride('B', 'C')] })!;
+    expect([leg.from.name, ...leg.via.map((v) => v.name), leg.to.name]).toEqual(['A', 'B', 'C']);
+    expect(leg.path).toHaveLength(4);
+    expect(parseTrip({ legs: [] })).toBeUndefined();
+  });
+
+  it('nennt Start und Ziel an Koordinaten beim gewählten Namen', () => {
+    const j = named(parseJourneys([{ startTime: T(1), endTime: T(9), transfers: 0, legs: [ride('START', 'END')] }])[0]!, 'Mein Standort', 'Wismar');
+    expect([j.legs[0]!.from.name, j.legs[0]!.to.name]).toEqual(['Mein Standort', 'Wismar']);
   });
 });

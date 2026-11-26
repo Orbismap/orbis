@@ -1,6 +1,7 @@
+import { decodePolyline } from '@/core/polyline';
 import { fetchJson } from '@/data/http';
 import { modeGroup, motisModes } from './modes';
-import { dedupeStops, matchesQuery, rankStops } from './stops';
+import { clusterStops, dedupeStops, matchesQuery, rankStops } from './stops';
 import type { Call, Departure, Journey, JourneyOptions, JourneyPage, Leg, Stop, Time, TransitProvider } from './types';
 
 /** Transitous (MOTIS v5, ohne Schlüssel; Orte sind Haltestellen-IDs oder Koordinaten "lat,lng"): `/v1/geocode`, `/v1/reverse-geocode`, `/v5/plan`, `/v5/stoptimes`. */
@@ -10,6 +11,7 @@ const BASE = 'https://api.transitous.org/api';
 
 interface PlaceDto {
   name?: string;
+  stopId?: string;
   lat?: number;
   lon?: number;
   departure?: string;
@@ -38,6 +40,8 @@ interface LegDto {
   cancelled?: boolean;
   distance?: number;
   intermediateStops?: PlaceDto[];
+  tripId?: string;
+  legGeometry?: { points: string; precision?: number };
 }
 
 export interface ItineraryDto {
@@ -55,6 +59,17 @@ export interface StopTimeDto {
   routeShortName?: string;
   displayName?: string;
   cancelled?: boolean;
+  tripId?: string;
+}
+
+/** Haltestelle im Kartenausschnitt (`/v1/map/stops`). */
+export interface MapStopDto {
+  name: string;
+  stopId?: string;
+  lat: number;
+  lon: number;
+  importance?: number;
+  modes?: string[];
 }
 
 export interface GeocodeDto {
@@ -99,6 +114,7 @@ function call(p: PlaceDto, leg: LegDto, kind: 'dep' | 'arr'): Call {
   const [actual, planned] = kind === 'dep' ? [p.departure, p.scheduledDeparture] : [p.arrival, p.scheduledArrival];
   return {
     name: p.name ?? '',
+    stopId: p.stopId,
     lat: p.lat,
     lng: p.lon,
     platform: p.track ?? p.scheduledTrack,
@@ -126,7 +142,32 @@ export function parseLeg(l: LegDto): Leg {
     bookingRequired: l.reservation === 'COMPULSORY' || undefined,
     walkM: foot && l.distance != null ? Math.round(l.distance) : undefined,
     cancelled: !!l.cancelled,
+    tripId: l.tripId,
+    path: l.legGeometry ? pathOf(l.legGeometry.points, l.legGeometry.precision) : undefined,
   };
+}
+
+function pathOf(points: string, precision = 6): [number, number][] | undefined {
+  const xy = decodePolyline(points, precision);
+  const out: [number, number][] = [];
+  for (let i = 0; i + 1 < xy.length; i += 2) out.push([xy[i]!, xy[i + 1]!]);
+  return out.length > 1 ? out : undefined;
+}
+
+/** Der Lauf einer Fahrt als ein Abschnitt; durchgebundene Teilstücke werden aneinandergehängt. */
+export function parseTrip(it: { legs?: LegDto[] }): Leg | undefined {
+  const [first, ...rest] = (it.legs ?? []).map(parseLeg).filter((l) => l.mode !== 'fuss');
+  if (!first) return undefined;
+  return rest.reduce((a, b) => ({
+    ...a, to: b.to, via: [...a.via, a.to, ...b.via], path: a.path && b.path ? [...a.path, ...b.path] : undefined, cancelled: a.cancelled || b.cancelled,
+  }), first);
+}
+
+export function parseMapStops(list: MapStopDto[]): Stop[] {
+  return clusterStops(list.filter((s) => s.stopId).map((s) => {
+    const modes = [...new Set((s.modes ?? []).map(modeGroup))];
+    return { id: s.stopId!, name: s.name, lat: s.lat, lng: s.lon, modes: modes.length ? modes : undefined, importance: s.importance };
+  }));
 }
 
 /** Abfahrt/Ankunft der Verbindung aus ihren Abschnitten (nach dem Einmischen neuer Zeiten neu berechnen). */
@@ -136,6 +177,12 @@ export function journeyOf(legs: Leg[], transfers: number, delaySource?: 'db'): J
 
 export function parseJourneys(list: ItineraryDto[]): Journey[] {
   return list.filter((it) => it.legs.length > 0).map((it) => journeyOf(it.legs.map(parseLeg), it.transfers));
+}
+
+/** Startet oder endet die Suche an Koordinaten, heißen die Orte in der Antwort "START" und "END". */
+export function named(j: Journey, from: string, to: string): Journey {
+  const rename = (c: Call): Call => (c.name === 'START' ? { ...c, name: from } : c.name === 'END' ? { ...c, name: to } : c);
+  return journeyOf(j.legs.map((l) => ({ ...l, from: rename(l.from), to: rename(l.to) })), j.transfers, j.delaySource);
 }
 
 export function parseDepartures(list: StopTimeDto[]): Departure[] {
@@ -148,6 +195,7 @@ export function parseDepartures(list: StopTimeDto[]): Departure[] {
       platformChanged: changed(s.place) || undefined,
       time: makeTime(s.place.departure ?? s.place.arrival, s.place.scheduledDeparture ?? s.place.scheduledArrival, s.realTime),
       cancelled: !!s.cancelled || !!s.place.cancelled,
+      tripId: s.tripId,
     }))
     .filter((d) => Number.isFinite(d.time.planned));
 }
@@ -170,6 +218,17 @@ export function createTransitous(base = BASE): TransitProvider {
 
     nearbyStops: async (lat, lng, signal) =>
       dedupeStops(parseStops(await get<GeocodeDto[]>('/v1/reverse-geocode', new URLSearchParams({ place: `${lat.toFixed(5)},${lng.toFixed(5)}`, type: 'STOP', language: 'de' }), 12000, signal))),
+
+    trip: async (tripId, signal) => {
+      const leg = parseTrip(await get<{ legs?: LegDto[] }>('/v5/trip', new URLSearchParams({ tripId, language: 'de' }), 20000, signal));
+      if (!leg) throw new Error('Zu dieser Fahrt gibt es keinen Linienlauf.');
+      return leg;
+    },
+
+    stopsIn: async ([west, south, east, north], signal) => {
+      const q = new URLSearchParams({ min: `${south.toFixed(5)},${west.toFixed(5)}`, max: `${north.toFixed(5)},${east.toFixed(5)}`, language: 'de' });
+      return parseMapStops(await get<MapStopDto[]>('/v1/map/stops', q, 15000, signal));
+    },
 
     departures: async (stop, opts = {}, signal) => {
       const q = new URLSearchParams({ stopId: stop.id, n: String(opts.n ?? 25), time: new Date(opts.time ?? Date.now()).toISOString(), language: 'de' });
@@ -196,7 +255,7 @@ export function createTransitous(base = BASE): TransitProvider {
       if (o.wheelchair) q.set('pedestrianProfile', 'WHEELCHAIR');
       if (cursor) q.set('pageCursor', cursor);
       const r = await get<{ itineraries?: ItineraryDto[]; previousPageCursor?: string; nextPageCursor?: string }>('/v5/plan', q, 30000, signal);
-      return { journeys: parseJourneys(r.itineraries ?? []), earlier: r.previousPageCursor, later: r.nextPageCursor };
+      return { journeys: parseJourneys(r.itineraries ?? []).map((j) => named(j, from.name, to.name)), earlier: r.previousPageCursor, later: r.nextPageCursor };
     },
   };
 }
