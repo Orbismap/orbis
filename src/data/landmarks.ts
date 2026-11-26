@@ -48,6 +48,8 @@ export interface Catalogue {
   release: string;
   template: string;
   occupied: ReadonlySet<string>;
+  /** path of the list of all landmarks of the release (assets.json, ~1.5 MB compressed): the layer "Landmarks" shows them as points */
+  assets?: string;
 }
 
 class HttpError extends Error {
@@ -151,19 +153,25 @@ export function loadCatalogue(): Promise<Catalogue> {
     // `no-cache`: always ask whether `latest` moved on, a stale pointer leads to files of a release that is gone
     const latest = await getJson<{ catalogue?: string; release?: string }>(`${LANDMARKS_BASE}/api/v1/latest.json`, { cache: 'no-cache' });
     if (!latest.catalogue) throw new Error('landmarks: no catalogue');
-    const cat = await getJson<{ release?: string; index?: { template?: string; occupied?: string[] } }>(LANDMARKS_BASE + latest.catalogue);
+    const cat = await getJson<{ release?: string; assets?: string; index?: { template?: string; occupied?: string[] } }>(LANDMARKS_BASE + latest.catalogue);
     if (!cat.index?.template || !Array.isArray(cat.index.occupied)) throw new Error('landmarks: no index');
-    return (current = { release: cat.release ?? latest.release ?? latest.catalogue, template: cat.index.template, occupied: new Set(cat.index.occupied) });
+    return (current = { release: cat.release ?? latest.release ?? latest.catalogue, template: cat.index.template, occupied: new Set(cat.index.occupied), assets: cat.assets });
   })();
   catalogue.catch(() => { catalogue = undefined; });
   return catalogue;
+}
+
+/** Asks `latest` again: for whoever is about to load a large file of the release (it vanishes with the release). */
+export function reloadCatalogue(): Promise<Catalogue> {
+  catalogue = undefined;
+  return loadCatalogue();
 }
 
 let refreshing: Promise<Catalogue> | undefined;
 /** After a 404 of a release's file: fetch `latest` again (once for all callers); resolves to the newer catalogue, or the same release if none. */
 function refreshCatalogue(stale: Catalogue): Promise<Catalogue> {
   if (current && current.release !== stale.release) return Promise.resolve(current);
-  refreshing ??= (() => { catalogue = undefined; return loadCatalogue(); })().finally(() => { refreshing = undefined; });
+  refreshing ??= reloadCatalogue().finally(() => { refreshing = undefined; });
   return refreshing;
 }
 

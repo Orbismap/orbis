@@ -38,6 +38,7 @@ import { portsParse } from './ports';
 import { powerPlants } from './powerplants';
 import { wikiResources } from './resources';
 import { dataCenters } from './datacenters';
+import { landmarkPoints } from './landmarks';
 import { heatCells } from './heat';
 import { webcamFeed, webcamPoints } from './webcams';
 import { radioStations } from './radio';
@@ -111,6 +112,7 @@ export const parsers = {
   powerPlants,
   wikiResources,
   dataCenters,
+  landmarkPoints,
   heatCells,
   webcamFeed,
   webcamPoints,

@@ -40,6 +40,8 @@ export const buildingsDetailed = signal(false);
 export const buildingsColoured = signal(false);
 /** The layer "3D-Gebäude" is switched on (any type). Written by the layer. */
 export const buildingsLayerOn = signal(false);
+/** The layer "Landmarks" is on: close up the 3D models show on every basemap (features/landmarks/source.ts). Written by the layer. */
+export const landmarksLayerOn = signal(false);
 /** The layer's type "Gebäude" wants the basemap's plain 2.5D buildings even where the Karte mode (Daten/Fahren) hides them. Written by the layer. */
 export const buildingsPlainWanted = signal(false);
 /** The layer "Gelände" is on: it forces the terrain height map on, whatever the basemap mode asks for. Written by the layer. */

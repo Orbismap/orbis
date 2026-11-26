@@ -16,8 +16,8 @@ export function Attribution() {
   regionalReady.value; // re-render once lazily loaded regional credits exist
   const base = basemapCredits(k.basemap, viewport.value?.bounds);
   const layers = sourcesOf(k.layers.filter((l) => l.visible).map((l) => l.id));
-  // the 3D landmarks belong to no layer: they are credited while they are drawn
-  if (landmarksShown.value) layers.push({ name: LANDMARKS_CREDIT, url: LANDMARKS_SITE, license: LANDMARKS_LICENSE, layers: [] });
+  // the 3D landmarks are drawn without their layer too: they are credited while they are drawn (once, if the layer names them already)
+  if (landmarksShown.value && !layers.some((c) => c.name === LANDMARKS_CREDIT)) layers.push({ name: LANDMARKS_CREDIT, url: LANDMARKS_SITE, license: LANDMARKS_LICENSE, layers: [] });
   return (
     <div class="attr" ref={wrap}>
       <button type="button" class="attr-btn" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}>
