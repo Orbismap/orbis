@@ -23,6 +23,13 @@
     --ok: #58d0a0;
     --ok-quiet: rgba(88, 208, 160, 0.13);
     --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    /* was der gemeinsame App-Wechsler (ui/hud) braucht, wie in Wetter/Karte */
+    --g-panel: rgba(22, 26, 34, 0.82);
+    --g-pop: rgba(22, 26, 34, 0.97);
+    --g-fill: rgba(255, 255, 255, 0.06);
+    --g-fill-hover: rgba(255, 255, 255, 0.09);
+    --g-rim: rgba(255, 255, 255, 0.09);
+    --g-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 
     /* Verkehrsmittel: Badges und Linien */
     --m-fern: #e5484d;
@@ -58,7 +65,6 @@
     --r-round: 999px;
     --hit-touch: 48px;
     --tabbar-h: 66px;
-    --panel-w: 420px;
     --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
@@ -83,6 +89,12 @@
       --ok: #0d6e4c;
       --ok-quiet: rgba(13, 110, 76, 0.1);
       --shadow: 0 4px 16px rgba(15, 24, 38, 0.18);
+      --g-panel: rgba(255, 255, 255, 0.82);
+      --g-pop: rgba(255, 255, 255, 0.97);
+      --g-fill: rgba(0, 0, 0, 0.04);
+      --g-fill-hover: rgba(0, 0, 0, 0.07);
+      --g-rim: rgba(0, 0, 0, 0.07);
+      --g-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
     }
   }
 }

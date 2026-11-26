@@ -126,6 +126,11 @@
 .ohud-pill .ohud-name { overflow: hidden; text-overflow: ellipsis; }
 .ohud-pill .ohud-chev { margin-left: -4px; }
 
+/* the switcher without a menu (OrbisSwitcher); the app positions the wrapper */
+.ohud-solo { --hud-mini-h: 40px; position: absolute; }
+.ohud-solo > .ohud-mini { position: relative; top: auto; }
+.ohud-solo .ohud-mini-bar { padding-right: 12px; }
+
 /* the capsule grows downward: the row height animates from 0 to its content */
 .ohud-switch { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 240ms var(--ease); }
 .ohud-mini[data-switcher='open'] .ohud-switch { grid-template-rows: 1fr; }
@@ -169,6 +174,27 @@
 .ohud-check { flex: none; color: var(--text-1); }
 .ohud-proj[aria-current='page'] { color: var(--text-1); background: var(--g-fill); }
 @media (hover: hover) { .ohud-proj:hover { background: var(--g-fill-hover); color: var(--text-1); } }
+
+/* ---- menu content (HudMenu, HudRow) ---- */
+.ohud-menu { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; padding: 4px 8px 12px; text-align: left; }
+.ohud-menu h2 { margin: 12px 8px 4px; font-size: 12px; font-weight: 700; color: var(--text-3); }
+.ohud-row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 12px; background: none; color: var(--text-1); font: inherit; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
+.ohud-row svg { flex: none; }
+.ohud-row span { flex: 1; min-width: 0; }
+.ohud-row small { display: block; overflow: hidden; font-size: 12px; color: var(--text-3); white-space: nowrap; text-overflow: ellipsis; }
+.ohud-row[aria-pressed='true'], .ohud-row[aria-current='page'] { background: var(--g-fill); }
+@media (hover: hover) { .ohud-row:hover { background: var(--g-fill-hover); } }
+.ohud-menu p { margin: 16px 10px 0; font-size: 12px; color: var(--text-3); }
+.ohud-menu a { color: inherit; }
+/* mouse screens: the compact rows of the map menu */
+.ohud-menu[data-dense] { gap: 0; }
+.ohud-menu[data-dense] h2 { margin: 14px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.01em; }
+.ohud-menu[data-dense] .ohud-row { flex: none; min-height: 32px; padding: 3px 10px; border-radius: 8px; }
+.ohud-menu[data-dense] .ohud-row span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* the search capsule at the top of a menu */
+.ohud-search { display: flex; flex: none; align-items: center; gap: 7px; height: 32px; margin: 2px 4px 0; padding: 0 10px; border: 0; border-radius: 999px; background: var(--g-fill); color: var(--text-3); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.ohud-search svg { flex: none; }
+@media (hover: hover) { .ohud-search:hover { background: var(--g-fill-hover); color: var(--text-2); } }
 
 @media (max-width: 719px) {
   /* The open menu spans (almost) the full width instead of a narrow strip; room for the notch. */

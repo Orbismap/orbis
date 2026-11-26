@@ -7,7 +7,7 @@ describe('Orbis apps', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('lists the apps of the menu', () => {
-    expect(PROJECTS.map((p) => p.id)).toEqual(['map', 'wetter', 'find']);
+    expect(PROJECTS.map((p) => p.id)).toEqual(['map', 'wetter', 'bahn', 'find']);
   });
 
   it('swaps the subdomain on the real hosts', () => {
@@ -16,6 +16,9 @@ describe('Orbis apps', () => {
     expect(projectUrl('wetter')).toBe('https://wetter.maltee.dev/');
     at('https://maps.maltee.dev/');
     expect(projectUrl('find')).toBe('https://find.maltee.dev/');
+    expect(projectUrl('bahn')).toBe('https://bahn.maltee.dev/');
+    at('https://bahn.maltee.dev/');
+    expect(projectUrl('map')).toBe('https://maps.maltee.dev/');
   });
 
   it('uses the mode parameter elsewhere', () => {

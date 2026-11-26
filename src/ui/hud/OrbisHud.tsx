@@ -10,6 +10,8 @@ const PanelIcon = () => (
   </svg>
 );
 
+const projectName = (id: ProjectId) => PROJECTS.find((p) => p.id === id)?.name ?? '';
+
 export interface OrbisHudProps {
   /** The app this menu belongs to – sets the name in the header and the capsule. */
   project: ProjectId;
@@ -37,7 +39,7 @@ export interface OrbisHudProps {
  * capsule that slides down in its place. A click on the logo (header or capsule) opens the list of the other Orbis apps.
  */
 export function OrbisHud({ project, open, onOpenChange, children, panelClass, rootClass, mainExtra, beside, aside, fixed, style }: OrbisHudProps) {
-  const name = PROJECTS.find((p) => p.id === project)?.name ?? '';
+  const name = projectName(project);
   const capsule = <Capsule project={project} name={name} hidden={open} onShow={() => onOpenChange(true)} />;
   return (
     <div class={['ohud', rootClass].filter(Boolean).join(' ')} data-main={open ? 'open' : 'closed'} data-fixed={fixed ? 'true' : undefined} style={style}>
@@ -75,6 +77,57 @@ export function HudPill({ icon, label, title, expanded, onClick }: { icon: Compo
   );
 }
 
+/** The app switcher on its own, for an app without the left menu: the capsule without "show menu". The app places it. */
+export function OrbisSwitcher({ project }: { project: ProjectId }) {
+  return (
+    <div class="ohud-solo">
+      <Capsule project={project} name={projectName(project)} />
+    </div>
+  );
+}
+
+/** ⌘B / Ctrl+B hides and shows the menu. */
+export function useMenuShortcut(toggle: () => void) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'b') return;
+      e.preventDefault();
+      toggle();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+}
+
+/** A list in the panel of an app's menu: headings (`h2`), rows (HudRow) and notes (`p`). `dense` for mouse screens. */
+export function HudMenu({ label, dense, children }: { label: string; dense?: boolean; children: ComponentChildren }) {
+  return (
+    <nav class="ohud-menu" data-dense={dense || undefined} aria-label={label}>
+      {children}
+    </nav>
+  );
+}
+
+/** One row of a HudMenu: either a choice (`current` gets a check mark) or, with `page`, a destination. */
+export function HudRow({ icon, title, note, current, page, onClick }: { icon: ComponentChildren; title: string; note?: string; current?: boolean; page?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" class="ohud-row" aria-pressed={page ? undefined : current} aria-current={page && current ? 'page' : undefined} onClick={onClick}>
+      {icon}
+      <span>
+        {title}
+        {note && <small>{note}</small>}
+      </span>
+      {current && !page && <Check />}
+    </button>
+  );
+}
+
+const Check = () => (
+  <svg class="ohud-check" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+    <path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+);
+
 /** Closes a popup on Escape or a press outside of `root`. */
 function useDismiss(root: { current: HTMLElement | null }, active: boolean, close: () => void) {
   useEffect(() => {
@@ -99,11 +152,7 @@ function ProjectList({ project, shown, close }: { project: ProjectId; shown: boo
           <a href={projectUrl(p.id)} class="ohud-proj" aria-current={p.id === project ? 'page' : undefined} tabIndex={shown ? 0 : -1} onClick={(e) => (p.id === project ? (e.preventDefault(), close()) : undefined)}>
             {p.icon()}
             <span>{p.name}</span>
-            {p.id === project && (
-              <svg class="ohud-check" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-                <path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            )}
+            {p.id === project && <Check />}
           </a>
         </li>
       ))}
@@ -134,8 +183,8 @@ function Header({ project, name, onHide }: { project: ProjectId; name: string; o
   );
 }
 
-/** Closed state: logo + app name + "show menu". The logo area grows downward into the list of Orbis apps. */
-function Capsule({ project, name, hidden, onShow }: { project: ProjectId; name: string; hidden: boolean; onShow: () => void }) {
+/** Closed state: logo + app name + "show menu" (if there is a menu). The logo area grows downward into the list of Orbis apps. */
+function Capsule({ project, name, hidden = false, onShow }: { project: ProjectId; name: string; hidden?: boolean; onShow?: () => void }) {
   const [switcher, setSwitcher] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   useDismiss(root, switcher, () => setSwitcher(false));
@@ -151,9 +200,11 @@ function Capsule({ project, name, hidden, onShow }: { project: ProjectId; name: 
           <span class="ohud-name">{name}</span>
           <Chevron />
         </button>
-        <button type="button" class="ohud-btn" aria-label="Menü einblenden" aria-keyshortcuts="Meta+B Control+B" onClick={onShow}>
-          <PanelIcon />
-        </button>
+        {onShow && (
+          <button type="button" class="ohud-btn" aria-label="Menü einblenden" aria-keyshortcuts="Meta+B Control+B" onClick={onShow}>
+            <PanelIcon />
+          </button>
+        )}
       </div>
       <div class="ohud-switch" aria-hidden={!switcher}>
         <ProjectList project={project} shown={switcher} close={() => setSwitcher(false)} />

@@ -13,6 +13,10 @@ describe('kinds', () => {
     }
   });
 
+  it('words "the next one" as article, adjective, noun (the first screen takes it apart)', () => {
+    for (const k of KINDS) expect(k.next, k.id).toMatch(/^(den nächsten|die nächste|das nächste) \S+$/);
+  });
+
   it('takes its own places from the base map and names them', () => {
     expect(BAKERY.place({ class: 'bakery', subclass: 'bakery', name: 'Kamps' }, 8, 50, 41)).toEqual({ key: 'm41', lng: 8, lat: 50, title: 'Kamps', detail: 'Bäckerei' });
     expect(BAKERY.place({ class: 'toilets', subclass: 'toilets' }, 8, 50, 42)).toBeNull();

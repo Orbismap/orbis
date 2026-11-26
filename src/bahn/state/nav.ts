@@ -1,5 +1,6 @@
 import { computed, signal } from '@preact/signals';
 import type { Journey, JourneyOptions, ModeGroup, Stop } from '../data/types';
+import { panelOpen } from '../ui/scene';
 import { myLocation } from './location';
 
 export type TabId = 'start' | 'abfahrten' | 'merkliste';
@@ -37,6 +38,7 @@ if (canHistory) {
 }
 
 export const push = (screen: Screen) => {
+  panelOpen.value = true;
   stack.value = [...stack.value, entry(screen)];
   if (canHistory) history.pushState({ bn: stack.value.length }, '');
 };
@@ -51,10 +53,12 @@ export const pop = () => {
 };
 /** Oberster Bildschirm wird durch einen anderen ersetzt (kein zusätzlicher Historieneintrag). */
 export const replaceTop = (screen: Screen) => {
+  panelOpen.value = true;
   stack.value = [...stack.value.slice(0, -1), entry(screen)];
   if (canHistory) history.replaceState({ bn: stack.value.length }, '');
 };
 export const goTab = (next: TabId) => {
+  panelOpen.value = true;
   const depth = stack.value.length;
   stack.value = [];
   tab.value = next;
@@ -80,6 +84,7 @@ export const journeyOptions = (): JourneyOptions => ({
 
 /** Seite der Haltestelle öffnen. Eine Suche darüber wird durch sie ersetzt. */
 export function openStop(stop: Stop) {
+  panelOpen.value = true; // auch wenn die Haltestelle schon oben liegt
   const top = stack.value[stack.value.length - 1];
   if (top?.kind === 'search') replaceTop({ kind: 'stop', stop });
   else if (!(top?.kind === 'stop' && top.stop.id === stop.id)) push({ kind: 'stop', stop });

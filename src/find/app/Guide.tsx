@@ -7,6 +7,7 @@ import { metres } from '../data/places';
 import { chosen, kind, retry, search, searchRadius, target, way } from '../state/finder';
 import { compass, heading, manual, position, positionState, startCompass } from '../state/sensors';
 import { openSearch, useMyPosition } from '../state/ui';
+import { KindSentence } from './KindSentence';
 
 /** The turn of the arrow, continuous so that it never spins the long way round. */
 let turned = 0;
@@ -35,10 +36,11 @@ function Elsewhere() {
 }
 
 /** `search`: offer the place search as the second way. */
-function Notice({ title, text, action, onAction, search: second }: { title: string; text?: string; action?: string; onAction?: () => void; search?: boolean }) {
+function Notice({ title, lead, text, action, onAction, search: second }: { title: string; lead?: ComponentChildren; text?: string; action?: string; onAction?: () => void; search?: boolean }) {
   return (
     <>
       <h1 class="find-title">{title}</h1>
+      {lead && <p class="find-lead">{lead}</p>}
       {text && <p class="find-text">{text}</p>}
       <div class="find-actions">
         {action && <button type="button" class="find-button" onClick={onAction}>{action}</button>}
@@ -51,7 +53,7 @@ function Notice({ title, text, action, onAction, search: second }: { title: stri
 
 function content(): ComponentChildren {
   const state = positionState.value;
-  if (state === 'off') return <Notice title="Orbis Find" text={`Findet ${kind.value.next}.`} action="Los geht’s" onAction={useMyPosition} search />;
+  if (state === 'off') return <Notice title="Orbis Find" lead={<KindSentence />} action="Los geht’s" onAction={useMyPosition} search />;
   if (state === 'denied') return <Notice title="Kein Zugriff auf den Standort" text="Erlaube ihn in den Einstellungen deines Browsers und versuche es noch einmal." action="Erneut versuchen" onAction={useMyPosition} search />;
   if (state === 'unavailable') return <Notice title="Standort nicht verfügbar" text="Prüfe, ob die Ortung deines Geräts eingeschaltet ist." action="Erneut versuchen" onAction={useMyPosition} search />;
   const here = position.value;

@@ -75,6 +75,17 @@
 .find-distance { font-size: clamp(2rem, 7dvh, 3.5rem); font-weight: 750; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .find-name { font-size: 1.125rem; font-weight: 650; }
 .find-title { font-size: 1.5rem; font-weight: 750; }
+/* the first screen: "Orbis Find" small above the large sentence (KindSentence) */
+.find-title:has(+ .find-lead) { font-size: 1.125rem; }
+.find-lead { width: min(100%, 18em); font-size: 1.625rem; font-weight: 750; line-height: 1.25; }
+/* the noun, centred on a line of its own, rolls upwards to the next one */
+.find-roll { display: grid; height: 1.25em; overflow: hidden; color: var(--limb); }
+.find-roll > span { grid-area: 1 / 1; white-space: nowrap; }
+.find-roll-in { animation: find-roll-in 450ms var(--ease) both; }
+.find-roll-out { animation: find-roll-out 450ms var(--ease) both; }
+.find-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@keyframes find-roll-in { from { translate: 0 100%; opacity: 0; } }
+@keyframes find-roll-out { to { translate: 0 -100%; opacity: 0; } }
 .find-text { color: var(--text-3); max-width: 32ch; }
 .find-hint { color: var(--text-3); font-size: 0.8125rem; max-width: 34ch; }
 .find-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
@@ -116,17 +127,7 @@
 .find-results { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; width: 100%; max-width: 560px; margin: 0 auto; }
 .find-result { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex: none; min-height: 56px; padding: 10px 14px; border: 0; border-radius: 14px; background: var(--ink-2); color: inherit; font: inherit; text-align: left; cursor: pointer; }
 
-.find-menu { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; padding: 4px 8px 12px; text-align: left; }
-.find-menu h2 { margin: 12px 8px 4px; font-size: 12px; font-weight: 700; color: var(--text-3); }
-.find-row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 12px; background: none; color: var(--text-1); font: inherit; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
-.find-row svg { flex: none; }
-.find-row span { flex: 1; min-width: 0; }
-.find-row small { display: block; overflow: hidden; font-size: 12px; color: var(--text-3); white-space: nowrap; text-overflow: ellipsis; }
-.find-row[aria-pressed='true'] { background: var(--g-fill); }
-@media (hover: hover) { .find-row:hover { background: var(--g-fill-hover); } }
-.find-menu p { margin: 16px 10px 0; font-size: 12px; color: var(--text-3); }
-.find-menu a { color: inherit; }
-.find-menu :focus-visible, .ohud :focus-visible { outline: 2px solid var(--limb); outline-offset: 2px; }
+.ohud :focus-visible { outline: 2px solid var(--limb); outline-offset: 2px; }
 
 .find-catalog { position: fixed; inset: 0; z-index: 50; overflow-y: auto; overscroll-behavior: contain; background: var(--ink-0); }
 .find-catalog-body { box-sizing: border-box; max-width: 760px; margin: 0 auto; padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
