@@ -136,11 +136,14 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   const disposeGlobeTerrainFix = installGlobeTerrainFix(ml);
   const terminator = createTerminator(ml);
   // Desktop: a plain click on empty map closes the detail menu (selection and Karte menu, layers stay on); the point
-  // query needs a 1 s press. Mobile keeps tap-to-query.
+  // query needs a 1 s press. Mobile keeps tap-to-query. While a route is planned, both set a point of the route.
   const picking = createPicking(
     ml,
     (at) => {
-      if (isMobile.peek()) return setProbe(at);
+      if (isMobile.peek()) {
+        if (!at || !routePick(at)) setProbe(at);
+        return;
+      }
       const lbl = at && !isMobile.peek() ? labelAt(ml, at) : undefined;
       if (at && routePick(lbl ?? at, lbl?.title)) return;
       if (lbl) {

@@ -58,3 +58,6 @@ export function keyboardInset(innerHeight: number, view: { height: number; offse
   const covered = innerHeight - view.height - view.offsetTop;
   return covered > 80 ? Math.round(covered) : 0; // smaller differences are browser bars
 }
+
+/** Does a panel pulled down `distance` px and let go at `velocity` px/s (down = positive) close? */
+export const dismisses = (distance: number, velocity: number): boolean => distance > 100 || (distance > 24 && velocity > 600);

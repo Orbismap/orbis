@@ -114,11 +114,24 @@
   height: 54px;
   padding: 0 var(--s-1) 0 var(--s-2);
 }
-.hud-mobile :is(.lrow.is-on, .lfield.is-selected) {
+.hud-mobile .lfield.is-selected {
   border-radius: 0;
 }
-.hud-mobile .lrow + .lrow::before {
+/* the switch says on and off: no tint, and the hairlines stay */
+.hud-mobile .lrow.is-on {
+  background: transparent;
+}
+.hud-mobile .lrow + .lrow::before,
+.hud-mobile .lrow.is-on + .lrow::before,
+.hud-mobile .lrow + .lrow.is-on::before {
+  display: block;
   left: 52px;
+}
+.hud-mobile .switch-mark {
+  flex: none;
+  align-self: center;
+  margin: 0 var(--s-1);
+  cursor: pointer;
 }
 .hud-mobile .lrow-badge {
   width: 32px;
@@ -261,9 +274,84 @@
   width: var(--hit-touch);
   height: var(--hit-touch);
 }
+/* 26 px to look at, 44 to hit; the switch beside it is wider on phones */
+.popover-sheet .bm-key {
+  right: calc(51px + var(--s-3));
+}
+.popover-sheet .bm-key::after {
+  content: '';
+  position: absolute;
+  inset: -9px;
+}
 .popover-sheet .nameform-label,
 .popover-sheet .kall-head {
   font-size: var(--fs-small);
+}
+
+/* ---------- route planner and saved places: desktop panels, plain pages in the sheet ---------- */
+.hud-mobile .sheet-body .hudd {
+  flex: none;
+  width: auto;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  animation: none;
+}
+.hud-mobile .sheet-body .hudd-head {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  align-items: center;
+  min-height: 56px;
+  padding: 0 var(--s-3) 0 var(--s-4);
+  background: var(--ink-1);
+}
+.hud-mobile .hudd-head h2 {
+  flex: 1;
+  padding-top: 0;
+  font-size: var(--fs-inspector);
+}
+.hud-mobile .sheet-body .hudd-scroll {
+  flex: none;
+  overflow: visible;
+  overscroll-behavior: auto;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.hud-mobile .hud-rbtn {
+  width: var(--hit-touch);
+  height: var(--hit-touch);
+}
+.hud-mobile :is(.rt-mode, .rt-link) {
+  height: var(--hit-touch);
+  font-size: var(--fs-ui);
+}
+.hud-mobile .rt-field {
+  height: 52px;
+}
+/* suggestions push the page down instead of floating over it */
+.hud-mobile .rt-sugg {
+  position: static;
+  flex-basis: 100%;
+}
+.hud-mobile :is(.rt-opt, .rt-step, .rt-steps-toggle) {
+  min-height: 48px;
+}
+.hud-mobile :is(.rt-opt-t b, .rt-step, .rt-steps-toggle, .rt-cams) {
+  font-size: 1rem;
+}
+.hud-mobile :is(.rt-opt-t small, .rt-step small, .rt-steps-toggle small, .rt-opt-n, .rt-opt-card small, .rt-card-t small) {
+  font-size: var(--fs-small);
+}
+.hud-mobile .rt-card-more {
+  width: var(--hit-touch);
+  height: var(--hit-touch);
+}
+.hud-mobile .rt-foot {
+  border-top: 0;
+  padding-block: 0 var(--s-3);
 }
 
 /* ---------- selection, settings, catalog ---------- */

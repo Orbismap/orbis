@@ -65,7 +65,7 @@ export const MapView = memo(function MapView() {
   }, []);
   // maplibre-gl.css (unlayered) sets position:relative on its container, so the sizing lives on a wrapper
   return (
-    <div class="map wx-map-host" role="application" aria-label="Karte">
+    <div class="map wx-map-host" role="application" aria-label="Karte" data-behind-modal>
       <div ref={host} style={{ width: '100%', height: '100%' }} />
     </div>
   );

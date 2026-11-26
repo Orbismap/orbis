@@ -60,7 +60,7 @@ export function applyUrlState(u: UrlState): void {
     if (u.time !== undefined) setTime(u.time);
     // a new object each time: the same object asked for again starts the follow again
     followWanted.value = u.follow ? { ...u.follow } : null;
-    if (u.route && !isMobile.peek()) openRouteFromUrl(u.route);
+    if (u.route) openRouteFromUrl(u.route);
     if (u.place && !isMobile.peek()) {
       const cur = place.peek();
       if (!cur || cur.title !== u.place.title || cur.lat !== u.place.lat || cur.lng !== u.place.lng) selectPlace({ id: `url:${u.place.title}`, title: u.place.title, subtitle: u.place.subtitle, lng: u.place.lng, lat: u.place.lat, kind: u.place.kind });

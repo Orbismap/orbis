@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { orteView } from '../../state/hud';
 import { activeStop, addStop, clearRoute, coordStop, isRouteSaved, removeStop, routeChoice, backfillRoute, routeMode, routeState, routeView, saveCurrentRoute, savedPlaces, savedRoutes, setStop, stops, swapStops, type Stop } from '../../state/routes';
-import { mapEngine } from '../../state/ui';
+import { isMobile, mapEngine } from '../../state/ui';
 import { Button, IconButton } from '../../ui/Button';
 import { cx } from '../../ui/hooks';
 import { Icon } from '../../ui/icons/Icon';
@@ -291,7 +291,7 @@ export function RoutePanel() {
       <ScrollArea class="hudd-scroll">{planning ? <Planner /> : <SavedList />}</ScrollArea>
       {planning && (
         <p class="rt-hint rt-foot" role="status">
-          {stops.value[0] ? 'Klicke auf einen Weg oder eine Straße, um Punkte zu deiner Route hinzuzufügen.' : 'Klicke auf einen Weg oder eine Straße, um deinen Startpunkt hinzuzufügen.'}
+          {isMobile.value ? 'Tippe' : 'Klicke'} auf einen Weg oder eine Straße, um {stops.value[0] ? 'Punkte zu deiner Route' : 'deinen Startpunkt'} hinzuzufügen.
         </p>
       )}
     </Panel>

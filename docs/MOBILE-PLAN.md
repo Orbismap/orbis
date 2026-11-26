@@ -69,14 +69,16 @@ Jede Etappe ist ein eigener PR und für sich nutzbar. Aufwand: S bis halber Tag,
 - Gesehen und noch offen: Die Legende liegt breit über der Karte (Etappe 4); die Blick-Zeile mit Zeitleiste
   nimmt auf Unterseiten viel Platz (Etappe 2).
 
-### 1. Nichts Kaputtes, für alle bedienbar (M) · Befunde 1–4
+### 1. Nichts Kaputtes, für alle bedienbar (M) · Befunde 1–4 · erledigt, Test am iPhone offen
 
-- „Route“: Planer als Seite im Sheet anzeigen (`RoutePanel` wiederverwenden, kein zweiter Planer).
-- Ebenenzeilen: Häkchen bzw. Schalter als Zustand; Farbe nur zusätzlich.
-- Destruktive Knöpfe: dunklere Füllfarbe mit mindestens 4,5:1; `test/contrast.mjs` um Knöpfe erweitern.
-- Blätter: Fokus setzen und zurückgeben, `aria-modal`, Hintergrund `inert`, Wischen zum Schließen.
-- Zoom-Knöpfe für Bedienungshilfen; `.bm-key` (26 px) auf mindestens 44 px Trefferfläche.
-- **Fertig, wenn:** jeder sichtbare Knopf etwas Sichtbares tut und VoiceOver alle Bedienelemente benennt.
+- „Route“: Der Planer (`RoutePanel`) ist eine Seite im Sheet; Tippen auf die Karte setzt Routenpunkte, Links mit
+  Route öffnen ihn.
+- Ebenenzeilen zeigen am Handy einen Schalter statt nur der Hintergrundfarbe.
+- Gefüllte „Löschen“-Knöpfe: `--alert-fill`, Weiß darauf 5,2:1; `test/contrast.mjs` prüft die Knöpfe mit.
+- Blätter nehmen den Fokus und geben ihn zurück, sind `aria-modal`, sperren den Hintergrund und lassen sich nach
+  unten wegwischen.
+- Zoom-Knöpfe unsichtbar, für VoiceOver und Schaltersteuerung vorhanden; Cesium-Schlüsselknopf 44 px.
+- Offen für Etappe 2: Die Route liegt zur Hälfte hinter dem Sheet (Befund 7). VoiceOver am Gerät ist nicht geprüft.
 
 ### 2. Gerüst wie Apple Karten (L) · Befunde 6–9
 

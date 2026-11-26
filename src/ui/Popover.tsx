@@ -3,6 +3,7 @@ import { createPortal } from 'preact/compat';
 import { useEffect, useRef } from 'preact/hooks';
 import { IconButton } from './Button';
 import { cx, useEscape, useOutside } from './hooks';
+import { useSwipeDown } from './swipe-dismiss';
 import { Icon } from './icons/Icon';
 import type { UiIconName } from './icons/paths';
 import './popover.css';
@@ -27,9 +28,29 @@ export interface PopoverProps {
 const onPhone = () => typeof document !== 'undefined' && document.documentElement.dataset.bp === 'mobile';
 
 /**
+ * What an action sheet does beyond looking like one: it takes the focus and gives it back, and what lies behind it
+ * (marked `data-behind-modal`) can neither be touched nor reached by a screen reader.
+ */
+function useModal(ref: { current: HTMLElement | null }, active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const box = ref.current!;
+    const before = document.activeElement as HTMLElement | null;
+    if (!box.contains(before)) box.focus({ preventScroll: true });
+    const behind = [...document.querySelectorAll<HTMLElement>('[data-behind-modal]')].filter((n) => !n.inert);
+    for (const n of behind) n.inert = true;
+    return () => {
+      for (const n of behind) n.inert = false;
+      const now = document.activeElement;
+      if (before?.isConnected && (!now || now === document.body || box.contains(now))) before.focus({ preventScroll: true });
+    };
+  }, [active]);
+}
+
+/**
  * Anchored popover: Escape and outside press close it, focus returns to the anchor's first button.
  * On phones it is an action sheet instead: docked to the bottom above a scrim, outside every panel, so that nothing clips
- * it or lies on top of it; `align`, `up` and `style` do not apply there.
+ * it or lies on top of it; `align`, `up` and `style` do not apply there. It is modal, and a pull down closes it.
  */
 export function Popover({ open, onClose, children, align = 'start', up, class: cls, label, anchorRef, menu, style }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -37,9 +58,12 @@ export function Popover({ open, onClose, children, align = 'start', up, class: c
   useEscape(open, onClose);
   // the action sheet closes by its scrim: closing on pointerdown would let the following click hit what lies underneath
   useOutside(open && !phone, anchorRef ?? ref, onClose);
+  // before the menu takes the focus: the modal remembers where it was
+  useModal(ref, open && phone);
   useEffect(() => {
     if (open && menu) ref.current?.querySelector<HTMLElement>('[role^="menuitem"]')?.focus();
   }, [open, menu]);
+  useSwipeDown(ref, open && phone, onClose);
   if (!open) return null;
   const onKey = (e: KeyboardEvent) => {
     if (!menu) return;
@@ -51,14 +75,28 @@ export function Popover({ open, onClose, children, align = 'start', up, class: c
     else if (e.key === 'End') (e.preventDefault(), items[items.length - 1]?.focus());
   };
   const box = (
-    <div ref={ref} class={cx('popover', `popover-${align}`, up && 'popover-up', phone && 'popover-sheet', cls)} style={phone ? undefined : style} role={menu ? 'menu' : 'dialog'} aria-label={label} onKeyDown={onKey}>
+    <div
+      ref={ref}
+      class={cx('popover', `popover-${align}`, up && 'popover-up', phone && 'popover-sheet', cls)}
+      style={phone ? undefined : style}
+      role={menu && !phone ? 'menu' : 'dialog'}
+      aria-modal={phone || undefined}
+      tabIndex={phone ? -1 : undefined}
+      aria-label={label}
+      onKeyDown={onKey}
+    >
       {phone && (
-        <div class="popover-head" role="presentation">
+        <div class="popover-head">
           <span class="popover-title">{label}</span>
           <IconButton icon="close" label="Schließen" onClick={onClose} />
         </div>
       )}
-      {children}
+      {/* the sheet is a dialog with a close button; the menu inside it holds menu items only */}
+      {phone && menu ? (
+        <div role="menu" aria-label={label}>
+          {children}
+        </div>
+      ) : children}
     </div>
   );
   if (!phone) return box;

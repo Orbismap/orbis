@@ -11,6 +11,7 @@ import { camera } from '../../state/view';
 import { hasKey } from '../../keys';
 import { setLayerVisible } from '../../karten/active';
 import { useEscape } from '../../ui/hooks';
+import { SwitchMark } from '../../ui/Switch';
 import { Popover } from '../../ui/Popover';
 import { multiValues } from '../../layers/multi';
 import { OptionFields, shownOptions } from './LayerDetails';
@@ -122,6 +123,8 @@ export function LayerRow({ layer, def, karteId, from, index = 0, count = 1, onGr
           </button>
         )}
         {editing ? null : hasChoices(def) ? <FilterButton def={def} layer={layer} karteId={karteId} onSettings={openPage} /> : <SettingsButton def={def} onClick={openPage} />}
+        {/* phones show on and off as a switch, not by the colour of the row alone */}
+        {isMobile.value && !editing && <SwitchMark checked={layer.visible} onClick={toggle} />}
       </div>
       {st.state === 'loading' && <span class="lrow-strip" role="progressbar" aria-label={`${def.title} lädt`} />}
     </li>

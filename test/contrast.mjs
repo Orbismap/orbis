@@ -18,5 +18,12 @@ for (const [t, d] of Object.entries(themes)) for (const [bn, b] of Object.entrie
   const row = Object.entries(d.text).map(([k, v]) => { const c = cr(hex(v), bg); if (k.startsWith('text')) worst = Math.min(worst, c); return `${k} ${c.toFixed(1)}`; });
   console.log(`${t.padEnd(5)} on ${bn.padEnd(12)} ${row.join('  ')}`);
 }
+// filled buttons: label on fill (ui/button.css, ui/tokens.css)
+const buttons = { 'primary dark': ['#04202f', '#72c8f0'], 'primary light': ['#ffffff', '#0a5f94'], destructive: ['#ffffff', '#c6382c'] };
+for (const [name, [fg, bg]] of Object.entries(buttons)) {
+  const c = cr(hex(fg), hex(bg));
+  worst = Math.min(worst, c);
+  console.log(`button ${name.padEnd(14)} ${c.toFixed(1)}`);
+}
 console.log(`worst text ratio: ${worst.toFixed(2)}`);
 if (worst < 4.5) process.exit(1);

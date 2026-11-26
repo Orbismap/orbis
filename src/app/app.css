@@ -180,8 +180,12 @@
     right: var(--rail-inset);
     top: calc(env(safe-area-inset-top) + var(--hit-touch) + 20px);
   }
-  .hud-mobile .rail-zoom {
-    display: none;
+  /* no zoom buttons to see, but VoiceOver and Switch Control still reach them; focused, they appear */
+  .hud-mobile .rail-zoom:not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    clip-path: inset(50%);
   }
   .hud-mobile .attr-pos {
     position: absolute;

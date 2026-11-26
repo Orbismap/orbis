@@ -3,7 +3,7 @@ import { getLayer } from '../../layers/registry';
 import type { LegendSpec } from '../../layers/types';
 import { basemapDef } from '../../map/basemaps';
 import { activeKarte, legends, openActive } from '../../state/session';
-import { detailOpen } from '../../state/hud';
+import { detailOpen, orteView } from '../../state/hud';
 import { clearSelection } from '../../state/selection';
 import { leftPanelOpen, leftTab, leftView, isMobile, sheetDetent } from '../../state/ui';
 import { closeDetail, openDetail } from '../layers-panel/themes-state';
@@ -32,7 +32,8 @@ function reveal(): void {
   leftPanelOpen.value = true;
   detailOpen.value = true;
   if (isMobile.peek()) {
-    clearSelection(); // a selection would stay in front of what was asked for
+    orteView.value = null; // the planner or a selection would stay in front of what was asked for
+    clearSelection();
     if (sheetDetent.peek() === 'peek') sheetDetent.value = 'half';
   }
 }
