@@ -6,7 +6,7 @@ import type { ReadonlySignal } from '@preact/signals';
 import type { LandmarkSample } from '../../ext/types';
 import type { GeoFrame } from '../world3d/frame';
 import type { Stage, StagePart } from '../world3d/stage';
-import { exaggeration } from '../world3d/terrain';
+import { exaggeration, idleThrottle } from '../world3d/terrain';
 import { LandmarkBadges } from './badges';
 
 // 3D landmarks: the low-poly GLB models of the Landmarks dataset (CC0), each standing where its OpenStreetMap building is. The base
@@ -305,11 +305,11 @@ export class LandmarksPart implements StagePart {
   }
 
   /** Terrain tiles arrive after the models: when the ground under one changed, it moves with it. */
-  private onIdle = () => {
+  private onIdle = idleThrottle(() => this.stage.wake(), () => {
     let changed = false;
     for (const e of this.entries.values()) if (this.readGround(e)) changed = true;
     if (changed) this.stage.wake();
-  };
+  });
 
   /** Starts the loads that are due and puts loaded models into their places. */
   private fill() {

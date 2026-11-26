@@ -17,6 +17,8 @@ export function wrapLng(lng: number): number {
   const v = ((((lng + 180) % 360) + 360) % 360) - 180;
   return v;
 }
+/** The longitude in the copy of the world next to `centerLng` (not wrapped to ±180). */
+export const lngNear = (lng: number, centerLng: number) => lng + 360 * Math.round((centerLng - lng) / 360);
 export const clampLat = (lat: number) => clamp(lat, -90, 90);
 export const clampMercatorLat = (lat: number) => clamp(lat, -MAX_MERCATOR_LAT, MAX_MERCATOR_LAT);
 

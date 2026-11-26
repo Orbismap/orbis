@@ -12,7 +12,7 @@ import { mapDark, poiLabelsVisible, projection } from '../state/view';
 import { reducedMotion } from '../state/settings';
 import { buildingHeightFactor } from '../map/buildings-tilt';
 import type { MapEngine } from '../map/types';
-import { buildingsChannel, followCurrent, followWanted, landmarksChannel, powerChannel, shipsChannel, tilesetsChannel, tilesetsState, tracksChannel, treesChannel } from './channels';
+import { buildingsChannel, followCurrent, followWanted, landmarksChannel, powerChannel, shipsChannel, tilesetsChannel, tilesetsState, tracksChannel, treesChannel, windTurbinesChannel } from './channels';
 import { proEnabled } from './licence';
 import type { ExtensionHost, OrbisExtension } from './types';
 
@@ -47,6 +47,7 @@ function makeHost(engine: MapEngine): ExtensionHost {
     ships: shipsChannel,
     power: powerChannel,
     trees: treesChannel,
+    windTurbines: windTurbinesChannel,
     buildings: buildingsChannel,
     landmarks: landmarksChannel,
     tilesets: tilesetsChannel,

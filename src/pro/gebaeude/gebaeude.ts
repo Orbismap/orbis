@@ -4,7 +4,7 @@ import type { BuildingSample } from '../../ext/types';
 import { unit } from '../baeume/baeume';
 import type { GeoFrame } from '../world3d/frame';
 import type { Stage, StagePart } from '../world3d/stage';
-import { exaggeration, groundAt } from '../world3d/terrain';
+import { exaggeration, groundAt, idleThrottle } from '../world3d/terrain';
 import { roofColour, wallColour } from './colours';
 import { withoutSplitOutlines } from './outlines';
 import { buildBuilding, roofShapeOf, type Pt } from './roofs';
@@ -244,7 +244,7 @@ export class GebaeudePart implements StagePart {
   }
 
   /** Terrain tiles arrive after the buildings: when the ground under them changed, they move with it (only the ground attribute is rewritten). */
-  private onIdle = () => {
+  private onIdle = idleThrottle(() => this.stage.wake(), () => {
     const attr = this.mesh.geometry.getAttribute('ground') as THREE.BufferAttribute | undefined;
     let changed = false;
     for (const [b, [start, count]] of this.spans) {
@@ -255,7 +255,7 @@ export class GebaeudePart implements StagePart {
       if (attr) (attr.array as Float32Array).fill(h, start, start + count);
     }
     if (changed && attr) { attr.needsUpdate = true; this.stage.wake(); }
-  };
+  });
 
   /** All buildings into one geometry: the per-building arrays are copied, nothing is computed. z holds the height above the ground, the ground is an attribute of its own. */
   private rebuild() {

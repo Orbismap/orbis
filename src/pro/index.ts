@@ -10,6 +10,7 @@ import { PlanesPart } from './planes/planes';
 import { ShipsPart } from './ships/ships';
 import { StromnetzPart } from './stromnetz/stromnetz';
 import { TilesetPart } from './tiles3d/tileset';
+import { WindkraftPart } from './windkraft/windkraft';
 import { Follow } from './world3d/follow';
 import { Stage, STAGE_LAYER_ID, type StagePart } from './world3d/stage';
 
@@ -33,6 +34,7 @@ export const extension: OrbisExtension = {
     const planes = new PlanesPart(map, stage, (id) => host.tracks.select(id), host.reducedMotion);
     const ships = new ShipsPart(map, stage, (id) => host.ships.select(id), host.reducedMotion);
     const power = new StromnetzPart(map, stage);
+    const turbines = new WindkraftPart(map, stage, (id) => host.windTurbines.select(id), host.reducedMotion);
     const trees = new BaeumePart(map, stage);
     const buildings = new GebaeudePart(map, stage, host.buildingHeightFactor);
     const landmarks = new LandmarksPart(map, stage, host.buildingHeightFactor, host.mapDark, host.landmarkLabels, host.landmarkTierLimit);
@@ -54,6 +56,7 @@ export const extension: OrbisExtension = {
     stage.add(tiles);
     stage.add(buildings);
     stage.add(landmarks);
+    stage.add(turbines);
     stage.add(power);
     stage.add(trees);
     stage.add(ships);
@@ -146,39 +149,36 @@ export const extension: OrbisExtension = {
     const unbindPlanes = bind(host.tracks, planes, () => planes.tracker.planes.size);
     const unbindShips = bind(host.ships, ships, () => ships.tracker.ships.size);
 
-    // The power grid has no selection or follow. The layer publishes towers from zoom 14 and an empty list below, so
-    // the 3D presentation switches itself on and off with the zoom; present() hides the 2D tower dots meanwhile.
-    let powerOn = false;
-    let powerRelease: (() => void) | null = null;
-    const evaluatePower = () => {
-      const show = power.count > 0;
-      if (show === powerOn) return;
-      powerOn = show;
-      power.setActive(show);
-      if (show) powerRelease = host.power.present();
-      else { powerRelease?.(); powerRelease = null; }
+    // Static things (power grid, trees, wind turbines): the layer publishes them from its zoom on and an empty list below, so the
+    // 3D presentation switches itself on and off with the zoom; present() hides the 2D dots meanwhile.
+    const showStatic = <T>(channel: TracksChannel<T>, part: { readonly count: number; setActive(on: boolean): void; feed(items: readonly T[]): void }) => {
+      let release: (() => void) | null = null;
+      const evaluate = () => {
+        const show = part.count > 0;
+        if (show === (release !== null)) return;
+        part.setActive(show);
+        if (show) release = channel.present();
+        else { release?.(); release = null; }
+      };
+      const unsubscribe = channel.subscribe((items) => {
+        part.feed(items);
+        evaluate();
+      });
+      evaluate();
+      return () => {
+        unsubscribe();
+        release?.();
+        release = null;
+      };
     };
-    const stopPower = host.power.subscribe((items) => {
-      power.feed(items);
-      evaluatePower();
+    const unbindPower = showStatic(host.power, power);
+    const unbindTrees = showStatic(host.trees, trees);
+    const unbindTurbines = showStatic(host.windTurbines, turbines);
+    // a click on a 3D turbine opens the card of the layer; that turbine is highlighted
+    const stopTurbineSelected = host.windTurbines.selectedId.subscribe((id) => {
+      turbines.selected = id;
+      stage.wake();
     });
-    evaluatePower();
-    // Trees work the same way: the layer publishes them from zoom 15 and an empty list below.
-    let treesOn = false;
-    let treesRelease: (() => void) | null = null;
-    const evaluateTrees = () => {
-      const show = trees.count > 0;
-      if (show === treesOn) return;
-      treesOn = show;
-      trees.setActive(show);
-      if (show) treesRelease = host.trees.present();
-      else { treesRelease?.(); treesRelease = null; }
-    };
-    const stopTrees = host.trees.subscribe((items) => {
-      trees.feed(items);
-      evaluateTrees();
-    });
-    evaluateTrees();
     // Buildings: the layer publishes them from zoom 13.5 and an empty list below; while they are drawn the basemap's 2.5D houses step aside.
     let buildingsOn = false;
     let buildingsRelease: (() => void) | null = null;
@@ -208,14 +208,14 @@ export const extension: OrbisExtension = {
       stopReport();
       unbindPlanes();
       unbindShips();
-      stopPower();
-      stopTrees();
+      unbindPower();
+      unbindTrees();
+      stopTurbineSelected();
+      unbindTurbines();
       stopBuildings();
       stopLandmarks();
       stopTiles();
       tilesRelease?.();
-      powerRelease?.();
-      treesRelease?.();
       buildingsRelease?.();
       follow.dispose();
       host.removeLayer(stage.id);

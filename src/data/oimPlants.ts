@@ -53,11 +53,12 @@ export function osmPlantFilter(fuel: string, minMw: number): FilterSpecification
 /** OpenInfraMap serves plants and substations only from this zoom on (lower tiles hold just power lines). */
 export const OSM_PLANTS_MIN_ZOOM = 5;
 
-export function osmPlantParts(filter: VtPart['filter']): VtPart[] {
+/** `generatorFilter`: for the single generators, when they differ (wind turbines drawn in 3D leave their dots). */
+export function osmPlantParts(filter: VtPart['filter'], generatorFilter: VtPart['filter'] = filter): VtPart[] {
   return [
     { id: 'osm-flaeche', sourceLayer: 'power_plant', kind: 'fill', filter, color: sourceColor, minZoom: OSM_PLANTS_MIN_ZOOM },
     { id: 'osm-werk', sourceLayer: 'power_plant_point', kind: 'circle', filter, color: sourceColor, size: radius, sortKey: expr(['-', 0, mw]), minZoom: OSM_PLANTS_MIN_ZOOM },
-    { id: 'osm-erzeuger', sourceLayer: 'power_generator', kind: 'circle', filter, color: sourceColor, size: expr(['interpolate', ['linear'], ['zoom'], 9, 1.6, 14, 4, 18, 8]), minZoom: 9 },
+    { id: 'osm-erzeuger', sourceLayer: 'power_generator', kind: 'circle', filter: generatorFilter, color: sourceColor, size: expr(['interpolate', ['linear'], ['zoom'], 9, 1.6, 14, 4, 18, 8]), minZoom: 9 },
   ];
 }
 
@@ -66,7 +67,7 @@ const METHOD: Record<string, string> = {
   wind_turbine: 'Windkraftanlage', photovoltaic: 'Photovoltaik', anaerobic_digestion: 'Biogas', gasification: 'Vergasung', thermal: 'Thermisch',
 };
 
-export function describeOsmPlant(f: AnyFeature, part: VtPart): InspectCard {
+export function describeOsmPlant(f: AnyFeature, part: Pick<VtPart, 'id'>): InspectCard {
   const p = f.properties as Record<string, unknown>;
   const src = OSM_SOURCES[str(p.source)];
   const out = num(p.output);

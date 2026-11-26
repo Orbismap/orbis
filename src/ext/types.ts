@@ -95,6 +95,18 @@ export interface PowerLineSample {
 /** What the power grid channel carries: towers and overhead lines, to be connected by the extension. */
 export type PowerGridSample = PowerTowerSample | PowerLineSample;
 
+/** One wind turbine as the OpenInfraMap tiles give it (OpenStreetMap `power=generator`, `source=wind`); the extension works out its size and model itself. */
+export interface WindTurbineSample {
+  /** unique within the layer: the OSM id */
+  id: string;
+  lng: number;
+  lat: number;
+  /** rated power in MW, undefined when untagged (the tiles carry no hub height or rotor diameter) */
+  outputMw?: number;
+  /** the weather model's wind there at the selected time, 10 m above the ground; undefined while not loaded */
+  wind?: { speedMs: number; fromDeg: number };
+}
+
 /** One tree as the tiles give it (OpenStreetMap `natural=tree`, or a point on a `tree_row` / `hedge` line); the extension works out the model itself. */
 export interface TreeSample {
   /** unique within the layer: the position (the tiles carry no OSM ids) */
@@ -238,6 +250,8 @@ export interface ExtensionHost {
   readonly power: TracksChannel<PowerGridSample>;
   /** Channel for single trees (layer `baeume`). */
   readonly trees: TracksChannel<TreeSample>;
+  /** Channel for single wind turbines (layer `kraftwerke`). */
+  readonly windTurbines: TracksChannel<WindTurbineSample>;
   /** Channel for building footprints with their roof and height tags (`features/buildings3d/roofs-source.ts`, no layer). */
   readonly buildings: TracksChannel<BuildingSample>;
   /** Channel for 3D landmark models (`features/landmarks/source.ts`, no layer: they are always drawn, in front of OSM buildings). */
