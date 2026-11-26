@@ -88,7 +88,7 @@
   }
 }
 
-/* Phones: action sheet. Unlayered, so that it wins over the positions and sizes features give their popovers. */
+/* Phones: menu at its button, or sheet from the bottom. Unlayered, so that it wins over the positions and sizes features give their popovers. */
 .popover-layer {
   position: fixed;
   inset: 0;
@@ -102,6 +102,33 @@
   pointer-events: auto;
   touch-action: pan-x pan-y;
   animation: pop-scrim 180ms var(--ease);
+}
+/* a menu dims nothing, the layer only catches the tap beside it */
+.popover-layer.is-menu {
+  display: block;
+  padding: 0;
+  background: transparent;
+  animation: none;
+}
+.popover.popover-menu {
+  position: fixed;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.popover.popover-menu:focus,
+.popover.popover-sheet:focus {
+  outline: none;
+}
+.popover-menu .menuitem {
+  min-height: var(--hit-touch);
+  padding: 0 var(--s-3);
+  font-size: 1rem;
 }
 .popover.popover-sheet {
   position: relative;
@@ -136,9 +163,6 @@
   padding: 4px 8px 4px 18px;
   background: var(--ink-1);
 }
-.popover.popover-sheet:focus {
-  outline: none;
-}
 /* grabber: the sheet can be pulled down */
 .popover-head::before {
   content: '';
@@ -160,11 +184,29 @@
   font-size: var(--fs-title);
   font-weight: 600;
 }
-.popover-sheet .menuitem {
-  flex: none;
+/* a question about an action: the question, the action, and "Abbrechen" apart from it, full width */
+.popover.popover-actions {
+  padding: var(--s-3) var(--s-3);
+}
+.popover-actions .nameform {
+  width: auto;
+}
+.popover-actions .kall-confirm {
+  text-align: center;
+}
+.popover-actions .nameform-actions {
+  flex-direction: column-reverse;
+  gap: var(--s-2);
+}
+.popover-actions .nameform-actions .btn {
+  width: 100%;
   min-height: 52px;
-  padding: 0 var(--s-3);
+  justify-content: center;
   font-size: 1rem;
+}
+.popover-actions .nameform-actions .btn-ghost {
+  background: var(--g-fill);
+  font-weight: 600;
 }
 @keyframes pop-scrim {
   from {

@@ -179,25 +179,37 @@ Schmales, dichtes Paneel (300 px, `--panel-left` in `ui/tokens.css`). Zeilen
 
 ## Aufbau Mobil (< 900 px)
 
+Eine Karte, **ein** Sheet, Bedienung in Daumenreichweite (wie Apple Karten).
+
 ```
 ┌───────────────────────┐
-│ [◎ Suche……………] [⚙]    │  Kopf: Suche als Pille, Einstellungen
-│                    [3D]│
-│        Karte       [⌖] │  rechte Daumenleiste: Projektion, Standort
-│                        │
+│       Maßstab    [🌐] │  oben rechts: Grundkarte, 3D, Kompass, externe Karte
+│        Karte     [3D] │
+│ Legende          [➤]  │  Standort unten rechts, über dem Sheet
 │ ┌────────────────────┐ │
 │ │ ▬                  │ │  Sheet, drei Stufen:
-│ │ Wetter ▾  Jetzt    │ │   1 Blick  (112 px): Karte wählen, Zeit, Zeitleiste
-│ │ ▶ ──────│───────── │ │   2 Halb   (50 %):   Ebenen der Karte
-│ └────────────────────┘ │   3 Voll   (100 % − Kopf): Katalog, Inspektor, Einstellungen
+│ │ 🔍 Suchen        ⚙ │ │   Blick: Suche, Einstellungen, Karte, Zeit, „＋“, Zeitleiste
+│ │ Wetter ▾  Jetzt  ＋ │ │   Halb:  Ebenen der Karte oder eine Seite, Karte sichtbar
+│ │ ▶ ──────│───────── │ │   Voll:  Suche, Katalog, Einstellungen
+│ └────────────────────┘ │
 └───────────────────────┘
 ```
 
 - Sheet folgt dem Finger, rastet mit Federung ein, respektiert `env(safe-area-inset-*)`. Der Inhalt scrollt in „Halb“ und „Voll“
   nativ (Scroll-Viewport = sichtbarer Teil); Herunterziehen am Scroll-Anfang übergibt die Geste ans Sheet, Griff und Blick-Zeile
-  ziehen das Sheet immer. Zurück-Geste/Escape schließt eine Stufe.
-- Auswahl auf der Karte öffnet den Inspektor in Stufe „Halb“ als Überlagerung; die Karte verschiebt sich nie.
-- Zeitleiste ist in Stufe 1 immer erreichbar, Scrubben mit dem Daumen, haptisches Ticken an Tagesgrenzen
+  ziehen das Sheet immer. Glas in „Blick“ und „Halb“, deckend in „Voll“.
+- **Seiten** liegen als Stapel über der Liste (`state/sheet-pages.ts`): Auswahl, Ebene, Route, Orte, Katalog, Einstellungen,
+  Suche, Panel. „Zurück“ links geht eine Seite zurück, „Schließen“ rechts führt zur Liste. Browser-Zurück und Escape gehen
+  genau eine Seite zurück, ohne Seite eine Stufe tiefer. Wird eine Seite geschlossen, kehrt das Sheet zur vorigen Höhe zurück.
+  Auf einer Seite entfällt die Blick-Zeile; gesenkt zeigt das Sheet den Kopf der Seite.
+- **Suche** unten im Sheet: Antippen öffnet „Voll“ mit „Zuletzt gesucht“, Vorschlägen und „Abbrechen“.
+- **Auswahl** auf der Karte: Antippen wählt ein Objekt oder einen Ortsnamen, auf leere Fläche wählt ab; langes Drücken setzt
+  eine Stecknadel mit Ortskarte. Läge der Punkt unter dem Sheet, verschiebt sich die Karte so weit, dass er sichtbar bleibt.
+  Flüge und Routen enden oberhalb des Sheets.
+- **Aufklappen:** Auswahl aus wenigen Punkten ist ein Menü am Knopf (Kartenwahl, „⋯“, externe Karte). Einstellungen zum
+  Durchsehen (Grundkarte, Filter einer Ebene, Quellen) sind eine Seite im Sheet (`Popover page`). Formulare sind ein Blatt
+  von unten, Rückfragen vor dem Löschen ein Aktionsblatt mit „Abbrechen“.
+- Zeitleiste ist in „Blick“ immer erreichbar, Scrubben mit dem Daumen, haptisches Ticken an Tagesgrenzen
   (`navigator.vibrate`, wenn vorhanden).
 
 ## Karten: Ansichten und eigene Karten

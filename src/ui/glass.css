@@ -35,7 +35,6 @@
   .iconbtn-solid,
   .iconbtn-round,
   .attr-btn,
-  .msearch,
   .cap,
   .compass-round {
     background-color: var(--g-control);
@@ -72,7 +71,6 @@
     .iconbtn-solid,
   .iconbtn-round,
   .attr-btn,
-  .msearch,
   .cap,
   .compass-round { background-color: color-mix(in srgb, var(--ink-1) 94%, var(--text-1)); background-image: none; }
   }
@@ -88,7 +86,6 @@
     .iconbtn-solid,
   .iconbtn-round,
   .attr-btn,
-  .msearch,
   .cap,
   .compass-round { background-color: color-mix(in srgb, var(--ink-1) 96%, var(--text-1)); background-image: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
   }
@@ -103,7 +100,6 @@
   .tooltip, .iconbtn-solid,
   .iconbtn-round,
   .attr-btn,
-  .msearch,
   .cap,
   .compass-round { background-color: var(--ink-1); background-image: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: inset 0 0 0 1px var(--text-3); }
     :root { --text-2: var(--text-1); --text-3: var(--text-2); }

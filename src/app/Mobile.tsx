@@ -1,120 +1,92 @@
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect } from 'preact/hooks';
 import { serializeHash } from '../core/url';
 import { SeasonBar } from '../features/season/SeasonBar';
 import { Scalebar } from '../features/scalebar/Scalebar';
 import { Attribution } from '../features/attribution/Attribution';
-import { InspectorCard } from '../features/inspector/Inspector';
-import { KartenChangeRow } from '../features/karten-bar/actions';
 import { KartenSwitcher } from '../features/karten-bar/KartenSwitcher';
 import { Legend } from '../features/legend/Legend';
 import { startedWithMap as startedFromWetter } from '../map/adopt';
 import { ReturnFromWetter } from './ReturnFromWetter';
-import { ProbeCard } from '../features/probe/ProbeCard';
-import { RoutePanel } from '../features/routes/RoutePanel';
-import { SavedPlaces } from '../features/routes/SavedPlaces';
 import { Readout } from '../features/timeline/Transport';
 import { TimelineCompact } from '../features/timeline/Timeline';
-import { TopBar, ToolRail } from '../features/tools/Tools';
+import { LocateButton, ToolRail } from '../features/tools/Tools';
+import { SearchBar } from '../features/search/SheetSearch';
+import { startKeepVisible } from '../features/shared/keep-visible';
 import { reducedMotion } from '../state/settings';
 import { activeKarte } from '../state/session';
-import { clearSelection, inspector, probe } from '../state/selection';
+import { goBack, sheetPages, startSheetPages } from '../state/sheet-pages';
 import { showView } from '../state/sheet-view';
 import { currentUrlState } from '../state/url-sync';
-import { searchOpen, sheetDetent, leftTab, leftView } from '../state/ui';
+import { sheetDetent, leftTab } from '../state/ui';
+import { sheetCover } from '../state/view';
 import { hasTimeLayers } from '../state/time';
-import { orteView } from '../state/hud';
-import { detailPage } from '../features/layers-panel/themes-state';
 import { feedEntries } from '../features/feed/Feed';
 import { Icon } from '../ui/icons/Icon';
 import { Sheet } from '../ui/Sheet';
-import { LeftBody } from './LeftBody';
+import { PageContent, PanelPage } from './SheetPage';
 import { startSheetHistory } from './history';
 import './mobile.css';
 
-function Header() {
-  return (
-    <header class="mhead">
-      <button type="button" class="msearch" onClick={() => (searchOpen.value = true)} aria-label="Suche öffnen">
-        <Icon name="search" size={18} />
-        <span>Ort oder Ebene suchen</span>
-      </button>
-      <TopBar />
-    </header>
-  );
-}
+/** Heights of the bar at the top of the sheet, grip included. */
+const BAR = { timed: 192, plain: 136, search: 80 };
+/** What a lowered sheet shows of a page: the grip and the page's head. */
+const PAGE_PEEK = 80;
 
-/** Always visible bar of the sheet: the Karte, the time or what is on the map, and "add layer"; the timeline below, if any. */
-function PeekRow({ timed }: { timed: boolean }) {
+/** The bar of the list: search and settings; below it the Karte, the time or what is on the map, and "add layer". */
+function Bar({ searching, timed }: { searching: boolean; timed: boolean }) {
   const n = activeKarte.value.layers.filter((l) => l.visible).length;
   return (
     <div class="peek">
-      <div class="peek-row">
-        <KartenSwitcher />
-        <div class="peek-mid">{timed ? <Readout /> : <span class="peek-count">{n === 0 ? 'Keine Ebene aktiv' : n === 1 ? '1 Ebene aktiv' : `${n} Ebenen aktiv`}</span>}</div>
-        <button type="button" class="peek-add" aria-label="Ebene hinzufügen" data-nodrag onClick={() => showView('catalog')}>
-          <Icon name="plus" size={22} />
-        </button>
-      </div>
-      {timed && <TimelineCompact />}
+      {/* first in both states: the field keeps its element, and with it the focus and the keyboard */}
+      <SearchBar />
+      {!searching && (
+        <>
+          <div class="peek-row">
+            <KartenSwitcher />
+            <div class="peek-mid">{timed ? <Readout /> : <span class="peek-count">{n === 0 ? 'Keine Ebene aktiv' : n === 1 ? '1 Ebene aktiv' : `${n} Ebenen aktiv`}</span>}</div>
+            <button type="button" class="peek-add" aria-label="Ebene hinzufügen" data-nodrag onClick={() => showView('catalog')}>
+              <Icon name="plus" size={22} />
+            </button>
+          </div>
+          {timed && <TimelineCompact />}
+        </>
+      )}
     </div>
   );
 }
 
 export function MobileLayout() {
-  const sel = inspector.value;
-  const p = probe.value;
   const detent = sheetDetent.value;
   const timed = hasTimeLayers.value;
-  const view = leftView.value;
-  const page = detailPage.value?.layerId;
+  const stack = sheetPages.value;
+  const top = stack[stack.length - 1];
+  const panel = top?.id === 'panel';
+  // a panel lies over its page, which stays: the button that opened the panel lives there
+  const page = panel ? stack[stack.length - 2] : top;
 
-  const orte = orteView.value;
+  useEffect(() => {
+    const stops = [
+      startSheetPages(),
+      startSheetHistory(() => serializeHash(currentUrlState()), { hasPage: () => sheetPages.value.length > 0, back: goBack }),
+      startKeepVisible(),
+    ];
+    return () => {
+      stops.forEach((s) => s());
+      sheetCover.value = 0;
+    };
+  }, []);
 
-  // a selection opens a lowered sheet at half, and closing it lowers the sheet again
-  const raised = useRef(false);
-  useEffect(() => {
-    if (sel || p) {
-      if (sheetDetent.peek() === 'peek') {
-        raised.current = true;
-        sheetDetent.value = 'half';
-      }
-    } else if (raised.current) {
-      raised.current = false;
-      // not when the route planner took the selection's place: lowering and raising at once would upset the history
-      if (!orteView.peek() && sheetDetent.peek() === 'half') sheetDetent.value = 'peek';
-    }
-  }, [sel, p]);
-  // the route planner and the saved places show at half height, the map stays in view
-  useEffect(() => {
-    if (!orte) return;
-    raised.current = false;
-    sheetDetent.value = 'half';
-  }, [orte]);
-  // catalog and settings need room; they and a layer page take the place of a selection
-  useEffect(() => {
-    if (view === 'layers') return;
-    raised.current = false;
-    clearSelection();
-    sheetDetent.value = 'full';
-  }, [view]);
-  useEffect(() => {
-    if (!page) return;
-    raised.current = false;
-    orteView.value = null;
-    clearSelection();
-    if (sheetDetent.peek() === 'peek') sheetDetent.value = 'half';
-  }, [page]);
-  useEffect(() => startSheetHistory(() => serializeHash(currentUrlState())), []);
-
-  const list = !sel && !p && !orte;
-  const feed = list && view === 'layers' && leftTab.value === 'feed' && feedEntries.value.length > 0;
-  const scrollKey = sel ? `sel:${sel.layerId}:${sel.card.title}` : p ? 'probe' : orte ? orte : view !== 'layers' ? view : page ? `page:${page}` : leftTab.value;
+  const searching = top?.id === 'search';
+  const feed = !page && leftTab.value === 'feed' && feedEntries.value.length > 0;
+  const bar = !top || searching;
 
   return (
     <div class="hud hud-mobile" data-detent={detent} data-behind-modal>
-      <Header />
       <div class="rail-pos">
-        <ToolRail popoverUp />
+        <ToolRail popoverUp locate={false} />
+      </div>
+      <div class="locate-pos">
+        <LocateButton />
       </div>
       <div class="season-pos">
         <SeasonBar />
@@ -130,23 +102,24 @@ export function MobileLayout() {
         <Attribution />
       </div>
       <Sheet
-        label="Karten, Ebenen und Zeit"
+        label="Suche, Karten, Ebenen und Zeit"
         detent={detent}
         onDetent={(d) => (sheetDetent.value = d)}
-        peekHeight={timed ? 136 : 80}
-        topInset={64}
+        onRest={(px) => (sheetCover.value = px)}
+        peekHeight={searching ? BAR.search : top ? PAGE_PEEK : timed ? BAR.timed : BAR.plain}
+        peekLive={!bar}
+        topInset={12}
         reducedMotion={reducedMotion()}
-        scrollKey={scrollKey}
-        keepScroll={list && view === 'layers' && !page}
-        fill={list && (view === 'catalog' || feed)}
-        peek={<PeekRow timed={timed} />}
+        scrollKey={top ? `${top.id}:${top.key}` : leftTab.value}
+        keepScroll={!top}
+        fill={!panel && (page?.id === 'catalog' || feed)}
+        peek={bar ? <Bar searching={searching} timed={timed} /> : undefined}
       >
-        {sel ? <InspectorCard key={`${sel.layerId}:${sel.card.title}`} card={sel.card} layerId={sel.layerId} /> : p ? <ProbeCard /> : orte === 'routes' ? <RoutePanel /> : orte === 'places' ? <SavedPlaces /> : (
-          <>
-            {view === 'layers' && <KartenChangeRow />}
-            <LeftBody />
-          </>
-        )}
+        <div class="sheet-page" hidden={panel}>
+          <PageContent page={page} />
+        </div>
+        {/* under another page (a point tapped while it was open) the panel waits */}
+        {panel && <PanelPage />}
       </Sheet>
     </div>
   );

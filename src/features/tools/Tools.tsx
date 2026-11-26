@@ -1,9 +1,7 @@
 import { useRef } from 'preact/hooks';
 import { unwrapAngle } from '../../map/frame';
 import { useCameraFrame } from '../../map/useCameraFrame';
-import { showView } from '../../state/sheet-view';
-import { inspector, probe } from '../../state/selection';
-import { isMobile, leftPanelOpen, leftView, mapEngine, sheetDetent } from '../../state/ui';
+import { leftPanelOpen, leftView, mapEngine } from '../../state/ui';
 import { camera } from '../../state/view';
 import { IconButton } from '../../ui/Button';
 import { Icon } from '../../ui/icons/Icon';
@@ -11,6 +9,7 @@ import { tipProps } from '../../ui/tip-state';
 import { TiltGroup } from './Tilt';
 import { BasemapPicker } from '../basemap/BasemapPicker';
 import { OpenInMaps } from './OpenInMaps';
+import { goToMyLocation } from './my-location';
 import './tools.css';
 
 const zoomBy = (d: number) => mapEngine.peek()?.flyTo({ zoom: camera.peek().zoom + d, duration: 260 });
@@ -68,10 +67,10 @@ function Compass() {
 }
 
 /** Right edge rail: basemap and view button (icon = current projection), zoom capsule, compass. G toggles the projection. */
-export function ToolRail({ popoverUp }: { popoverUp?: boolean }) {
+export function ToolRail({ popoverUp, locate }: { popoverUp?: boolean; locate?: boolean }) {
   return (
     <div class="rail" role="group" aria-label="Kartenansicht">
-      <BasemapPicker side={popoverUp ? 'left' : 'down'} />
+      <BasemapPicker side={popoverUp ? 'left' : 'down'} locate={locate} />
       <div class="cap rail-cap rail-stack rail-zoom">
         <button type="button" class="railbtn" aria-label="Vergrößern" onClick={() => zoomBy(1)} {...tipProps('Vergrößern', undefined, 'left')}>
           <Icon name="plus" size={20} />
@@ -88,9 +87,18 @@ export function ToolRail({ popoverUp }: { popoverUp?: boolean }) {
   );
 }
 
+/** Phones: "my location" within reach of the thumb, just above the sheet. */
+export function LocateButton() {
+  return (
+    <div class="cap rail-cap">
+      <button type="button" class="railbtn" aria-label="Zum eigenen Standort" onClick={goToMyLocation}>
+        <Icon name="navigate" size={20} />
+      </button>
+    </div>
+  );
+}
+
 function openSettings() {
-  // a lowered sheet or a selection in it would hide the settings: show them instead of toggling
-  if (isMobile.peek() && (sheetDetent.peek() === 'peek' || inspector.peek() || probe.peek())) return showView('settings');
   leftPanelOpen.value = true;
   leftView.value = leftView.peek() === 'settings' ? 'layers' : 'settings';
 }

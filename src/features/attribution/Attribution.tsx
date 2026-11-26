@@ -24,7 +24,7 @@ export function Attribution() {
         <Icon name="info" size={14} />
         <span>Quellen</span>
       </button>
-      <Popover open={open} onClose={() => setOpen(false)} align="end" up label="Quellen und Lizenzen" anchorRef={wrap} class="attr-pop">
+      <Popover page open={open} onClose={() => setOpen(false)} align="end" up label="Quellen und Lizenzen" anchorRef={wrap} class="attr-pop">
         <div class="attr-body">
           <h3>Karte</h3>
           <ul role="list">

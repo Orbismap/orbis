@@ -1,6 +1,8 @@
 import { formatAge, formatCoord, formatDateTime } from '../../core/format';
 import type { InspectCard } from '../../layers/types';
 import { clearSelection } from '../../state/selection';
+import { closeCard } from '../../state/sheet-pages';
+import { SheetBack } from '../shared/SheetNav';
 import { now } from '../../state/time';
 import { Button, IconButton } from '../../ui/Button';
 import { Icon } from '../../ui/icons/Icon';
@@ -17,6 +19,7 @@ export function InspectorCard({ card, layerId }: { card: InspectCard; layerId: s
   return (
     <article class="insp" aria-label={card.title} data-layer={layerId}>
       <header class="insp-head">
+        {!card.backLabel && <SheetBack />}
         {card.backLabel ? (
           <IconButton icon="chevron-left" label={card.backLabel} onClick={clearSelection} />
         ) : (
@@ -29,7 +32,7 @@ export function InspectorCard({ card, layerId }: { card: InspectCard; layerId: s
           <h2 class="insp-title">{card.title}</h2>
           {card.subtitle && <p class="insp-sub">{card.subtitle}</p>}
         </div>
-        <IconButton icon="close" label="Schließen" shortcut="Esc" onClick={clearSelection} />
+        <IconButton icon="close" label="Schließen" shortcut="Esc" onClick={() => closeCard(clearSelection)} />
       </header>
       {card.time !== undefined && (
         <p class="insp-time num">

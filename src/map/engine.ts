@@ -9,7 +9,7 @@ import { closeKarteDetail } from '../state/hud';
 import { routePick } from '../state/routes';
 import { clearSelection, selectPlace, setProbe } from '../state/selection';
 import { isMobile } from '../state/ui';
-import { activeBasemap as activeBasemapSignal, buildings3d, poiBasemap, poiLayerOn, poiLabelsVisible, buildingColour, buildingsColoured, buildingsLayerOn, buildingsPlainWanted, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, terrainLayerOn, viewport, type CameraState, type Padding } from '../state/view';
+import { activeBasemap as activeBasemapSignal, buildings3d, poiBasemap, poiLayerOn, poiLabelsVisible, buildingColour, buildingsColoured, buildingsLayerOn, buildingsPlainWanted, buildingsReplaced, camera, mapDark, karteMode, padding, projection as projectionSignal, sheetCover, terrainLayerOn, viewport, type CameraState, type Padding } from '../state/view';
 import { BASEMAPS, BASEMAP_IDS, DEFAULT_BASEMAP, isStaticBasemap, GENERIC_BUILDINGS_ID, buildingColourOf, HILLSHADE_LAYER, HILLSHADE_STRENGTH, TERRAIN_EXAGGERATION, TERRAIN_SOURCE, composeStyle, hasOwnBuildings, hasTiles3d, isAerial, showsRelief, skyFor } from './basemaps';
 import { registerDemTiles } from './dem-protocol';
 import { reliefRange } from './relief';
@@ -135,28 +135,23 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
   const disposeBuildingsTilt = installBuildingsTilt(ml);
   const disposeGlobeTerrainFix = installGlobeTerrainFix(ml);
   const terminator = createTerminator(ml);
-  // Desktop: a plain click on empty map closes the detail menu (selection and Karte menu, layers stay on); the point
-  // query needs a 1 s press. Mobile keeps tap-to-query. While a route is planned, both set a point of the route.
+  // A tap or click on a label selects the place, one on empty map deselects (and closes the Karte menu, layers stay on);
+  // a long press drops a pin. While a route is planned, a tap sets a point of the route.
   const picking = createPicking(
     ml,
     (at) => {
-      if (isMobile.peek()) {
-        if (!at || !routePick(at)) setProbe(at);
-        return;
-      }
-      const lbl = at && !isMobile.peek() ? labelAt(ml, at) : undefined;
+      const lbl = at ? labelAt(ml, at) : undefined;
       if (at && routePick(lbl ?? at, lbl?.title)) return;
       if (lbl) {
         selectPlace({ id: `lbl:${lbl.lng.toFixed(4)},${lbl.lat.toFixed(4)}`, title: lbl.title, subtitle: '', lng: lbl.lng, lat: lbl.lat, category: lbl.category || undefined });
-        engine.flyTo({ center: [lbl.lng, lbl.lat], zoom: Math.max(ml.getZoom(), lbl.zoom) });
+        // phones keep their zoom: features/shared/keep-visible.ts moves the map only if the sheet would cover the point
+        if (!isMobile.peek()) engine.flyTo({ center: [lbl.lng, lbl.lat], zoom: Math.max(ml.getZoom(), lbl.zoom) });
         return;
       }
       if (at) (clearSelection(), closeKarteDetail());
       else setProbe(null);
     },
-    (at) => {
-      if (!isMobile.peek()) setProbe(at);
-    },
+    (at) => setProbe(at),
   );
   // the places of the basemap and the badges of the 3D landmarks (pro, layer id of pro/landmarks/badges.ts) open the detail menu, like a searched place
   picking.add([POI_LAYER_ID, poiDotsId(POI_LAYER_ID), 'landmark-badges'], {
@@ -566,7 +561,7 @@ export function createMapEngine(container: HTMLElement, init: EngineInit = {}): 
       return picking.add(layerIds, h);
     },
     flyTo(target: CameraTarget) {
-      flyToTarget(ml, target, padding.peek());
+      flyToTarget(ml, target, padding.peek(), sheetCover.peek());
     },
     holdCamera: () => limits.hold(),
     requestRender() {

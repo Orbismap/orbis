@@ -89,13 +89,15 @@ export function clampCamera<T extends { zoom: number; pitch: number; bearing: nu
 
 const EASING = { linear: (p: number) => p, out: (p: number) => 1 - (1 - p) * (1 - p) };
 
-export function flyToTarget(ml: MlMap, t: CameraTarget, basePadding: Padding): void {
+/** `cover`: px at the bottom edge that something lies over (the phone sheet); targets come to rest above it. */
+export function flyToTarget(ml: MlMap, t: CameraTarget, basePadding: Padding, cover = 0): void {
   const padding = { ...basePadding, ...t.padding };
+  const hidden = cover ? Math.min(cover, ml.getContainer().clientHeight / 2) : 0;
   const duration = t.duration ?? 1200;
   const easing = t.easing ? { easing: EASING[t.easing] } : {};
   if (t.bounds) {
     const [w, s, e, n] = t.bounds;
-    ml.fitBounds([[w, s], [e, n]], { padding, duration, maxZoom: t.maxZoom ?? 16, bearing: t.bearing ?? ml.getBearing(), pitch: t.pitch ?? ml.getPitch(), ...easing });
+    ml.fitBounds([[w, s], [e, n]], { padding: { ...padding, bottom: padding.bottom + hidden }, duration, maxZoom: t.maxZoom ?? 16, bearing: t.bearing ?? ml.getBearing(), pitch: t.pitch ?? ml.getPitch(), ...easing });
     return;
   }
   const opts = {
@@ -105,9 +107,12 @@ export function flyToTarget(ml: MlMap, t: CameraTarget, basePadding: Padding): v
     pitch: t.pitch,
     padding,
     essential: true,
+    // an offset, unlike a padding, leaves the camera of the map as it is; without a target there is nothing to move up
+    ...(hidden && t.center ? { offset: [0, -hidden / 2] as [number, number] } : {}),
     ...easing,
   };
-  if (duration === 0) ml.jumpTo(opts);
+  if (duration === 0 && opts.offset) ml.easeTo({ ...opts, duration: 0 });
+  else if (duration === 0) ml.jumpTo(opts);
   else ml.flyTo({ ...opts, duration });
 }
 

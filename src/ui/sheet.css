@@ -58,7 +58,7 @@
     transition: opacity var(--t-panel) var(--ease);
   }
   /* lowered, only the peek row shows: the content does not peep into the safe area below it */
-  .sheet.is-peek:not(.is-dragging) .sheet-body-wrap {
+  .sheet.is-peek:not(.is-dragging, .is-live) .sheet-body-wrap {
     opacity: 0;
   }
   .sheet-body {

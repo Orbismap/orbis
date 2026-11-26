@@ -6,6 +6,7 @@ import type { KarteLayer } from '../../karten/types';
 import type { LayerDef } from '../../layers/types';
 import { Icon } from '../../ui/icons/Icon';
 import { Switch } from '../../ui/Switch';
+import { SheetClose } from '../shared/SheetNav';
 import { RemoveAction, SourceList } from './LayerDetails';
 import { closeDetail } from './themes-state';
 
@@ -27,6 +28,7 @@ export function PageFrame({ def, from, children }: { def: LayerDef; from: string
           <span>{from}</span>
         </button>
         <h3 class="lpage-bartitle">{def.title}</h3>
+        <SheetClose />
       </div>
       {children}
     </section>

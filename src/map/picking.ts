@@ -79,11 +79,15 @@ export function createPicking(ml: MlMap, onMiss: (at: { lng: number; lat: number
   // long press: pointer held still for LONG_PRESS_MS (500 ms); the click that follows the release is swallowed
   let press: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | undefined;
   let swallowClick = false;
+  // browsers follow a touch with made-up mouse events: those must not start a second press or release the click lock
+  let touched = -Infinity;
   const cancelPress = () => {
     if (press) clearTimeout(press.timer);
     press = undefined;
   };
   const onDown = (e: MapMouseEvent | MapTouchEvent) => {
+    if (e.type === 'touchstart') touched = performance.now();
+    else if (performance.now() - touched < 1000) return;
     cancelPress();
     swallowClick = false;
     if (!onLongPress || ('button' in e.originalEvent && (e.originalEvent as MouseEvent).button !== 0)) return;
@@ -153,7 +157,11 @@ export function createPicking(ml: MlMap, onMiss: (at: { lng: number; lat: number
   ml.on('mousemove', onPressMove);
   ml.on('touchmove', onPressMove);
   ml.on('mouseup', cancelPress);
-  ml.on('touchend', cancelPress);
+  const onTouchEnd = () => {
+    touched = performance.now();
+    cancelPress();
+  };
+  ml.on('touchend', onTouchEnd);
   ml.on('touchcancel', cancelPress);
   ml.on('dragstart', cancelPress);
   ml.on('zoomstart', cancelPress);
@@ -178,7 +186,7 @@ export function createPicking(ml: MlMap, onMiss: (at: { lng: number; lat: number
       ml.off('mousemove', onPressMove);
       ml.off('touchmove', onPressMove);
       ml.off('mouseup', cancelPress);
-      ml.off('touchend', cancelPress);
+      ml.off('touchend', onTouchEnd);
       ml.off('touchcancel', cancelPress);
       ml.off('dragstart', cancelPress);
       ml.off('zoomstart', cancelPress);

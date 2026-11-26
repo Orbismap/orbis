@@ -4,7 +4,7 @@ import { formatCoord } from '../core/format';
 import { getJSON, setJSON } from '../core/storage';
 import { fetchAscentDescent, fetchRoutes, thinCoords, type RouteMode, type RouteResult } from '../features/routes/osrm';
 import { parseReverse } from '../features/place/reverse';
-import { mapEngine } from './ui';
+import { isMobile, mapEngine } from './ui';
 import { orteView } from './hud';
 import { clearSelection } from './selection';
 
@@ -140,8 +140,8 @@ export const isRouteSaved = () => {
 
 /** Opens the planner with nothing filled in (menu, Cmd+K). */
 export function newRoute(): void {
-  clearSelection();
   batch(() => {
+    clearSelection();
     clearRoute();
     orteView.value = 'routes';
     routeView.value = 'plan';
@@ -150,9 +150,10 @@ export function newRoute(): void {
 
 /** Opens the planner with a destination (from a place card). */
 export function routeTo(p: Omit<Stop, 'id'>): void {
-  clearSelection();
   const to: Stop = { ...p, id: stopId(p.lng, p.lat) };
   batch(() => {
+    // phones keep the card below the planner, one step back (state/sheet-pages.ts)
+    if (!isMobile.peek()) clearSelection();
     const l = stops.peek();
     stops.value = [l.length > 2 ? l[0]! : l[0] && l[0].id !== to.id ? l[0] : null, ...l.slice(1, -1), to];
     activeStop.value = Math.max(0, stops.peek().findIndex((s) => s === null));

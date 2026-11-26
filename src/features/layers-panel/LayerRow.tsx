@@ -197,7 +197,7 @@ function FilterButton({ def, layer, karteId, onSettings }: { def: LayerDef; laye
   const pop = useRef<HTMLDivElement>(null);
   const open = pos !== null;
   const close = () => setPos(null);
-  const phone = isMobile.value; // there the shared popover is an action sheet and closes itself
+  const phone = isMobile.value; // there the options are a page of the sheet, and the popover closes itself
   useEscape(open && !phone, close);
   // not enough room below the row: open upwards instead (anchored at the bottom edge, so the height does not matter)
   useLayoutEffect(() => {
@@ -247,7 +247,7 @@ function FilterButton({ def, layer, karteId, onSettings }: { def: LayerDef; laye
         <Icon name={customPage(def.id) ? 'sliders' : 'filter'} size={16} />
       </button>
       {phone && (
-        <Popover open={open} onClose={close} label={def.title} class="lrow-pop" anchorRef={btn}>
+        <Popover page open={open} onClose={close} label={def.title} class="lrow-pop" anchorRef={btn}>
           {body}
         </Popover>
       )}

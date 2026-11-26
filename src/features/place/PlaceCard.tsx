@@ -3,6 +3,8 @@ import { formatCoord } from '../../core/format';
 import { getLayer } from '../../layers/registry';
 import { clearSelection, place } from '../../state/selection';
 import { RouteButton } from '../routes/RouteButton';
+import { closeCard } from '../../state/sheet-pages';
+import { SheetBack } from '../shared/SheetNav';
 import { isPlaceSaved, toggleSavedPlace } from '../../state/routes';
 import { toast } from '../../ui/toast';
 import { Button, IconButton } from '../../ui/Button';
@@ -90,9 +92,10 @@ export function PlaceCard() {
   return (
     <article class="insp place" aria-label={p.title}>
       <header class="place-head">
+        <SheetBack />
         <IconButton icon="share" label="Link teilen" class="place-share" onClick={() => share(p.title)} />
         <h2 class="place-title">{p.title}</h2>
-        <IconButton icon="close" label="Schließen" shortcut="Esc" class="place-close" onClick={clearSelection} />
+        <IconButton icon="close" label="Schließen" shortcut="Esc" class="place-close" onClick={() => closeCard(clearSelection)} />
       </header>
       <div class="insp-actions place-actions">
         <RouteButton title={p.title} subtitle={p.subtitle} lng={p.lng} lat={p.lat} />

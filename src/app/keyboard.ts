@@ -1,6 +1,7 @@
 import { clearSelection, inspector, probe } from '../state/selection';
 import { listedKarten } from '../karten/store';
 import { openKarte } from '../karten/active';
+import { goBack, sheetPages } from '../state/sheet-pages';
 import { goLive, hasTimeLayers, step } from '../state/time';
 import { closeKarteDetail, hudSearchFocus, detailOpen, orteView } from '../state/hud';
 import { isMobile, leftPanelOpen, leftView, searchOpen, settingsOpen, shortcutsOpen, sheetDetent } from '../state/ui';
@@ -46,13 +47,14 @@ export function startKeyboard(): () => void {
       return;
     }
     if (e.key === 'Escape') {
-      if (inspector.peek() || probe.peek()) {
-        clearSelection();
-        if (isMobile.peek()) sheetDetent.value = 'peek';
-      } else if (orteView.peek()) orteView.value = null;
+      if (isMobile.peek()) {
+        if (sheetPages.peek().length) goBack();
+        else if (sheetDetent.peek() !== 'peek') sheetDetent.value = sheetDetent.peek() === 'full' ? 'half' : 'peek';
+        else return;
+      } else if (inspector.peek() || probe.peek()) clearSelection();
+      else if (orteView.peek()) orteView.value = null;
       else if (leftView.peek() !== 'layers') leftView.value = 'layers';
-      else if (!isMobile.peek() && detailOpen.peek()) closeKarteDetail();
-      else if (isMobile.peek() && sheetDetent.peek() !== 'peek') sheetDetent.value = sheetDetent.peek() === 'full' ? 'half' : 'peek';
+      else if (detailOpen.peek()) closeKarteDetail();
       else return;
       e.preventDefault();
       return;

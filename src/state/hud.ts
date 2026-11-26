@@ -31,9 +31,10 @@ export const detailOpen = signal(false);
 /** "Orte" pages of the main menu shown in the detail menu: saved places or the route planner. */
 export type OrteView = 'places' | 'routes';
 export const orteView = signal<OrteView | null>(null);
-// picking an object or a place on the map replaces the Orte page (route and saved places stay in their state)
+// picking an object or a place on the map replaces the Orte page (route and saved places stay in their state);
+// on phones the page stays below the card, one step back (state/sheet-pages.ts)
 effect(() => {
-  if ((inspector.value || probe.value || place.value) && orteView.peek()) orteView.value = null;
+  if ((inspector.value || probe.value || place.value) && orteView.peek() && !isMobile.peek()) orteView.value = null;
 });
 
 /** The detail menu shows: a map selection, an Orte page, or the active Karte while it is open. */

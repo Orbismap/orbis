@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { signal } from '@preact/signals';
 import { sheetDetent } from '../state/ui';
 import { startSheetHistory } from './history';
 
@@ -37,13 +38,15 @@ function fakeBrowser(url: string) {
 }
 
 describe('startSheetHistory', () => {
-  beforeEach(() => (sheetDetent.value = 'peek'));
+  const pages = signal(0);
+  const nav = { hasPage: () => pages.value > 0, back: () => void pages.value-- };
+  beforeEach(() => ((pages.value = 0), (sheetDetent.value = 'peek')));
   afterEach(() => vi.unstubAllGlobals());
 
   it('keeps the state changed in the open sheet when the sheet is lowered', () => {
     const b = fakeBrowser('#old');
     let now = '#old';
-    const stop = startSheetHistory(() => now);
+    const stop = startSheetHistory(() => now, nav);
     sheetDetent.value = 'half';
     now = '#new';
     b.history.replaceState(b.history.state, '', now); // the URL writer
@@ -55,7 +58,7 @@ describe('startSheetHistory', () => {
 
   it('leaves a link that only changes the hash alone', () => {
     const b = fakeBrowser('#old');
-    const stop = startSheetHistory(() => '#current');
+    const stop = startSheetHistory(() => '#current', nav);
     sheetDetent.value = 'half';
     b.follow('#linked');
     expect(b.url()).toBe('#linked');
@@ -65,7 +68,7 @@ describe('startSheetHistory', () => {
 
   it('lowers the sheet by one detent per back press, with the current URL', () => {
     const b = fakeBrowser('#old');
-    const stop = startSheetHistory(() => '#new');
+    const stop = startSheetHistory(() => '#new', nav);
     sheetDetent.value = 'full';
     b.history.back();
     expect(sheetDetent.value).toBe('half');
@@ -74,6 +77,35 @@ describe('startSheetHistory', () => {
     expect(sheetDetent.value).toBe('peek');
     expect(b.depth()).toBe(0);
     expect(b.url()).toBe('#new');
+    stop();
+  });
+
+  it('goes back one page per press and writes the URL of the page it arrives at', () => {
+    const b = fakeBrowser('#old');
+    const stop = startSheetHistory(() => `#pages-${pages.value}`, nav);
+    sheetDetent.value = 'half';
+    pages.value = 2;
+    b.history.back();
+    expect(pages.value).toBe(1);
+    expect(sheetDetent.value).toBe('half');
+    expect(b.depth()).toBe(1);
+    b.history.back();
+    expect(pages.value).toBe(0);
+    b.history.back();
+    expect(sheetDetent.value).toBe('peek');
+    expect(b.depth()).toBe(0);
+    expect(b.url()).toBe('#pages-0');
+    stop();
+  });
+
+  it('keeps an entry for a page on a lowered sheet', () => {
+    const b = fakeBrowser('#old');
+    const stop = startSheetHistory(() => '#new', nav);
+    pages.value = 1;
+    expect(b.depth()).toBe(1);
+    b.history.back();
+    expect(pages.value).toBe(0);
+    expect(b.depth()).toBe(0);
     stop();
   });
 });

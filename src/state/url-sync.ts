@@ -12,7 +12,7 @@ import { activeKarte, browsedKarte } from './session';
 import { detailOpen, orteView } from './hud';
 import { place, selectPlace } from './selection';
 import { coordStop, routeMode, routeVisible, routeView, stops } from './routes';
-import { isMobile, leftPanelOpen } from './ui';
+import { leftPanelOpen } from './ui';
 import { live, setTime, time } from './time';
 import { camera, karteMode, projection, setCamera, setProjection } from './view';
 
@@ -61,7 +61,7 @@ export function applyUrlState(u: UrlState): void {
     // a new object each time: the same object asked for again starts the follow again
     followWanted.value = u.follow ? { ...u.follow } : null;
     if (u.route) openRouteFromUrl(u.route);
-    if (u.place && !isMobile.peek()) {
+    if (u.place) {
       const cur = place.peek();
       if (!cur || cur.title !== u.place.title || cur.lat !== u.place.lat || cur.lng !== u.place.lng) selectPlace({ id: `url:${u.place.title}`, title: u.place.title, subtitle: u.place.subtitle, lng: u.place.lng, lat: u.place.lat, kind: u.place.kind });
     }

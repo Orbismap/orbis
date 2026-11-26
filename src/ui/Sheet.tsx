@@ -12,14 +12,18 @@ const ORDER: Detent[] = ['peek', 'half', 'full'];
 export interface SheetProps {
   detent: Detent;
   onDetent(d: Detent): void;
-  /** Always visible part (the "Blick" row). */
-  peek: ComponentChildren;
+  /** Always visible part (the "Blick" row). Without it the content starts right under the grip. */
+  peek?: ComponentChildren;
   /** Height of the peek part in px, without the bottom safe area. */
   peekHeight?: number;
   /** Space kept free above the sheet at the full detent (header), without the top safe area. */
   topInset?: number;
   /** Reports the visible height whenever it changes (every frame while moving). `settled` is true at rest. */
   onVisible?(px: number, settled: boolean): void;
+  /** Reports the height the sheet comes to rest at, as soon as it is known. */
+  onRest?(px: number): void;
+  /** The lowered sheet shows the top of the content, and it can be used there (a page's own head). */
+  peekLive?: boolean;
   children?: ComponentChildren;
   label: string;
   reducedMotion?: boolean;
@@ -91,7 +95,7 @@ function useKeyboardInset() {
  * The body's viewport is exactly the visible part. A touch on it moves the sheet or scrolls the content, see
  * `claimsGesture`. The grip and peek row always drag the sheet.
  */
-export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64, onVisible, children, label, reducedMotion, scrollKey = '', keepScroll, fill }: SheetProps) {
+export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64, onVisible, onRest, peekLive, children, label, reducedMotion, scrollKey = '', keepScroll, fill }: SheetProps) {
   const safe = useSafeArea();
   const vh = useViewportHeight();
   const keyboard = useKeyboardInset();
@@ -100,7 +104,8 @@ export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64,
 
   const peekH = peekHeight + safe.bottom;
   const fullH = Math.max(peekH + 80, vh - topInset - safe.top);
-  const halfH = Math.min(fullH - 40, Math.max(peekH + 120, Math.round(vh * 0.5)));
+  // half the screen, but with a tall bar at the top still enough room below it for a few rows
+  const halfH = Math.min(fullH - 40, Math.max(peekH + 120, Math.round(vh * 0.5), Math.min(peekH + 230, Math.round(vh * 0.6))));
   const points = [peekH, halfH, fullH];
   const targetFor = (d: Detent) => points[ORDER.indexOf(d)]!;
 
@@ -142,6 +147,7 @@ export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64,
   useLayoutEffect(() => {
     if (dragging.current) return;
     animateTo(targetFor(detent), cur.current.v);
+    onRest?.(targetFor(detent));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detent, peekH, halfH, fullH]);
   useEffect(
@@ -279,7 +285,7 @@ export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64,
   return (
     <div
       ref={root}
-      class={cx('sheet', `is-${detent}`)}
+      class={cx('sheet', `is-${detent}`, peekLive && 'is-live')}
       role="region"
       aria-label={label}
       style={{ height: `${fullH}px`, bottom: `${keyboard}px`, transform: `translate3d(0, ${fullH - cur.current.x}px, 0)`, ['--peek-h' as string]: `${peekH}px` }}
@@ -291,13 +297,15 @@ export function Sheet({ detent, onDetent, peek, peekHeight = 120, topInset = 64,
       <button type="button" class="sheet-grab" aria-label={detent === 'full' ? 'Leiste verkleinern' : 'Leiste vergrößern'} aria-expanded={detent !== 'peek'} onClick={cycle}>
         <span class="sheet-grip" />
       </button>
-      <div class="sheet-peek" style={{ height: `${peekHeight - 20}px` }}>
-        {peek}
-      </div>
+      {peek !== undefined && (
+        <div class="sheet-peek" style={{ height: `${peekHeight - 20}px` }}>
+          {peek}
+        </div>
+      )}
       <div
         class="sheet-body-wrap"
         style={{ paddingBottom: `${Math.max(0, fullH - targetFor(detent))}px` }}
-        {...(detent === 'peek' ? ({ inert: '' } as object) : {})}
+        {...(detent === 'peek' && !peekLive ? ({ inert: '' } as object) : {})}
         // typing needs room above the keyboard
         onFocusIn={(e: FocusEvent) => (e.target as HTMLElement).matches('input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea') && latest.current.onDetent('full')}
       >

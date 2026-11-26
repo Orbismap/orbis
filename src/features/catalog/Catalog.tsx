@@ -5,7 +5,8 @@ import { allLayers, layersByCategory } from '../../layers/registry';
 import type { LayerDef } from '../../layers/types';
 import { activeKarte } from '../../state/session';
 import { isMobile, leftView } from '../../state/ui';
-import { Button, IconButton } from '../../ui/Button';
+import { Button } from '../../ui/Button';
+import { SheetBack, SheetClose } from '../shared/SheetNav';
 import { Icon } from '../../ui/icons/Icon';
 import { cx } from '../../ui/hooks';
 import { VirtualList } from '../../ui/VirtualList';
@@ -131,9 +132,10 @@ export function Catalog({ modal }: { modal?: boolean } = {}) {
   return (
     <div class={cx('cat', modal && 'cat-modal')}>
       <div class="cat-head">
-        {!modal && <IconButton icon="chevron-left" label="Zurück zu den Ebenen" onClick={() => (leftView.value = 'layers')} />}
+        {!modal && <SheetBack always />}
         <h2 class="cat-title">Ebene hinzufügen</h2>
         {!modal && <span class="cat-count num">{allLayers().length}</span>}
+        {!modal && <SheetClose />}
       </div>
       <div class="cat-search">
         <Icon name="search" size={16} />

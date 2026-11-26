@@ -4,6 +4,8 @@ import { clearSelection, probe } from '../../state/selection';
 import { Button, IconButton } from '../../ui/Button';
 import { copyText, flyToPoint } from '../shared/map';
 import { RouteButton } from '../routes/RouteButton';
+import { closeCard } from '../../state/sheet-pages';
+import { SheetBack } from '../shared/SheetNav';
 import { share } from '../place/PlaceCard';
 import { useReverse } from '../place/reverse';
 import { probeValues } from './values';
@@ -23,12 +25,13 @@ export function ProbeCard() {
   return (
     <article class="insp probe place" aria-label="Markierter Standort">
       <header class="place-head">
+        <SheetBack />
         <IconButton icon="share" label="Link teilen" class="place-share" onClick={() => share(title)} />
         <div class="place-titles">
           <h2 class="place-title">{title}</h2>
           {sub && <p class="place-sub">{sub}</p>}
         </div>
-        <IconButton icon="close" label="Schließen" shortcut="Esc" class="place-close" onClick={clearSelection} />
+        <IconButton icon="close" label="Schließen" shortcut="Esc" class="place-close" onClick={() => closeCard(clearSelection)} />
       </header>
       <div class="insp-actions place-actions">
         <RouteButton title={rev?.title ?? formatCoord(p.lat, p.lng, 4)} subtitle={sub} lng={p.lng} lat={p.lat} />
