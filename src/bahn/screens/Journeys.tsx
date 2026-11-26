@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { online } from '@/core/online';
 import { describeError } from '@/data/http';
 import { Icon } from '../ui/icons';
 import { MapSheet } from '../ui/MapSheet';
@@ -6,7 +7,9 @@ import type { MapMarker } from '../ui/NetMap';
 import { journeyRoutes, modeColor } from '../ui/routes';
 import { LineBadge, PlatformSign } from '../ui/Badges';
 import { clock, delayState, delayText, duration } from '../ui/format';
+import { SavedNote } from '../ui/SavedNote';
 import { plannedJourney } from '../data';
+import { saveJourneys, savedJourneys } from '../data/offline';
 import type { Journey } from '../data/types';
 import { sources } from '../state/sources';
 import { favorites, recents } from '../state/places';
@@ -26,32 +29,42 @@ export function JourneysScreen() {
   const [hover, setHover] = useState<Journey | null>(null);
 
   const w = when.value;
+  const net = online.value;
+  /** Wann die gezeigten gespeicherten Verbindungen ankamen; null, sobald die Quelle geantwortet hat. */
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  const enrich = (journeys: Journey[], signal: AbortSignal, set: (j: Journey[]) => void) => {
-    if (!sources.delays) return;
-    sources.delays.journeys(journeys, signal).then((merged) => !signal.aborted && set(merged), () => undefined);
-  };
+  /** Zeigt die Liste und behält sie für die Zeit ohne Netz. */
+  const keep = (change: (cur: Journey[]) => Journey[]) =>
+    setList((cur) => {
+      const next = change(cur);
+      if (from && dest) saveJourneys(from, dest, journeyOptions(), next);
+      return next;
+    });
 
   useEffect(() => {
     if (!from || !dest) return;
     const ctl = new AbortController();
+    const kept = savedJourneys(from, dest, journeyOptions(), w.time);
     setState({ loading: true });
-    setList([]);
+    setList(kept?.data ?? []);
+    setSavedAt(kept?.at ?? null);
+    setCursors({});
     sources.transit.journeys(from, dest, journeyOptions(), undefined, ctl.signal).then(
       (page) => {
         if (ctl.signal.aborted) return;
-        const shown = sources.delays ? page.journeys.map(plannedJourney) : page.journeys;
-        setList(shown);
+        const planned = sources.delays ? page.journeys.map(plannedJourney) : page.journeys;
+        keep(() => planned);
+        setSavedAt(null);
         setCursors({ earlier: page.earlier, later: page.later });
         setState({ loading: false });
         if (page.journeys.length && from.name !== 'Mein Standort') recents.add({ kind: 'route', from, to: dest });
-        enrich(page.journeys, ctl.signal, (merged) => setList(merged));
+        sources.delays?.journeys(page.journeys, ctl.signal).then((merged) => !ctl.signal.aborted && keep(() => merged), () => undefined);
       },
       (e: unknown) => !ctl.signal.aborted && setState({ loading: false, error: describeError(e) }),
     );
     return () => ctl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from?.id, dest?.id, w.time, w.arriveBy]);
+  }, [from?.id, dest?.id, w.time, w.arriveBy, net]);
 
   const loadMore = async (dir: 'earlier' | 'later') => {
     const cursor = cursors[dir];
@@ -61,11 +74,11 @@ export function JourneysScreen() {
       const page = await sources.transit.journeys(from, dest, journeyOptions(), cursor);
       const fresh = page.journeys.filter((j) => !list.some((x) => keyOf(x) === keyOf(j)));
       const shown = sources.delays ? fresh.map(plannedJourney) : fresh;
-      setList((cur) => (dir === 'earlier' ? [...shown, ...cur] : [...cur, ...shown]));
+      keep((cur) => (dir === 'earlier' ? [...shown, ...cur] : [...cur, ...shown]));
       setCursors((c) => ({ ...c, [dir]: dir === 'earlier' ? page.earlier : page.later }));
       if (sources.delays) {
         const merged = await sources.delays.journeys(fresh);
-        setList((cur) => cur.map((j) => merged.find((m) => keyOf(m) === keyOf(j)) ?? j));
+        keep((cur) => cur.map((j) => merged.find((m) => keyOf(m) === keyOf(j)) ?? j));
       }
     } catch (e) {
       setState((s) => ({ ...s, error: describeError(e) }));
@@ -102,6 +115,7 @@ export function JourneysScreen() {
         }
       >
         {cursors.earlier && <button type="button" class="bn-more" disabled={!!more} onClick={() => void loadMore('earlier')}>{more === 'earlier' ? 'Lädt …' : '⬆ Frühere Verbindungen'}</button>}
+        {savedAt !== null && list.length > 0 && <SavedNote at={savedAt} />}
         {state.loading && <p class="bn-note">Suche Verbindungen …</p>}
         {state.error && <p class="bn-note bn-late">{state.error}</p>}
         {!state.loading && !state.error && list.length === 0 && <p class="bn-note">Keine Verbindung gefunden. Probiere andere Zeiten oder weniger Filter.</p>}

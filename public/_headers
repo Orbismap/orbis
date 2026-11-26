@@ -13,10 +13,13 @@
 /wetter/manifest.webmanifest
   Cache-Control: no-cache
 
+/bahn/manifest.webmanifest
+  Cache-Control: no-cache
+
 /wetter-sw.js
   Cache-Control: no-cache
 
-/wetter-precache.json
+/bahn-sw.js
   Cache-Control: no-cache
 
 /*

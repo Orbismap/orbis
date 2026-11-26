@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { haversine } from '@/core/geo';
 import { Icon } from '../ui/icons';
+import { SavedNote } from '../ui/SavedNote';
 import { MapSheet } from '../ui/MapSheet';
 import { useScene, type Scene } from '../ui/scene';
 import { DepartureRow } from '../ui/Departures';
@@ -141,6 +142,7 @@ function Nearby({ origin: o }: { origin: Stop }) {
       <button type="button" class="bn-hd bn-hd-link" onClick={() => openBoard(stop)}>
         In deiner Nähe · {stop.name} · {distance(km)}<Icon name="back" size={14} class="bn-flip" />
       </button>
+      {dep.saved && dep.updated && <SavedNote at={dep.updated} now={now} />}
       {dep.loading && dep.list.length === 0 && <p class="bn-note">Lädt …</p>}
       {dep.error && dep.list.length === 0 && <p class="bn-note bn-late">{dep.error}</p>}
       {dep.list.slice(0, 4).map((d, i) => <DepartureRow key={`${d.line}${d.time.planned}${i}`} d={d} now={now} onClick={() => openBoard(stop)} />)}

@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { formatAge } from '@/core/format';
 import { Icon } from '../ui/icons';
+import { SavedNote } from '../ui/SavedNote';
 import { BoardRow } from '../ui/Departures';
 import type { ModeGroup } from '../data/types';
 import { favorites } from '../state/places';
@@ -21,7 +22,7 @@ export function Board() {
   const stop = boardStop.value;
   const [filter, setFilter] = useState('all');
   const now = useNow(15_000);
-  const { list, loading, error, updated } = useDepartures(stop, 40);
+  const { list, loading, error, updated, saved: kept } = useDepartures(stop, 40);
   useScene(stop ? { center: [stop.lng, stop.lat], zoom: 15, markers: [{ id: stop.id, lng: stop.lng, lat: stop.lat, kind: 'selected' }] } : {});
 
   if (!stop) {
@@ -37,6 +38,7 @@ export function Board() {
   const active = FILTERS.find((f) => f.id === filter)!;
   const shown = list.filter((d) => !active.modes.length || active.modes.includes(d.mode));
   const saved = favorites.has({ kind: 'stop', stop });
+  const status = updated && !kept ? `Aktualisiert ${formatAge(updated, now)}` : loading ? 'Lädt …' : '';
 
   return (
     <div class="bn-page">
@@ -48,13 +50,14 @@ export function Board() {
           <Icon name="star" />
         </button>
       </div>
-      <p class="bn-small">{updated ? `Aktualisiert ${formatAge(updated, now)}` : 'Lädt …'}{stop.area ? ` · ${stop.area}` : ''}</p>
+      <p class="bn-small">{[status, stop.area].filter(Boolean).join(' · ')}</p>
+      {kept && updated && <SavedNote at={updated} now={now} />}
       <div class="bn-pills bn-scrollx">
         {FILTERS.map((f) => <button key={f.id} type="button" class="bn-pill" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>{f.label}</button>)}
       </div>
       {loading && list.length === 0 && <p class="bn-note">Lädt …</p>}
       {error && <p class="bn-note bn-late">{error}</p>}
-      {!loading && !error && shown.length === 0 && <p class="bn-note">Keine Abfahrten in den nächsten Stunden.</p>}
+      {!loading && (!error || kept) && shown.length === 0 && <p class="bn-note">{kept ? 'Keine gespeicherten Abfahrten mehr.' : 'Keine Abfahrten in den nächsten Stunden.'}</p>}
       <div class="bn-board">
         {shown.map((d, i) => <BoardRow key={`${d.line}${d.time.planned}${i}`} d={d} />)}
       </div>

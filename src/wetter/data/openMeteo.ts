@@ -164,6 +164,7 @@ export function loadWarning(lat: number, lng: number, options: FetchOptions = {}
       headline: String(p.HEADLINE || p.EVENT || 'Wetterwarnung'),
       text: String(p.DESCRIPTION ?? '').replace(/\s+/g, ' ').trim().slice(0, 240),
       source: 'Deutscher Wetterdienst',
+      expires: Date.parse(String(p.EXPIRES ?? '')) || undefined,
     };
   }), options.signal);
 }

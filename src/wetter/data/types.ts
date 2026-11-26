@@ -46,6 +46,8 @@ export interface WarningInfo {
   headline: string;
   text: string;
   source: string;
+  /** UTC ms: a saved warning is dropped from then on. */
+  expires?: number;
 }
 
 export interface WeatherSupplements {

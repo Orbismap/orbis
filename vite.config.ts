@@ -1,13 +1,13 @@
 import { defineConfig } from 'vitest/config';
 import preact from '@preact/preset-vite';
 import { fileURLToPath } from 'node:url';
-import { wetterPwa } from './vite.wetter-pwa';
+import { orbisPwa } from './vite.pwa';
 
 const src = fileURLToPath(new URL('./src', import.meta.url));
 
 export default defineConfig({
   base: './',
-  plugins: [preact(), wetterPwa()],
+  plugins: [preact(), orbisPwa()],
   resolve: { alias: { '@': src } },
   build: {
     target: 'es2022',

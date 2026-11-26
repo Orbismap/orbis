@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fakeStorage } from '@/core/lastKnown.test';
 import type { PointSeries, WeatherSupplements } from './types';
 
 vi.mock('./icon', () => ({ loadIconSeries: vi.fn() }));
@@ -120,5 +121,44 @@ describe('source chain', () => {
     expect(result.source.label).toBe('Beispieldaten');
     expect(result.weather.place.name).toBe('Bad Kleinen');
     expect(result.weather.current.temp).toBe(4);
+  });
+});
+
+describe('offline', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('localStorage', fakeStorage());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const loadOnce = async () => {
+    vi.mocked(loadOpenMeteoSeries).mockResolvedValue(series('Open-Meteo'));
+    vi.mocked(loadSupplements).mockResolvedValue(supplements);
+    await loadWeather(location);
+  };
+
+  it('uses the saved forecast when no source answers, and says so', async () => {
+    await loadOnce();
+    vi.mocked(loadOpenMeteoSeries).mockRejectedValue(new Error('offline'));
+    vi.mocked(loadIconSeries).mockRejectedValue(new Error('offline'));
+    const result = await loadWeather(location);
+    expect(result.source).toEqual({ label: 'Gespeichert', detail: 'gerade eben · Open-Meteo' });
+    expect(result.weather.current.temp).toBe(4);
+    expect(result.weather.current.air.value).toBe(20);
+  });
+
+  it('prefers the saved forecast over an older mirror run', async () => {
+    await loadOnce();
+    vi.mocked(loadOpenMeteoSeries).mockRejectedValue(new Error('offline'));
+    vi.mocked(loadIconSeries).mockResolvedValue({ ...series('ICON · R2 (Fallback)'), issued: Date.now() - 6 * 3_600_000 });
+    expect((await loadWeather(location)).source.label).toBe('Gespeichert');
+  });
+
+  it('keeps the last known extras when only they fail', async () => {
+    await loadOnce();
+    vi.mocked(loadSupplements).mockRejectedValue(new Error('offline'));
+    const result = await loadWeather(location);
+    expect(result.weather.current.air.value).toBe(20);
+    expect(result.weather.daily).toHaveLength(10);
   });
 });

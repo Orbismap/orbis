@@ -5,7 +5,7 @@ für Züge und Busse.
 
 - Einstieg: `src/entry.ts` wählt per Hostname `bahn.*` oder lokal `?mode=bahn` (`pnpm dev`, dann `/?mode=bahn`).
 - Code: `src/bahn/` (`app/` Oberfläche, `data/` Domänenmodell und Anbieter-Schnittstelle, `styles/` Tokens).
-- PWA: `public/bahn/manifest.webmanifest`, bisher nur SVG-Icon, noch kein Service Worker, Domain `bahn.maltee.dev` in `wrangler.jsonc`.
+- PWA: `public/bahn/manifest.webmanifest`, bisher nur SVG-Icon, Service Worker für den Offline-Betrieb (`docs/WETTER-HOSTING.md`, Abschnitt Offline), Domain `bahn.maltee.dev` in `wrangler.jsonc`.
 - Stand: leere Hülle mit vier Reitern (Verbindung, Abfahrten, Karte, Merkliste) und `TransitProvider`-Schnittstelle.
 
 ## Datenquellen (aus dem alten Orbis, `src/api/connections.ts`, `dbdelays.ts`, `transit.ts`)
@@ -40,7 +40,8 @@ für Züge und Busse.
 - Karte: MapLibre mit dem dunklen Stil der Wetterkarte, lädt erst bei Bedarf. Noch keine Orbis-Ebenen, keine Fahrzeuge live.
 - Lokal: `pnpm dev`, dann `/?mode=bahn`.
 - Zurück-Taste und Wischgeste: jeder geöffnete Bildschirm ist ein Historieneintrag (`state/nav.ts`). Reiterwechsel erzeugen keine Einträge.
-- Noch nicht: Service Worker, Domain, Orbis-Ebenen, Hellmodus-Feinschliff.
+- Offline: Start ohne Netz und zuletzt bekannte Daten (`data/offline.ts`).
+- Noch nicht: Orbis-Ebenen, Hellmodus-Feinschliff.
 
 ## Desktop (ab 960 px Breite)
 
@@ -54,4 +55,4 @@ für Züge und Busse.
 1. Umfang (Deutschland oder Europa). Quelle ist entschieden: Transitous plus DB-Worker.
 2. Funktionsumfang der ersten Version und Reiter-Aufbau.
 3. Karte: MapLibre-Engine aus Orbis wiederverwenden (Wetter-Modus tut das schon) oder erst später.
-4. Offline, Favoriten, Benachrichtigungen bei Verspätung.
+4. Favoriten, Benachrichtigungen bei Verspätung.
