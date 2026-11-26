@@ -95,6 +95,40 @@ export interface PowerLineSample {
 /** What the power grid channel carries: towers and overhead lines, to be connected by the extension. */
 export type PowerGridSample = PowerTowerSample | PowerLineSample;
 
+/** One weather balloon (radiosonde) as it last reported. */
+export interface BalloonSample {
+  /** serial number */
+  id: string;
+  lng: number;
+  lat: number;
+  /** metres above sea level */
+  altM: number;
+  /** drift over ground, m/s */
+  speedMs: number;
+  /** direction of the drift (degrees), undefined when unknown */
+  course?: number;
+  /** vertical speed in m/s, negative falling */
+  climbMs: number;
+  /** on its balloon (rising or floating), falling on its parachute, or on the ground */
+  state: 'balloon' | 'chute' | 'landed';
+  /** colour of the altitude as '#rrggbb' (2D icon and legend), so both presentations agree */
+  color: string;
+  /** time of the position fix, ms since epoch */
+  t: number;
+}
+
+/** One wind turbine as the OpenInfraMap tiles give it (OpenStreetMap `power=generator`, `source=wind`); the extension works out its size and model itself. */
+export interface WindTurbineSample {
+  /** unique within the layer: the OSM id */
+  id: string;
+  lng: number;
+  lat: number;
+  /** rated power in MW, undefined when untagged (the tiles carry no hub height or rotor diameter) */
+  outputMw?: number;
+  /** the weather model's wind there at the selected time, 10 m above the ground; undefined while not loaded */
+  wind?: { speedMs: number; fromDeg: number };
+}
+
 /** One tree as the tiles give it (OpenStreetMap `natural=tree`, or a point on a `tree_row` / `hedge` line); the extension works out the model itself. */
 export interface TreeSample {
   /** unique within the layer: the position (the tiles carry no OSM ids) */
@@ -214,9 +248,9 @@ export interface TracksChannel<T = TrackSample> {
   contributeActions(provider: (id: string) => CardAction[]): { changed(): void; dispose(): void };
 }
 
-/** An object the follow camera keeps in the middle: an aircraft (`flug`, ICAO hex) or a ship (`schiff`, MMSI). Also what the URL carries (`f=flug:3c6444`). */
+/** An object the follow camera keeps in the middle: an aircraft (`flug`, ICAO hex), a ship (`schiff`, MMSI) or a weather balloon (`ballon`, serial). Also what the URL carries (`f=flug:3c6444`). */
 export interface FollowRef {
-  kind: 'flug' | 'schiff';
+  kind: 'flug' | 'schiff' | 'ballon';
   id: string;
 }
 
@@ -238,6 +272,10 @@ export interface ExtensionHost {
   readonly power: TracksChannel<PowerGridSample>;
   /** Channel for single trees (layer `baeume`). */
   readonly trees: TracksChannel<TreeSample>;
+  /** Channel for weather balloons (layer `wetterballons`). */
+  readonly balloons: TracksChannel<BalloonSample>;
+  /** Channel for single wind turbines (layer `kraftwerke`). */
+  readonly windTurbines: TracksChannel<WindTurbineSample>;
   /** Channel for building footprints with their roof and height tags (`features/buildings3d/roofs-source.ts`, no layer). */
   readonly buildings: TracksChannel<BuildingSample>;
   /** Channel for 3D landmark models (`features/landmarks/source.ts`, no layer: they are always drawn, in front of OSM buildings). */

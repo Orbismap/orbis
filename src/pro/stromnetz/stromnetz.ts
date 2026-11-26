@@ -7,6 +7,7 @@ import type { Stage, StagePart } from '../world3d/stage';
 import { towerGeometries, towerMaterial } from './models';
 import { buildNetwork, spanWires, type Network } from './network';
 import { WireMesh, type DrawWire } from './wires';
+import { idleThrottle } from '../world3d/terrain';
 
 // 3D power grid: a model at every tower position (design from the tags and the voltage, real or typical height, standing
 // on the terrain, turned along the line) and, between the towers, wires that start and end at the insulators of the
@@ -75,7 +76,7 @@ export class StromnetzPart implements StagePart {
   }
 
   /** Terrain tiles arrive after the towers: when the ground under them changed, they and their wires move with it. */
-  private onIdle = () => {
+  private onIdle = idleThrottle(() => this.stage.wake(), () => {
     let changed = false;
     this.network.towers.forEach((t, i) => {
       const h = this.terrainAt(t.lng, t.lat);
@@ -85,7 +86,7 @@ export class StromnetzPart implements StagePart {
     if (!changed) return;
     this.buildWires();
     this.stage.wake();
-  };
+  });
 
   private buildWires() {
     const { towers, spans } = this.network;

@@ -157,6 +157,7 @@ describe('url', () => {
     expect(h).toBe('#/@28.1882,-82.1512,15.27z,99b,65p?g=1&f=flug:3c6444');
     expect(parseHash(h)).toEqual(s);
     expect(parseHash('#/?f=schiff:244123456').follow).toEqual({ kind: 'schiff', id: '244123456' });
+    expect(parseHash('#/?f=ballon:V1234567').follow).toEqual({ kind: 'ballon', id: 'V1234567' });
     expect(parseHash('#/?f=auto:1').follow).toBeUndefined();
     expect(parseHash('#/?f=flug:a%20b').follow).toBeUndefined();
   });

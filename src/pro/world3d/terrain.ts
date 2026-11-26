@@ -20,3 +20,21 @@ export function groundAt(map: MlMap, lng: number, lat: number): number {
   const h = map.queryTerrainElevation({ lng, lat });
   return typeof h === 'number' && Number.isFinite(h) ? h / ex : 0;
 }
+
+/**
+ * A part's idle handler, run at most every `gapMs`: while something on the stage animates (turning rotors, moving aircraft), the
+ * map reports `idle` after every frame. A skipped call asks for one more frame (`wake`) afterwards, so terrain that just arrived is not missed.
+ */
+export function idleThrottle(wake: () => void, fn: () => void, gapMs = 500): () => void {
+  let last = -Infinity;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return () => {
+    const wait = last + gapMs - performance.now();
+    if (wait > 0) {
+      timer ??= setTimeout(() => { timer = undefined; wake(); }, wait);
+      return;
+    }
+    last = performance.now();
+    fn();
+  };
+}

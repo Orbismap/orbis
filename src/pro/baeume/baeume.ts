@@ -4,7 +4,7 @@ import type { TreeSample } from '../../ext/types';
 import type { GeoFrame } from '../world3d/frame';
 import { GeoInstances } from '../world3d/instances';
 import type { Stage, StagePart } from '../world3d/stage';
-import { exaggeration, groundAt } from '../world3d/terrain';
+import { exaggeration, groundAt, idleThrottle } from '../world3d/terrain';
 import { TREE_H, modelKey, treeGeometries, treeMaterial, type TreeShape } from './models';
 
 // 3D trees: a smooth model at every tree position of the channel (shape from the leaf type and the tree's id, height from the
@@ -135,7 +135,7 @@ export class BaeumePart implements StagePart {
   }
 
   /** Terrain tiles arrive after the trees: when the ground under them changed, they move with it. */
-  private onIdle = () => {
+  private onIdle = idleThrottle(() => this.stage.wake(), () => {
     let changed = false;
     this.trees.forEach((t, i) => {
       const h = this.terrainAt(t.lng, t.lat);
@@ -143,7 +143,7 @@ export class BaeumePart implements StagePart {
       this.ground[i] = h;
     });
     if (changed) this.stage.wake();
-  };
+  });
 
   update(frame: GeoFrame): boolean {
     if (!this.active) return false;

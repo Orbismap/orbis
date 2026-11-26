@@ -7,7 +7,10 @@ import { formatNumber } from '../../core/format';
 import { bucketUrl } from '../../data/endpoints';
 import { FUELS, FUEL_ORDER, type FuelClass, type PlantCollection, type PlantProps } from '../../data/parsers/powerplants';
 import { PlantMatcher, fuelClassOfOsm } from '../../data/plantMerge';
+import { windTurbinesChannel } from '../../ext/channels';
+import { publishWindTurbines } from '../../features/windturbines/source';
 import type { AnyFeature } from '../../render/common';
+import { ICON_SOURCE } from '../../render/gl/latest';
 import { pointLayer } from '../../render/points';
 import { vectorTileLayer } from '../../render/vectortiles';
 import { OIM_ATTRIBUTION, OIM_SOURCE, oimTiles } from '../../data/openinframap';
@@ -43,6 +46,8 @@ export default defineLayer({
       name: 'WRI Global Power Plant Database', url: 'https://datasets.wri.org/dataset/globalpowerplantdatabase',
       license: 'CC BY 4.0, World Resources Institute', manifest: { bucket: 'data', key: 'wri/powerplants.json' },
     },
+    // Orbis Pro: the 3D wind turbines turn with this wind
+    ICON_SOURCE,
   ],
   options: [
     {
@@ -68,8 +73,13 @@ export default defineLayer({
     // --- OpenStreetMap: its plants are always drawn (from zoom 5, where the tiles have them)
     const osmFilter = computed<FilterSpecification>(() => osmPlantFilter(String(ctx.options.value.fuel ?? 'all'), Number(ctx.options.value.minMw ?? 0)));
     const osmSource = `${ctx.id}.osm-src`;
+    // --- channel for extensions (Orbis Pro): the single wind turbines, filtered like their dots; presented in 3D, the dots go
+    const turbines = publishWindTurbines(ctx, osmSource, osmFilter);
+    const generatorFilter = computed<FilterSpecification>(() => (windTurbinesChannel.presented.value ? (['all', osmFilter.value, ['!=', ['get', 'source'], 'wind']] as FilterSpecification) : osmFilter.value));
+    // the card of a turbine clicked in 3D is none of the dots': their selection rings go away then
+    const kit = { ...ctx, ownSelection: (card: Parameters<typeof turbines.isCard>[0]) => !turbines.isCard(card) && !!ctx.ownSelection?.(card) };
     // the WRI layer reports the status of the row (the OSM tiles are not requested below zoom 5)
-    const osm = vectorTileLayer({ ...ctx, status: () => {} }, { tiles: oimTiles('power'), name: 'osm', attribution: OIM_ATTRIBUTION, parts: osmPlantParts(osmFilter), describe: describeOsmPlant });
+    const osm = vectorTileLayer({ ...kit, status: () => {} }, { tiles: oimTiles('power'), name: 'osm', attribution: OIM_ATTRIBUTION, parts: osmPlantParts(osmFilter, generatorFilter), describe: describeOsmPlant });
 
     // --- duplicate check: WRI plants with an OSM counterpart are hidden. The OSM objects come from the loaded tiles.
     let matcher = new PlantMatcher(undefined);
@@ -118,7 +128,7 @@ export default defineLayer({
       return ['all', ...parts] as FilterSpecification;
     });
 
-    const handle = pointLayer(ctx, {
+    const handle = pointLayer(kit, {
       data: plants,
       radius,
       color: colorExpr,
@@ -152,6 +162,7 @@ export default defineLayer({
         ml.off('zoom', onZoom);
         ml.off('sourcedata', onSourceData as never);
         ml.off('moveend', schedule);
+        turbines.destroy();
         osm.destroy();
         handle.destroy();
       },

@@ -11,6 +11,7 @@ import { reducedMotion, settings } from '../../state/settings';
 import type { LayerContext, LayerHandle } from '../../layers/types';
 import { Cleanup, idBase } from '../common';
 import { bracketTime, mercToLat, lngToMerc, latToMerc, type Bracket } from './grid';
+import { MAX_MERCATOR_LAT } from '../../core/geo';
 import { ProgramCache, setProjectionUniforms, type RenderArgs } from './gl-util';
 import type { OwxLatest } from '../../data/owx';
 import { followLatest, noteOf } from './latest';
@@ -176,7 +177,8 @@ class WindGrid {
   }
 }
 
-class ParticleCustomLayer implements CustomLayerInterface {
+/** Exported for tests. */
+export class ParticleCustomLayer implements CustomLayerInterface {
   readonly type = 'custom' as const;
   readonly renderingMode = '2d' as const;
   private map?: MlMap;
@@ -191,8 +193,10 @@ class ParticleCustomLayer implements CustomLayerInterface {
   private readonly data: Float32Array;
   private readonly age: Float32Array;
   private readonly life: Float32Array;
-  private readonly pool = new Float32Array(POOL * 2);
+  private readonly pool = new Float64Array(POOL * 2); // mercator
   private poolN = 0;
+  /** mercator position the particle history is relative to (the view centre): 32-bit offsets stay fine at every zoom */
+  private origin: [number, number] = [0, 0];
   private readonly wind = new WindGrid();
   private readonly tmp = new Float32Array(2);
   private windBr: Bracket = { i0: -1, i1: -1, f: -1 };
@@ -280,6 +284,7 @@ class ParticleCustomLayer implements CustomLayerInterface {
     const b = map.getBounds();
     const c = map.getCenter();
     const cx = lngToMerc(c.lng);
+    this.moveOrigin(cx, latToMerc(c.lat));
     const west = lngToMerc(b.getWest());
     const east = lngToMerc(b.getEast());
     const spanX = Math.min(1, east - west);
@@ -330,6 +335,20 @@ class ParticleCustomLayer implements CustomLayerInterface {
     }
   }
 
+  /** Takes another origin; the particles stay where they are. */
+  private moveOrigin(x: number, y: number): void {
+    const [dx, dy] = [this.origin[0] - x, this.origin[1] - y];
+    if (dx === 0 && dy === 0) return;
+    const d = this.data;
+    for (let i = 0; i < this.count; i++) {
+      for (let k = 0, o = i * STRIDE; k < HIST; k++, o += 2) {
+        d[o] = d[o]! + dx;
+        d[o + 1] = d[o + 1]! + dy;
+      }
+    }
+    this.origin = [x, y];
+  }
+
   private respawn(i: number, startAged: boolean): void {
     const o = i * STRIDE;
     const d = this.data;
@@ -338,8 +357,8 @@ class ParticleCustomLayer implements CustomLayerInterface {
       return;
     }
     const j = ((Math.random() * this.poolN) | 0) * 2;
-    const x = this.pool[j]!;
-    const y = this.pool[j + 1]!;
+    const x = this.pool[j]! - this.origin[0];
+    const y = this.pool[j + 1]! - this.origin[1];
     for (let k = 0; k < HIST; k++) {
       d[o + k * 2] = x;
       d[o + k * 2 + 1] = y;
@@ -351,7 +370,7 @@ class ParticleCustomLayer implements CustomLayerInterface {
   }
 
   // ---- simulation step ---------------------------------------------------------------------------
-  private step(dt: number): void {
+  private step(dt: number, globeness = 0): void {
     const map = this.map!;
     const store = this.store!;
     const t0 = performance.now();
@@ -389,20 +408,29 @@ class ParticleCustomLayer implements CustomLayerInterface {
     const shift = (this.sinceSample += dt) >= SAMPLE_DT;
     if (shift) this.sinceSample -= SAMPLE_DT;
     const full = WIND_FULL;
-    const k = (pxPerMs * dt) / world; // mercator units per m/s of wind
+    const k = (pxPerMs * dt) / world; // mercator units per m/s of wind (flat map)
+    // On the globe a mercator unit covers less screen towards the poles (cos lat), and the sphere is drawn larger the nearer the
+    // view centre is to a pole (MapLibre keeps the scale at the centre; the zoom value drops there). Both are undone, so that
+    // the screen speed stays the same everywhere.
+    const centreScale = Math.cos((Math.min(Math.abs(map.getCenter().lat), MAX_MERCATOR_LAT) * Math.PI) / 180);
+    const [ox, oy] = this.origin;
     for (let i = 0; i < this.count; i++) {
       const o = i * STRIDE;
       let a = this.age[i]! + dt;
       let x = d[o]!;
       let y = d[o + 1]!;
-      if (a >= this.life[i]! || x < v.x0 || x > v.x1 || y < v.y0 || y > v.y1) {
+      const mx = ox + x;
+      const my = oy + y;
+      if (a >= this.life[i]! || mx < v.x0 || mx > v.x1 || my < v.y0 || my > v.y1) {
         this.respawn(i, false);
         continue;
       }
-      this.wind.sample(x, y, w);
+      this.wind.sample(mx, my, w);
       const sp = Math.hypot(w[0]!, w[1]!);
-      x += w[0]! * k;
-      y -= w[1]! * k; // north is up, merc y grows southwards
+      // cosh(π (1 − 2y)) = 1 / cos(latitude)
+      const kk = globeness > 0 ? k * (1 + globeness * (centreScale * Math.cosh(Math.PI * (1 - 2 * my)) - 1)) : k;
+      x += w[0]! * kk;
+      y -= w[1]! * kk; // north is up, merc y grows southwards
       d[o] = x;
       d[o + 1] = y;
       if (shift) {
@@ -435,7 +463,7 @@ class ParticleCustomLayer implements CustomLayerInterface {
     const now = performance.now();
     const dt = this.lastT === 0 ? 1 / 60 : Math.min(0.05, (now - this.lastT) / 1000);
     this.lastT = now;
-    this.step(dt);
+    this.step(dt, args.defaultProjectionData.projectionTransition);
     if (!this.windReady || this.count === 0) {
       if (this.looping) map.triggerRepaint();
       return;
@@ -443,7 +471,7 @@ class ParticleCustomLayer implements CustomLayerInterface {
 
     const prog = this.programs.get(gl, args);
     gl.useProgram(prog.program);
-    setProjectionUniforms(prog, args);
+    setProjectionUniforms(prog, args, this.origin);
     const canvas = map.getCanvas();
     gl.uniform2f(prog.u('u_viewport'), canvas.width, canvas.height);
     gl.uniform1f(prog.u('u_phase'), Math.min(1, this.sinceSample / SAMPLE_DT));
