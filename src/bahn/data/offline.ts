@@ -77,8 +77,11 @@ const placeKey = (s: Stop) => (s.name === 'Mein Standort' ? `me:${s.lat.toFixed(
 const routeKey = (from: Stop, to: Stop, o: JourneyOptions) =>
   [placeKey(from), placeKey(to), o.arriveBy ? 'an' : 'ab', [...(o.modes ?? [])].sort().join(',')].join('|');
 
+/** The track geometry is large and only decoration: without a network the stops are joined by straight lines. */
+const slim = (j: Journey): Journey => ({ ...j, legs: j.legs.map(({ path: _path, ...leg }) => leg) });
+
 export function saveJourneys(from: Stop, to: Stop, o: JourneyOptions, list: Journey[]): void {
-  if (list.length) journeys.put(routeKey(from, to, o), list);
+  if (list.length) journeys.put(routeKey(from, to, o), list.map(slim));
 }
 
 /**

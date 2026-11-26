@@ -2,14 +2,20 @@ import { computed, signal } from '@preact/signals';
 import type { Journey, JourneyOptions, ModeGroup, Stop } from '../data/types';
 import { myLocation } from './location';
 
-export type TabId = 'start' | 'abfahrten' | 'karte' | 'merkliste';
+export type TabId = 'start' | 'abfahrten' | 'merkliste';
 export type Screen =
   | { kind: 'search'; target: 'from' | 'to' | 'stop' }
   | { kind: 'journeys' }
-  | { kind: 'journey'; journey: Journey };
+  | { kind: 'journey'; journey: Journey }
+  | { kind: 'stop'; stop: Stop }
+  | { kind: 'trip'; tripId: string; line: string; mode: ModeGroup; headsign: string; /** Haltestelle, von der aus der Lauf geöffnet wurde */ at?: string };
+/** Eine geöffnete Seite; `key` hält ihren Zustand, solange sie im Stapel liegt. */
+export type Entry = Screen & { key: number };
 
 export const tab = signal<TabId>('start');
-export const stack = signal<Screen[]>([]);
+export const stack = signal<Entry[]>([]);
+let nextKey = 1;
+const entry = (screen: Screen): Entry => ({ ...screen, key: nextKey++ });
 
 /**
  * Zurück-Taste und Wischgeste: Jeder geöffnete Bildschirm bekommt einen Eintrag in der Browser-Historie
@@ -31,7 +37,7 @@ if (canHistory) {
 }
 
 export const push = (screen: Screen) => {
-  stack.value = [...stack.value, screen];
+  stack.value = [...stack.value, entry(screen)];
   if (canHistory) history.pushState({ bn: stack.value.length }, '');
 };
 /** Oberster Bildschirm zu: wie die Zurück-Taste. */
@@ -45,7 +51,7 @@ export const pop = () => {
 };
 /** Oberster Bildschirm wird durch einen anderen ersetzt (kein zusätzlicher Historieneintrag). */
 export const replaceTop = (screen: Screen) => {
-  stack.value = [...stack.value.slice(0, -1), screen];
+  stack.value = [...stack.value.slice(0, -1), entry(screen)];
   if (canHistory) history.replaceState({ bn: stack.value.length }, '');
 };
 export const goTab = (next: TabId) => {
@@ -72,9 +78,19 @@ export const journeyOptions = (): JourneyOptions => ({
   modes: modes.value.length ? modes.value : undefined,
 });
 
-/** Haltestelle der Abfahrtstafel. */
-export const boardStop = signal<Stop | null>(null);
-export const openBoard = (stop: Stop) => { boardStop.value = stop; goTab('abfahrten'); };
+/** Seite der Haltestelle öffnen. Eine Suche darüber wird durch sie ersetzt. */
+export function openStop(stop: Stop) {
+  const top = stack.value[stack.value.length - 1];
+  if (top?.kind === 'search') replaceTop({ kind: 'stop', stop });
+  else if (!(top?.kind === 'stop' && top.stop.id === stop.id)) push({ kind: 'stop', stop });
+}
+
+/** Verbindungen zeigen; fehlt der Start oder das Ziel, vorher danach fragen. */
+export function openConnections() {
+  if (!origin.value) push({ kind: 'search', target: 'from' });
+  else if (!to.value) push({ kind: 'search', target: 'to' });
+  else push({ kind: 'journeys' });
+}
 
 export function swapEnds() {
   const o = origin.value;

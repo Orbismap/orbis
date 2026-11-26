@@ -30,6 +30,8 @@ export interface Time {
 /** Halt eines Fahrzeugs: Name, Gleis und Zeit. */
 export interface Call {
   name: string;
+  /** ID der Haltestelle bei der Quelle (Abfahrten dazu lassen sich abfragen). */
+  stopId?: string;
   lat?: number;
   lng?: number;
   platform?: string;
@@ -52,6 +54,10 @@ export interface Leg {
   /** Länge in Metern, nur bei Fußwegen. */
   walkM?: number;
   cancelled: boolean;
+  /** ID der Fahrt: der ganze Linienlauf lässt sich damit abfragen. */
+  tripId?: string;
+  /** Verlauf auf Gleis oder Straße als [lng, lat]; ohne ihn werden die Halte gerade verbunden. */
+  path?: [number, number][];
 }
 
 export interface Journey {
@@ -71,6 +77,7 @@ export interface Departure {
   platformChanged?: boolean;
   time: Time;
   cancelled: boolean;
+  tripId?: string;
 }
 
 export interface JourneyOptions {
@@ -101,6 +108,10 @@ export interface TransitProvider {
   nearbyStops(lat: number, lng: number, signal?: AbortSignal): Promise<Stop[]>;
   departures(stop: Stop, opts?: { n?: number; time?: number }, signal?: AbortSignal): Promise<Departure[]>;
   journeys(from: Stop, to: Stop, opts: JourneyOptions, cursor?: string, signal?: AbortSignal): Promise<JourneyPage>;
+  /** Der ganze Lauf einer Fahrt mit allen Halten. */
+  trip(tripId: string, signal?: AbortSignal): Promise<Leg>;
+  /** Haltestellen in einem Kartenausschnitt [West, Süd, Ost, Nord]. */
+  stopsIn(box: [number, number, number, number], signal?: AbortSignal): Promise<Stop[]>;
 }
 
 /** Mischt bessere Echtzeitdaten (DB) nachträglich ein. Liefert die Eingabe unverändert, wenn nichts passt. */

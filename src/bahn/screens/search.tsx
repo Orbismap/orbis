@@ -1,27 +1,32 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Icon, modeIcon } from '../ui/icons';
+import { Icon } from '../ui/icons';
+import { Empty, ErrorState, IconButton, Row, Section, Skeleton, StopRow } from '../ui/parts';
+import { Screen } from '../ui/Sheet';
+import { useScene } from '../ui/scene';
 import type { Stop } from '../data/types';
 import { sources } from '../state/sources';
-import { myLocation, position } from '../state/location';
+import { position } from '../state/location';
 import { favorites, recents, type Saved } from '../state/places';
-import { from, openBoard, origin, pop, replaceTop, to } from '../state/nav';
+import { from, openStop, origin, pop, replaceTop, stack, to } from '../state/nav';
 
 type Target = 'from' | 'to' | 'stop';
-const TITLES: Record<Target, string> = { from: 'Start', to: 'Ziel', stop: 'Haltestelle' };
+const PROMPTS: Record<Target, string> = { from: 'Von wo?', to: 'Wohin?', stop: 'Haltestelle suchen' };
 
-/** Gerätestandort als gewählten Start behandeln: `from` zurück auf null. */
+/** Eine Wahl übernehmen. `stop` null steht beim Start für den Gerätestandort. */
 function choose(target: Target, stop: Stop | null) {
+  if (stop) recents.add({ kind: 'stop', stop });
   if (target === 'stop') {
-    if (stop) openBoard(stop); // schließt auch die Suche
+    if (stop) openStop(stop); // ersetzt die Suche
     else pop();
     return;
   }
   if (target === 'from') from.value = stop;
   else to.value = stop;
-  if (stop) recents.add({ kind: 'stop', stop });
-  // Sind Start und Ziel bekannt, ersetzt die Verbindungsliste die Suche; sonst geht es zurück.
-  if (origin.value && to.value) replaceTop({ kind: 'journeys' });
-  else pop();
+  // Liegt die Verbindungsliste darunter, reicht Zurück. Sonst weiter: zum fehlenden Ende oder zu den Verbindungen.
+  if (stack.peek().at(-2)?.kind === 'journeys') pop();
+  else if (!origin.value) replaceTop({ kind: 'search', target: 'from' });
+  else if (!to.value) replaceTop({ kind: 'search', target: 'to' });
+  else replaceTop({ kind: 'journeys' });
 }
 
 export function SearchScreen({ target }: { target: Target }) {
@@ -31,7 +36,8 @@ export function SearchScreen({ target }: { target: Target }) {
   const [failed, setFailed] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
-  useEffect(() => input.current?.focus(), []);
+  // erst nach dem Einblenden: sonst schiebt die Tastatur die Seite
+  useEffect(() => input.current?.focus({ preventScroll: true }), []);
 
   useEffect(() => {
     const text = query.trim();
@@ -56,52 +62,39 @@ export function SearchScreen({ target }: { target: Target }) {
     };
   }, [query]);
 
-  const stops = (items: Saved[]): Stop[] => items.flatMap((s) => (s.kind === 'stop' ? [s.stop] : []));
+  useScene({});
+  const stops = (items: Saved[]): Stop[] => items.flatMap((x) => (x.kind === 'stop' ? [x.stop] : []));
   const empty = query.trim().length < 2;
   const showMe = target === 'from' && !!position.value && empty;
-
-  return (
-    <div class="bn-screen bn-search">
-      <div class="bn-searchbar">
-        <button type="button" class="bn-iconbtn" aria-label="Zurück" onClick={pop}><Icon name="back" /></button>
-        <input
-          ref={input}
-          class="bn-input"
-          type="search"
-          placeholder={`${TITLES[target]} suchen`}
-          value={query}
-          autocomplete="off"
-          enterkeyhint="search"
-          onInput={(e) => setQuery(e.currentTarget.value)}
-        />
-        {query && <button type="button" class="bn-iconbtn" aria-label="Leeren" onClick={() => setQuery('')}><Icon name="close" size={18} /></button>}
-      </div>
-
-      <div class="bn-list">
-        {showMe && (
-          <button type="button" class="bn-row" onClick={() => choose('from', null)}>
-            <Icon name="locate" class="bn-row-ic" /><span class="bn-row-main">Mein Standort<small>{myLocation.value?.name}</small></span>
-          </button>
-        )}
-        {empty && stops(favorites.list.value).length > 0 && <h2 class="bn-hd">Favoriten</h2>}
-        {empty && stops(favorites.list.value).map((s) => <StopRow key={`f${s.id}`} stop={s} icon="star" onPick={() => choose(target, s)} />)}
-        {empty && stops(recents.list.value).length > 0 && <h2 class="bn-hd">Zuletzt gesucht</h2>}
-        {empty && stops(recents.list.value).map((s) => <StopRow key={`r${s.id}`} stop={s} icon="recent" onPick={() => choose(target, s)} />)}
-        {!empty && busy && results.length === 0 && <p class="bn-note">Suche …</p>}
-        {!empty && failed && <p class="bn-note bn-late">Die Suche ist gerade nicht erreichbar.</p>}
-        {!empty && !busy && !failed && results.length === 0 && <p class="bn-note">Keine Haltestelle gefunden.</p>}
-        {results.map((s) => <StopRow key={s.id} stop={s} icon="pin" onPick={() => choose(target, s)} />)}
-      </div>
-    </div>
+  const starred = stops(favorites.list.value);
+  const recent = stops(recents.list.value).filter((x) => !starred.some((f) => f.id === x.id));
+  const list = (items: Stop[], icon: 'star' | 'recent' | 'pin') => (
+    <div class="bn-list">{items.map((x) => <StopRow key={`${icon}${x.id}`} stop={x} from={origin.value} icon={icon} onClick={() => choose(target, x)} />)}</div>
   );
-}
 
-function StopRow({ stop, icon, onPick }: { stop: Stop; icon: 'star' | 'recent' | 'pin'; onPick: () => void }) {
   return (
-    <button type="button" class="bn-row" onClick={onPick}>
-      <Icon name={icon} class="bn-row-ic" />
-      <span class="bn-row-main">{stop.name}{stop.area && <small>{stop.area}</small>}</span>
-      {stop.modes && <span class="bn-row-modes">{stop.modes.slice(0, 4).map((m) => <Icon key={m} name={modeIcon(m)} size={16} />)}</span>}
-    </button>
+    <Screen
+      label={PROMPTS[target]} rest="full"
+      head={
+        <div class="bn-searchbar">
+          <IconButton icon="back" label="Zurück" onClick={pop} />
+          <input
+            ref={input} class="bn-input" type="search" placeholder={PROMPTS[target]} aria-label={PROMPTS[target]}
+            value={query} autocomplete="off" enterkeyhint="search" onInput={(e) => setQuery(e.currentTarget.value)}
+          />
+          {query && <IconButton icon="close" label="Eingabe löschen" onClick={() => { setQuery(''); input.current?.focus(); }} />}
+        </div>
+      }
+    >
+      {showMe && <div class="bn-list"><Row icon="locate" title="Mein Standort" onClick={() => choose('from', null)} /></div>}
+      {empty && starred.length > 0 && <Section title="Gemerkt">{list(starred, 'star')}</Section>}
+      {empty && recent.length > 0 && <Section title="Zuletzt gesucht">{list(recent, 'recent')}</Section>}
+      {empty && !showMe && !starred.length && !recent.length && <Empty icon="search" title="Haltestelle eingeben" text="Zum Beispiel „Hamburg Hbf“ oder der Name deiner Bushaltestelle." />}
+      {!empty && busy && results.length === 0 && <Skeleton />}
+      {!empty && failed && <ErrorState message="Die Suche ist gerade nicht erreichbar." />}
+      {!empty && !busy && !failed && results.length === 0 && <Empty icon="search" title="Keine Haltestelle gefunden" text="Prüfe die Schreibweise oder ergänze den Ort." />}
+      {!empty && list(results, 'pin')}
+      {!empty && results.length > 0 && <p class="bn-note"><Icon name="pin" size={14} /> Haltestellen lassen sich auch auf der Karte antippen.</p>}
+    </Screen>
   );
 }

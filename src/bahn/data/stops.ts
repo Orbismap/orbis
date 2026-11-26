@@ -1,3 +1,4 @@
+import { haversine } from '@/core/geo';
 import type { ModeGroup, Stop } from './types';
 
 /**
@@ -30,6 +31,32 @@ export function dedupeStops(stops: Stop[]): Stop[] {
     const modes = [...new Set([...(kept.modes ?? []), ...(s.modes ?? [])])].sort((a, b) => MODE_ORDER.indexOf(a) - MODE_ORDER.indexOf(b));
     const better = (s.importance ?? 0) > (kept.importance ?? 0);
     out[at] = { ...(better ? s : kept), name, modes: modes.length ? modes : undefined, importance: Math.max(s.importance ?? 0, kept.importance ?? 0) };
+  }
+  return out;
+}
+
+/** Gleichnamige Halte so nah beieinander (m) sind auf der Karte eine Haltestelle. */
+const SAME_PLACE_M = 400;
+
+/**
+ * Für die Karte: Bahnsteige und die Einträge mehrerer Fahrplanquellen zu einer Haltestelle zusammenfassen. Anders als
+ * `dedupeStops` ohne Ortsangabe, deshalb zählt die Entfernung. Lage und ID kommen vom gewichtigsten Eintrag.
+ */
+export function clusterStops(stops: Stop[]): Stop[] {
+  const byName = new Map<string, Stop[]>();
+  const out: Stop[] = [];
+  for (const s of [...stops].sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0))) {
+    const name = cleanStopName(s.name);
+    const key = norm(name).join(' ');
+    const near = byName.get(key)?.find((o) => haversine([o.lng, o.lat], [s.lng, s.lat]) * 1000 <= SAME_PLACE_M);
+    if (near) {
+      const modes = [...new Set([...(near.modes ?? []), ...(s.modes ?? [])])].sort((a, b) => MODE_ORDER.indexOf(a) - MODE_ORDER.indexOf(b));
+      near.modes = modes.length ? modes : undefined;
+      continue;
+    }
+    const kept = { ...s, name, modes: s.modes && [...s.modes].sort((a, b) => MODE_ORDER.indexOf(a) - MODE_ORDER.indexOf(b)) };
+    out.push(kept);
+    (byName.get(key) ?? byName.set(key, []).get(key)!).push(kept);
   }
   return out;
 }

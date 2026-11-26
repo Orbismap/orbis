@@ -1,34 +1,39 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { online } from '@/core/online';
 import { describeError } from '@/data/http';
-import { Icon } from '../ui/icons';
-import { MapSheet } from '../ui/MapSheet';
-import type { MapMarker } from '../ui/NetMap';
-import { journeyRoutes, modeColor } from '../ui/routes';
-import { LineBadge, PlatformSign } from '../ui/Badges';
-import { clock, delayState, delayText, duration } from '../ui/format';
-import { SavedNote } from '../ui/SavedNote';
-import { plannedJourney } from '../data';
+import { Icon, modeIcon } from '../ui/icons';
+import { Screen } from '../ui/Sheet';
+import { useScene } from '../ui/scene';
+import { journeyMap } from '../ui/mapData';
+import { cssModeColor } from '../ui/mapLayers';
+import { Chip, Empty, ErrorState, IconButton, SavedNote, Skeleton } from '../ui/parts';
+import { PlatformSign } from '../ui/Badges';
+import { clock, delayState, delayText, duration, inMinutes, transfersText } from '../ui/format';
+import { MODE_GROUPS, plannedJourney } from '../data';
 import { saveJourneys, savedJourneys } from '../data/offline';
-import type { Journey } from '../data/types';
+import type { Journey, Leg } from '../data/types';
 import { sources } from '../state/sources';
 import { favorites, recents } from '../state/places';
-import { journeyOptions, origin, pop, push, to, when } from '../state/nav';
+import { journeyOptions, modes, origin, pop, push, swapEnds, to, when } from '../state/nav';
+import { useNow } from '../state/hooks';
 
-const keyOf = (j: Journey) => `${j.legs.find((l) => l.mode !== 'fuss')?.line ?? ''}|${Math.round(j.departure.planned / 60000)}|${Math.round(j.arrival.planned / 60000)}`;
+export const journeyKey = (j: Journey) => `${j.legs.find((l) => l.mode !== 'fuss')?.line ?? ''}|${Math.round(j.departure.planned / 60000)}|${Math.round(j.arrival.planned / 60000)}`;
 
-/** Verbindungsliste Start → Ziel, mit früher/später nachladen und DB-Echtzeit. */
+/** Verbindungsliste Start → Ziel: Strecke, Zeit und Filter im Kopf, früher/später nachladen, DB-Echtzeit. */
 export function JourneysScreen() {
-  const from = origin.value;
+  const start = origin.value;
   const dest = to.value;
   const [list, setList] = useState<Journey[]>([]);
   const [cursors, setCursors] = useState<{ earlier?: string; later?: string }>({});
   const [state, setState] = useState<{ loading: boolean; error?: string }>({ loading: true });
   const [more, setMore] = useState<'earlier' | 'later' | null>(null);
+  const [retry, setRetry] = useState(0);
   // Desktop: Fährt man über eine Verbindung, zeigt die Karte deren Strecke.
   const [hover, setHover] = useState<Journey | null>(null);
+  const now = useNow();
 
   const w = when.value;
+  const wanted = modes.value.join(',');
   const net = online.value;
   /** Wann die gezeigten gespeicherten Verbindungen ankamen; null, sobald die Quelle geantwortet hat. */
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -37,19 +42,23 @@ export function JourneysScreen() {
   const keep = (change: (cur: Journey[]) => Journey[]) =>
     setList((cur) => {
       const next = change(cur);
-      if (from && dest) saveJourneys(from, dest, journeyOptions(), next);
+      if (start && dest) saveJourneys(start, dest, journeyOptions(), next);
       return next;
     });
 
   useEffect(() => {
-    if (!from || !dest) return;
+    if (!start || !dest) {
+      setList([]);
+      setState({ loading: false });
+      return;
+    }
     const ctl = new AbortController();
-    const kept = savedJourneys(from, dest, journeyOptions(), w.time);
+    const kept = savedJourneys(start, dest, journeyOptions(), w.time);
     setState({ loading: true });
     setList(kept?.data ?? []);
     setSavedAt(kept?.at ?? null);
     setCursors({});
-    sources.transit.journeys(from, dest, journeyOptions(), undefined, ctl.signal).then(
+    sources.transit.journeys(start, dest, journeyOptions(), undefined, ctl.signal).then(
       (page) => {
         if (ctl.signal.aborted) return;
         const planned = sources.delays ? page.journeys.map(plannedJourney) : page.journeys;
@@ -57,28 +66,28 @@ export function JourneysScreen() {
         setSavedAt(null);
         setCursors({ earlier: page.earlier, later: page.later });
         setState({ loading: false });
-        if (page.journeys.length && from.name !== 'Mein Standort') recents.add({ kind: 'route', from, to: dest });
+        if (page.journeys.length && start.name !== 'Mein Standort') recents.add({ kind: 'route', from: start, to: dest });
         sources.delays?.journeys(page.journeys, ctl.signal).then((merged) => !ctl.signal.aborted && keep(() => merged), () => undefined);
       },
       (e: unknown) => !ctl.signal.aborted && setState({ loading: false, error: describeError(e) }),
     );
     return () => ctl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from?.id, dest?.id, w.time, w.arriveBy, net]);
+  }, [start?.id, dest?.id, w.time, w.arriveBy, wanted, net, retry]);
 
   const loadMore = async (dir: 'earlier' | 'later') => {
     const cursor = cursors[dir];
-    if (!from || !dest || !cursor || more) return;
+    if (!start || !dest || !cursor || more) return;
     setMore(dir);
     try {
-      const page = await sources.transit.journeys(from, dest, journeyOptions(), cursor);
-      const fresh = page.journeys.filter((j) => !list.some((x) => keyOf(x) === keyOf(j)));
+      const page = await sources.transit.journeys(start, dest, journeyOptions(), cursor);
+      const fresh = page.journeys.filter((j) => !list.some((x) => journeyKey(x) === journeyKey(j)));
       const shown = sources.delays ? fresh.map(plannedJourney) : fresh;
       keep((cur) => (dir === 'earlier' ? [...shown, ...cur] : [...cur, ...shown]));
       setCursors((c) => ({ ...c, [dir]: dir === 'earlier' ? page.earlier : page.later }));
       if (sources.delays) {
         const merged = await sources.delays.journeys(fresh);
-        keep((cur) => cur.map((j) => merged.find((m) => keyOf(m) === keyOf(j)) ?? j));
+        keep((cur) => cur.map((j) => merged.find((m) => journeyKey(m) === journeyKey(j)) ?? j));
       }
     } catch (e) {
       setState((s) => ({ ...s, error: describeError(e) }));
@@ -88,69 +97,138 @@ export function JourneysScreen() {
   };
 
   const shown = hover ?? list[0];
-  const routes = useMemo(() => (shown ? journeyRoutes(shown) : []), [shown]);
-
-  if (!from || !dest) return null;
-  const routeSaved = favorites.has({ kind: 'route', from, to: dest });
-  const ends: MapMarker[] = [
-    { id: 'from', lng: from.lng, lat: from.lat, kind: 'start' },
-    { id: 'to', lng: dest.lng, lat: dest.lat, kind: 'end' },
-  ];
+  const map = useMemo(() => (shown ? journeyMap(shown, cssModeColor) : undefined), [shown]);
+  const ends: [number, number][] = start && dest ? [[start.lng, start.lat], [dest.lng, dest.lat]] : [];
+  useScene({
+    ...(map ?? { stops: start && dest ? [{ stop: start, kind: 'start' }, { stop: dest, kind: 'end' }] : [], fit: ends }),
+    onRoute: () => shown && push({ kind: 'journey', journey: shown }),
+  });
 
   return (
-    <div class="bn-screen">
-      <MapSheet
-        scene={{ markers: ends, routes, fit: true }}
-        header={
-          <>
-            <div class="bn-ms-head">
-              <button type="button" class="bn-iconbtn" aria-label="Zurück" onClick={pop}><Icon name="back" /></button>
-              <div class="bn-toprt"><span>{from.name}</span><Icon name="back" size={14} class="bn-flip bn-dim" /><span>{dest.name}</span></div>
-              {from.name !== 'Mein Standort' && (
-                <button type="button" class={`bn-iconbtn ${routeSaved ? 'bn-starred' : ''}`} aria-label="Strecke merken" aria-pressed={routeSaved} onClick={() => favorites.toggle({ kind: 'route', from, to: dest })}><Icon name="star" /></button>
-              )}
-            </div>
-            <div class="bn-small bn-timeline-note">{w.arriveBy ? 'Ankunft' : 'Abfahrt'} {w.time ? new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(w.time) : 'jetzt'}</div>
-          </>
-        }
-      >
-        {cursors.earlier && <button type="button" class="bn-more" disabled={!!more} onClick={() => void loadMore('earlier')}>{more === 'earlier' ? 'Lädt …' : '⬆ Frühere Verbindungen'}</button>}
-        {savedAt !== null && list.length > 0 && <SavedNote at={savedAt} />}
-        {state.loading && <p class="bn-note">Suche Verbindungen …</p>}
-        {state.error && <p class="bn-note bn-late">{state.error}</p>}
-        {!state.loading && !state.error && list.length === 0 && <p class="bn-note">Keine Verbindung gefunden. Probiere andere Zeiten oder weniger Filter.</p>}
-        {list.map((j) => <JourneyCard key={keyOf(j)} j={j} onClick={() => push({ kind: 'journey', journey: j })} onHover={setHover} />)}
-        {cursors.later && <button type="button" class="bn-more" disabled={!!more} onClick={() => void loadMore('later')}>{more === 'later' ? 'Lädt …' : 'Spätere Verbindungen ⬇'}</button>}
-      </MapSheet>
-    </div>
+    <Screen label="Verbindungen" head={<RouteHead />}>
+      {savedAt !== null && list.length > 0 && <SavedNote at={savedAt} />}
+      {state.error && <ErrorState message={state.error} onRetry={() => setRetry(retry + 1)} />}
+      {state.loading && list.length === 0 && <Skeleton rows={3} card />}
+      {!state.loading && !state.error && list.length === 0 && (
+        start && dest
+          ? <Empty icon="search" title="Keine Verbindung gefunden" text="Probiere eine andere Zeit oder erlaube mehr Verkehrsmittel." />
+          : <Empty icon="search" title="Start und Ziel wählen" text="Tippe oben auf das freie Feld." />
+      )}
+      {cursors.earlier && <button type="button" class="bn-btn bn-btn-text bn-btn-wide" disabled={!!more} onClick={() => void loadMore('earlier')}>{more === 'earlier' ? 'Lädt …' : 'Frühere Verbindungen'}</button>}
+      <div class="bn-conns">
+        {list.map((j) => <JourneyCard key={journeyKey(j)} j={j} now={now} onClick={() => push({ kind: 'journey', journey: j })} onHover={setHover} />)}
+      </div>
+      {cursors.later && <button type="button" class="bn-btn bn-btn-text bn-btn-wide" disabled={!!more} onClick={() => void loadMore('later')}>{more === 'later' ? 'Lädt …' : 'Spätere Verbindungen'}</button>}
+    </Screen>
   );
 }
 
-function JourneyCard({ j, onClick, onHover }: { j: Journey; onClick: () => void; onHover: (j: Journey | null) => void }) {
+const pad = (n: number) => String(n).padStart(2, '0');
+const toLocalInput = (t: number) => {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+/** Kopf der Suche: Start und Ziel (antippen ändert), tauschen, merken, Zeit und Verkehrsmittel. */
+function RouteHead() {
+  const [open, setOpen] = useState<'time' | 'filter' | null>(null);
+  const start = origin.value;
+  const dest = to.value;
+  const w = when.value;
+  const toggle = (id: 'time' | 'filter') => setOpen((cur) => (cur === id ? null : id));
+  const route = start && dest ? ({ kind: 'route', from: start, to: dest } as const) : null;
+  const saved = route ? favorites.has(route) : false;
+  const timeText = w.time
+    ? `${w.arriveBy ? 'An' : 'Ab'} ${new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }).format(w.time)}`
+    : w.arriveBy ? 'Ankunft jetzt' : 'Abfahrt jetzt';
+
+  return (
+    <>
+      <div class="bn-routehead">
+        <IconButton icon="back" label="Zurück" onClick={pop} />
+        <div class="bn-fields">
+          <button type="button" class="bn-field" onClick={() => push({ kind: 'search', target: 'from' })}>
+            <span class="bn-dot" aria-hidden="true" /><span class="bn-sr">Start: </span><span>{start?.name ?? 'Start wählen'}</span>
+          </button>
+          <button type="button" class="bn-field" onClick={() => push({ kind: 'search', target: 'to' })}>
+            <span class="bn-dot bn-dot-end" aria-hidden="true" /><span class="bn-sr">Ziel: </span><span>{dest?.name ?? 'Ziel wählen'}</span>
+          </button>
+        </div>
+        <IconButton icon="swap" label="Start und Ziel tauschen" onClick={swapEnds} />
+      </div>
+      <div class="bn-chips">
+        <Chip icon="clock" expanded={open === 'time'} onClick={() => toggle('time')}>{timeText}</Chip>
+        <Chip icon="filter" expanded={open === 'filter'} onClick={() => toggle('filter')}>{modes.value.length ? `Verkehrsmittel · ${modes.value.length}` : 'Verkehrsmittel'}</Chip>
+        {route && start!.name !== 'Mein Standort' && <Chip icon="star" pressed={saved} onClick={() => favorites.toggle(route)}>{saved ? 'Gemerkt' : 'Merken'}</Chip>}
+      </div>
+      {open === 'time' && (
+        <div class="bn-options">
+          <div class="bn-segments" role="group" aria-label="Zeit gilt für">
+            <button type="button" aria-pressed={!w.arriveBy} onClick={() => (when.value = { ...w, arriveBy: false })}>Abfahrt</button>
+            <button type="button" aria-pressed={w.arriveBy} onClick={() => (when.value = { ...w, arriveBy: true })}>Ankunft</button>
+          </div>
+          <input
+            type="datetime-local" class="bn-input" aria-label="Datum und Uhrzeit" value={toLocalInput(w.time ?? Date.now())}
+            onChange={(e) => {
+              const t = Date.parse(e.currentTarget.value);
+              when.value = { ...w, time: Number.isFinite(t) ? t : null };
+            }}
+          />
+          <button type="button" class="bn-btn bn-btn-tonal" onClick={() => { when.value = { time: null, arriveBy: false }; setOpen(null); }}>Jetzt</button>
+        </div>
+      )}
+      {open === 'filter' && (
+        <div class="bn-options bn-chips bn-chips-wrap" role="group" aria-label="Nur diese Verkehrsmittel (keine Auswahl: alle)">
+          {MODE_GROUPS.map((g) => (
+            <Chip key={g.id} pressed={modes.value.includes(g.id)} onClick={() => (modes.value = modes.value.includes(g.id) ? modes.value.filter((m) => m !== g.id) : [...modes.value, g.id])}>{g.label}</Chip>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+const minutes = (l: Leg) => Math.max(0, (l.to.time.actual - l.from.time.actual) / 60000);
+
+/** Ergebnis: Zeiten und Dauer, der Verlauf als Balken in den Linienfarben, darunter Abfahrtsort, Umstiege und Status. */
+function JourneyCard({ j, now, onClick, onHover }: { j: Journey; now: number; onClick: () => void; onHover: (j: Journey | null) => void }) {
   const cancelled = j.legs.some((l) => l.cancelled);
-  const rides = j.legs.filter((l) => l.mode !== 'fuss');
-  const total = Math.max(1, j.arrival.actual - j.departure.actual);
-  const depState = delayState(j.departure);
-  const arrState = delayState(j.arrival);
+  const first = j.legs.find((l) => l.mode !== 'fuss');
   const worst = Math.max(j.departure.delayMin ?? 0, j.arrival.delayMin ?? 0);
+  // „in 5 min“ gilt der Abfahrt des ersten Fahrzeugs, nicht dem Losgehen davor
+  const soon = first ? first.from.time.actual - now : -Infinity;
+  // kurze Fußwege nehmen im Balken keinen Platz weg
+  const bar = j.legs.filter((l) => l.mode !== 'fuss' || minutes(l) >= 4);
   return (
     <button type="button" class={`bn-conn ${cancelled ? 'bn-cx' : ''}`} onClick={onClick} onMouseEnter={() => onHover(j)} onMouseLeave={() => onHover(null)} onFocus={() => onHover(j)} onBlur={() => onHover(null)}>
-      <div class="bn-conn-t">
-        <span class={depState === 'late' ? 'bn-late' : ''}>{clock(j.departure.actual)}</span>
-        <span class="bn-ar">→</span>
-        <span class={arrState === 'late' ? 'bn-late' : ''}>{clock(j.arrival.actual)}</span>
-        <span class="bn-conn-d">{duration(j.arrival.actual - j.departure.actual)}</span>
-      </div>
-      <div class="bn-bar">
-        {j.legs.map((l, i) => <span key={i} style={{ flex: Math.max(0.04, (l.to.time.actual - l.from.time.actual) / total), background: l.mode === 'fuss' ? 'var(--ink-3)' : modeColor(l.mode) }} />)}
-      </div>
-      <div class="bn-conn-meta">
-        {rides.slice(0, 3).map((l, i) => <LineBadge key={i} mode={l.mode} line={l.line} />)}
-        {rides.length > 3 && <span class="bn-small">+{rides.length - 3}</span>}
-        <span class="bn-small">{j.transfers === 0 ? 'Direkt' : `${j.transfers} Umstieg${j.transfers > 1 ? 'e' : ''}`}</span>
-        {cancelled ? <span class="bn-late">Ausfall</span> : worst >= 2 ? <span class="bn-late">{delayText(j.departure) || delayText(j.arrival)} min</span> : j.delaySource === 'db' ? <span class="bn-ok">pünktlich</span> : null}
-        {rides[0]?.from.platform && <span class="bn-conn-gl"><PlatformSign platform={rides[0].from.platform} changed={rides[0].from.platformChanged} mode={rides[0].mode} /></span>}
-      </div>
+      <span class="bn-conn-top">
+        <span class="bn-conn-times">
+          <b class={delayState(j.departure) === 'late' ? 'bn-late' : ''}>{clock(j.departure.actual)}</b>
+          <span aria-label="bis">–</span>
+          <b class={delayState(j.arrival) === 'late' ? 'bn-late' : ''}>{clock(j.arrival.actual)}</b>
+        </span>
+        <span class="bn-conn-dur">{duration(j.arrival.actual - j.departure.actual)}</span>
+      </span>
+      <span class="bn-legbar">
+        {bar.map((l, i) => (
+          <span key={i} class={`bn-seg bn-m-${l.mode}`} style={{ flexGrow: Math.max(1, Math.round(minutes(l))) }}>
+            {l.mode === 'fuss' ? <Icon name="fuss" size={14} /> : <><Icon name={modeIcon(l.mode)} size={14} /><span>{l.line}</span></>}
+          </span>
+        ))}
+      </span>
+      <span class="bn-conn-meta">
+        {first && (
+          <span class="bn-conn-from">
+            {soon > -60_000 && soon < 60 * 60_000 ? <b>{inMinutes(first.from.time.actual, now)}</b> : null}
+            <span>ab {first.from.name}</span>
+          </span>
+        )}
+        <PlatformSign platform={first?.from.platform} changed={first?.from.platformChanged} mode={first?.mode} />
+      </span>
+      <span class="bn-conn-meta">
+        <span>{transfersText(j.transfers)}</span>
+        {cancelled ? <span class="bn-tag bn-tag-late">Fällt aus</span> : worst >= 2 ? <span class="bn-tag bn-tag-late">{delayText(j.departure) || delayText(j.arrival)} min</span> : j.delaySource === 'db' ? <span class="bn-tag bn-tag-ok">pünktlich</span> : null}
+      </span>
     </button>
   );
 }
