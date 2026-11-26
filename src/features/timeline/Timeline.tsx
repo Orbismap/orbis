@@ -54,14 +54,8 @@ export function Timeline() {
   );
 }
 
-/** Mobile: the two rows that live in the sheet's peek detent. */
+/** Mobile: the timeline row in the bar of the sheet, shown while layers have a time. */
 export function TimelineCompact() {
-  if (!hasTimeLayers.value)
-    return (
-      <div class="tl-compact tl-compact-idle">
-        <LivePill />
-      </div>
-    );
   return (
     <div class="tl-compact">
       <PlayButton />

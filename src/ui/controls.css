@@ -112,7 +112,6 @@
     border-radius: 10px;
     background: color-mix(in srgb, var(--text-1) 7%, transparent);
     overflow: hidden;
-    overscroll-behavior: contain;
   }
   /* air between a field label and its list */
   .ld-label + .choices {
@@ -122,6 +121,7 @@
     /* half a row less than --choices-max: the cut row shows that the list goes on */
     max-height: calc((var(--choices-max) - 0.5) * var(--choice-h));
     overflow-y: auto;
+    overscroll-behavior: contain;
     scrollbar-width: thin;
   }
   .choices.is-scroll.has-below:not(.has-above) {

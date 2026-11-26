@@ -4,6 +4,7 @@ import type { LegendSpec } from '../../layers/types';
 import { basemapDef } from '../../map/basemaps';
 import { activeKarte, legends, openActive } from '../../state/session';
 import { detailOpen } from '../../state/hud';
+import { clearSelection } from '../../state/selection';
 import { leftPanelOpen, leftTab, leftView, isMobile, sheetDetent } from '../../state/ui';
 import { closeDetail, openDetail } from '../layers-panel/themes-state';
 import { MAX_ITEMS, MAX_LEGENDS, pickTicks } from './compact';
@@ -30,7 +31,10 @@ function reveal(): void {
   leftTab.value = 'layers';
   leftPanelOpen.value = true;
   detailOpen.value = true;
-  if (isMobile.peek() && sheetDetent.peek() === 'peek') sheetDetent.value = 'half';
+  if (isMobile.peek()) {
+    clearSelection(); // a selection would stay in front of what was asked for
+    if (sheetDetent.peek() === 'peek') sheetDetent.value = 'half';
+  }
 }
 const openLayer = (id: string) => batch(() => (reveal(), openActive(), openDetail(activeKarte.peek().id, id, 'Karte')));
 const openList = () => (reveal(), closeDetail());

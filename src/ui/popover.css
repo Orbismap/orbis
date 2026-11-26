@@ -87,3 +87,77 @@
     background: color-mix(in oklab, var(--line) 70%, transparent);
   }
 }
+
+/* Phones: action sheet. Unlayered, so that it wins over the positions and sizes features give their popovers. */
+.popover-layer {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-sheet) + 8);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding: calc(env(safe-area-inset-top) + 16px) 8px calc(var(--kb-inset, 0px) + max(8px, env(safe-area-inset-bottom)));
+  background: rgba(5, 8, 14, 0.45);
+  pointer-events: auto;
+  touch-action: pan-x pan-y;
+  animation: pop-scrim 180ms var(--ease);
+}
+.popover.popover-sheet {
+  position: relative;
+  inset: auto;
+  flex: 0 1 auto;
+  width: 100%;
+  max-width: 520px;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  margin: 0;
+  padding: 0 10px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 24px;
+  background: var(--ink-1);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  animation: pop-sheet 240ms var(--ease);
+}
+.popover-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  min-height: 56px;
+  margin: 0 -10px 4px;
+  padding: 4px 8px 4px 18px;
+  background: var(--ink-1);
+}
+.popover-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-title);
+  font-weight: 600;
+}
+.popover-sheet .menuitem {
+  flex: none;
+  min-height: 52px;
+  padding: 0 var(--s-3);
+  font-size: 1rem;
+}
+@keyframes pop-scrim {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pop-sheet {
+  from {
+    transform: translateY(32px);
+    opacity: 0;
+  }
+}

@@ -1,7 +1,9 @@
 import { useRef } from 'preact/hooks';
 import { unwrapAngle } from '../../map/frame';
 import { useCameraFrame } from '../../map/useCameraFrame';
-import { leftPanelOpen, leftView, mapEngine } from '../../state/ui';
+import { showView } from '../../state/sheet-view';
+import { inspector, probe } from '../../state/selection';
+import { isMobile, leftPanelOpen, leftView, mapEngine, sheetDetent } from '../../state/ui';
 import { camera } from '../../state/view';
 import { IconButton } from '../../ui/Button';
 import { Icon } from '../../ui/icons/Icon';
@@ -70,7 +72,7 @@ export function ToolRail({ popoverUp }: { popoverUp?: boolean }) {
   return (
     <div class="rail" role="group" aria-label="Kartenansicht">
       <BasemapPicker side={popoverUp ? 'left' : 'down'} />
-      <div class="cap rail-cap rail-stack">
+      <div class="cap rail-cap rail-stack rail-zoom">
         <button type="button" class="railbtn" aria-label="Vergrößern" onClick={() => zoomBy(1)} {...tipProps('Vergrößern', undefined, 'left')}>
           <Icon name="plus" size={20} />
         </button>
@@ -87,6 +89,8 @@ export function ToolRail({ popoverUp }: { popoverUp?: boolean }) {
 }
 
 function openSettings() {
+  // a lowered sheet or a selection in it would hide the settings: show them instead of toggling
+  if (isMobile.peek() && (sheetDetent.peek() === 'peek' || inspector.peek() || probe.peek())) return showView('settings');
   leftPanelOpen.value = true;
   leftView.value = leftView.peek() === 'settings' ? 'layers' : 'settings';
 }

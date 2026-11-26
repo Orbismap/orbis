@@ -1,6 +1,7 @@
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Icon } from '../../ui/icons/Icon';
 import { tipProps } from '../../ui/tip-state';
+import { isMobile, settingsKeyFocus } from '../../state/ui';
 import { projection } from '../../state/view';
 import { cx } from '../../ui/hooks';
 import { Popover } from '../../ui/Popover';
@@ -21,6 +22,11 @@ export function BasemapPicker({ side = 'down' }: { side?: 'down' | 'left' }) {
   const btn = useRef<HTMLButtonElement>(null);
   const globe = projection.value === 'globe';
   const pv = usePickerState(open);
+  // a locked map leads to the key field in the settings: on phones the action sheet would cover it
+  const keyAsked = settingsKeyFocus.value;
+  useEffect(() => {
+    if (keyAsked && isMobile.peek()) setOpen(false);
+  }, [keyAsked]);
   const close = () => {
     // give focus back to the rail button when it was inside the popover (Escape) or nowhere
     const a = document.activeElement;

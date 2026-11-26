@@ -174,52 +174,72 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* the map controls stay at the top right, clear of the sheet at every height; pinching zooms, so no zoom buttons */
   .hud-mobile .rail-pos {
     position: absolute;
     right: var(--rail-inset);
-    bottom: calc(var(--sheet-h, 128px) + 12px);
+    top: calc(env(safe-area-inset-top) + var(--hit-touch) + 20px);
+  }
+  .hud-mobile .rail-zoom {
+    display: none;
   }
   .hud-mobile .attr-pos {
     position: absolute;
     left: 12px;
     bottom: calc(var(--sheet-h, 128px) + 8px);
   }
-  /* mobile: above the attribution button, left of the rail, over the sheet */
+  /* mobile: above the attribution button, over the sheet */
   .hud-mobile .maplegend-pos {
     left: 12px;
-    right: calc(var(--rail-inset) + var(--rail-w) + 12px);
+    right: 12px;
     bottom: calc(var(--sheet-h, 128px) + 44px);
   }
   .hud-mobile .rail-pos,
   .hud-mobile .attr-pos,
-  .hud-mobile .maplegend-pos {
+  .hud-mobile .maplegend-pos,
+  .hud-mobile .scalebar-pos,
+  .hud-mobile .season-pos {
     transition: opacity var(--t-panel) var(--ease);
   }
-  .hud-mobile[data-detent='full'] .rail-pos,
-  .hud-mobile[data-detent='full'] .attr-pos,
-  .hud-mobile[data-detent='full'] .maplegend-pos {
+  .hud-mobile[data-detent='full'] :is(.rail-pos, .attr-pos, .maplegend-pos, .scalebar-pos, .season-pos) {
     opacity: 0;
     pointer-events: none;
-  }
-  [data-bp='mobile'] .lrow-title,
-  [data-bp='mobile'] .crow-title,
-  [data-bp='mobile'] .set-label,
-  [data-bp='mobile'] .srow-title {
-    font-size: 1.0625rem;
-  }
-  [data-bp='mobile'] .lrow-sub,
-  [data-bp='mobile'] .crow-summary {
-    font-size: 0.8125rem;
   }
   .peek {
     display: flex;
     flex-direction: column;
+    gap: var(--s-1);
   }
   .peek-row {
     display: flex;
     align-items: center;
     gap: var(--s-3);
-    height: 46px;
+    height: 52px;
+  }
+  .peek-row .kswitch {
+    max-width: 45%;
+  }
+  .peek-count {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-3);
+    font-size: var(--fs-small);
+    text-align: right;
+  }
+  .peek-add {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: var(--hit-touch);
+    height: var(--hit-touch);
+    border-radius: 50%;
+    background: var(--ink-2);
+    color: var(--limb);
+  }
+  .peek-add:active {
+    background: var(--ink-3);
   }
   .peek-mid {
     flex: 1;
@@ -234,23 +254,28 @@
     line-height: 1.2;
   }
   .peek-mid .tl-when {
-    font-size: var(--fs-ui);
-  }
-  .peek-mid .tl-rel {
     font-size: var(--fs-small);
+  }
+  /* the time on its own line, the date below: in one line they do not fit beside the switcher */
+  .peek-mid .tl-when > * {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    line-height: 1.25;
+  }
+  .peek-mid .tl-time {
+    flex-basis: 100%;
+    justify-content: end;
+    font-size: var(--fs-title);
+  }
+  /* "Live" and the "Jetzt" button in the timeline row say it already */
+  .peek-mid .tl-rel {
+    display: none;
   }
   .lbody-pad {
     padding-bottom: var(--s-4);
   }
   [data-bp='mobile'] {
     --toast-bottom: calc(var(--sheet-h, 128px) + 12px);
-  }
-  [data-bp='mobile'] .lrow-main,
-  [data-bp='mobile'] .ltab {
-    min-height: var(--hit-touch);
-  }
-  [data-bp='mobile'] .ltabs {
-    padding-top: var(--s-3);
   }
 }
 

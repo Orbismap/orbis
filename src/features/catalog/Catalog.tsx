@@ -171,7 +171,7 @@ export function Catalog({ modal }: { modal?: boolean } = {}) {
           <VirtualList
             class="cat-scroll"
             items={items}
-            rowHeight={(it) => (it.kind === 'head' ? 36 : it.kind === 'sub' ? 24 : (isMobile.value ? 44 : 36) + (it.snippet ? 16 : 0))}
+            rowHeight={(it) => (it.kind === 'head' ? 36 : it.kind === 'sub' ? 24 : (isMobile.value ? 52 : 36) + (it.snippet ? 16 : 0))}
             itemKey={(it) => it.id}
             scrollToIndex={rowIdx[a]}
             render={(it, i) =>

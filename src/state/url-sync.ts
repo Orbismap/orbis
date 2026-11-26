@@ -98,7 +98,8 @@ export function startUrlSync(): () => void {
   if (typeof window === 'undefined') return () => {};
   applyUrlState(parseHash(window.location.hash));
   const write = throttle((hash: string) => {
-    if (window.location.hash !== hash) window.history.replaceState(null, '', hash);
+    // the state of the entry stays: app/history.ts marks the sheet's entry with it
+    if (window.location.hash !== hash) window.history.replaceState(window.history.state, '', hash);
   }, 500);
   const stop = effect(() => write(serializeHash(currentUrlState())));
   const onHash = () => {

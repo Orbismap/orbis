@@ -7,7 +7,8 @@ import { activeKarte } from '../../state/session';
 import { updateSettings } from '../../state/settings';
 import { selectPlace, setProbe } from '../../state/selection';
 import { goLive } from '../../state/time';
-import { isMobile, leftPanelOpen, leftView, shortcutsOpen } from '../../state/ui';
+import { showView } from '../../state/sheet-view';
+import { isMobile, leftPanelOpen, shortcutsOpen } from '../../state/ui';
 import { projection, setProjection } from '../../state/view';
 import { customPage } from '../layers-panel/pages/registry';
 import { openLayerPage } from '../layers-panel/open-layer';
@@ -28,8 +29,8 @@ const COMMANDS: Command[] = [
   { id: 'theme-dark', title: 'Thema: Dunkel', icon: 'moon', words: ['design', 'nacht'], run: () => updateSettings({ theme: 'dark' }) },
   { id: 'theme-light', title: 'Thema: Hell', icon: 'sun', words: ['design', 'tag'], run: () => updateSettings({ theme: 'light' }) },
   { id: 'theme-auto', title: 'Thema: Automatisch', icon: 'settings', words: ['design', 'system'], run: () => updateSettings({ theme: 'auto' }) },
-  { id: 'add', title: 'Ebene hinzufügen', icon: 'layers', words: ['katalog', 'ebenen'], run: () => ((leftPanelOpen.value = true), (leftView.value = 'catalog')) },
-  { id: 'settings', title: 'Einstellungen', icon: 'settings', words: ['einheiten', 'optionen'], run: () => ((leftPanelOpen.value = true), (leftView.value = 'settings')) },
+  { id: 'add', title: 'Ebene hinzufügen', icon: 'layers', words: ['katalog', 'ebenen'], run: () => ((leftPanelOpen.value = true), showView('catalog')) },
+  { id: 'settings', title: 'Einstellungen', icon: 'settings', words: ['einheiten', 'optionen'], run: () => ((leftPanelOpen.value = true), showView('settings')) },
   { id: 'keys', title: 'Tastenkürzel', icon: 'keyboard', words: ['hilfe', 'shortcuts'], run: () => (shortcutsOpen.value = true) },
 ];
 

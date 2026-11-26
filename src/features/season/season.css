@@ -39,7 +39,14 @@
   .hud-desktop .season-pos {
     bottom: calc(var(--dock-h, 90px) + var(--dock-bottom) + 10px);
   }
+  /* below the scale bar, left of the map controls */
   .hud-mobile .season-pos {
-    top: calc(env(safe-area-inset-top, 0px) + 68px);
+    top: calc(env(safe-area-inset-top, 0px) + 96px);
+    left: 12px;
+    right: calc(var(--rail-inset) + var(--rail-w) + 12px);
+    transform: none;
+  }
+  .hud-mobile .season {
+    width: 100%;
   }
 }

@@ -11,7 +11,7 @@ import { cx } from '../../ui/hooks';
 import { Icon } from '../../ui/icons/Icon';
 import type { IconName } from '../../ui/icons/names';
 import { MenuItem, MenuSeparator, Popover } from '../../ui/Popover';
-import { leftView } from '../../state/ui';
+import { showView } from '../../state/sheet-view';
 import { toast } from '../../ui/toast';
 import { editMode } from '../layers-panel/themes-state';
 
@@ -187,7 +187,13 @@ export function KartenPopover({ open, onClose, anchor, align = 'end', up, class:
           <MenuItem icon="pencil" onClick={() => setView({ kind: 'rename', id: target.id })}>
             {target.name} umbenennen
           </MenuItem>
-          <MenuItem icon="plus" onClick={() => (leftView.value = 'catalog')}>
+          <MenuItem
+            icon="plus"
+            onClick={() => {
+              showView('catalog');
+              close();
+            }}
+          >
             Ebene hinzufügen
           </MenuItem>
           <MenuItem
