@@ -4,6 +4,7 @@ import { GeoJSONWrapper, fromVectorTileJs, type Feature } from '@maplibre/vt-pbf
 import { PbfReader } from 'pbf';
 import { replaceBuildingTile, tilePoint } from '../map/landmark-geometry';
 import { replacedByLandmark } from '../features/buildings3d/roofs-source';
+import { landmarkPoints } from './parsers/landmarks';
 import { inBoxes, inFootprint, loadCatalogue, loadTile, maskOf, ofmId, parseLandmarks, tileOf, tilesInView } from './landmarks';
 
 const ESB = {
@@ -29,6 +30,17 @@ describe('landmarks dataset', () => {
   it('drops entries without a model or anchor, and models under another licence', () => {
     expect(parseLandmarks({ assets: [{ ...ESB, lods: {} }, { ...ESB, anchor: undefined }, { ...ESB, artisticLicense: 'CC-BY-4.0' }] })).toEqual([]);
     expect(parseLandmarks(null)).toEqual([]);
+  });
+  it('turns the asset list into one point per model for the layer, grouped by type', () => {
+    const fc = landmarkPoints({ assets: [
+      { ...ESB, type: 'tower', place: { name: 'New York' }, wikidata: 'Q9188' },
+      { ...ESB },
+      { ...ESB, id: 'odd', type: 'something-new' },
+      { ...ESB, id: 'no-model', lods: {} },
+    ] });
+    expect(fc.features.map((f) => [f.properties.id, f.properties.group])).toEqual([['empire-state-building', 'turm'], ['odd', 'sonstiges']]);
+    expect(fc.features[0]).toMatchObject({ geometry: { coordinates: ESB.anchor }, properties: { kind: 'Turm', place: 'New York', heightM: 443.2, bounds: ESB.bounds.join(','), wikidata: 'Q9188' } });
+    expect(landmarkPoints(null).features).toEqual([]);
   });
   it('maps OSM elements to OpenFreeMap feature ids', () => {
     expect(ofmId({ type: 'way', id: 5 })).toBe(52);

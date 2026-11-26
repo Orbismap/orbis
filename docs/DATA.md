@@ -125,7 +125,7 @@ Orte/min, ein Tageszähler in `localStorage` stoppt bei 8 000, bei 429 gibt es 1
   Pacing mit den Ozean-Ebenen (`render/ocean/budget.ts`). Pflichtsatz: „Generated using Copernicus Atmosphere Monitoring Service information 2026“ steht in
   der Lizenzangabe der Ebene. Klassen: EEA-Grenzwerte wie bei Open-Meteo; Pollen in Körnern/m³ (nur Europa, saisonabhängig, außerhalb der Saison 0).
 
-## 3D-Wahrzeichen (kein Layer, mit Orbis Pro immer an)
+## 3D-Wahrzeichen (Modelle mit Orbis Pro; Punkte in der Ebene „Landmarks“)
 
 Quelle: [alexwohlbruck/landmarks](https://github.com/alexwohlbruck/landmarks) (Website `landmarks.barrelman.dev`), rund 2.000 Low-Poly-Modelle
 (Empire State Building, Eiffelturm, Brücken, Stadien …), vor allem USA, dazu London, Moskau, Mexiko-Stadt u. a.
@@ -137,7 +137,10 @@ Quelle: [alexwohlbruck/landmarks](https://github.com/alexwohlbruck/landmarks) (W
 - **Abruf** (`data/landmarks.ts`): `api/v1/latest.json` → Katalog (wenige kB, mit den belegten z12-Kacheln) → je Kachel in Sicht ein JSON mit den
   Wahrzeichen → je Modell eine GLB (niedrige Stufe, 50-300 kB, nach Inhalts-Hash unveränderlich). Alles mit CORS `*`, direkt von der
   Projektseite; `VITE_LANDMARKS_BASE` stellt auf eine eigene Kopie um.
-- **Wann** (`landmarksWanted`): mit der Ebene „3D-Gebäude“ auf jeder Grundkarte, sonst nur auf den Karten mit 2.5D-Häusern (Modus „Erkunden“, Gebäude-Schalter an). Nicht bei „Daten“, „Fahren" und auf Luftbildern: dort nur über die Ebene.
+- **Ebene „Landmarks“** (`layers/infrastruktur/landmarks.ts`, auch ohne Pro): alle Modelle als Punkte, ab Zoom 0 gebündelt (bis Zoom 12),
+  nach Art filterbar. Dafür lädt sie `assets.json` des Releases (Pfad im Katalog, ~1,5 MB komprimiert, im Worker geparst:
+  `data/parsers/landmarks.ts`). „In 3D ansehen“ fliegt zum Modell.
+- **Wann** (`landmarksWanted`): mit den Ebenen „3D-Gebäude“ und „Landmarks“ auf jeder Grundkarte, sonst nur auf den Karten mit 2.5D-Häusern (Modus „Erkunden“, Gebäude-Schalter an). Nicht bei „Daten“, „Fahren" und auf Luftbildern: dort nur über diese Ebenen.
 - **Vorrang** (`features/landmarks/source.ts`): ab Zoom 13,5 (wie die 2.5D-Häuser, das `minZoom` des Modells zählt nicht) zeichnet Pro jedes Modell in Sicht, unabhängig von Ebenen und
   Dachdaten. Die GLBs tragen Ausrichtung und Maßstab schon in sich (nicht noch einmal drehen oder skalieren), Achsen X Ost / Y oben / Z Süd.
 - **Gebäude ausschneiden** (`map/landmark-buildings.ts`, `map/landmark-geometry.ts`, wie im Landmarks-Demo): OpenFreeMap fasst Nachbargebäude zu

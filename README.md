@@ -53,7 +53,7 @@ Die Karte ist in neun Kategorien gegliedert; jede Ebene ist eine eigene, in sich
 | ☁️ **Wetter** | Radar, Satellit, Temperatur, Niederschlag, Wind und Strömung, Luftdruck, Böen, Bewölkung, Luftqualität, Schnee |
 | ⚠️ **Gefahren** | Unwetterwarnungen, Erdbeben, Vulkane, Brände, Stürme, Tsunamis, Blitze, Polarlicht, Radioaktivität |
 | ✈️ **Verkehr** | Straßennetz und Verkehrslage, Blitzer, Flugzeuge, Schiffe, Züge, Nahverkehr, Raketenstarts, Satelliten |
-| ⚡ **Infrastruktur** | Kraftwerke, Stromnetz, Telekomnetz, Rechenzentren, Rohstoffe, Pipelines, 3D-Gebäude |
+| ⚡ **Infrastruktur** | Kraftwerke, Stromnetz, Telekomnetz, Rechenzentren, Rohstoffe, Pipelines, 3D-Gebäude, Landmarks |
 | 💧 **Wasser** | Stauseen, Wasserwerke, Wasserleitungen |
 | 🌍 **Erde** | Gelände, Satellitenbild, Landbedeckung, Vegetation, Schneedecke, Nachtlichter, Plattengrenzen, Tierzüge im Jahreslauf, Basiskarte „Jahreszeiten“ mit Monatsregler |
 | 🌊 **Meer** | Strömung, Temperatur, Seegang, Gezeiten, Meereis, Schiffsrouten, Bojen |
