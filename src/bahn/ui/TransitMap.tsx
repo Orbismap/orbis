@@ -9,7 +9,7 @@ import { position, requestLocation } from '../state/location';
 import { openStop } from '../state/nav';
 import { bahnStyle } from './mapStyle';
 import { LAYERS, NEARBY_ZOOM, SOURCES, TAP_LAYERS, cssModeColor, nearbyFeatures, routeFeatures, stopFeatures } from './mapLayers';
-import { scene, type Scene } from './scene';
+import { scene, type Scene, sideCover } from './scene';
 import { sheetCover } from './sheetState';
 
 /** Ohne Standort und Szene zeigt die Karte Deutschland. */
@@ -48,7 +48,7 @@ export function TransitMap() {
       cleanup.push(() => m.remove());
       m.touchZoomRotate.disableRotation();
       m.keyboard.disableRotation();
-      m.addControl(new ml.AttributionControl({ compact: true }), 'top-left');
+      m.addControl(new ml.AttributionControl({ compact: true }), 'top-right'); // oben links sitzt der App-Wechsler
       // 'style.load' reicht für eigene Ebenen und kommt auch, wenn die Kacheln nicht erreichbar sind
       await new Promise<void>((resolve) => { m.once('style.load', () => resolve()); m.once('load', () => resolve()); });
       if (dead) return;
@@ -64,7 +64,7 @@ export function TransitMap() {
       // ---- Kamera: die Szene bewegt sie, bis der Nutzer selbst die Karte bewegt ----
       let moved = false;
       m.on('movestart', (e) => { if ((e as { originalEvent?: Event }).originalEvent) moved = true; });
-      const padding = (cover: number) => ({ top: 24, bottom: Math.min(cover, host.current!.clientHeight * 0.62), left: 0, right: 0 });
+      const padding = (cover: number, side: number) => ({ top: 24, bottom: Math.min(cover, host.current!.clientHeight * 0.62), left: side, right: 0 });
       const apply = (s: Scene, duration: number) => {
         moved = false;
         if (s.fit && s.fit.length > 1) {
@@ -88,7 +88,7 @@ export function TransitMap() {
         started = true;
       }));
       cleanup.push(effect(() => {
-        const next = padding(sheetCover.value);
+        const next = padding(sheetCover.value, sideCover.value);
         // wer selbst gesucht hat, behält seinen Ausschnitt; sonst wird die Szene im neuen Bereich wieder ganz gezeigt
         if (moved) m.easeTo({ padding: next, duration: 250 });
         else {

@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
 
 /** The Orbis apps. One build serves all of them; the hostname (or `?mode=`) decides which one boots, see `src/entry.ts`. */
-export type ProjectId = 'map' | 'wetter' | 'find';
+export type ProjectId = 'map' | 'wetter' | 'bahn' | 'find';
 
 export interface Project {
   id: ProjectId;
@@ -27,6 +27,11 @@ export const PROJECTS: readonly Project[] = [
     icon: () => svg(<path d="M5.5 15.5a3.5 3.5 0 0 1-.4-6.98 4.5 4.5 0 0 1 8.7-.52A3.75 3.75 0 0 1 14 15.5z" />),
   },
   {
+    id: 'bahn',
+    name: 'Bus & Bahn',
+    icon: () => svg(<path d="M6.5 3h7A2.5 2.5 0 0 1 16 5.5v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7A2.5 2.5 0 0 1 6.5 3zM4 9.5h12M7 12h.01M13 12h.01M7 14.5l-1.5 2.5M13 14.5l1.5 2.5" />),
+  },
+  {
     id: 'find',
     name: 'Find',
     icon: () => svg(<path d="M16.5 3.5 3.5 9l5.5 2 2 5.5z" />),
@@ -34,7 +39,7 @@ export const PROJECTS: readonly Project[] = [
 ];
 
 /** The subdomain of each app on the real hosts. */
-const HOSTS: Record<ProjectId, string> = { map: 'maps', wetter: 'wetter', find: 'find' };
+const HOSTS: Record<ProjectId, string> = { map: 'maps', wetter: 'wetter', bahn: 'bahn', find: 'find' };
 
 /** Address of another Orbis app: swaps the subdomain on the real hosts, uses `?mode=` everywhere else (local, previews). */
 export function projectUrl(id: ProjectId): string {

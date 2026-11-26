@@ -2,14 +2,14 @@ import { haversine } from '@/core/geo';
 import { Icon } from '../ui/icons';
 import { Chip, ErrorState, Row, SavedNote, Section, Skeleton, StopRow } from '../ui/parts';
 import { Screen } from '../ui/Sheet';
-import { useScene } from '../ui/scene';
+import { isDesktop, menuOpen, panelOpen, useScene } from '../ui/scene';
 import { DepartureRow } from '../ui/Departures';
 import { distance } from '../ui/format';
 import type { Stop } from '../data/types';
 import { sources } from '../state/sources';
 import { locationState, requestLocation } from '../state/location';
 import { favorites, recents, savedKey, type Saved } from '../state/places';
-import { from, openStop, origin, push, to } from '../state/nav';
+import { from, openStop, origin, push, stack, to } from '../state/nav';
 import { useAsync, useDepartures, useNow } from '../state/hooks';
 
 /** Start: „Wohin?“, Schnellziele, Abfahrten der nächsten Haltestelle und Haltestellen in der Nähe. */
@@ -17,11 +17,13 @@ export function Start() {
   const o = origin.value;
   useScene(o ? { center: [o.lng, o.lat], zoom: 15.2 } : {});
   const shortcuts = [...favorites.list.value, ...recents.list.value.filter((r) => !favorites.has(r))].slice(0, 8);
+  // am Desktop stehen Suche und Schnellziele im Menü, solange es offen ist
+  const inMenu = isDesktop.value && menuOpen.value;
 
   return (
     <Screen
       label="Start"
-      head={
+      head={inMenu ? <h1 class="bn-title">In der Nähe</h1> : (
         <>
           <button type="button" class="bn-where" onClick={() => push({ kind: 'search', target: 'to' })}>
             <Icon name="search" size={22} /><span>Wohin möchtest du?</span>
@@ -32,7 +34,7 @@ export function Start() {
             </div>
           )}
         </>
-      }
+      )}
     >
       {o ? <Nearby origin={o} /> : <LocateCard />}
     </Screen>
@@ -43,11 +45,13 @@ export const savedLabel = (s: Saved) => (s.kind === 'stop' ? s.stop.name : `${s.
 
 /** Gemerktes öffnen: eine Haltestelle zeigt ihre Abfahrten, eine Strecke ihre Verbindungen. */
 export function openSaved(s: Saved) {
+  panelOpen.value = true;
   if (s.kind === 'stop') openStop(s.stop);
   else {
     from.value = s.from;
     to.value = s.to;
-    push({ kind: 'journeys' });
+    // die offene Ergebnisliste folgt Start und Ziel von selbst
+    if (stack.peek().at(-1)?.kind !== 'journeys') push({ kind: 'journeys' });
   }
 }
 

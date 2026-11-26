@@ -1,8 +1,9 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect } from 'preact/hooks';
 import { online } from '@/core/online';
-import { Icon, type IconName } from '../ui/icons';
-import { ActiveScreen, isDesktop } from '../ui/scene';
+import { OrbisSwitcher } from '@/ui/hud/OrbisHud';
+import { Icon } from '../ui/icons';
+import { ActiveScreen, DESKTOP, isDesktop, menuOpen, panelOpen } from '../ui/scene';
 import { Sheet } from '../ui/Sheet';
 import { TransitMap, showMyLocation } from '../ui/TransitMap';
 import { detent, sheetCover } from '../ui/sheetState';
@@ -16,13 +17,15 @@ import { StopScreen } from '../screens/StopScreen';
 import { TripScreen } from '../screens/TripScreen';
 import { goTab, stack, tab, type Entry, type TabId } from '../state/nav';
 import { initLocation, locationState } from '../state/location';
+import { Menu } from './Menu';
+import { TABS } from './tabs';
 import './app.css';
 
-const TABS: { id: TabId; label: string; icon: IconName; page: () => ComponentChildren }[] = [
-  { id: 'start', label: 'Start', icon: 'home', page: () => <Start /> },
-  { id: 'abfahrten', label: 'Abfahrten', icon: 'clock', page: () => <Stops /> },
-  { id: 'merkliste', label: 'Merkliste', icon: 'star', page: () => <Saved /> },
-];
+const PAGES: Record<TabId, () => ComponentChildren> = {
+  start: () => <Start />,
+  abfahrten: () => <Stops />,
+  merkliste: () => <Saved />,
+};
 
 function page(p: Entry) {
   switch (p.kind) {
@@ -37,28 +40,31 @@ function page(p: Entry) {
 export function App() {
   useEffect(() => { void initLocation(); }, []);
   const pages = stack.value;
-  const current = TABS.find((t) => t.id === tab.value)!;
+  const desktop = isDesktop.value;
+  const current = tab.value;
 
   return (
-    <div class="bn-app">
+    <div class="bn-app" data-menu={menuOpen.value ? 'open' : 'closed'} data-panel={panelOpen.value ? 'open' : 'closed'} style={{ '--menu-w': `${DESKTOP.menu}px`, '--panel-w': `${DESKTOP.panel}px` }}>
       <main class="bn-main">
         <TransitMap />
+        {desktop ? <Menu /> : <OrbisSwitcher project="bahn" />}
         <LocateButton />
         <Sheet>
           {/* alle offenen Seiten bleiben bestehen, nur die oberste ist sichtbar und steuert die Karte */}
-          <ActiveScreen.Provider key={current.id} value={pages.length === 0}>{current.page()}</ActiveScreen.Provider>
+          <ActiveScreen.Provider key={current} value={pages.length === 0}>{PAGES[current]()}</ActiveScreen.Provider>
           {pages.map((p, i) => <ActiveScreen.Provider key={p.key} value={i === pages.length - 1}>{page(p)}</ActiveScreen.Provider>)}
         </Sheet>
         {!online.value && <div class="bn-offline" role="status">Offline · gespeicherte Daten</div>}
       </main>
-      <nav class="bn-tabs" aria-label="Hauptnavigation">
-        <img class="bn-rail-logo" src="./bahn/favicon.svg" alt="Bus &amp; Bahn" width="40" height="40" />
-        {TABS.map((t) => (
-          <button key={t.id} type="button" class="bn-tab" aria-current={t.id === tab.value ? 'page' : undefined} onClick={() => goTab(t.id)}>
-            <span class="bn-tab-ic"><Icon name={t.icon} size={22} /></span>{t.label}
-          </button>
-        ))}
-      </nav>
+      {!desktop && (
+        <nav class="bn-tabs" aria-label="Hauptnavigation">
+          {TABS.map((t) => (
+            <button key={t.id} type="button" class="bn-tab" aria-current={t.id === current ? 'page' : undefined} onClick={() => goTab(t.id)}>
+              <span class="bn-tab-ic"><Icon name={t.icon} size={22} /></span>{t.label}
+            </button>
+          ))}
+        </nav>
+      )}
     </div>
   );
 }

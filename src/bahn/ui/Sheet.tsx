@@ -1,7 +1,8 @@
 import type { ComponentChildren } from 'preact';
 import { useContext, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { effect } from '@preact/signals';
-import { ActiveScreen, isDesktop } from './scene';
+import { Icon } from './icons';
+import { ActiveScreen, isDesktop, panelOpen } from './scene';
 import { detent, sheetCover, sheetTops, snap, tapped, type Detent } from './sheetState';
 
 const DRAG_START = 8;
@@ -72,11 +73,16 @@ export function Sheet({ children }: { children: ComponentChildren }) {
     <div
       ref={root}
       class={`bn-sheet bn-sheet-${at} ${dragTop !== null ? 'bn-sheet-drag' : ''}`}
-      style={desktop ? undefined : { top: height ? top : '46%' }}
+      style={desktop ? undefined : { top: height ? top : '46%' }} inert={desktop && !panelOpen.value}
       onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
     >
       {!desktop && (
         <button type="button" class="bn-grab" aria-label={at === 'full' ? 'Karte zeigen' : 'Liste vergrößern'} onClick={() => (detent.value = tapped(detent.peek()))}><i /></button>
+      )}
+      {desktop && (
+        <button type="button" class="ohud-btn bn-close" aria-label="Schließen" onClick={() => (panelOpen.value = false)}>
+          <Icon name="close" size={16} />
+        </button>
       )}
       <div class="bn-views">{children}</div>
     </div>
