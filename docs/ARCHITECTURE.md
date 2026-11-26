@@ -433,6 +433,7 @@ interface ExtensionHost {
   power: TracksChannel<PowerGridSample>;        // dasselbe für Strommasten und Freileitungen (Stromnetz)
   trees: TracksChannel<TreeSample>;             // dasselbe für Einzelbäume (Bäume)
   windTurbines: TracksChannel<WindTurbineSample>; // dasselbe für einzelne Windräder (Kraftwerke)
+  balloons: TracksChannel<BalloonSample>;       // dasselbe für Wetterballons
   tilesets: TracksChannel<TilesetSample>;       // gestreamte 3D-Stadtmodelle (3D Tiles), Quelle `features/buildings3d/tiles-source.ts`
   reportTilesets(state: TilesetsState): void;   // Laden/Fehler der Tilesets zurück an die Ebene
   reducedMotion(): boolean;
@@ -466,6 +467,8 @@ Beim Abschalten der Ebene sendet `reset()` eine leere Liste und vergisst die Aus
 
 `WindTurbineSample` (Ebene `kraftwerke`, Quelle `features/windturbines/source.ts`): die einzelnen Windräder der OpenInfraMap-Kacheln (`power_generator`, `source=wind`) mit OSM-ID, Position, Nennleistung (Naben- und Rotormaße stehen nicht in den Kacheln) und dem Wind zur gewählten Zeit (10 m über Grund, ICON-Überblick 0,5°, `features/windturbines/wind.ts`; dieselben `u`/`v`-Gitter wie die Windströmung, rund 7 MB je Lauf, nur geladen, solange Windräder veröffentlicht werden, unabhängig davon, ob die Ebene `stroemung` an ist), gefiltert wie die 2D-Punkte (Optionen „Energieträger“ und „Mindestleistung“). Veröffentlicht ab Zoom 12, nur solange jemand zuhört; `data/parsers/windturbines.ts` behält Gesehenes (höchstens 6000, die dem Zentrum nächsten). `present()` blendet die 2D-Punkte der Windräder aus (andere Erzeuger und Windpark-Flächen bleiben); `select(id)` öffnet die Karte der Ebene, `selectedId` nennt das hervorzuhebende Rad.
 
+`BalloonSample` (Ebene `wetterballons`, Quelle `features/balloons/source.ts`): Seriennummer, Position, Höhe über Meer, Drift, Steigrate, Zustand (`balloon`, `chute`, `landed`; `sondeStage`), Farbe der Höhe (wie 2D-Symbol und Legende) und Zeit der Meldung, gefiltert wie die 2D-Symbole. Wie bei Flugzeugen öffnet `select(id)` die Karte der Ebene samt den Knöpfen der Erweiterung (Folgen, `f=ballon:<Seriennummer>`); `present()` blendet die 2D-Symbole aus.
+
 `TreeSample` (Ebene `baeume`): Einzelbäume aus `trees.pmtiles` (OSM `natural=tree`, 35 Mio. Punkte, nur Kachelzoom 15) mit Art, Höhe, Stammumfang, Laub-/Nadelbaum und Laubzyklus, ohne OSM-ID (die Position ist die Kennung). Zweite Ebene `tree_lines` derselben Datei (`natural=tree_row`, `barrier=hedge`, Felder `kind`, `species`, `height`, `leaf_type`, `leaf_cycle`): `data/parsers/trees.ts` setzt daraus Bäume alle 10 m (Reihe) bzw. kleine Büsche dicht an dicht (Hecke, `hedge: true`), Orbis Pro zeichnet sie mit denselben Modellen. Die 2D-Karte zeigt nur die Einzelbäume. Veröffentlicht ab Zoom 15 (wie die 2D-Punkte, mit Pro sieht man die Punkte nie), nur solange jemand zuhört; bereinigt von `data/parsers/trees.ts` (Doppelte aus überlappenden Kacheln, nur Blickfeld mit Rand, höchstens 25 000, die dem Zentrum nächsten). `present()` blendet die 2D-Punkte aus. Welches Modell ein Baum bekommt, entscheidet die Erweiterung.
 
 ### Pro-Paket (`src/pro/`)
@@ -477,6 +480,7 @@ world3d/            die Bühne: EIN MapLibre-Custom-Layer 'orbis-stage' mit EINE
   stage.ts          Custom-Layer, Teile (StagePart), Picking/Hover/Klick, Neuzeichnen nur bei Bedarf
   instances.ts      Instanzen: tausende gleiche Modelle in einem Aufruf
   mesh.ts           flach schattierte prozedurale Geometrie mit Vertexfarben (Masten, Windräder)
+  drops.ts          dünne Lote zum Boden, in einem Aufruf (Flugzeuge, Ballons)
   follow.ts, follow-math.ts   Folgekamera: folgt jedem Teil mit positionOf, Klick auf anderes Objekt wechselt das Ziel
   size.ts           Größenkurve (lesbare Mindestgröße, Wachsen der Auswahl), outline.ts: Kontur per umgestülpter Hülle
   hit.ts            Treffertests am Bildschirm (Segmentabstand, Dreieck, Viereck)
@@ -497,6 +501,10 @@ stromnetz/          Teil „Stromnetz“
   sag.ts            Durchhang (rein, getestet)
   wires.ts          alle Drähte in einer Mesh
   stromnetz.ts      der StagePart: Masten auf dem Gelände, Drähte, Blickfeldauswahl, Statistik
+balloons/           Teil „Wetterballons“
+  motion.ts         Zustand zwischen Meldungen (Drift und Steigrate, höchstens 5 min, fallende halten am Boden), rein und getestet
+  models.ts         Sonde, Schnur, Hülle, Fallschirm, Bodenmarke
+  balloons.ts       der StagePart: Ballons in echter Höhe, Lot zum Boden, Picking
 windkraft/          Teil „Windräder“
   models.ts         Maße aus der Leistung (rein, getestet) und prozedurale Modelle: Turm, Gondel, Rotor
   motion.ts         Wind in Nabenhöhe, Drehzahlkennlinie, Nachführen der Gondel (rein, getestet)
@@ -533,6 +541,8 @@ Flugzeug ist hervorgehoben.
 **Schiffe.** Genauso immer und nur 3D, sobald die Ebene `schiffe` Schiffe meldet (Stream, Digitraffic und BarentsWatch, bis zu 8000 aus dem Stream), auf jedem Zoom; `present()` des Schiffskanals blendet Symbole und Ring aus, die Spur und die Routenlinie des gewählten Schiffs zeichnet weiter die Basis (Kartenlinie, funktioniert auch unter 3D). Je Klasse ein Low-Poly-Modell (Fracht mit Containerstapeln, Tanker mit Deckleitung und Luken, Passagierschiff mit gestaffelten Decks und Schornstein, Fischer, Schlepper/Spezial, Segelboot mit Mast und Segel, Sonstige) als **eine** zusammengeführte Geometrie mit Zusatzattribut `aLight`: ein Material mischt die Klassenfarbe (wie Legende und 2D-Symbol) je Vertex zu Weiß (Rumpf 0, Aufbauten und Segel hell), sodass Details in jeder Klassenfarbe lesbar bleiben. Länge aus den AIS-Stammdaten (8–400 m), sonst typisch je Klasse; nie kürzer als ~22 px auf dem Bildschirm (fällt unter Zoom 9 sanft wie bei den Flugzeugen). Koppelnavigation nur, solange das Schiff fährt, höchstens 10 min (wie die 2D-Ebene), angeglichen an jede neue Meldung (kein Zurückziehen, Sprung nach langer Pause); der Bug folgt der wahren Peilung, sonst dem Kurs, ein liegendes Schiff behält seine Drehung. Schiffe, die 90 s nicht in der Liste sind, verschwinden (die Liste kommt etwa jede Sekunde, das einzelne Schiff meldet selten). Klick → `ships.select(id)` → die echte Karte der Ebene (Foto, Ziel, ETA) mit der Schaltfläche „Folgen“; das gewählte Schiff wächst und bekommt eine weiße Kontur, Name über Zeiger, Auswahl und Folgeziel. Klick auf ein Schiff während man einem Flugzeug folgt (oder umgekehrt) wechselt das Ziel. Schiffe liegen unter den Flugzeugen (Reihenfolge der Bühne). Die Bühne meldet `ships` und `shipsDrawn`.
 
 **Bäume.** `baeume/` (`models.ts`, `baeume.ts`) stellt jeden Baum des Channels als glattes 3D-Modell auf das Gelände: Stamm und gewölbte Krone mit weichen Normalen und Vertexfarben, drei Laubkronen (rund, oval, breit) und ein Nadelbaum, je in hoher und niedriger Auflösung (nah bzw. unter 22 px Bildhöhe). Form, Drehung und Helligkeit folgen der OSM-Id (stabil), die Höhe dem Tag `height`, sonst dem Stammumfang, sonst einem typischen Wert. Die Bühne meldet `trees` und `treesDrawn`.
+
+**Wetterballons.** Auf jeder Zoomstufe, sobald die Ebene `wetterballons` Sonden hat: in echter Höhe als Ballon (die Hülle wächst mit der Höhe) beim Steigen und Schweben, am Fallschirm beim Sinken, als Kästchen mit liegendem Schirm nach der Landung. Die Modelle behalten eine lesbare Bildschirmgröße (34 px, weiter draußen kleiner), ein Lot und eine Marke zeigen den Ort am Boden; die ausgewählte Sonde ist größer. Neu gezeichnet wird nur, solange sich eine auf dem Bildschirm merklich bewegt. Die Bühne meldet `balloons` und `balloonsDrawn`.
 
 **Windräder.** Sobald die Ebene `kraftwerke` ab Zoom 12 Windräder veröffentlicht, zeichnet die Erweiterung je Rad Turm, Gondel und Rotor als Instanzen. Nabenhöhe und Rotordurchmesser kommen aus der Nennleistung (typische Anlagen, ohne Angabe 2 MW). Jede Gondel zeigt dorthin, woher der Wind zur gewählten Zeit kommt. Die Drehzahl folgt dem Wind in Nabenhöhe (aus dem 10-m-Wind mit dem 1/7-Potenzgesetz): unter 3 m/s und ab 25 m/s Stillstand, dazwischen steigend bis zur Nenndrehzahl bei 11 m/s (große Rotoren langsamer); Änderungen laufen weich ein. Ohne Winddaten: 250° und 8 m/s. Außerhalb des Modellzeitraums gilt der erste bzw. letzte Schritt (wie bei der Windströmung). Anfangswinkel sind versetzt; die Karte wird dafür nur neu gezeichnet, wenn ein Rotor mindestens 6 px breit ist und „Bewegung reduzieren“ aus ist. Weil dann nach jedem Bild `idle` feuert, lesen alle Teile das Gelände gedrosselt (`idleThrottle`). Die Bühne meldet `windTurbines` und `windDrawn`.
 

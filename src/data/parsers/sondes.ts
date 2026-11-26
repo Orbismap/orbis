@@ -1,4 +1,5 @@
 // SondeHub `/sondes?last=<s>`: latest telemetry per radiosonde -> tracks (position, drift, altitude).
+import type { BalloonSample } from '../../ext/types';
 import type { TrackObject } from '../../render/tracks';
 
 export type SondeProps = {
@@ -14,6 +15,22 @@ export type SondeProps = {
 };
 
 const n = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+
+/** What a sonde is doing: without a change of height it floats high up, or it lies on the ground. */
+export function sondeStage(p: Pick<SondeProps, 'phase' | 'alt'>): 'rising' | 'falling' | 'floating' | 'landed' {
+  if (p.phase !== 0) return p.phase > 0 ? 'rising' : 'falling';
+  return p.alt > 1500 ? 'floating' : 'landed';
+}
+
+/** A sonde for the extension channel; `color`: the one of its altitude. */
+export function sondeSample(t: TrackObject, color: string): BalloonSample {
+  const p = t.props as unknown as SondeProps;
+  const stage = sondeStage(p);
+  return {
+    id: t.id, lng: t.lng, lat: t.lat, altM: p.alt, speedMs: t.speed ?? 0, ...(t.heading !== undefined ? { course: t.heading } : {}), climbMs: p.vv,
+    state: stage === 'falling' ? 'chute' : stage === 'landed' ? 'landed' : 'balloon', color, t: t.t,
+  };
+}
 
 export function sondes(raw: unknown): TrackObject[] {
   if (typeof raw !== 'object' || raw === undefined) return [];

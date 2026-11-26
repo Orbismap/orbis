@@ -4,6 +4,7 @@
 import { effect } from '@preact/signals';
 import type { ExtensionHost, FollowRef, OrbisExtension, TracksChannel } from '../ext/types';
 import { BaeumePart } from './baeume/baeume';
+import { BalloonsPart } from './balloons/balloons';
 import { GebaeudePart } from './gebaeude/gebaeude';
 import { LandmarksPart } from './landmarks/landmarks';
 import { PlanesPart } from './planes/planes';
@@ -33,6 +34,7 @@ export const extension: OrbisExtension = {
     const stage = new Stage(map, (below) => host.placeLayer(STAGE_LAYER_ID, below ? 'below-data' : 'points'));
     const planes = new PlanesPart(map, stage, (id) => host.tracks.select(id), host.reducedMotion);
     const ships = new ShipsPart(map, stage, (id) => host.ships.select(id), host.reducedMotion);
+    const balloons = new BalloonsPart(map, stage, (id) => host.balloons.select(id));
     const power = new StromnetzPart(map, stage);
     const turbines = new WindkraftPart(map, stage, (id) => host.windTurbines.select(id), host.reducedMotion);
     const trees = new BaeumePart(map, stage);
@@ -60,8 +62,16 @@ export const extension: OrbisExtension = {
     stage.add(power);
     stage.add(trees);
     stage.add(ships);
+    stage.add(balloons);
     stage.add(planes);
     host.addCustomLayer(stage, 'points');
+
+    /** what can be followed: the part that draws it and the channel that opens its card */
+    const followable = {
+      flug: { part: planes, channel: host.tracks },
+      schiff: { part: ships, channel: host.ships },
+      ballon: { part: balloons, channel: host.balloons },
+    } satisfies Record<FollowRef['kind'], unknown>;
 
     // Following from the URL: starts once the object is in the data (and selects it, so its card opens); ends when the URL
     // no longer asks for it. What is followed is reported back, so the URL carries it.
@@ -70,7 +80,7 @@ export const extension: OrbisExtension = {
       if (!pending) return;
       if (performance.now() > pending.until) { pending = null; return; }
       const { ref } = pending;
-      const [part, channel] = ref.kind === 'flug' ? [planes, host.tracks] : [ships, host.ships];
+      const { part, channel } = followable[ref.kind];
       if (!part.positionOf(ref.id)) return;
       pending = null;
       channel.select(ref.id);
@@ -88,7 +98,8 @@ export const extension: OrbisExtension = {
     });
     const stopReport = follow.listen(() => {
       const id = follow.id;
-      host.follow.report(id === null ? null : { kind: follow.followedPart === planes ? 'flug' : 'schiff', id });
+      const kind = (Object.keys(followable) as FollowRef['kind'][]).find((k) => followable[k].part === follow.followedPart);
+      host.follow.report(id === null || !kind ? null : { kind, id });
     });
 
     // One presenter per channel: 3D at every zoom as soon as the channel has something to show (the base's 2D icons
@@ -148,6 +159,7 @@ export const extension: OrbisExtension = {
 
     const unbindPlanes = bind(host.tracks, planes, () => planes.tracker.planes.size);
     const unbindShips = bind(host.ships, ships, () => ships.tracker.ships.size);
+    const unbindBalloons = bind(host.balloons, balloons, () => balloons.count);
 
     // Static things (power grid, trees, wind turbines): the layer publishes them from its zoom on and an empty list below, so the
     // 3D presentation switches itself on and off with the zoom; present() hides the 2D dots meanwhile.
@@ -208,6 +220,7 @@ export const extension: OrbisExtension = {
       stopReport();
       unbindPlanes();
       unbindShips();
+      unbindBalloons();
       unbindPower();
       unbindTrees();
       stopTurbineSelected();

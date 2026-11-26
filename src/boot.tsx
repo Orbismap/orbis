@@ -6,7 +6,7 @@ import './ui/base.css';
 import { App } from './app/App';
 import * as karten from './karten/store';
 import { initKartenStore } from './karten/store';
-import { buildingsChannel, powerChannel, shipsChannel, tracksChannel, treesChannel, windTurbinesChannel } from './ext/channels';
+import { balloonsChannel, buildingsChannel, powerChannel, shipsChannel, tracksChannel, treesChannel, windTurbinesChannel } from './ext/channels';
 import { extensionStatus, proAvailable, startExtensions } from './ext/loader';
 import { allLayers, getLayer } from './layers/registry';
 import { getEngine } from './map/engine';
@@ -64,6 +64,7 @@ export function bootOrbis(root: HTMLElement, opts: { adopt?: { map: MlMap; eleme
         power: powerChannel,
         trees: treesChannel,
         windTurbines: windTurbinesChannel,
+        balloons: balloonsChannel,
         buildings: buildingsChannel,
         stage: () => (getEngine()?.ml.getLayer('orbis-stage') as unknown as { implementation?: { stats?(): unknown } } | undefined)?.implementation?.stats?.(),
       },

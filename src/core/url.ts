@@ -22,7 +22,7 @@ export interface UrlState {
   globe?: boolean;
   /** false = main sidebar collapsed (s=0); undefined/true = open (the default, never written). */
   sidebar?: boolean;
-  /** Followed aircraft or ship (f=flug:<hex> / f=schiff:<mmsi>). */
+  /** Followed aircraft, ship or weather balloon (f=flug:<hex> / f=schiff:<mmsi> / f=ballon:<serial>). */
   follow?: FollowRef;
   /** Searched place shown in the detail menu. */
   place?: { lat: number; lng: number; title: string; subtitle: string; kind?: string };
@@ -102,7 +102,7 @@ export function parseHash(hash: string): UrlState {
       /* malformed escape: ignore the route */
     }
   }
-  const f = /^(flug|schiff):([A-Za-z0-9_-]{1,32})$/.exec(q.get('f') ?? '');
+  const f = /^(flug|schiff|ballon):([A-Za-z0-9_-]{1,32})$/.exec(q.get('f') ?? '');
   if (f) out.follow = { kind: f[1] as FollowRef['kind'], id: f[2]! };
   const g = q.get('g');
   if (g === '1') out.globe = true;

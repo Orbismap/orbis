@@ -8,6 +8,7 @@ import { hull, outlineMaterial } from '../world3d/outline';
 import type { Stage, StagePart } from '../world3d/stage';
 import { hullGeometries, MAX_SPINNERS, MODEL_BOOST, MODEL_MIN_SCALE, MODEL_COLOR, MODEL_PARTS, planeGeometries, SPINNERS, spinnerGeometries } from './models';
 import { glbFor } from './aircraft-models';
+import { DropLines } from '../world3d/drops';
 import { loadGlb } from './glb';
 import { PlaneTracker, type PlaneState } from './smoothing';
 import { growScale, sizeScale, stepGrow } from '../world3d/size';
@@ -69,9 +70,7 @@ export class PlanesPart implements StagePart {
   /** inverted hull of the selected aircraft: the model's back faces, pushed out along their normals */
   private outline: GeoInstances;
   private outlineWidth = { value: 0 };
-  private dropMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false });
-  private drops = new THREE.LineSegments(new THREE.BufferGeometry(), this.dropMat);
-  private dropCapacity = 0;
+  private drops = new DropLines();
   private rigs = new Map<string, TrailRig>();
   private lastTrailSet = 0;
   private label = document.createElement('div');
@@ -105,9 +104,7 @@ export class PlanesPart implements StagePart {
     this.outline = new GeoInstances(hullGeometries(), hullMat);
     // after the models: opaque, depth-tested against them, so it only shows around them
     this.outline.object.renderOrder = 1;
-    this.drops.frustumCulled = false;
-    this.drops.renderOrder = 2;
-    this.object.add(this.models.object, this.rotors.object, this.outline.object, this.shadows.object, this.drops);
+    this.object.add(this.models.object, this.rotors.object, this.outline.object, this.shadows.object, this.drops.object);
     this.object.visible = false;
     this.labelBox.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1';
     this.label.style.cssText =
@@ -247,7 +244,7 @@ export class PlanesPart implements StagePart {
     this.rotors.update(frame);
     this.outline.update(frame);
     this.shadows.update(frame);
-    this.setDrops(dropPos);
+    this.drops.set(dropPos);
     this.drawn = visible.length;
 
     // trails: the selected aircraft's and those nearest to the middle of the view
@@ -350,20 +347,6 @@ export class PlanesPart implements StagePart {
     }
   }
 
-  private setDrops(pos: number[]) {
-    const g = this.drops.geometry;
-    if (pos.length > this.dropCapacity * 3) {
-      g.dispose();
-      this.dropCapacity = Math.ceil(pos.length / 3 * 1.5) + 64;
-      this.drops.geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.dropCapacity * 3), 3).setUsage(THREE.DynamicDrawUsage));
-    }
-    const attr = this.drops.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
-    if (!attr) return;
-    (attr.array as Float32Array).set(pos);
-    attr.needsUpdate = true;
-    this.drops.geometry.setDrawRange(0, pos.length / 3);
-  }
-
   /** Callsign above the hovered, selected or followed aircraft; moved every frame so it never trails behind while zooming. */
   private syncLabel(frame: GeoFrame) {
     const id = this.hovered ?? this.followed ?? this.selected;
@@ -459,8 +442,7 @@ export class PlanesPart implements StagePart {
     this.rotors.dispose();
     this.shadows.dispose();
     this.outline.dispose();
-    this.drops.geometry.dispose();
-    this.dropMat.dispose();
+    this.drops.dispose();
     this.labelBox.remove();
     this.tracker.clear();
   }
