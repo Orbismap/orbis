@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VectorTile } from '@mapbox/vector-tile';
 import { GeoJSONWrapper, fromVectorTileJs, type Feature } from '@maplibre/vt-pbf';
 import { PbfReader } from 'pbf';
 import { replaceBuildingTile, tilePoint } from '../map/landmark-geometry';
 import { replacedByLandmark } from '../features/buildings3d/roofs-source';
-import { inBoxes, inFootprint, maskOf, ofmId, parseLandmarks, tileOf, tilesInView } from './landmarks';
+import { inBoxes, inFootprint, loadCatalogue, loadTile, maskOf, ofmId, parseLandmarks, tileOf, tilesInView } from './landmarks';
 
 const ESB = {
   id: 'empire-state-building',
@@ -40,7 +40,7 @@ describe('landmarks dataset', () => {
     const [x, y] = tileOf(-73.9859714, 40.7485288);
     expect(x).toBe(1206);
     expect(y).toBe(1539);
-    const cat = { template: '', occupied: new Set([`${x}/${y}`, `${x + 1}/${y}`, '1/1']) };
+    const cat = { release: 'r', template: '', occupied: new Set([`${x}/${y}`, `${x + 1}/${y}`, '1/1']) };
     expect(tilesInView(cat, -74.0, 40.70, -73.9, 40.80)).toEqual([`${x}/${y}`, `${x + 1}/${y}`]);
     expect(tilesInView(cat, 10, 10, 11, 11)).toEqual([]);
   });
@@ -97,5 +97,29 @@ describe('the model has priority over the OSM building', () => {
     expect(replacedByLandmark({ rings: ring(-73.9860, 40.7484) }, shaped)).toBe(true);
     expect(replacedByLandmark({ rings: ring(-73.9850, 40.7480) }, shaped)).toBe(false);
     expect(inBoxes(-73.985, 40.748, boxMask.boxes)).toBe(true);
+  });
+});
+
+describe('a replaced release', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+  const release = (id: string) => ({ release: id, index: { template: `/r/${id}/{x}/{y}.json`, occupied: ['1/2'] } });
+
+  it('404 of a tile: takes the newer release and fetches the tile there', async () => {
+    let latest = 'a';
+    const asset = { id: 'x', anchor: [1, 2], lods: { low: { url: '/m.glb' } } };
+    vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+      if (u.endsWith('/latest.json')) return json({ catalogue: `/c/${latest}.json`, release: latest });
+      if (u.includes('/c/')) return json(release(latest));
+      if (u.includes('/r/a/')) return json({}, 404);
+      return json({ assets: [asset] });
+    }));
+    const old = await loadCatalogue();
+    expect(old.release).toBe('a');
+    latest = 'b';
+    const [one, two] = await Promise.all([loadTile(old, '1/2'), loadTile(old, '1/2')]);
+    expect(one.map((l) => l.id)).toEqual(['x']);
+    expect(two).toBe(one);
+    expect((await loadCatalogue()).release).toBe('b');
   });
 });
