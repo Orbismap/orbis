@@ -1,4 +1,4 @@
-// What both maps of the app share: MapLibre with the app's style, loaded on demand, north up, following the size of its box.
+// What both maps of the app share: MapLibre with the app's style, loaded on demand, not turned by gestures, following the size of its box.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { GeoJSONSource, Map as MlMap, MapOptions } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
