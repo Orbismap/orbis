@@ -11,9 +11,9 @@ import { buildWeather, compass, loadWeather } from './weather';
 
 const location = { name: 'Bad Kleinen', eyebrow: 'Mecklenburg-Vorpommern', lat: 53.75, lng: 11.47 };
 
-function series(label = 'ICON · R2'): PointSeries {
-  const base = Date.now() - 30 * 60_000;
-  const times = Array.from({ length: 24 }, (_, i) => base + i * 3_600_000);
+/** Two days of hours, like the live sources: longer than the 24 columns the timeline shows. */
+function series(label = 'ICON · R2', base = Date.now() - 30 * 60_000): PointSeries {
+  const times = Array.from({ length: 48 }, (_, i) => base + i * 3_600_000);
   return {
     label, detail: 'Lauf 12 UTC', issued: Date.now(), offsetSeconds: 3600, times,
     temp: times.map(() => 4),
@@ -57,22 +57,6 @@ describe('weather view model', () => {
     expect(weather.daily[0]!.label).toBe('Heute');
   });
 
-  it('adds sunrise and sunset as extra timeline entries with minutes', () => {
-    const now = new Date();
-    const localNoon = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12) - 3_600_000;
-    const withSun: WeatherSupplements = {
-      daily: Array.from({ length: 2 }, (_, i) => ({ date: localNoon + i * 86_400_000, min: 0, max: 5 })),
-      sun: [
-        { sunrise: '07:55', sunset: '16:06', uv: 1 },
-        { sunrise: '07:56', sunset: '16:05', uv: 1 },
-      ],
-    };
-    const events = buildWeather(series(), withSun, location).hourly.filter((hour) => hour.event);
-    expect(events.length).toBeGreaterThan(0);
-    expect(events.every((hour) => /^\d{2}:\d{2}$/.test(hour.time))).toBe(true);
-    expect(new Set(events.map((hour) => hour.event))).toEqual(new Set(['sunrise', 'sunset']));
-  });
-
   it('falls back to deriving days from the series when Open-Meteo is unavailable', () => {
     const weather = buildWeather(series(), {}, location);
     expect(weather.daily.length).toBeGreaterThan(0);
@@ -84,6 +68,35 @@ describe('weather view model', () => {
     expect(compass(270)).toBe('W');
     expect(compass(90)).toBe('O');
     expect(compass(180)).toBe('S');
+  });
+});
+
+describe('sunrise and sunset in the timeline', () => {
+  // 27 November, UTC+1 like `series()`: local midnight and local noon as UTC ms
+  const midnight = Date.UTC(2026, 10, 26, 23);
+  const noon = midnight + 12 * 3_600_000;
+  const withSun: WeatherSupplements = {
+    daily: Array.from({ length: 2 }, (_, i) => ({ date: noon + i * 86_400_000, min: 0, max: 5 })),
+    sun: [
+      { sunrise: '07:55', sunset: '16:06', uv: 1 },
+      { sunrise: '07:56', sunset: '16:05', uv: 1 },
+    ],
+  };
+  const events = (data: PointSeries) => buildWeather(data, withSun, location).hourly.filter((hour) => hour.event);
+
+  afterEach(() => vi.useRealTimers());
+
+  it.each(Array.from({ length: 24 }, (_, hour) => hour))('adds both as extra entries with minutes at %i:00', (hour) => {
+    vi.useFakeTimers({ now: midnight + hour * 3_600_000 });
+    const found = events(series());
+    expect(found.every((entry) => /^\d{2}:\d{2}$/.test(entry.time))).toBe(true);
+    expect(new Set(found.map((entry) => entry.event))).toEqual(new Set(['sunrise', 'sunset']));
+  });
+
+  it('keeps a sunset that is minutes away when the first column is already the next hour', () => {
+    vi.useFakeTimers({ now: midnight + 16 * 3_600_000 });
+    // hours on the full hour: at 16:00 the strip starts with 17:00
+    expect(events(series('Open-Meteo', midnight)).map((entry) => entry.time)).toContain('16:06');
   });
 });
 
