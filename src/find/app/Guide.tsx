@@ -3,11 +3,12 @@ import { computed } from '@preact/signals';
 import type { ComponentChildren } from 'preact';
 import { online } from '@/core/online';
 import { formatDistance } from '@/features/routes/osrm';
+import { isPoor } from '../data/attitude';
 import { isThere, unwrap } from '../data/guide';
 import { metres } from '../data/places';
 import { chosen, kind, retry, search, searchRadius, target, way } from '../state/finder';
-import { compass, heading, manual, position, positionState, startCompass } from '../state/sensors';
-import { mapBearing, openSearch, useMyPosition } from '../state/ui';
+import { compass, compassAccuracy, heading, manual, position, positionState, startCompass } from '../state/sensors';
+import { calibrating, mapBearing, openSearch, useMyPosition } from '../state/ui';
 import { KindSentence } from './KindSentence';
 
 /** The turn of the arrow, continuous so that it never spins the long way round. */
@@ -89,7 +90,9 @@ function content(): ComponentChildren {
       {!arrived && compass.value !== 'on' && (
         <p class="find-hint">{heading.value === null ? 'Ohne Kompass zeigt der Pfeil die Richtung auf der Karte.' : 'Ohne Kompass gilt der Pfeil in Fahrtrichtung.'}</p>
       )}
+      {compass.value === 'on' && isPoor(compassAccuracy.value) && <p class="find-hint find-warn">Der Kompass ist gerade ungenau.</p>}
       <div class="find-actions">
+        {compass.value === 'on' && <button type="button" class="find-button find-quiet" onClick={() => (calibrating.value = true)}>{isPoor(compassAccuracy.value) ? 'Kompass kalibrieren' : 'Kompass falsch?'}</button>}
         {compass.value === 'ask' && <button type="button" class="find-button" onClick={() => void startCompass()}>Kompass einschalten</button>}
         {chosen.value && <button type="button" class="find-button find-quiet" onClick={() => (chosen.value = null)}>Zum nächsten Ziel</button>}
       </div>

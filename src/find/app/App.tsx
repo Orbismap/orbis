@@ -2,9 +2,10 @@ import { useEffect } from 'preact/hooks';
 import { draft, resumeAdding } from '../state/add';
 import { startFinder } from '../state/finder';
 import { initSensors } from '../state/sensors';
-import { augmented, browsing, searching, useSearched } from '../state/ui';
+import { augmented, browsing, calibrating, searching, useSearched } from '../state/ui';
 import { AddView } from './AddView';
 import { CameraView } from './CameraView';
+import { Calibrate } from './Calibrate';
 import { Catalog } from './Catalog';
 import { Guide } from './Guide';
 import { FindMap } from './FindMap';
@@ -36,6 +37,7 @@ export function App() {
       <Menu />
       {searching.value && <PlaceSearch onClose={() => (searching.value = false)} onPick={useSearched} />}
       {browsing.value && <Catalog onClose={() => (browsing.value = false)} />}
+      {calibrating.value && <Calibrate />}
       {offlineView.value === 'download' && <OfflineDownload />}
       {offlineView.value === 'manage' && <OfflineManage />}
     </>

@@ -177,6 +177,12 @@
 .find-danger { background: #c8364a; color: #fff; }
 .find-sheet :focus-visible { outline: 2px solid var(--limb); outline-offset: 2px; }
 
+/* setting the compass right */
+.find-eight { display: block; width: min(220px, 70%); margin: 0 auto; color: var(--limb); }
+.find-steps { display: grid; gap: 8px; margin: 0; padding-left: 22px; }
+.find-compass { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: 16px; background: var(--ink-2); }
+.find-compass svg { flex: none; width: 72px; height: 72px; }
+
 @media (orientation: landscape) {
   .find { grid-template-rows: 1fr; grid-template-columns: 1fr 1fr; }
   .find-guide { border-top: 0; border-left: 1px solid var(--ink-3); }

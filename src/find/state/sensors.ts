@@ -16,6 +16,8 @@ export const heading = signal<number | null>(null);
 export const attitude = signal<Camera | null>(null);
 /** 'ask': a tap on the compass button is needed; 'on': readings arrive. */
 export const compass = signal<'none' | 'ask' | 'on' | 'denied'>('none');
+/** By how many degrees the compass says it may be off (negative: it cannot tell); null: it says nothing (all but iOS). */
+export const compassAccuracy = signal<number | null>(null);
 
 /** Above this speed (m/s) the way travelled says where one is heading. */
 const COURSE_SPEED = 1.2;
@@ -26,6 +28,10 @@ const turnTo = (next: number) => {
   const previous = heading.peek();
   heading.value = previous === null ? next : unwrap(previous, next);
 };
+
+/** Whole fives: the value flickers, and nothing needs it finer. */
+const roughly = (degrees: number | undefined): number | null =>
+  typeof degrees !== 'number' ? null : degrees < 0 ? -1 : Math.ceil(degrees / 5) * 5;
 
 /** iOS: what turns its alpha into one counted from north. */
 let northOffset: number | null = null;
@@ -38,10 +44,13 @@ const onOrientation = (e: Event) => {
   const camera = blend(attitude.peek(), next, SMOOTH);
   batch(() => {
     compass.value = 'on';
+    compassAccuracy.value = roughly(reading.webkitCompassAccuracy);
     attitude.value = camera;
     turnTo(headingOf(camera));
   });
 };
+/** Forgets the north found so far (iOS), so that the next level reading sets it anew. */
+export const findNorthAnew = () => { northOffset = null; };
 const listenCompass = () => {
   window.addEventListener('deviceorientationabsolute', onOrientation);
   window.addEventListener('deviceorientation', onOrientation);
