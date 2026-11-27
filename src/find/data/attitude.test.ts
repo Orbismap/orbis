@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blend, cameraFromAngles, dot, fromNorth, headingOf, type Vec } from './attitude';
+import { blend, cameraFromAngles, directionName, dot, fromNorth, headingOf, isPoor, type Vec } from './attitude';
 
 const close = (a: Vec, b: Vec) => a.forEach((v, i) => expect(v).toBeCloseTo(b[i]!, 6));
 
@@ -51,10 +51,26 @@ describe('north', () => {
     expect((north.alpha + 360) % 360).toBeCloseTo(270, 6);
   });
 
+  it('does not keep a north found while the device is held up', () => {
+    const up = fromNorth({ alpha: 10, beta: 100, webkitCompassHeading: 270 }, null)!;
+    expect(up.offset).toBeNull();
+    // the first level reading then counts at once, not bit by bit
+    expect(fromNorth({ alpha: 10, beta: 20, webkitCompassHeading: 90 }, up.offset)!.offset).toBe(260);
+  });
+
   it('keeps the offset while the device is held up', () => {
     // the compass of an upright iPhone may flip by half a turn
     const up = fromNorth({ alpha: 10, beta: 90, webkitCompassHeading: 270 }, 260)!;
     expect(up).toEqual({ alpha: 270, offset: 260 });
     expect(fromNorth({ alpha: 10, beta: 20, webkitCompassHeading: 80 }, 260)!.offset).toBeCloseTo(262, 6);
+  });
+});
+
+describe('what the compass says', () => {
+  it('names directions, also of unwrapped angles', () => {
+    expect([0, 44, 100, 350, -90, 765].map(directionName)).toEqual(['Norden', 'Nordosten', 'Osten', 'Norden', 'Westen', 'Nordosten']);
+  });
+  it('is poor when it cannot tell or may be far off', () => {
+    expect([null, 10, 40, -1].map(isPoor)).toEqual([false, false, true, true]);
   });
 });
