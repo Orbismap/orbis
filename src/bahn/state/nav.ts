@@ -8,6 +8,7 @@ export type Screen =
   | { kind: 'search'; target: 'from' | 'to' | 'stop' }
   | { kind: 'journeys' }
   | { kind: 'journey'; journey: Journey }
+  | { kind: 'saved'; id: string }
   | { kind: 'stop'; stop: Stop }
   | { kind: 'trip'; tripId: string; line: string; mode: ModeGroup; headsign: string; /** Haltestelle, von der aus der Lauf geöffnet wurde */ at?: string };
 /** Eine geöffnete Seite; `key` hält ihren Zustand, solange sie im Stapel liegt. */

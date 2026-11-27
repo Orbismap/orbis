@@ -9,12 +9,16 @@ import { Catalog } from './Catalog';
 import { Guide } from './Guide';
 import { FindMap } from './FindMap';
 import { Menu } from './Menu';
+import { OfflineDownload } from './OfflineDownload';
+import { OfflineManage } from './OfflineManage';
+import { initOffline, offlineView } from '../offline/state';
 import { PlaceSearch } from './PlaceSearch';
 
 /** Two halves: the map (or the camera view) above, the arrow below. The Orbis menu lies on top, closed to a capsule in the corner. */
 export function App() {
   useEffect(() => {
     const stop = startFinder();
+    void initOffline();
     void initSensors();
     void resumeAdding();
     return stop;
@@ -32,6 +36,8 @@ export function App() {
       <Menu />
       {searching.value && <PlaceSearch onClose={() => (searching.value = false)} onPick={useSearched} />}
       {browsing.value && <Catalog onClose={() => (browsing.value = false)} />}
+      {offlineView.value === 'download' && <OfflineDownload />}
+      {offlineView.value === 'manage' && <OfflineManage />}
     </>
   );
 }

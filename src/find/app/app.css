@@ -146,6 +146,37 @@
 .find-tile i { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--limb); color: var(--on-limb); }
 .find-catalog :focus-visible { outline: 2px solid var(--limb); outline-offset: 3px; }
 
+/* offline maps: choosing and managing, over the whole screen */
+.find-sheet { position: fixed; inset: 0; z-index: 50; overflow-y: auto; overscroll-behavior: contain; background: var(--ink-0); }
+.find-sheet-body { box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; max-width: 640px; margin: 0 auto; padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.find-sheet header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.find-sheet h1 { margin: 0; font-size: 1.375rem; }
+.find-sheet p { margin: 0; max-width: none; }
+.find-sheet > * > * { flex: none; }
+.find-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.find-sheet .find-search-bar .find-button { margin: 0; }
+.find-cities { display: flex; flex-direction: column; gap: 6px; }
+.find-cities:empty { display: none; }
+.find-cities .find-result[aria-pressed='true'] { box-shadow: inset 0 0 0 2px var(--limb); }
+.find-areamap { position: relative; height: 42dvh; min-height: 240px; overflow: hidden; border-radius: 16px; }
+/* 20px as FRAME in OfflineDownload */
+.find-frame { position: absolute; inset: 20px; border: 2.5px solid var(--limb); border-radius: 6px; box-shadow: 0 0 0 40px rgba(5, 8, 13, 0.45); pointer-events: none; }
+.find-kinds { display: grid; margin: 0; padding: 0; border: 0; }
+.find-kinds legend { padding: 0; font-weight: 700; }
+.find-kinds-all { display: flex; gap: 16px; }
+.find-kinds label { display: flex; align-items: center; gap: 12px; min-height: 44px; border-top: 1px solid var(--ink-3); cursor: pointer; }
+.find-kinds input { width: 20px; height: 20px; accent-color: var(--limb); }
+.find-kinds label span { flex: 1; }
+.find-kinds small { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.find-linkbutton { min-height: 40px; padding: 0; border: 0; background: none; color: var(--limb); font: inherit; font-weight: 700; cursor: pointer; }
+.find-nameinput { box-sizing: border-box; width: 100%; height: 48px; padding: 0 16px; border: 1px solid var(--ink-3); border-radius: 14px; background: var(--ink-2); color: var(--text-1); font: inherit; font-size: 1rem; }
+.find-sizebar { position: sticky; bottom: 0; display: flex; flex-direction: column; gap: 4px; padding: 10px 0 max(8px, env(safe-area-inset-bottom)); background: var(--ink-0); text-align: center; }
+.find-card { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 16px; background: var(--ink-2); }
+.find-card .find-actions { justify-content: flex-start; }
+.find-card progress { width: 100%; accent-color: var(--limb); }
+.find-danger { background: #c8364a; color: #fff; }
+.find-sheet :focus-visible { outline: 2px solid var(--limb); outline-offset: 2px; }
+
 @media (orientation: landscape) {
   .find { grid-template-rows: 1fr; grid-template-columns: 1fr 1fr; }
   .find-guide { border-top: 0; border-left: 1px solid var(--ink-3); }
