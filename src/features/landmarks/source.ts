@@ -37,16 +37,17 @@ export function startLandmarks(): () => void {
     const ml = engine.ml;
     let dead = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let key = '';
+    /** the ids of the last published set; undefined: it went out without outlines, the next scan publishes it again */
+    let key: string | undefined = '';
     let run = 0;
 
     const set = async (items: LandmarkSample[], my: number) => {
       const next = items.map((l) => l.id).sort().join('|');
       if (next === key) return;
       // the outlines first (once, the dataset's footprint file): the model and the cut buildings appear together
-      const shapes = items.length ? await loadFootprints().catch(() => ({})) : {};
+      const shapes = items.length ? await loadFootprints().catch(() => undefined) : {};
       if (dead || my !== run) return;
-      key = next;
+      key = shapes ? next : undefined;
       landmarkMask.value = items.length ? maskOf(items, shapes) : EMPTY_MASK;
       landmarksShown.value = items.length > 0;
       landmarksChannel.publish(() => items);

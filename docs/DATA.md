@@ -135,7 +135,7 @@ Quelle: [alexwohlbruck/landmarks](https://github.com/alexwohlbruck/landmarks) (W
   `artisticLicense: CC0-1.0` (`parseLandmarks`). Der Hinweis „3D-Wahrzeichen: Landmarks von Alex Wohlbruck und Claude (CC0)“ steht in der
   Kartenecke und unter „Quellen“, solange Modelle gezeichnet werden (Pflicht ist er bei CC0 nicht, wir nennen die Urheber trotzdem).
 - **Abruf** (`data/landmarks.ts`): `api/v1/latest.json` → Katalog (wenige kB, mit den belegten z12-Kacheln) → je Kachel in Sicht ein JSON mit den
-  Wahrzeichen → je Modell eine GLB (niedrige Stufe, 50-300 kB, nach Inhalts-Hash unveränderlich). Alles mit CORS `*`, direkt von der
+  Wahrzeichen → je Modell eine GLB (niedrige Stufe, 50-300 kB, nah dran bei manchen die feine; nach Inhalts-Hash unveränderlich). Alles mit CORS `*`, direkt von der
   Projektseite; `VITE_LANDMARKS_BASE` stellt auf eine eigene Kopie um.
 - **Ebene „Landmarks“** (`layers/infrastruktur/landmarks.ts`, auch ohne Pro): alle Modelle als Punkte, ab Zoom 0 gebündelt (bis Zoom 12),
   nach Art filterbar. Dafür lädt sie `assets.json` des Releases (Pfad im Katalog, ~1,5 MB komprimiert, im Worker geparst:
@@ -148,5 +148,15 @@ Quelle: [alexwohlbruck/landmarks](https://github.com/alexwohlbruck/landmarks) (W
   Gebäude-Ebenen die Quelle `ofm-landmarks`: ein Protokoll holt die OFM-Kachel und zieht die Umrisse der Wahrzeichen räumlich ab
   (`polygon-clipping`), unzusammengefasste Gebäude fallen über die Feature-Id weg (OSM-Id × 10 + 1 Node, 2 Way, 3 Relation). Ohne Wahrzeichen
   lesen die Ebenen wieder `ofm`. Pros Detailgebäude aus den Dachkacheln fallen weg, wenn ihre Mitte im Umriss liegt.
-- **Umrisse**: `replacement-footprints.json` (2,8 MB, ODbL, © OpenStreetMap-Mitwirkende) gehört nicht zur veröffentlichten API; sie kommt einmal
-  über jsDelivr von einem festen Commit des Repos (`FOOTPRINTS_URL`).
+- **Umrisse**: `replacement-footprints.json` (~3 MB, ODbL, © OpenStreetMap-Mitwirkende) gehört nicht zur veröffentlichten API; sie kommt einmal
+  über jsDelivr aus dem Repo, vom aktuellen Stand (`@main`), mit einem festen Commit nur als Rückfall (`FOOTPRINTS_URLS`). Ein fest
+  verdrahteter Stand veraltet: jedem neueren Wahrzeichen fehlt dann der Umriss und sein Haus bleibt unter dem Modell stehen. Ohne Umriss
+  (viele Brücken, Skulpturen) wird nur per Id entfernt, nie nach dem Rechteck um das Modell.
+- **Auf dem Gelände** (`pro/landmarks/ground.ts`, wie auf `landmarks.barrelman.dev`): jedes Modell steht als starrer Körper, nie ans Gelände
+  verbogen. y = 0 kommt auf den tiefsten Boden unter dem Modell (0,3 m eingedrückt), bergseitig steckt es im Hang. Brücken und Achterbahnen,
+  die dem Gelände nachgebaut sind, werden nach ihren Füßen gestellt. Nicht geladene Höhen zählen nicht (`loadedGroundAt`); ohne jede Höhe
+  wartet das Modell. `elevation` hebt oder senkt das ganze Modell: Was bei abgesenkten Stadien unter dem Boden liegt, verdeckt das Gelände,
+  ohne Gelände wird es abgeschnitten. Ab `detailZoom` kommt die feine Stufe (`lods.detail`), Animationen der Datei laufen mit (nicht bei
+  „Bewegung reduzieren“).
+- **Anders als auf der Referenzseite**: flach von oben werden die Modelle wie die 2.5D-Häuser gestaucht (ab 30° Neigung volle Höhe), Licht und
+  Schatten kommen von der gemeinsamen Pro-Bühne, nachts leuchten nur die Materialien (keine Anstrahlung), und die 3D-Fahrbahnen der Brücken fehlen.

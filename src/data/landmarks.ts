@@ -16,6 +16,8 @@ export const LANDMARKS_LICENSE = 'Modelle CC0 1.0, Standorte © OpenStreetMap-Mi
 
 /** The tile zoom of the dataset's index. */
 export const INDEX_ZOOM = 12;
+/** From this zoom on the finer model is shown, where the dataset names no zoom of its own. */
+const DETAIL_ZOOM = 17;
 
 /** True while landmarks are drawn (written by the source): the sources list names them then. */
 export const landmarksShown = signal(false);
@@ -32,13 +34,32 @@ export const EMPTY_MASK: LandmarkMask = { ids: new Set(), boxes: [], footprints:
 export const landmarkMask = signal<LandmarkMask>(EMPTY_MASK);
 
 /**
- * The OSM outlines the dataset cuts out of the basemap, by landmark id (~2.8 MB, ODbL, © OpenStreetMap contributors). They are not part
- * of the published API, only of the demo's source, so they come from a pinned commit through jsDelivr; once, when the first landmark is in view.
+ * The OSM outlines the dataset cuts out of the basemap, by landmark id (~3 MB, ODbL, © OpenStreetMap contributors). They are not part
+ * of the published API, only of the dataset's repository, so they come from there through jsDelivr; once, when the first landmark is in
+ * view. The catalogue is always the latest release, so the outlines are the latest too (`@main`, cached by the CDN for hours): a file
+ * pinned to a commit lacks the outlines of every landmark added later, and those keep their house under the model. The pinned commit is
+ * only the way back when the latest file cannot be had or read.
  */
-export const FOOTPRINTS_URL = 'https://cdn.jsdelivr.net/gh/alexwohlbruck/landmarks@a5945afdc50d14bb02bae0c41f42afa3c7451063/web/replacement-footprints.json';
+const FOOTPRINTS_FILE = (ref: string) => `https://cdn.jsdelivr.net/gh/alexwohlbruck/landmarks@${ref}/web/replacement-footprints.json`;
+export const FOOTPRINTS_URLS = [FOOTPRINTS_FILE('main'), FOOTPRINTS_FILE('3b9801ed86ec5fbc1f8ce18f47be45a541453d31')];
+
+async function fetchFootprints(): Promise<Record<string, MultiPolygon>> {
+  let failed: unknown;
+  for (const url of FOOTPRINTS_URLS) {
+    try {
+      const { assets } = await getJson<{ assets?: Record<string, MultiPolygon> }>(url);
+      if (assets && Object.keys(assets).length) return assets;
+      failed = new Error(`landmarks: no outlines in ${url}`);
+    } catch (e) {
+      failed = e;
+    }
+  }
+  throw failed;
+}
+
 let footprints: Promise<Record<string, MultiPolygon>> | undefined;
 export function loadFootprints(): Promise<Record<string, MultiPolygon>> {
-  footprints ??= getJson<{ assets?: Record<string, MultiPolygon> }>(FOOTPRINTS_URL).then((j) => j.assets ?? {});
+  footprints ??= fetchFootprints();
   footprints.catch(() => { footprints = undefined; });
   return footprints;
 }
@@ -71,10 +92,12 @@ interface RawAsset {
   minZoom?: number;
   height?: number;
   elevation?: number;
+  type?: string;
   bounds?: [number, number, number, number];
   osm?: RawOsm | null;
   additionalOsm?: RawOsm[];
-  lods?: { low?: { url?: string; bytes?: number } };
+  lods?: { low?: { url?: string; bytes?: number }; detail?: { url?: string } };
+  detailZoom?: number | null;
   placement?: { bearing?: number; scale?: number };
   artisticLicense?: string;
   credits?: { name?: string; kind?: string }[];
@@ -96,6 +119,7 @@ export function parseLandmarks(json: unknown, base = LANDMARKS_BASE): LandmarkSa
   const assets = (json as { assets?: RawAsset[] } | null)?.assets;
   if (!Array.isArray(assets)) return [];
   const out: LandmarkSample[] = [];
+  const absolute = (url: string) => (url.startsWith('http') ? url : base + url);
   for (const a of assets) {
     const url = a.lods?.low?.url;
     const [lng, lat] = a.anchor ?? [];
@@ -110,9 +134,11 @@ export function parseLandmarks(json: unknown, base = LANDMARKS_BASE): LandmarkSa
       lng,
       lat,
       elevationM: num(a.elevation, 0),
+      overTerrain: a.type === 'bridge' || a.type === 'coaster',
       minZoom: num(a.minZoom, 15),
       heightM: num(a.height, 0),
-      url: url.startsWith('http') ? url : base + url,
+      url: absolute(url),
+      ...(a.lods?.detail?.url ? { detail: { url: absolute(a.lods.detail.url), minZoom: num(a.detailZoom, DETAIL_ZOOM) } } : {}),
       bounds: b && b.length === 4 ? [b[0], b[1], b[2], b[3]] : [lng, lat, lng, lat],
       osmIds: ids,
     });

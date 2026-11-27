@@ -11,7 +11,7 @@ export const exaggeration = (map: MlMap): number => {
 };
 
 /** Below this exaggeration the terrain is on its way in or out: a height read now says too little about the real one. */
-const MIN_READ = 0.05;
+export const MIN_READ = 0.05;
 
 /** The real terrain height at a place (m, as it is without exaggeration); 0 without terrain or while it is almost flat. */
 export function groundAt(map: MlMap, lng: number, lat: number): number {
@@ -19,6 +19,32 @@ export function groundAt(map: MlMap, lng: number, lat: number): number {
   if (ex < MIN_READ) return 0;
   const h = map.queryTerrainElevation({ lng, lat });
   return typeof h === 'number' && Number.isFinite(h) ? h / ex : 0;
+}
+
+interface TerrainProbe {
+  getElevationAndDEMStateForLngLat?(at: unknown, tileZoom: number): { elevation: number; demState: string };
+}
+
+/**
+ * Like `groundAt`, but undefined where the height is not known: where no elevation tile has loaded (yet), MapLibre answers 0, which
+ * whoever places something on the ground must not take for sea level. MapLibre tells the two apart only inside (`terrain`, pinned
+ * version); should that go, an exact 0 counts as unknown.
+ */
+export function loadedGroundAt(map: MlMap, lng: number, lat: number): number | undefined {
+  const ex = exaggeration(map);
+  if (ex < MIN_READ) return undefined;
+  const inside = map as unknown as { terrain?: TerrainProbe | null; _camera?: { transform?: { tileZoom?: number } } };
+  let h: number | null | undefined;
+  if (inside.terrain?.getElevationAndDEMStateForLngLat) {
+    const at = map.getCenter();
+    at.lng = lng;
+    at.lat = lat;
+    const read = inside.terrain.getElevationAndDEMStateForLngLat(at, inside._camera?.transform?.tileZoom ?? Math.floor(map.getZoom()));
+    h = read.demState === 'loaded' ? read.elevation : undefined;
+  } else {
+    h = map.queryTerrainElevation({ lng, lat }) || undefined;
+  }
+  return typeof h === 'number' && Number.isFinite(h) ? h / ex : undefined;
 }
 
 /**

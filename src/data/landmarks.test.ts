@@ -27,6 +27,13 @@ describe('landmarks dataset', () => {
     expect(l).toMatchObject({ id: 'empire-state-building', lng: -73.9859714, lat: 40.7485288, minZoom: 13, elevationM: 0, url: 'https://example.org/models/esb/abc/low.glb' });
     expect(l!.osmIds).toEqual([346338542, 1374251252, 773]);
   });
+  it('keeps the finer model with its zoom, and knows which structures may be built over the terrain', () => {
+    const lods = { low: ESB.lods.low, detail: { url: '/models/esb/abc/detail.glb' } };
+    const [a, b, c] = parseLandmarks({ assets: [{ ...ESB, lods, detailZoom: 16, type: 'bridge' }, { ...ESB, lods }, ESB] }, 'https://example.org');
+    expect(a).toMatchObject({ detail: { url: 'https://example.org/models/esb/abc/detail.glb', minZoom: 16 }, overTerrain: true });
+    expect(b).toMatchObject({ detail: { minZoom: 17 }, overTerrain: false });
+    expect(c!.detail).toBeUndefined();
+  });
   it('drops entries without a model or anchor, and models under another licence', () => {
     expect(parseLandmarks({ assets: [{ ...ESB, lods: {} }, { ...ESB, anchor: undefined }, { ...ESB, artisticLicense: 'CC-BY-4.0' }] })).toEqual([]);
     expect(parseLandmarks(null)).toEqual([]);
@@ -96,12 +103,12 @@ describe('the model has priority over the OSM building', () => {
     expect(inFootprint(lng, lat, footprint.geometry)).toBe(true);
     expect(inFootprint(...at(2000, 2000), footprint.geometry)).toBe(false);
   });
-  it('leaves the detailed buildings out by their outline, or by the footprint box without one', () => {
+  it('leaves the detailed buildings out by their outline, and none without one', () => {
     const items = parseLandmarks({ assets: [ESB] });
     const ring = (lng: number, lat: number): [number, number][][] => [[[lng, lat], [lng + 1e-4, lat], [lng + 1e-4, lat + 1e-4], [lng, lat]]];
     const boxMask = maskOf(items);
-    expect(replacedByLandmark({ rings: ring(-73.985, 40.748) }, boxMask)).toBe(true);
-    expect(replacedByLandmark({ rings: ring(-73.9, 40.7) }, boxMask)).toBe(false);
+    // no outline (a bridge, a sculpture): the model's box must not take the houses in it away
+    expect(replacedByLandmark({ rings: ring(-73.985, 40.748) }, boxMask)).toBe(false);
     expect(replacedByLandmark({ rings: ring(-73.985, 40.748) }, maskOf([]))).toBe(false);
     // with an outline that is smaller than the box, a house in the box but outside of it stays
     const shape = [[[[-73.9862, 40.7483], [-73.9858, 40.7483], [-73.9858, 40.7487], [-73.9862, 40.7487], [-73.9862, 40.7483]]]] as never;
@@ -109,6 +116,40 @@ describe('the model has priority over the OSM building', () => {
     expect(replacedByLandmark({ rings: ring(-73.9860, 40.7484) }, shaped)).toBe(true);
     expect(replacedByLandmark({ rings: ring(-73.9850, 40.7480) }, shaped)).toBe(false);
     expect(inBoxes(-73.985, 40.748, boxMask.boxes)).toBe(true);
+  });
+});
+
+describe('the outlines of the replaced buildings', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); });
+  const shape = [[[[0, 0], [1, 0], [1, 1], [0, 0]]]];
+  const answer = async (replies: (url: string) => Response) => {
+    vi.resetModules();
+    const asked: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (u: string) => { asked.push(u); return replies(u); }));
+    const m = await import('./landmarks');
+    return { asked, urls: m.FOOTPRINTS_URLS, load: m.loadFootprints };
+  };
+
+  it('come from the latest file of the dataset, once', async () => {
+    const { asked, urls, load } = await answer(() => new Response(JSON.stringify({ assets: { esb: shape } })));
+    expect(await load()).toEqual({ esb: shape });
+    await load();
+    expect(asked).toEqual([urls[0]]);
+    expect(urls[0]).toContain('@main/');
+  });
+  it('come from the pinned commit when the latest file fails or holds none', async () => {
+    for (const latest of [new Response('', { status: 503 }), new Response('{"assets":{}}')]) {
+      const { asked, urls, load } = await answer((u) => (u.includes('@main/') ? latest : new Response(JSON.stringify({ assets: { old: shape } }))));
+      expect(await load()).toEqual({ old: shape });
+      expect(asked).toEqual(urls);
+    }
+  });
+  it('are asked again after a failure', async () => {
+    let down = true;
+    const { load } = await answer(() => (down ? new Response('', { status: 503 }) : new Response(JSON.stringify({ assets: { esb: shape } }))));
+    await expect(load()).rejects.toThrow();
+    down = false;
+    expect(await load()).toEqual({ esb: shape });
   });
 });
 

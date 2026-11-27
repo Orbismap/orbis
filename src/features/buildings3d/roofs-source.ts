@@ -35,22 +35,18 @@ const centre = (ring: readonly (readonly [number, number])[]): [number, number] 
 };
 
 /**
- * Is this building one that a landmark model stands in for? The middle of its outline lies in the landmark's replaced outline, or,
- * where the dataset has none, in its footprint box. (The buildings of the OpenFreeMap tiles are already cut; this is for the roof tiles.)
+ * Is this building one that a landmark model stands in for? The middle of its outline lies in the landmark's replaced outline. Where the
+ * dataset has no outline (bridges, sculptures) nothing is left out: the model's box would take unrelated houses with it.
+ * (The buildings of the OpenFreeMap tiles are already cut; this is for the roof tiles.)
  */
 export function replacedByLandmark(b: { rings: [number, number][][] }, mask: LandmarkMask): boolean {
-  if (!mask.boxes.length) return false;
   const ring = b.rings[0];
-  if (!ring?.length) return false;
+  if (!mask.boxes.length || !ring?.length) return false;
   let x = 0, y = 0;
   for (const p of ring) { x += p[0]; y += p[1]; }
   const [lng, lat] = [x / ring.length, y / ring.length];
-  return mask.boxes.some((box, i) => {
-    const [w, s, e, n] = box;
-    if (lng < w || lng > e || lat < s || lat > n) return false;
-    const shape = mask.footprints[i]?.geometry;
-    return shape && shape.length ? inFootprint(lng, lat, shape) : true;
-  });
+  // the box first: it is cheap, and most buildings of a view are near no landmark
+  return mask.boxes.some(([w, s, e, n], i) => lng >= w && lng <= e && lat >= s && lat <= n && inFootprint(lng, lat, mask.footprints[i]?.geometry ?? []));
 }
 
 /** Colour and material tags OSM gives a building: dropped when the layer is set to "not coloured". */

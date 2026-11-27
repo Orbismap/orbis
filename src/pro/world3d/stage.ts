@@ -175,6 +175,8 @@ export class Stage implements CustomLayerInterface {
   onAdd(map: MlMap, gl: WebGL2RenderingContext) {
     this.renderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
     this.renderer.autoClear = false;
+    // a part may cut its own materials (landmarks sunk into the ground, while the map has no terrain to hide that part)
+    this.renderer.localClippingEnabled = true;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     map.on('mousemove', this.onMouseMove);
