@@ -141,8 +141,9 @@ export function buildWeather(
   const hours = [] as WeatherNow['hourly'];
   // A full day ahead – the strip scrolls horizontally, so it no longer needs to be truncated to nine slots.
   const last = Math.min(size, index + 24);
+  // The first column may be the next hour: what rises or sets between now and then still belongs to the strip.
   const moments = sunMoments(
-    supplements.sun, daily, series.times[index]! - 30 * 60_000, series.times[last - 1]! + 30 * 60_000,
+    supplements.sun, daily, Math.min(now, series.times[index]! - 30 * 60_000), series.times[last - 1]! + 30 * 60_000,
   );
   let momentIndex = 0;
   for (let i = index; i < last; i++) {
