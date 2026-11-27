@@ -12,6 +12,8 @@ export const searching = signal(false);
 export const browsing = signal(false);
 /** The camera view (AR) stands in the place of the map. */
 export const augmented = signal(false);
+/** What is up on the map, degrees clockwise from north; 0 while there is no map. */
+export const mapBearing = signal(0);
 
 /** Call from a tap: iOS asks for the compass only then. */
 export function openCameraView(): void {

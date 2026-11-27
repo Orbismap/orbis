@@ -7,14 +7,15 @@ import { isThere, unwrap } from '../data/guide';
 import { metres } from '../data/places';
 import { chosen, kind, retry, search, searchRadius, target, way } from '../state/finder';
 import { compass, heading, manual, position, positionState, startCompass } from '../state/sensors';
-import { openSearch, useMyPosition } from '../state/ui';
+import { mapBearing, openSearch, useMyPosition } from '../state/ui';
 import { KindSentence } from './KindSentence';
 
 /** The turn of the arrow, continuous so that it never spins the long way round. */
 let turned = 0;
 const arrow = computed(() => {
   const w = way.value;
-  if (w) turned = unwrap(turned, w.bearing - (heading.value ?? 0));
+  // without any direction of one's own the arrow shows the direction on the map, however that is turned
+  if (w) turned = unwrap(turned, w.bearing - (heading.value ?? mapBearing.value));
   return turned;
 });
 
@@ -86,7 +87,7 @@ function content(): ComponentChildren {
       <p class="find-name">{to.title}</p>
       {to.detail && <p class="find-text">{to.detail}</p>}
       {!arrived && compass.value !== 'on' && (
-        <p class="find-hint">{heading.value === null ? 'Ohne Kompass zeigt der Pfeil die Richtung auf der Karte, oben ist Norden.' : 'Ohne Kompass gilt der Pfeil in Fahrtrichtung.'}</p>
+        <p class="find-hint">{heading.value === null ? 'Ohne Kompass zeigt der Pfeil die Richtung auf der Karte.' : 'Ohne Kompass gilt der Pfeil in Fahrtrichtung.'}</p>
       )}
       <div class="find-actions">
         {compass.value === 'ask' && <button type="button" class="find-button" onClick={() => void startCompass()}>Kompass einschalten</button>}
