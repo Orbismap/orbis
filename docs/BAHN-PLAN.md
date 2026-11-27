@@ -24,6 +24,7 @@ für Züge und Busse.
 - `transitous.ts`: reine Parser plus `createTransitous()`. `delays.ts`: DB-Worker mit Pause bei Fehlern, `plannedJourney` / `plannedDepartures` für die Anzeige, bis die DB-Daten da sind. `modes.ts`: MOTIS-Modi ↔ Gruppen. `index.ts`: `createSources()`.
 - Ablauf in der Oberfläche: Transitous abfragen, Züge mit `plannedJourney` zeigen, `delays.journeys()` nachladen und ersetzen.
 - Worker-Adresse: `VITE_BAHN_DELAYS_URL` (`off` schaltet ab), Standard `https://orbis-trains.malte9799.workers.dev`.
+- Push zu gespeicherten Verbindungen: derselbe Worker; `VITE_BAHN_PUSH_URL` (`off` schaltet ab). Einzelne Fahrten tragen ein `date`, dafür muss der Worker aus Orbismap/data neu ausgerollt sein.
 - **Worker:** `https://bahn.maltee.dev` steht in `ALLOWED_ORIGINS` von `orbis-data/workers/push/wrangler.jsonc` (Branch `claude/bahn-origin`). Der Worker muss nach dem Merge neu deployt werden.
 
 ## Oberfläche

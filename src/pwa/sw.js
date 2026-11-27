@@ -114,7 +114,8 @@ async function page(request) {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (request.method !== 'GET' || request.headers.has('range')) return;
+  // 'no-store': die App will den Stand des Servers und hebt selbst auf, was sie braucht (Offline-Karten in Orbis Find)
+  if (request.method !== 'GET' || request.headers.has('range') || request.cache === 'no-store') return;
 
   const url = new URL(request.url);
   const own = url.origin === self.location.origin;
@@ -128,4 +129,39 @@ self.addEventListener('fetch', (event) => {
   } else if (!LIVE.some((pattern) => pattern.test(request.url))) {
     event.respondWith(networkFirst(event));
   }
+});
+
+// Web Push: Orbis Bahn meldet Verspätung und Ausfall gespeicherter Verbindungen (Orbismap/data, workers/push). Der Worker
+// schickt verschlüsselt { title, body, tag }; `tag` ist "trip-<id>". Nur Orbis Bahn meldet sich dafür an.
+self.addEventListener('push', (event) => {
+  let message = {};
+  try {
+    message = event.data?.json() ?? {};
+  } catch {
+    message = { body: event.data?.text() };
+  }
+  event.waitUntil(
+    self.registration.showNotification(message.title || 'Orbis Bahn', {
+      body: message.body || '',
+      tag: message.tag || 'orbis',
+      renotify: true,
+      icon: '/apple-touch-icon.png',
+      data: { trip: String(message.tag || '').startsWith('trip-') ? message.tag.slice(5) : null },
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const trip = event.notification.data?.trip;
+  event.waitUntil(
+    (async () => {
+      const [open] = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      if (open) {
+        if (trip) open.postMessage({ type: 'open-trip', id: trip });
+        return open.focus();
+      }
+      return self.clients.openWindow(trip ? `/?trip=${encodeURIComponent(trip)}` : '/');
+    })(),
+  );
 });

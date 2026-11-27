@@ -8,6 +8,7 @@ import { chosen, kind, places, target, way } from '../state/finder';
 import { canEdit } from '../state/osm';
 import { heading, manual, position } from '../state/sensors';
 import { openAdding, openCameraView } from '../state/ui';
+import { lastView } from '../offline/state';
 import { FOUND_LAYERS } from './mapStyle';
 import { meElement, setData, useMap } from './useMap';
 
@@ -76,6 +77,16 @@ export function FindMap() {
       if (!p || moved) return;
       if (!framedAt || framedKey !== to?.key || metres(framedAt, [p.lng, p.lat]) > FOLLOW_M) frame();
     }));
+    // where the choice of an offline area starts: what this map shows, taken flat around its middle
+    const remember = () => {
+      const { clientWidth: w, clientHeight: h } = m.getContainer();
+      const c = m.getCenter();
+      const side = m.unproject([w, h / 2]).lng - c.lng;
+      const up = side * Math.cos((c.lat * Math.PI) / 180) * (h / w);
+      lastView.value = [c.lng - side, c.lat - up, c.lng + side, c.lat + up];
+    };
+    m.on('moveend', remember);
+
     m.on('movestart', (e) => {
       if (!(e as { originalEvent?: Event }).originalEvent) return;
       moved = true;

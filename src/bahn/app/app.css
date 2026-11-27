@@ -188,6 +188,19 @@
 .bn-walk b { font-weight: 650; }
 .bn-walk small { font-size: var(--fs-label); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ---------- Gespeicherte Verbindung ---------- */
+.bn-tripset { margin: 4px 0 10px; padding: 6px 14px; }
+.bn-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; cursor: pointer; }
+.bn-switch > span { display: grid; }
+.bn-switch b { font-weight: 650; }
+.bn-switch small, .bn-set-label { font-size: var(--fs-label); color: var(--text-3); }
+.bn-set-label { margin: 4px 0; }
+.bn-switch input { flex: none; width: 22px; height: 22px; accent-color: var(--limb); }
+.bn-days { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 6px; }
+.bn-days button { flex: 1 1 0; min-width: 36px; min-height: 40px; padding: 0 2px; border: 1px solid var(--line); border-radius: 10px; font-size: var(--fs-label); font-weight: 650; color: var(--text-2); }
+.bn-days button[aria-pressed='true'] { background: var(--limb-quiet); border-color: transparent; color: var(--limb); }
+.bn-remove { color: var(--alert); }
+
 /* ---------- Zustände ---------- */
 .bn-note { display: flex; align-items: center; gap: 6px; margin: 12px 0; font-size: var(--fs-label); color: var(--text-3); }
 .bn-warning { margin: 4px 0 8px; font-size: var(--fs-label); font-weight: 650; color: var(--warn); }

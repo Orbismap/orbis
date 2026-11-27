@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { GeoJSONSource, Map as MlMap, MapOptions } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { findStyle } from './mapStyle';
+import { SCHEME, loadForMap } from '../offline/protocol';
 
 type MapLibre = typeof import('maplibre-gl');
 
@@ -18,6 +19,7 @@ export function useMap(options: Omit<MapOptions, 'container' | 'style'>, setup: 
       const ml = await import('maplibre-gl');
       if (dead) return;
       ml.setWorkerUrl(workerUrl);
+      ml.addProtocol(SCHEME, loadForMap);
       const m: MlMap = new ml.Map({ ...options, container: host.current!, style: findStyle, attributionControl: false, dragRotate: false, pitchWithRotate: false });
       cleanup.push(() => m.remove());
       m.touchZoomRotate.disableRotation();

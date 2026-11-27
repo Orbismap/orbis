@@ -1,6 +1,7 @@
 // The lower half: one big arrow to the target, how far it is and what it is. Before that: what is still missing.
 import { computed } from '@preact/signals';
 import type { ComponentChildren } from 'preact';
+import { online } from '@/core/online';
 import { formatDistance } from '@/features/routes/osrm';
 import { isThere, unwrap } from '../data/guide';
 import { metres } from '../data/places';
@@ -61,9 +62,15 @@ function content(): ComponentChildren {
 
   const to = target.value, w = way.value;
   if (!to || !w) {
-    if (search.value === 'error') return <Notice title="Daten nicht ladbar" text="Prüfe deine Verbindung." action="Erneut versuchen" onAction={retry} />;
+    if (search.value === 'error') {
+      return online.value
+        ? <Notice title="Daten nicht ladbar" text="Prüfe deine Verbindung." action="Erneut versuchen" onAction={retry} />
+        : <Notice title="Hier nicht offline verfügbar" text="Für diesen Ort oder diese Kategorie ist keine Offline-Karte gespeichert." action="Erneut versuchen" onAction={retry} />;
+    }
     if (search.value !== 'ready') return <Notice title="Suche in der Nähe …" />;
-    return <Notice title="Nichts in der Nähe" text={`${kind.value.none} im Umkreis von ${formatDistance(searchRadius.value)}.`} />;
+    // offline only the saved areas were searched: no radius can be promised
+    const nothing = online.value ? `${kind.value.none} im Umkreis von ${formatDistance(searchRadius.value)}.` : `${kind.value.none} in deinen Offline-Karten hier.`;
+    return <Notice title="Nichts in der Nähe" text={nothing} />;
   }
 
   // a searched place is not where one is: nobody arrives from there

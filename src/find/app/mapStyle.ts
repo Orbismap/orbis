@@ -1,4 +1,4 @@
-import type { LayerSpecification, StyleSpecification } from 'maplibre-gl';
+import type { LayerSpecification, StyleSpecification, VectorSourceSpecification } from 'maplibre-gl';
 import { BUILDING_FILTER, REAL_BUILDING_BASE, REAL_BUILDING_HEIGHT } from '@/map/buildings-tilt';
 import { wxStyle } from '@/wetter/features/forecast/map-style';
 
@@ -44,6 +44,10 @@ export const FOUND_LAYERS = ['found-others', 'found-target'];
 
 export const findStyle: StyleSpecification = (() => {
   const style = structuredClone(wxStyle);
+  // tiles and letters go through the app, which answers them from the offline maps without a network (offline/protocol.ts)
+  const base = style.sources.ofm as VectorSourceSpecification;
+  style.sources.ofm = { type: 'vector', tiles: ['findmap://tile/{z}/{x}/{y}'], minzoom: 0, maxzoom: 14, attribution: base.attribution };
+  style.glyphs = 'findmap://font/{fontstack}/{range}';
   const at = style.layers.findIndex((l) => l.id === 'places');
   style.layers.splice(at < 0 ? style.layers.length : at, 0, ...near);
   style.layers.push(...overlay);
