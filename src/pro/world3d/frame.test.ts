@@ -176,3 +176,41 @@ describe('near enough for a name', () => {
     expect(f.isNear(10, 45)).toBe(false);
   });
 });
+
+describe('focus pulls the near plane in', () => {
+  // z_clip = a * w + b: near = -b / (a + 1), far = -b / (a - 1)
+  const planes = (m: THREE.Matrix4) => {
+    const e = m.elements;
+    const a = e[10]! / e[11]!;
+    const b = e[14]! - a * e[15]!;
+    return { near: -b / (a + 1), far: -b / (a - 1) };
+  };
+  const input = (t: number, focus?: [number, number, number]) => {
+    const m = matrices(14, 10, 50, 70, 0);
+    return { mainMatrix: t > 0 ? m.globe : m.merc, fallbackMatrix: m.merc, transition: t, center: { lng: 10, lat: 50 }, fov: 0.6435011087932844, width: W, height: H, focus };
+  };
+
+  for (const [name, t] of [['globe', 1], ['flat map', 0]] as const) {
+    it(`never cuts off an object right in front of the camera (${name})`, () => {
+      const plain = planes(new GeoFrame(input(t)).proj);
+      // an altitude at which the object is only ~20 view units in front of the camera (found by bisection)
+      const probe = new GeoFrame(input(t)) as unknown as { clip(lon: number, lat: number, alt: number): { w: number } };
+      let [lo, hi] = [0, 20000];
+      for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2;
+        if (probe.clip(10, 50, mid).w > 20) lo = mid;
+        else hi = mid;
+      }
+      const focused = planes(new GeoFrame(input(t, [10, 50, lo])).proj);
+      expect(focused.near).toBeLessThan(plain.near);
+      expect(focused.near).toBeGreaterThan(0);
+      expect(Math.abs(focused.far / plain.far - 1)).toBeLessThan(1e-6);
+    });
+
+    it(`leaves the near plane alone when the focus is far (${name})`, () => {
+      const plain = planes(new GeoFrame(input(t)).proj);
+      const far = planes(new GeoFrame(input(t, [10, 50, 0])).proj);
+      expect(far.near).toBeLessThanOrEqual(plain.near + 1e-9);
+    });
+  }
+});

@@ -38,7 +38,16 @@ export interface FrameInput {
   height: number;
   /** device pixels per CSS pixel */
   ratio?: number;
+  /**
+   * [lon, lat, altitude m] of the object the camera looks at. The near plane is pulled in to a share of its distance, so the
+   * object is never cut off however close the camera comes (the map's own near plane is a fixed share of the distance to
+   * the map centre, which can be hundreds of metres when the centre lies on the ground far below).
+   */
+  focus?: Vec3;
 }
+
+/** the near plane is at most this share of the distance to the focus */
+const NEAR_SHARE_OF_FOCUS = 0.02;
 
 /** Unit vector on the sphere, times (1 + altitude / radius). */
 export function toUnit(lon: number, lat: number, altM = 0): Vec3 {
@@ -125,7 +134,31 @@ export class GeoFrame {
       this.origin = toMercator(input.center.lng, input.center.lat);
       this.proj.copy(this.mercMatrix);
     }
+    if (input.focus) this.tightenNear(input.focus);
     this.proj.multiply(new THREE.Matrix4().makeTranslation(this.origin[0], this.origin[1], this.origin[2]));
+  }
+
+  /** Pulls the near plane of every matrix in to a share of the distance to `focus` (never pushes it out). */
+  private tightenNear(focus: Vec3) {
+    const w = Math.abs(this.clip(focus[0], focus[1], focus[2]).w);
+    if (!(w > 0)) return;
+    const want = w * NEAR_SHARE_OF_FOCUS;
+    const tighten = (m: THREE.Matrix4) => {
+      const e = m.elements;
+      if (!e[11]) return;
+      // z_clip = a * w + b with a = (far + near) / (far - near), b = -2 far near / (far - near)
+      const a = e[10] / e[11];
+      const b = e[14] - a * e[15];
+      const near = -b / (a + 1);
+      const far = -b / (a - 1);
+      if (near > want && far > want) withDepthRange(m, want, far);
+    };
+    tighten(this.mercMatrix);
+    if (this.globe) {
+      tighten(this.globeMatrix);
+      this.inverse.copy(this.globeMatrix).invert();
+      this.proj.copy(this.globeMatrix);
+    } else this.proj.copy(this.mercMatrix);
   }
 
   /** Size of the drawing buffer in device pixels. */

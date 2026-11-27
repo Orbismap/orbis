@@ -44,6 +44,8 @@ export const buildingsLayerOn = signal(false);
 export const landmarksLayerOn = signal(false);
 /** The layer's type "Gebäude" wants the basemap's plain 2.5D buildings even where the Karte mode (Daten/Fahren) hides them. Written by the layer. */
 export const buildingsPlainWanted = signal(false);
+/** A replay (Live-Wiederholungen) is open: the map shows aerial images (Esri Weltbilder) and no 3D terrain, whatever the Karte says. Written by state/replay. */
+export const replayLook = signal(false);
 /** The layer "Gelände" is on: it forces the terrain height map on, whatever the basemap mode asks for. Written by the layer. */
 export const terrainLayerOn = signal(false);
 /** The colour the 2.5D buildings of the shown basemap have (dark on the dark map, light on the light one): buildings without a colour of their own get it, also with Orbis Pro. Written by the map engine. */

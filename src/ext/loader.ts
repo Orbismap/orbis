@@ -10,6 +10,8 @@ import { poiZoomBonus, tierLimitAt } from '../map/poi';
 import { mapEngine } from '../state/ui';
 import { mapDark, poiLabelsVisible, projection } from '../state/view';
 import { reducedMotion } from '../state/settings';
+import { shotAt } from '../replay/director';
+import { onReplayFrame, replayEffectiveSpeed, replayFocus, setReplayFocus, replayEvent, replayPhase, replayPlaying, replaySeeks, replayT } from '../state/replay';
 import { buildingHeightFactor } from '../map/buildings-tilt';
 import type { MapEngine } from '../map/types';
 import { balloonsChannel, buildingsChannel, followCurrent, followWanted, landmarksChannel, powerChannel, shipsChannel, tilesetsChannel, tilesetsState, tracksChannel, treesChannel, windTurbinesChannel } from './channels';
@@ -52,6 +54,7 @@ function makeHost(engine: MapEngine): ExtensionHost {
     buildings: buildingsChannel,
     landmarks: landmarksChannel,
     tilesets: tilesetsChannel,
+    replay: { event: replayEvent, t: replayT, playing: replayPlaying, phase: replayPhase, seeks: replaySeeks, speed: replayEffectiveSpeed, focus: replayFocus, setFocus: setReplayFocus, shot: () => { const ev = replayEvent.peek(); return ev ? shotAt(ev, replayT.peek(), replayFocus.peek()) : null; }, onFrame: onReplayFrame },
     reportTilesets: (state) => { tilesetsState.value = state; },
     holdCamera: () => engine.holdCamera(),
     buildingHeightFactor: () => buildingHeightFactor(engine.ml),

@@ -199,4 +199,74 @@
     max-height: 100%;
     overflow: hidden;
   }
+
+  /* vertical timeline of an event */
+  .insp-tl {
+    list-style: none;
+    margin: var(--s-3) 0 0;
+    padding: 0 0 0 14px;
+    position: relative;
+  }
+  .insp-tl::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--g-sep);
+  }
+  .insp-tl-step {
+    position: relative;
+  }
+  .insp-tl-step::before {
+    content: '';
+    position: absolute;
+    left: -14px;
+    top: 13px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--ink-1);
+    border: 2px solid var(--limb);
+    box-sizing: border-box;
+  }
+  .insp-tl-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    width: 100%;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: var(--r-input);
+    background: transparent;
+    color: var(--text-1);
+    text-align: left;
+    font: inherit;
+  }
+  .insp-tl-body.is-link {
+    cursor: pointer;
+  }
+  .insp-tl-body.is-link:hover,
+  .insp-tl-body.is-link:focus-visible {
+    background: var(--g-fill-hover);
+  }
+  .insp-tl-step:hover::before {
+    border-color: var(--now);
+  }
+  .insp-tl-at {
+    font-size: var(--fs-axis);
+    color: var(--now);
+    font-weight: 650;
+  }
+  .insp-tl-title {
+    font-size: var(--fs-ui);
+    font-weight: 600;
+  }
+  .insp-tl-text {
+    font-size: var(--fs-small);
+    line-height: var(--lh-ui);
+    color: var(--text-3);
+  }
 }

@@ -101,6 +101,8 @@ export class Stage implements CustomLayerInterface {
   clock: number | null = null;
   /** set by the follow camera */
   clicks: ClickGate | null = null;
+  /** the object a camera looks at ([lon, lat, altitude m]): the depth range reaches in to it (see GeoFrame `focus`) */
+  focus: Vec3 | null = null;
   private renderer?: THREE.WebGLRenderer;
   private target?: THREE.WebGLRenderTarget;
   private scene = new THREE.Scene();
@@ -212,6 +214,7 @@ export class Stage implements CustomLayerInterface {
       width: canvas.clientWidth,
       height: canvas.clientHeight,
       ratio: canvas.width / canvas.clientWidth,
+      focus: this.focus ?? undefined,
     });
     this.frame = frame;
     const now = this.clock ?? performance.now();
