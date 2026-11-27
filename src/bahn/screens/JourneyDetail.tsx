@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Icon } from '../ui/icons';
 import { LineBadge, PlatformSign } from '../ui/Badges';
@@ -9,14 +10,24 @@ import { journeyMap, legIndex, stopOfCall } from '../ui/mapData';
 import { cssModeColor } from '../ui/mapLayers';
 import { clock, delayState, delayText, duration, transfersText } from '../ui/format';
 import type { Call, Journey, Leg } from '../data/types';
-import { openStop, push } from '../state/nav';
+import { openStop, push, replaceTop } from '../state/nav';
+import { findTrip, saveTrip } from '../state/trips';
+import type { SavedTrip } from '../data/savedTrips';
 
 /**
  * Verbindungsdetail: ein Abschnitt je Karte, dazwischen die Umstiege. Antippen eines Abschnitts (auch auf der Karte)
  * hebt ihn hervor und zeigt seine Strecke.
  */
-export function JourneyDetail({ journey: j }: { journey: Journey }) {
+export function JourneyDetail({ journey: j, saved, children }: { journey: Journey; /** shown as a saved connection */ saved?: SavedTrip; children?: ComponentChildren }) {
   const [focus, setFocus] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const known = saved ?? findTrip(j);
+  const keep = () => {
+    const result = known ?? saveTrip(j);
+    if (result === 'full') setSaveError('Du hast schon 30 Verbindungen gespeichert. Entferne zuerst eine in der Merkliste.');
+    else if (result === 'storage') setSaveError('Speichern fehlgeschlagen: Der Speicher des Geräts ist voll oder gesperrt.');
+    else replaceTop({ kind: 'saved', id: result.id });
+  };
   const cards = useRef<(HTMLElement | null)[]>([]);
   const map = useMemo(() => journeyMap(j, cssModeColor, focus), [j, focus]);
   const fromMap = useRef(false);
@@ -61,6 +72,13 @@ export function JourneyDetail({ journey: j }: { journey: Journey }) {
             subtitle={`${new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short' }).format(j.departure.planned)} · ${duration(j.arrival.actual - j.departure.actual)} · ${transfersText(j.transfers)}`}
             actions={<IconButton icon="share" label="Teilen" onClick={share} />}
           />
+          {!saved && (
+            <div class="bn-actions">
+              <button type="button" class={`bn-btn ${known ? 'bn-btn-tonal' : 'bn-btn-filled'}`} onClick={keep}>
+                <Icon name="star" size={18} />{known ? 'Gespeichert · Einstellungen' : 'Offline speichern'}
+              </button>
+            </div>
+          )}
           {(late || j.legs.some((l) => l.cancelled)) && (
             <div class="bn-chips">
               {late && <span class="bn-tag bn-tag-late">{delay} min Verspätung</span>}
@@ -70,6 +88,8 @@ export function JourneyDetail({ journey: j }: { journey: Journey }) {
         </>
       }
     >
+      {saveError && <p class="bn-warning" role="alert">{saveError}</p>}
+      {children}
       <ol class="bn-trip">
         {j.legs.map((l, i) => {
           const before = j.legs[i - 1];

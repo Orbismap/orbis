@@ -5,12 +5,17 @@ import { kind } from '../state/finder';
 import { canEdit, signOut, token } from '../state/osm';
 import { manual, position } from '../state/sensors';
 import { KindSign } from './KindSign';
+import { job, offlineView, regions } from '../offline/state';
 import { browsing, menuOpen, openAdding, openCatalogue, openSearch, useMyPosition } from '../state/ui';
 
 export function Menu() {
   useMenuShortcut(() => (menuOpen.value = !menuOpen.value));
 
   const looked = kind.value;
+  const openOffline = (view: 'download' | 'manage') => {
+    menuOpen.value = false;
+    offlineView.value = view;
+  };
   return (
     <OrbisHud
       project="find" fixed open={menuOpen.value} onOpenChange={(open) => (menuOpen.value = open)}
@@ -22,6 +27,9 @@ export function Menu() {
         <h2>Start</h2>
         <HudRow icon={<Icon name="locate" size={18} />} title="Mein Standort" current={manual.value === null} onClick={useMyPosition} />
         <HudRow icon={<Icon name="search" size={18} />} title="Ort suchen" note={manual.value ?? undefined} current={manual.value !== null} onClick={openSearch} />
+        <h2>Offline</h2>
+        <HudRow icon={<Icon name="plus" size={18} />} title="Gebiet herunterladen" onClick={() => openOffline('download')} />
+        <HudRow icon={<Icon name="search" size={18} />} title="Offline-Karten verwalten" note={job.value ? 'Download läuft …' : regions.value.length ? `${regions.value.length} gespeichert` : undefined} onClick={() => openOffline('manage')} />
         {canEdit && looked.add && (
           <>
             <h2>OpenStreetMap</h2>

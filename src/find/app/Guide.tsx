@@ -1,19 +1,22 @@
 // The lower half: one big arrow to the target, how far it is and what it is. Before that: what is still missing.
 import { computed } from '@preact/signals';
 import type { ComponentChildren } from 'preact';
+import { online } from '@/core/online';
 import { formatDistance } from '@/features/routes/osrm';
+import { isPoor } from '../data/attitude';
 import { isThere, unwrap } from '../data/guide';
 import { metres } from '../data/places';
 import { chosen, kind, retry, search, searchRadius, target, way } from '../state/finder';
-import { compass, heading, manual, position, positionState, startCompass } from '../state/sensors';
-import { openSearch, useMyPosition } from '../state/ui';
+import { compass, compassAccuracy, heading, manual, position, positionState, startCompass } from '../state/sensors';
+import { calibrating, mapBearing, openSearch, useMyPosition } from '../state/ui';
 import { KindSentence } from './KindSentence';
 
 /** The turn of the arrow, continuous so that it never spins the long way round. */
 let turned = 0;
 const arrow = computed(() => {
   const w = way.value;
-  if (w) turned = unwrap(turned, w.bearing - (heading.value ?? 0));
+  // without any direction of one's own the arrow shows the direction on the map, however that is turned
+  if (w) turned = unwrap(turned, w.bearing - (heading.value ?? mapBearing.value));
   return turned;
 });
 
@@ -61,9 +64,15 @@ function content(): ComponentChildren {
 
   const to = target.value, w = way.value;
   if (!to || !w) {
-    if (search.value === 'error') return <Notice title="Daten nicht ladbar" text="Prüfe deine Verbindung." action="Erneut versuchen" onAction={retry} />;
+    if (search.value === 'error') {
+      return online.value
+        ? <Notice title="Daten nicht ladbar" text="Prüfe deine Verbindung." action="Erneut versuchen" onAction={retry} />
+        : <Notice title="Hier nicht offline verfügbar" text="Für diesen Ort oder diese Kategorie ist keine Offline-Karte gespeichert." action="Erneut versuchen" onAction={retry} />;
+    }
     if (search.value !== 'ready') return <Notice title="Suche in der Nähe …" />;
-    return <Notice title="Nichts in der Nähe" text={`${kind.value.none} im Umkreis von ${formatDistance(searchRadius.value)}.`} />;
+    // offline only the saved areas were searched: no radius can be promised
+    const nothing = online.value ? `${kind.value.none} im Umkreis von ${formatDistance(searchRadius.value)}.` : `${kind.value.none} in deinen Offline-Karten hier.`;
+    return <Notice title="Nichts in der Nähe" text={nothing} />;
   }
 
   // a searched place is not where one is: nobody arrives from there
@@ -79,9 +88,11 @@ function content(): ComponentChildren {
       <p class="find-name">{to.title}</p>
       {to.detail && <p class="find-text">{to.detail}</p>}
       {!arrived && compass.value !== 'on' && (
-        <p class="find-hint">{heading.value === null ? 'Ohne Kompass zeigt der Pfeil die Richtung auf der Karte, oben ist Norden.' : 'Ohne Kompass gilt der Pfeil in Fahrtrichtung.'}</p>
+        <p class="find-hint">{heading.value === null ? 'Ohne Kompass zeigt der Pfeil die Richtung auf der Karte.' : 'Ohne Kompass gilt der Pfeil in Fahrtrichtung.'}</p>
       )}
+      {compass.value === 'on' && isPoor(compassAccuracy.value) && <p class="find-hint find-warn">Der Kompass ist gerade ungenau.</p>}
       <div class="find-actions">
+        {compass.value === 'on' && <button type="button" class="find-button find-quiet" onClick={() => (calibrating.value = true)}>{isPoor(compassAccuracy.value) ? 'Kompass kalibrieren' : 'Kompass falsch?'}</button>}
         {compass.value === 'ask' && <button type="button" class="find-button" onClick={() => void startCompass()}>Kompass einschalten</button>}
         {chosen.value && <button type="button" class="find-button find-quiet" onClick={() => (chosen.value = null)}>Zum nächsten Ziel</button>}
       </div>

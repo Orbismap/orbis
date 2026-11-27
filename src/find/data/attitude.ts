@@ -13,7 +13,17 @@ export interface OrientationReading {
   absolute?: boolean;
   /** iOS only: the compass heading of the top of the device */
   webkitCompassHeading?: number;
+  /** iOS only: by how many degrees that heading may be off; negative: the compass cannot tell */
+  webkitCompassAccuracy?: number;
 }
+
+/** From this many degrees of possible error on the compass is called inaccurate. */
+const POOR_DEG = 25;
+export const isPoor = (accuracy: number | null): boolean => accuracy !== null && (accuracy < 0 || accuracy > POOR_DEG);
+
+const NAMES = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'];
+/** "Nordosten" for degrees clockwise from north, also beyond one turn. */
+export const directionName = (degrees: number): string => NAMES[((Math.round(degrees / 45) % 8) + 8) % 8]!;
 
 const RAD = Math.PI / 180;
 /** iOS: up to this tilt (degrees) the compass heading is trusted to find north anew. */
@@ -67,15 +77,15 @@ export function blend(previous: Camera | null, next: Camera, share: number): Cam
 /**
  * The `alpha` of a reading counted from north, or null when the reading says nothing about north. iOS counts alpha from wherever
  * it started and names the compass heading beside it: their difference (`offset`) is renewed while the device is level enough for
- * the compass to be right, and carried while it is held up.
+ * the compass to be right, and carried while it is held up. Only a level reading is kept: one taken while the device is held up
+ * serves for the moment, but may be half a turn off.
  */
 export function fromNorth(e: OrientationReading, offset: number | null): { alpha: number; offset: number | null } | null {
   if (typeof e.alpha !== 'number') return null;
   if (typeof e.webkitCompassHeading !== 'number') return e.absolute ? { alpha: e.alpha, offset } : null;
   const level = Math.abs(e.beta ?? 0) < LEVEL_BETA && Math.abs(e.gamma ?? 0) < LEVEL_GAMMA;
   const found = 360 - e.webkitCompassHeading - e.alpha;
-  let next = offset;
-  if (next === null) next = found;
-  else if (level) next += ((((found - next) % 360) + 540) % 360 - 180) * 0.2;
+  if (offset === null) return { alpha: e.alpha + found, offset: level ? found : null };
+  const next = level ? offset + ((((found - offset) % 360) + 540) % 360 - 180) * 0.2 : offset;
   return { alpha: e.alpha + next, offset: next };
 }

@@ -10,8 +10,12 @@ export const menuOpen = signal(false);
 export const searching = signal(false);
 /** The catalogue of things to look for is open. */
 export const browsing = signal(false);
+/** The help to set the compass right is open. */
+export const calibrating = signal(false);
 /** The camera view (AR) stands in the place of the map. */
 export const augmented = signal(false);
+/** What is up on the map, degrees clockwise from north; 0 while there is no map. */
+export const mapBearing = signal(0);
 
 /** Call from a tap: iOS asks for the compass only then. */
 export function openCameraView(): void {

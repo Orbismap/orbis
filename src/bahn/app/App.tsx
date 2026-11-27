@@ -13,9 +13,12 @@ import { Saved } from '../screens/Saved';
 import { SearchScreen } from '../screens/search';
 import { JourneysScreen } from '../screens/Journeys';
 import { JourneyDetail } from '../screens/JourneyDetail';
+import { SavedTripScreen } from '../screens/SavedTripScreen';
 import { StopScreen } from '../screens/StopScreen';
 import { TripScreen } from '../screens/TripScreen';
-import { goTab, stack, tab, type Entry, type TabId } from '../state/nav';
+import { goTab, push, stack, tab, type Entry, type TabId } from '../state/nav';
+import { startPushSync } from '../state/push';
+import { openFromNotification } from '../state/notification';
 import { initLocation, locationState } from '../state/location';
 import { Menu } from './Menu';
 import { TABS } from './tabs';
@@ -32,6 +35,7 @@ function page(p: Entry) {
     case 'search': return <SearchScreen target={p.target} />;
     case 'journeys': return <JourneysScreen />;
     case 'journey': return <JourneyDetail journey={p.journey} />;
+    case 'saved': return <SavedTripScreen id={p.id} />;
     case 'stop': return <StopScreen stop={p.stop} />;
     case 'trip': return <TripScreen {...p} />;
   }
@@ -39,6 +43,8 @@ function page(p: Entry) {
 
 export function App() {
   useEffect(() => { void initLocation(); }, []);
+  useEffect(() => startPushSync(), []);
+  useEffect(() => openFromNotification((id) => { goTab('merkliste'); push({ kind: 'saved', id }); }), []);
   const pages = stack.value;
   const desktop = isDesktop.value;
   const current = tab.value;

@@ -36,10 +36,10 @@ function worker(config: { version: string; required: string[]; optional: string[
     await done;
   };
   /** The worker's answer, or `network` when it leaves the request to the browser. */
-  const get = async (url: string, mode = 'cors') => {
+  const get = async (url: string, mode = 'cors', cache?: RequestCache) => {
     let answer: Promise<Response> | undefined;
     const waits: Promise<unknown>[] = [];
-    on.fetch!({ request: { url: urlOf(url), method: 'GET', mode, headers: new Headers() }, respondWith: (p: Promise<Response>) => (answer = p), waitUntil: (p: Promise<unknown>) => waits.push(p) });
+    on.fetch!({ request: { url: urlOf(url), method: 'GET', mode, cache, headers: new Headers() }, respondWith: (p: Promise<Response>) => (answer = p), waitUntil: (p: Promise<unknown>) => waits.push(p) });
     if (!answer) return 'network';
     const res = await answer;
     await Promise.all(waits);
@@ -53,6 +53,11 @@ const TILE = 'https://tiles.example/1/2/3.pbf';
 const status = (r: Response | string) => (typeof r === 'string' ? r : r.type === 'error' ? 'error' : r.status);
 
 describe('service worker', () => {
+  it('leaves requests that ask for the server’s state to the browser', async () => {
+    const sw = worker(v1);
+    await sw.lifecycle('install');
+    expect(await sw.get(TILE, 'cors', 'no-store')).toBe('network');
+  });
   it('starts the app and shows what was seen without a network', async () => {
     const sw = worker(v1);
     await sw.lifecycle('install');
