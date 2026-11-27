@@ -172,8 +172,10 @@ export interface LandmarkSample {
   name: string;
   lng: number;
   lat: number;
-  /** metres up (positive) or down from the lowest ground under the footprint */
+  /** metres up (positive) or down from the lowest ground under the footprint; what ends up below the ground is not seen */
   elevationM: number;
+  /** a structure that may be built over the terrain, its supports down to the ground at their own feet (bridge, coaster) */
+  overTerrain: boolean;
   /** the model is drawn from this zoom on */
   minZoom: number;
   /** height of the model in metres, 0 when unknown */
@@ -182,6 +184,8 @@ export interface LandmarkSample {
   url: string;
   /** [west, south, east, north] of its footprint */
   bounds: [number, number, number, number];
+  /** the finer model some landmarks have, for the close view */
+  detail?: { url: string; minZoom: number };
   /** feature ids these buildings have in the OpenFreeMap tiles (the base hides them, the model has priority) */
   osmIds: number[];
 }

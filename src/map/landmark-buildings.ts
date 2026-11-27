@@ -118,7 +118,7 @@ export function watchLandmarkBuildings(ml: MlMap): () => void {
   apply();
   // a changed set renews the cut; the same set again (a new object) does not reload every tile
   let seen = '';
-  const key = (m: LandmarkMask) => [...m.ids].sort().join(',') + '|' + m.footprints.length;
+  const key = (m: LandmarkMask) => [...m.ids].sort().join(',') + '|' + m.footprints.length + '|' + m.footprints.filter((f) => f.geometry.length).length;
   seen = key(landmarkMask.peek());
   const stop = landmarkMask.subscribe((m) => { const k = key(m); if (k !== seen) { seen = k; schedule(); } });
   ml.on('styledata', onStyle);
