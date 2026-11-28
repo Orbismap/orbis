@@ -1,5 +1,6 @@
+import { timetableOf } from './savedTrips';
 import { describe, expect, it, vi } from 'vitest';
-import { createDbDelays, provenOnTime, plannedJourney } from './delays';
+import { createDbDelays, cardNotes, provenOnTime, plannedJourney } from './delays';
 import { modeGroup, motisModes } from './modes';
 import { makeTime, named, parseDepartures, parseJourneys, parseStops, parseTrip } from './transitous';
 
@@ -99,6 +100,23 @@ describe('DB-Verspätungen', () => {
     expect(ride.from.time).toMatchObject({ delayMin: 4, delaySource: 'db', actual: Date.parse(T(5)) + 4 * 60000 });
     expect(ride.from.platform).toBe('13');
     expect(ride.to.time.delayMin).toBeNull(); // Ankunft nicht gefunden: bleibt Fahrplan
+  });
+
+  it('übernimmt Grund und Meldungen beider Halte und vergisst sie im Fahrplan', async () => {
+    const [j] = parseJourneys([itinerary]);
+    const bikes = { code: 91, text: 'Fahrradmitnahme nicht möglich' };
+    const load = { code: 97, text: 'Hohe Auslastung' };
+    const wlan = { code: 70, text: 'WLAN nicht verfügbar' };
+    const fetchFn = vi.fn(async (_u: string, init?: RequestInit) => {
+      const { queries } = JSON.parse(String(init?.body)) as { queries: { kind: string }[] };
+      const results = queries.map((q) => ({ delayMin: 4, cancelled: false, ...(q.kind === 'dep' ? { notes: [bikes, wlan] } : { cause: 'Bauarbeiten', notes: [bikes, load] }) }));
+      return new Response(JSON.stringify({ results }));
+    });
+    const [out] = await createDbDelays({ baseUrl: 'https://w', fetchFn: fetchFn as unknown as typeof fetch }).journeys([plannedJourney(j!)]);
+    expect(out!.legs[0]).toMatchObject({ cause: 'Bauarbeiten', notes: [bikes, wlan, load] });
+    expect(cardNotes(out!)).toEqual([load.text, bikes.text]);
+    expect(cardNotes(timetableOf(out!))).toEqual([]);
+    expect(timetableOf(out!).legs[0]!.cause).toBeUndefined();
   });
 
   it('nennt eine Verbindung nur pünktlich, wenn jede Zeit jedes Fahrzeugs bekannt ist', () => {

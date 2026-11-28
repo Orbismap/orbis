@@ -61,7 +61,7 @@ export function timetableOf(j: Journey, ms = 0): Journey {
     ...rest,
     departure: time(j.departure),
     arrival: time(j.arrival),
-    legs: j.legs.map((l) => ({ ...l, cancelled: false, tripId: ms ? undefined : l.tripId, from: call(l.from), to: call(l.to), via: l.via.map(call) })),
+    legs: j.legs.map((l) => ({ ...l, cancelled: false, cause: undefined, notes: undefined, tripId: ms ? undefined : l.tripId, from: call(l.from), to: call(l.to), via: l.via.map(call) })),
   };
 }
 
