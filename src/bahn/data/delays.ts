@@ -1,7 +1,7 @@
 import { HttpError } from '@/data/http';
 import { isRail } from './modes';
 import { journeyOf } from './transitous';
-import type { Call, DelayEnricher, Departure, Journey, Leg, Stop, Time } from './types';
+import type { Call, DelayEnricher, Departure, Journey, Leg, Note, Stop, Time } from './types';
 
 /**
  * Echtzeit der Bahn aus den DB-Fahrplandaten. Der Schlüssel liegt im Worker (Orbismap/data, `workers/push`,
@@ -22,6 +22,8 @@ interface Hit {
   cancelled: boolean;
   track?: string;
   trackChanged?: boolean;
+  cause?: string;
+  notes?: Note[];
 }
 
 const keyOf = (q: Query) => `${q.station}|${q.ts}|${q.kind}|${q.line}`;
@@ -39,11 +41,25 @@ export function plannedJourney(j: Journey): Journey {
 export const plannedDepartures = (list: Departure[]): Departure[] =>
   list.map((d) => (isRail(d.mode) ? { ...d, time: plannedTime(d.time) } : d));
 
+/** Was schon in der Ergebnisliste stehen soll: Auslastung, Fahrräder, Einstieg, Wagen und Reservierung. */
+const ON_CARD = [97, 96, 91, 92, 82, 85, 80, 86];
+
+export function cardNotes(j: Journey): string[] {
+  const all = j.legs.flatMap((l) => l.notes ?? []).filter((n) => ON_CARD.includes(n.code));
+  return [...new Set(all.sort((a, b) => ON_CARD.indexOf(a.code) - ON_CARD.indexOf(b.code)).map((n) => n.text))];
+}
+
 /** „pünktlich“ nur, wenn es belegt ist: Von jedem Fahrzeug sind Ab- und Ankunft bekannt und keine ab 2 min zu spät. */
 export function provenOnTime(j: Journey): boolean {
   const rides = j.legs.filter((l) => l.mode !== 'fuss');
   const ok = (t: Time) => t.delayMin !== null && t.delayMin < 2;
   return rides.length > 0 && rides.every((l) => !l.cancelled && ok(l.from.time) && ok(l.to.time));
+}
+
+/** Meldungen beider Halte zusammen, jede einmal. Beim Grund zählt die Abfahrt, sonst die Ankunft. */
+function messagesOf(d?: Hit | null, a?: Hit | null): Pick<Leg, 'cause' | 'notes'> {
+  const notes = [...new Map([...(d?.notes ?? []), ...(a?.notes ?? [])].map((n) => [n.code, n])).values()];
+  return { cause: d?.cause ?? a?.cause, notes: notes.length ? notes : undefined };
 }
 
 export interface DelayOptions {
@@ -114,6 +130,7 @@ export function createDbDelays({ baseUrl = DEFAULT_DELAYS_URL, fetchFn = fetch }
             from: d ? trackOf(l.from, d) : l.from,
             to: a ? trackOf(l.to, a) : l.to,
             cancelled: l.cancelled || !!d?.cancelled || !!a?.cancelled,
+            ...messagesOf(d, a),
           };
         });
         return matched ? journeyOf(legs, j.transfers, 'db') : j;

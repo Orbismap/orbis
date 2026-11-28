@@ -39,6 +39,12 @@ export interface Call {
   time: Time;
 }
 
+/** Eine Meldung zum Zug; `code` ist die Nummer der DB. */
+export interface Note {
+  code: number;
+  text: string;
+}
+
 export interface Leg {
   mode: ModeGroup;
   /** Linienname, z. B. "ICE 1601" oder "S 5"; leer bei Fußwegen. */
@@ -54,6 +60,10 @@ export interface Leg {
   /** Länge in Metern, nur bei Fußwegen. */
   walkM?: number;
   cancelled: boolean;
+  /** Grund für Verspätung oder Ausfall laut DB. */
+  cause?: string;
+  /** Meldungen der DB zu diesem Zug (Wagen, Fahrräder, Auslastung …), neueste zuerst. Keine Meldung heißt nicht „alles gut“. */
+  notes?: Note[];
   /** ID der Fahrt: der ganze Linienlauf lässt sich damit abfragen. */
   tripId?: string;
   /** Verlauf auf Gleis oder Straße als [lng, lat]; ohne ihn werden die Halte gerade verbunden. */

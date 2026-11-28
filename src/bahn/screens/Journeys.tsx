@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { provenOnTime } from '../data/delays';
+import { cardNotes, provenOnTime } from '../data/delays';
 import { online } from '@/core/online';
 import { describeError } from '@/data/http';
 import { Icon, modeIcon } from '../ui/icons';
@@ -196,6 +196,7 @@ function JourneyCard({ j, now, onClick, onHover }: { j: Journey; now: number; on
   const cancelled = j.legs.some((l) => l.cancelled);
   const first = j.legs.find((l) => l.mode !== 'fuss');
   const worst = Math.max(j.departure.delayMin ?? 0, j.arrival.delayMin ?? 0);
+  const notes = cardNotes(j);
   // „in 5 min“ gilt der Abfahrt des ersten Fahrzeugs, nicht dem Losgehen davor
   const soon = first ? first.from.time.actual - now : -Infinity;
   // kurze Fußwege nehmen im Balken keinen Platz weg
@@ -226,6 +227,7 @@ function JourneyCard({ j, now, onClick, onHover }: { j: Journey; now: number; on
         )}
         <PlatformSign platform={first?.from.platform} changed={first?.from.platformChanged} mode={first?.mode} />
       </span>
+      {notes.length > 0 && <span class="bn-conn-notes">{notes.join(' · ')}</span>}
       <span class="bn-conn-meta">
         <span>{transfersText(j.transfers)}</span>
         {cancelled ? <span class="bn-tag bn-tag-late">Fällt aus</span> : worst >= 2 ? <span class="bn-tag bn-tag-late">{delayText(j.departure) || delayText(j.arrival)} min</span> : provenOnTime(j) ? <span class="bn-tag bn-tag-ok">pünktlich</span> : null}
