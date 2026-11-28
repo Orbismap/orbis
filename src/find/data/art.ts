@@ -56,6 +56,14 @@ export const ART = {
   // charging post with bolt and plug
   charger: box(38, 14, 58, 94, 14) + shape('M72 28 52 66h15l-5 30 24-42H70z', INK) + line('M28 110h78', 8)
     + line('M96 80c24 0 12 22 28 22s14-18 14-34', 7) + box(128, 40, 20, 28, 6, SUN) + line('M133 40V28M143 40V28', 5, SUN),
+  // patrol car with its light on
+  police: box(66, 24, 28, 18, 6, SUN) + line('M52 20l-12-8M108 20l12-8M80 14V6', 5, SUN)
+    + shape('M44 66l12-22q3-6 10-6h28q7 0 10 6l12 22z') + shape('M55 62l8-15h34l8 15z', INK) + box(22, 62, 116, 34, 12)
+    + dot(42, 78, 6, SUN) + dot(118, 78, 6, SUN) + box(64, 74, 32, 8, 3, INK) + box(34, 92, 20, 18, 5) + box(106, 92, 20, 18, 5),
+  // the hospital building and its H
+  hospital: box(18, 52, 36, 54, 4) + box(106, 52, 36, 54, 4) + box(46, 18, 68, 88, 6) + box(58, 30, 44, 42, 6, INK)
+    + line('M71 40v22M89 40v22M71 51h18', 6, SUN) + box(70, 82, 20, 24, 3, INK)
+    + box(26, 64, 12, 12, 2, INK) + box(122, 64, 12, 12, 2, INK) + line('M10 108h140', 6),
   // heart with a bolt
   defibrillator: `<g transform="translate(80 61) scale(0.84) translate(-80 -59)">${shape('M80 108C34 80 18 60 18 41a29 29 0 0 1 62-18 29 29 0 0 1 62 18c0 19-16 39-62 67z') + shape('M87 30 58 70h20l-8 28 32-44H81z', '#e5484d')}</g>`,
 } as const;

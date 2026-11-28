@@ -46,6 +46,10 @@ export interface Kind {
   tiles: { set?: string; layer: string; zoom: number };
   /** how one travels there */
   mode: RouteMode;
+  /** for what one needs in an emergency: the number to call, shown with every search */
+  emergency?: { number: '110' | '112'; note?: string };
+  /** how many rings of tiles are searched at most, for what lies further apart (data/places.ts) */
+  rings?: number;
   /** null: not of this kind, or not usable for the person (e.g. private). `id`: the tile feature's */
   place(properties: Record<string, unknown>, lng: number, lat: number, id?: number): Place | null;
   /** missing: nothing of this kind is entered from the app */
@@ -92,7 +96,7 @@ export const BIKE_PARKING: Kind = {
 };
 
 /** A kind read from the places of the base map. `labels`: what a place is called, per `subclass` that belongs to the kind. */
-function onMap(kind: Pick<Kind, 'id' | 'name' | 'next' | 'none' | 'glyph' | 'mode'> & { labels: Record<string, string>; only?: string }): Kind {
+function onMap(kind: Pick<Kind, 'id' | 'name' | 'next' | 'none' | 'glyph' | 'mode' | 'emergency' | 'rings'> & { labels: Record<string, string>; only?: string }): Kind {
   const { labels, only, ...rest } = kind;
   return {
     ...rest,
@@ -119,5 +123,10 @@ export const STATION = onMap({ id: 'bahnhof', name: 'Bahnhof', next: 'den nächs
 export const STOP = onMap({ id: 'haltestelle', name: 'Haltestelle', next: 'die nächste Haltestelle', none: 'Keine Haltestelle', glyph: 'directions_bus', mode: 'foot', labels: { bus_stop: 'Bushaltestelle', bus_station: 'Busbahnhof', tram_stop: 'Straßenbahn' } });
 export const FUEL = onMap({ id: 'tankstelle', name: 'Tankstelle', next: 'die nächste Tankstelle', none: 'Keine Tankstelle', glyph: 'local_gas_station', mode: 'car', labels: { fuel: 'Tankstelle' } });
 export const CHARGER = onMap({ id: 'ladesaeule', name: 'Ladesäule', next: 'die nächste Ladesäule', none: 'Keine Ladesäule', glyph: 'ev_station', mode: 'car', labels: { charging_station: 'Ladesäule' } });
+/** Police stations and hospitals are few: about 12 km to each side in central Europe. */
+const FAR_RINGS = 8;
+export const POLICE = onMap({ id: 'polizei', name: 'Polizei', next: 'die nächste Polizeiwache', none: 'Keine Polizeiwache', glyph: 'local_police', mode: 'foot', emergency: { number: '110' }, rings: FAR_RINGS, labels: { police: 'Polizei' } });
+// without `clinic`: those are mostly practices
+export const HOSPITAL = onMap({ id: 'krankenhaus', name: 'Krankenhaus', next: 'das nächste Krankenhaus', none: 'Kein Krankenhaus', glyph: 'local_hospital', mode: 'car', emergency: { number: '112', note: 'Nicht jedes Krankenhaus hat eine Notaufnahme.' }, rings: FAR_RINGS, labels: { hospital: 'Krankenhaus' } });
 
-export const KINDS: readonly Kind[] = [BIKE_PARKING, BIKE_RENTAL, TOILETS, WATER, ATM, BAKERY, SUPERMARKET, PHARMACY, STATION, STOP, FUEL, CHARGER];
+export const KINDS: readonly Kind[] = [BIKE_PARKING, BIKE_RENTAL, TOILETS, WATER, ATM, BAKERY, SUPERMARKET, PHARMACY, STATION, STOP, FUEL, CHARGER, POLICE, HOSPITAL];

@@ -3,7 +3,7 @@ import { haversine, type LngLat } from '@/core/geo';
 import { tilePosition, type TilePoint } from '@/data/tilePoints';
 import type { Kind, Place } from './kinds';
 
-/** Rings around the own tile that are searched at most (4: a square of 9 tiles, about 6 km to each side in central Europe). */
+/** Rings around the own tile that are searched at most, unless the kind says otherwise (4: a square of 9 tiles, about 6 km to each side in central Europe). */
 export const MAX_RING = 4;
 const EQUATOR_M = 40_075_016;
 
@@ -42,7 +42,7 @@ export async function searchPlaces(kind: Kind, at: LngLat, read: (x: number, y: 
   const found = new Map<string, Place>();
   let nearest = Infinity;
   let radius = 0;
-  for (let r = 0; r <= MAX_RING; r++) {
+  for (let r = 0; r <= (kind.rings ?? MAX_RING); r++) {
     const tiles = await Promise.all(ringTiles(x, y, r, zoom).map(([tx, ty]) => read(tx, ty)));
     for (const point of tiles.flat()) {
       const place = kind.place(point.properties, point.lng, point.lat, point.id);
