@@ -13,6 +13,8 @@ import type { Call, Journey, Leg } from '../data/types';
 import { openStop, push, replaceTop } from '../state/nav';
 import { findTrip, saveTrip } from '../state/trips';
 import type { SavedTrip } from '../data/savedTrips';
+import { useNow } from '../state/hooks';
+import { Lifts } from './Lifts';
 
 /**
  * Verbindungsdetail: ein Abschnitt je Karte, dazwischen die Umstiege. Antippen eines Abschnitts (auch auf der Karte)
@@ -22,6 +24,7 @@ export function JourneyDetail({ journey: j, saved, children }: { journey: Journe
   const [focus, setFocus] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const known = saved ?? findTrip(j);
+  const now = useNow();
   const keep = () => {
     const result = known ?? saveTrip(j);
     if (result === 'full') setSaveError('Du hast schon 30 Verbindungen gespeichert. Entferne zuerst eine in der Merkliste.');
@@ -90,6 +93,7 @@ export function JourneyDetail({ journey: j, saved, children }: { journey: Journe
     >
       {saveError && <p class="bn-warning" role="alert">{saveError}</p>}
       {children}
+      <Lifts journey={j} now={now} />
       <ol class="bn-trip">
         {j.legs.map((l, i) => {
           const before = j.legs[i - 1];

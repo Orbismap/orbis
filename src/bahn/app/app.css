@@ -205,6 +205,12 @@
 
 /* ---------- Zustände ---------- */
 .bn-note { display: flex; align-items: center; gap: 6px; margin: 12px 0; font-size: var(--fs-label); color: var(--text-3); }
+.bn-lifts { margin: 4px 0 10px; font-size: var(--fs-label); }
+.bn-lifts summary { min-height: 44px; display: flex; align-items: center; font-weight: 650; color: var(--warn); cursor: pointer; }
+.bn-lifts summary::after { content: '▾'; margin-left: 6px; }
+.bn-lifts[open] summary::after { content: '▴'; }
+.bn-lifts ul { margin: 4px 0 8px; padding-left: 18px; }
+.bn-lifts p { margin: 4px 0; opacity: 0.75; }
 .bn-warning { margin: 4px 0 8px; font-size: var(--fs-label); font-weight: 650; color: var(--warn); }
 .bn-saved { margin: 4px 0; font-size: var(--fs-small); font-weight: 650; color: var(--warn); }
 .bn-card { margin-top: 8px; padding: 16px; border-radius: var(--r-card); background: var(--ink-2); border: 1px solid var(--line); }
