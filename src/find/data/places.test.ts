@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { tilePosition } from '@/data/tilePoints';
-import { BIKE_PARKING } from './kinds';
+import { BIKE_PARKING, HOSPITAL } from './kinds';
 import { MAX_RING, coveredRadius, ringTiles, searchPlaces, withOwn } from './places';
 
 const AT: [number, number] = [13.4, 52.52];
@@ -40,6 +40,14 @@ describe('places around a position', () => {
     const none = await searchPlaces(BIKE_PARKING, AT, async () => (calls++, []));
     expect(none.places).toEqual([]);
     expect(calls).toBe((2 * MAX_RING + 1) ** 2);
+  });
+
+  it('searches further for what lies far apart, and does not take a practice for a hospital', async () => {
+    let calls = 0;
+    await searchPlaces(HOSPITAL, AT, async () => (calls++, []));
+    expect(calls).toBe(17 ** 2);
+    expect(HOSPITAL.place({ class: 'hospital', subclass: 'clinic' }, 1, 2)).toBeNull();
+    expect(HOSPITAL.place({ class: 'hospital', subclass: 'hospital', name: 'Helios' }, 1, 2)).toMatchObject({ title: 'Helios', detail: 'Krankenhaus' });
   });
 
   it('describes a parking', () => {

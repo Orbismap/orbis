@@ -1,6 +1,6 @@
 // What the catalogue shows. Entries without a kind are announced only ("Bald"): their data is still to come.
 import type { ArtId } from './art';
-import { ATM, BAKERY, BIKE_PARKING, BIKE_RENTAL, CHARGER, FUEL, PHARMACY, STATION, STOP, SUPERMARKET, TOILETS, WATER, type Kind } from './kinds';
+import { ATM, BAKERY, BIKE_PARKING, BIKE_RENTAL, CHARGER, FUEL, HOSPITAL, PHARMACY, POLICE, STATION, STOP, SUPERMARKET, TOILETS, WATER, type Kind } from './kinds';
 import { PARKING_TILE } from './parkingArt';
 
 export interface Entry { art: ArtId; name: string; colour: string; kind?: Kind }
@@ -41,6 +41,10 @@ export const CATALOG: readonly { title: string; entries: readonly Entry[] }[] = 
   },
   {
     title: 'Notfall',
-    entries: [{ art: 'defibrillator', name: 'Defibrillator', colour: '#c8364a' }],
+    entries: [
+      { art: 'police', name: 'Polizei', colour: '#1f4e9c', kind: POLICE },
+      { art: 'hospital', name: 'Krankenhaus', colour: '#b83250', kind: HOSPITAL },
+      { art: 'defibrillator', name: 'Defibrillator', colour: '#c8364a' },
+    ],
   },
 ];

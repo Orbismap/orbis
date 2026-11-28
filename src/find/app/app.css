@@ -183,6 +183,10 @@
 .find-compass { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: 16px; background: var(--ink-2); }
 .find-compass svg { flex: none; width: 72px; height: 72px; }
 
+.find-emergency { flex: none; }
+.find-call { display: inline-block; padding: 8px 4px; font-weight: 700; }
+.find-emergency ~ .find-arrow { width: min(34vw, 14dvh); height: min(34vw, 14dvh); }
+
 @media (orientation: landscape) {
   .find { grid-template-rows: 1fr; grid-template-columns: 1fr 1fr; }
   .find-guide { border-top: 0; border-left: 1px solid var(--ink-3); }

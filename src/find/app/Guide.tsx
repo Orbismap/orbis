@@ -101,6 +101,18 @@ function content(): ComponentChildren {
   );
 }
 
+/** On top, also when nothing was found: whom to call. */
+function Emergency() {
+  const call = kind.value.emergency;
+  if (!call) return null;
+  return (
+    <p class="find-hint find-emergency">
+      Im Notfall: <a class="find-call" href={`tel:${call.number}`}>{call.number} anrufen</a>
+      {call.note && <><br />{call.note}</>}
+    </p>
+  );
+}
+
 export function Guide() {
-  return <section class="find-guide" aria-live="polite">{content()}</section>;
+  return <section class="find-guide" aria-live="polite"><Emergency />{content()}</section>;
 }
