@@ -44,9 +44,9 @@ export const plannedDepartures = (list: Departure[]): Departure[] =>
 /** Was schon in der Ergebnisliste stehen soll: Auslastung, Fahrräder, Einstieg, Wagen und Reservierung. */
 const ON_CARD = [97, 96, 91, 92, 82, 85, 80, 86];
 
-export function cardNotes(j: Journey): string[] {
+export function cardNotes(j: Journey): Note[] {
   const all = j.legs.flatMap((l) => l.notes ?? []).filter((n) => ON_CARD.includes(n.code));
-  return [...new Set(all.sort((a, b) => ON_CARD.indexOf(a.code) - ON_CARD.indexOf(b.code)).map((n) => n.text))];
+  return [...new Map(all.sort((a, b) => ON_CARD.indexOf(a.code) - ON_CARD.indexOf(b.code)).map((n) => [n.code, n])).values()];
 }
 
 /** „pünktlich“ nur, wenn es belegt ist: Von jedem Fahrzeug sind Ab- und Ankunft bekannt und keine ab 2 min zu spät. */

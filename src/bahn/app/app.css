@@ -153,8 +153,13 @@
 .bn-tag { display: inline-flex; flex: none; align-items: center; padding: 3px 10px; border-radius: var(--r-round); font-size: 0.75rem; font-weight: 750; }
 .bn-tag-late { background: var(--alert-quiet); color: var(--alert); }
 .bn-tag-ok { background: var(--ok-quiet); color: var(--ok); }
-.bn-conn-notes { display: block; font-size: var(--fs-label); font-weight: 650; color: var(--warn); text-align: left; }
-.bn-notes { margin: 4px 0 8px; padding-left: 18px; font-size: var(--fs-label); color: var(--warn); }
+.bn-conn-notes { display: flex; flex-wrap: wrap; gap: 6px; color: var(--warn); }
+.bn-note-ic { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); }
+.bn-notes { display: flex; flex-wrap: wrap; column-gap: 2px; margin: 2px 0 6px; color: var(--warn); }
+.bn-note-btn { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: none; color: inherit; }
+.bn-note-btn[aria-expanded="true"] .bn-note-ic { background: var(--ink-1); border-color: currentColor; }
+.bn-note-text { flex-basis: 100%; margin: 0; font-size: var(--fs-label); }
+.bn-note-text:empty { display: none; }
 
 /* ---------- Verbindung und Linienlauf ---------- */
 .bn-trip { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 0; padding: 0; list-style: none; }

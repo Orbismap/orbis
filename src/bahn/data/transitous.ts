@@ -1,6 +1,6 @@
 import { decodePolyline } from '@/core/polyline';
 import { fetchJson } from '@/data/http';
-import { modeGroup, motisModes } from './modes';
+import { modeGroup, motisModes, vehicleOf } from './modes';
 import { clusterStops, dedupeStops, matchesQuery, rankStops } from './stops';
 import type { Call, Departure, Journey, JourneyOptions, JourneyPage, Leg, Stop, Time, TransitProvider } from './types';
 
@@ -133,6 +133,7 @@ export function parseLeg(l: LegDto): Leg {
   to.time = makeTime(l.endTime, l.scheduledEndTime ?? l.to.scheduledArrival, l.realTime);
   return {
     mode,
+    vehicle: foot ? undefined : vehicleOf(l.mode, lineName(l)),
     line: foot ? '' : lineName(l),
     headsign: (l.headsign ?? '').trim(),
     from,
@@ -189,6 +190,7 @@ export function parseDepartures(list: StopTimeDto[]): Departure[] {
   return list
     .map((s): Departure => ({
       mode: modeGroup(s.mode),
+      vehicle: vehicleOf(s.mode, lineName(s)),
       line: lineName(s),
       headsign: (s.headsign ?? '').trim(),
       platform: s.place.track ?? s.place.scheduledTrack,

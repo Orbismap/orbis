@@ -4,6 +4,9 @@
 /** Verkehrsmittel-Gruppen der Oberfläche (Filter, Farben, Symbole). */
 export type ModeGroup = 'fern' | 'regio' | 'sbahn' | 'ubahn' | 'tram' | 'bus' | 'fernbus' | 'faehre' | 'fuss' | 'sonst';
 
+/** Fahrzeuge mit eigenem Symbol innerhalb oder außerhalb der Gruppen. Filter und Farben richten sich nach der Gruppe. */
+export type Vehicle = 'schnellzug' | 'nachtzug' | 'ersatz' | 'rufbus' | 'taxi' | 'mitfahrt' | 'schwebebahn' | 'seilbahn' | 'standseil' | 'flug';
+
 export interface Stop {
   id: string;
   name: string;
@@ -47,6 +50,7 @@ export interface Note {
 
 export interface Leg {
   mode: ModeGroup;
+  vehicle?: Vehicle;
   /** Linienname, z. B. "ICE 1601" oder "S 5"; leer bei Fußwegen. */
   line: string;
   headsign: string;
@@ -81,6 +85,7 @@ export interface Journey {
 
 export interface Departure {
   mode: ModeGroup;
+  vehicle?: Vehicle;
   line: string;
   headsign: string;
   platform?: string;

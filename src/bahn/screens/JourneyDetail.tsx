@@ -14,6 +14,7 @@ import { openStop, push, replaceTop } from '../state/nav';
 import { findTrip, saveTrip } from '../state/trips';
 import type { SavedTrip } from '../data/savedTrips';
 import { useNow } from '../state/hooks';
+import { NoteButtons } from '../ui/Notes';
 import { Lifts } from './Lifts';
 
 /**
@@ -149,17 +150,13 @@ function RideCard({ leg, active, onShow }: { leg: Leg; active: boolean; onShow: 
   return (
     <div class={`bn-ride ${active ? 'bn-active' : ''} ${leg.cancelled ? 'bn-cx' : ''}`} style={{ '--c': `var(--m-${leg.mode})` }}>
       <button type="button" class="bn-ride-head" aria-pressed={active} onClick={onShow}>
-        <LineBadge mode={leg.mode} line={leg.line} />
+        <LineBadge mode={leg.mode} line={leg.line} vehicle={leg.vehicle} />
         <span class="bn-ride-dir"><b>{leg.headsign ? `Richtung ${leg.headsign}` : leg.line}</b><small>{[duration(leg.to.time.actual - leg.from.time.actual), leg.agency].filter(Boolean).join(' · ')}</small></span>
         <Icon name="map" size={20} class="bn-dim" />
       </button>
       {leg.cancelled && <p class="bn-warning bn-late">Diese Fahrt fällt aus.</p>}
       {leg.cause && <p class="bn-warning">Grund laut DB: {leg.cause}</p>}
-      {leg.notes && (
-        <ul class="bn-notes" aria-label="Meldungen der DB zu diesem Zug">
-          {leg.notes.map((n) => <li key={n.code}>{n.text}</li>)}
-        </ul>
-      )}
+      {leg.notes && <NoteButtons notes={leg.notes} />}
       {leg.bookingRequired && <p class="bn-warning">Nur mit Anmeldung (Rufbus).</p>}
       <div class="bn-calls">
         <CallRow call={leg.from} mode={leg.mode} strong />

@@ -1,11 +1,11 @@
-import type { ModeGroup } from '../data/types';
+import type { ModeGroup, Vehicle } from '../data/types';
 import { Icon, modeIcon } from './icons';
 
 /** Linien-Badge: Symbol | Linienname. Farbe und Symbol hängen vom Verkehrsmittel ab. */
-export function LineBadge({ mode, line }: { mode: ModeGroup; line: string }) {
+export function LineBadge({ mode, line, vehicle }: { mode: ModeGroup; line: string; vehicle?: Vehicle }) {
   return (
     <span class={`bn-badge bn-m-${mode}`}>
-      <Icon name={modeIcon(mode)} size={16} />
+      <Icon name={modeIcon(mode, vehicle)} size={16} />
       {line && <i />}
       {line}
     </span>

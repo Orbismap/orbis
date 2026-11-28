@@ -114,7 +114,7 @@ describe('DB-Verspätungen', () => {
     });
     const [out] = await createDbDelays({ baseUrl: 'https://w', fetchFn: fetchFn as unknown as typeof fetch }).journeys([plannedJourney(j!)]);
     expect(out!.legs[0]).toMatchObject({ cause: 'Bauarbeiten', notes: [bikes, wlan, load] });
-    expect(cardNotes(out!)).toEqual([load.text, bikes.text]);
+    expect(cardNotes(out!)).toEqual([load, bikes]);
     expect(cardNotes(timetableOf(out!))).toEqual([]);
     expect(timetableOf(out!).legs[0]!.cause).toBeUndefined();
   });
