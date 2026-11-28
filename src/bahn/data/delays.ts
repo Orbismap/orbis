@@ -39,6 +39,13 @@ export function plannedJourney(j: Journey): Journey {
 export const plannedDepartures = (list: Departure[]): Departure[] =>
   list.map((d) => (isRail(d.mode) ? { ...d, time: plannedTime(d.time) } : d));
 
+/** „pünktlich“ nur, wenn es belegt ist: Von jedem Fahrzeug sind Ab- und Ankunft bekannt und keine ab 2 min zu spät. */
+export function provenOnTime(j: Journey): boolean {
+  const rides = j.legs.filter((l) => l.mode !== 'fuss');
+  const ok = (t: Time) => t.delayMin !== null && t.delayMin < 2;
+  return rides.length > 0 && rides.every((l) => !l.cancelled && ok(l.from.time) && ok(l.to.time));
+}
+
 export interface DelayOptions {
   baseUrl?: string;
   fetchFn?: typeof fetch;
