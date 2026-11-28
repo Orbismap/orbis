@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cardNotes, provenOnTime } from '../data/delays';
+import { NoteIcons } from '../ui/Notes';
 import { online } from '@/core/online';
 import { describeError } from '@/data/http';
 import { Icon, modeIcon } from '../ui/icons';
@@ -214,7 +215,7 @@ function JourneyCard({ j, now, onClick, onHover }: { j: Journey; now: number; on
       <span class="bn-legbar">
         {bar.map((l, i) => (
           <span key={i} class={`bn-seg bn-m-${l.mode}`} style={{ flexGrow: Math.max(1, Math.round(minutes(l))) }}>
-            {l.mode === 'fuss' ? <Icon name="fuss" size={14} /> : <><Icon name={modeIcon(l.mode)} size={14} /><span>{l.line}</span></>}
+            {l.mode === 'fuss' ? <Icon name="fuss" size={14} /> : <><Icon name={modeIcon(l.mode, l.vehicle)} size={14} /><span>{l.line}</span></>}
           </span>
         ))}
       </span>
@@ -227,7 +228,7 @@ function JourneyCard({ j, now, onClick, onHover }: { j: Journey; now: number; on
         )}
         <PlatformSign platform={first?.from.platform} changed={first?.from.platformChanged} mode={first?.mode} />
       </span>
-      {notes.length > 0 && <span class="bn-conn-notes">{notes.join(' · ')}</span>}
+      {notes.length > 0 && <NoteIcons notes={notes} />}
       <span class="bn-conn-meta">
         <span>{transfersText(j.transfers)}</span>
         {cancelled ? <span class="bn-tag bn-tag-late">Fällt aus</span> : worst >= 2 ? <span class="bn-tag bn-tag-late">{delayText(j.departure) || delayText(j.arrival)} min</span> : provenOnTime(j) ? <span class="bn-tag bn-tag-ok">pünktlich</span> : null}

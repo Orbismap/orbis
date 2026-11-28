@@ -47,7 +47,7 @@ export function TripScreen({ tripId, line, mode, headsign, at }: Props) {
   return (
     <Screen
       label={`Linie ${line}`}
-      head={<Header title={<LineBadge mode={mode} line={line} />} subtitle={headsign ? `Richtung ${headsign}` : leg?.agency} />}
+      head={<Header title={<LineBadge mode={mode} line={line} vehicle={leg?.vehicle} />} subtitle={headsign ? `Richtung ${headsign}` : leg?.agency} />}
     >
       {trip.loading && !leg && <Skeleton rows={7} />}
       {trip.error && <ErrorState message={trip.error} onRetry={trip.reload} />}

@@ -12,7 +12,7 @@ export function DepartureRow({ d, now, at }: { d: Departure; now: number; at: St
   const open = d.tripId ? () => push({ kind: 'trip', tripId: d.tripId!, line: d.line, mode: d.mode, headsign: d.headsign, at: at.id }) : undefined;
   return (
     <button type="button" class={`bn-dep ${d.cancelled ? 'bn-cx' : ''}`} onClick={open} disabled={!open}>
-      <LineBadge mode={d.mode} line={d.line} />
+      <LineBadge mode={d.mode} line={d.line} vehicle={d.vehicle} />
       <span class="bn-dep-main">
         <b>{d.headsign}</b>
         <small>
