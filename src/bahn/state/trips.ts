@@ -2,7 +2,7 @@
 import { signal } from '@preact/signals';
 import { getJSON, setJSON } from '@/core/storage';
 import { plannedJourney } from '../data';
-import { currentRun, ends, hasRealTime, makeSavedTrip, matches, sameRides, timetableOf, type SavedTrip } from '../data/savedTrips';
+import { commuteOff, currentRun, ends, hasRealTime, makeSavedTrip, matches, sameRides, timetableOf, type SavedTrip } from '../data/savedTrips';
 import type { Journey } from '../data/types';
 import { sources } from './sources';
 
@@ -27,12 +27,34 @@ function write(next: SavedTrip[]): boolean {
 
 export const findTrip = (j: Journey): SavedTrip | undefined => trips.value.find((t) => matches(t, j));
 
-export type SaveResult = SavedTrip | 'full' | 'storage';
+/** Removes the single trips that are over. Commuter trips stay. */
+export function pruneTrips(now = Date.now()): void {
+  const next = trips.peek().filter((t) => !currentRun(t, now).past);
+  if (next.length < trips.peek().length) write(next);
+}
+
+/** Tidies up at the start, once a minute, and when the app comes back to the front. */
+export function startTripCleanup(): () => void {
+  const run = () => pruneTrips();
+  run();
+  const timer = setInterval(run, 60_000);
+  document.addEventListener('visibilitychange', run);
+  return () => {
+    clearInterval(timer);
+    document.removeEventListener('visibilitychange', run);
+  };
+}
+
+export const endCommute = (t: SavedTrip) => updateTrip(t.id, commuteOff(t));
+
+export type SaveResult = SavedTrip | 'full' | 'storage' | 'past';
 export function saveTrip(j: Journey): SaveResult {
   const known = findTrip(j);
   if (known) return known;
-  if (trips.peek().length >= MAX_TRIPS) return 'full';
   const trip = makeSavedTrip(j);
+  if (currentRun(trip).past) return 'past';
+  pruneTrips();
+  if (trips.peek().length >= MAX_TRIPS) return 'full';
   return write([trip, ...trips.peek()]) ? trip : 'storage';
 }
 

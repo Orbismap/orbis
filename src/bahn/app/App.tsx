@@ -18,6 +18,7 @@ import { StopScreen } from '../screens/StopScreen';
 import { TripScreen } from '../screens/TripScreen';
 import { goTab, push, stack, tab, type Entry, type TabId } from '../state/nav';
 import { startPushSync } from '../state/push';
+import { startTripCleanup } from '../state/trips';
 import { openFromNotification } from '../state/notification';
 import { initLocation, locationState } from '../state/location';
 import { Menu } from './Menu';
@@ -43,6 +44,7 @@ function page(p: Entry) {
 
 export function App() {
   useEffect(() => { void initLocation(); }, []);
+  useEffect(() => startTripCleanup(), []);
   useEffect(() => startPushSync(), []);
   useEffect(() => openFromNotification((id) => { goTab('merkliste'); push({ kind: 'saved', id }); }), []);
   const pages = stack.value;

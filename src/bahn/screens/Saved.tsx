@@ -28,7 +28,7 @@ function TripRow({ trip, now }: { trip: SavedTrip; now: number }) {
         list.map((l) => l.line).join(', '),
         trip.notify ? 'Nachricht an' : '',
       ].filter(Boolean).join(' · ')}
-      after={cancelled ? <span class="bn-tag bn-tag-late">Fällt aus</span> : late ? <span class="bn-tag bn-tag-late">verspätet</span> : run.past ? <span class="bn-tag">vorbei</span> : null}
+      after={cancelled ? <span class="bn-tag bn-tag-late">Fällt aus</span> : late ? <span class="bn-tag bn-tag-late">verspätet</span> : run.arrived ? <span class="bn-tag">vorbei</span> : null}
       onClick={() => push({ kind: 'saved', id: trip.id })}
     />
   );

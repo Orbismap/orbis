@@ -28,6 +28,7 @@ export function JourneyDetail({ journey: j, saved, children }: { journey: Journe
   const keep = () => {
     const result = known ?? saveTrip(j);
     if (result === 'full') setSaveError('Du hast schon 30 Verbindungen gespeichert. Entferne zuerst eine in der Merkliste.');
+    else if (result === 'past') setSaveError('Diese Fahrt ist seit über einer Stunde vorbei und wird nicht mehr gespeichert.');
     else if (result === 'storage') setSaveError('Speichern fehlgeschlagen: Der Speicher des Geräts ist voll oder gesperrt.');
     else replaceTop({ kind: 'saved', id: result.id });
   };

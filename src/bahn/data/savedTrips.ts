@@ -25,8 +25,10 @@ export interface SavedTrip {
 export const LEADS = [30, 20, 10, 5];
 /** the push worker keeps this many trips per device (Orbismap/data, workers/push: MAX_TRIPS) */
 export const MAX_WATCHED = 10;
-/** a run stays "the current one" this long after its planned arrival (a late train is still on the way) */
+/** a run of a commuter trip stays "the current one" this long after its planned arrival (a late train is still on the way) */
 export const OVER_AFTER_MS = 90 * 60_000;
+/** a single trip is removed this long after its arrival */
+export const KEEP_AFTER_MS = 60 * 60_000;
 /** the track geometry is thinned to this many points per leg, so that saved trips stay small */
 const PATH_POINTS = 300;
 
@@ -91,7 +93,9 @@ export interface Run {
   journey: Journey;
   /** when the kept real time arrived */
   liveAt?: number;
-  /** a single trip that is over */
+  /** a single trip that has arrived */
+  arrived: boolean;
+  /** a single trip that is over for good: it is removed */
   past: boolean;
 }
 
@@ -112,9 +116,21 @@ export function currentRun(t: SavedTrip, now = Date.now()): Run {
       break;
     }
   }
-  const past = !days.length && journey.arrival.planned + OVER_AFTER_MS < now;
   const live = t.live && t.live.run === journey.departure.planned ? t.live : undefined;
-  return { journey: live?.journey ?? journey, liveAt: live?.at, past };
+  // a known delay counts: a late train arrives later
+  const arrival = Math.max(journey.arrival.planned, live?.journey.arrival.actual ?? 0);
+  const arrived = !days.length && arrival < now;
+  const past = !days.length && arrival + KEEP_AFTER_MS < now;
+  return { journey: live?.journey ?? journey, liveAt: live?.at, arrived, past };
+}
+
+/**
+ * The change that turns a commuter trip back into a single one. When the day it was saved for is over, it becomes the run
+ * that is shown now; else it would be removed at once.
+ */
+export function commuteOff(t: SavedTrip, now = Date.now()): Partial<SavedTrip> {
+  if (!currentRun({ ...t, commute: undefined }, now).past) return { commute: undefined };
+  return { commute: undefined, journey: timetableOf(currentRun(t, now).journey) };
 }
 
 /** Whether `j` is this saved trip: the very connection, or a run of the commuter trip. */

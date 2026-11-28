@@ -8,7 +8,7 @@ import { Screen } from '../ui/Sheet';
 import { LEADS, MAX_WATCHED, WEEKDAYS, currentRun, defaultDays, type SavedTrip } from '../data/savedTrips';
 import { pop } from '../state/nav';
 import { enablePush, pushState, syncState, testPush } from '../state/push';
-import { refreshTrip, removeTrip, trips, updateTrip } from '../state/trips';
+import { endCommute, refreshTrip, removeTrip, trips, updateTrip } from '../state/trips';
 import { useNow } from '../state/hooks';
 import { JourneyDetail } from './JourneyDetail';
 
@@ -36,13 +36,13 @@ export function SavedTripScreen({ id }: { id: string }) {
   if (!trip) {
     return (
       <Screen label="Gespeicherte Verbindung" head={<Header title="Nicht mehr gespeichert" />}>
-        <p class="bn-note">Diese Verbindung wurde entfernt.</p>
+        <p class="bn-note">Diese Verbindung wurde entfernt. Einzelne Fahrten werden 1 Stunde nach der Ankunft automatisch gelöscht.</p>
       </Screen>
     );
   }
   const run = currentRun(trip, now);
-  const state = run.past
-    ? 'Diese Fahrt ist vorbei.'
+  const state = run.arrived
+    ? 'Diese Fahrt ist vorbei. Sie wird 1 Stunde nach der Ankunft entfernt.'
     : run.liveAt
       ? `Echtzeit ${formatAge(run.liveAt, now)}${!net || failed ? ' · gerade nicht aktualisierbar' : ''}`
       : !net
@@ -52,7 +52,7 @@ export function SavedTripScreen({ id }: { id: string }) {
   return (
     <JourneyDetail journey={run.journey} saved={trip}>
       <p class="bn-saved" role="status">Auf diesem Gerät gespeichert · {state}</p>
-      <TripSettings trip={trip} past={run.past} />
+      <TripSettings trip={trip} past={run.arrived} />
     </JourneyDetail>
   );
 }
@@ -92,7 +92,7 @@ function TripSettings({ trip, past }: { trip: SavedTrip; past: boolean }) {
     <div class="bn-card bn-tripset">
       <label class="bn-switch">
         <span><b>Pendlerstrecke</b><small>Gleiche Fahrt an festen Wochentagen</small></span>
-        <input type="checkbox" role="switch" checked={!!days} onChange={(e) => change({ commute: e.currentTarget.checked ? { days: defaultDays(trip.journey) } : undefined })} />
+        <input type="checkbox" role="switch" checked={!!days} onChange={(e) => { if (e.currentTarget.checked) change({ commute: { days: defaultDays(trip.journey) } }); else endCommute(trip); }} />
       </label>
       {days && (
         <div class="bn-days" role="group" aria-label="Wochentage">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentRun, defaultDays, makeSavedTrip, matches, timetableOf, watched, type SavedTrip } from './savedTrips';
+import { commuteOff, currentRun, defaultDays, makeSavedTrip, matches, timetableOf, watched, type SavedTrip } from './savedTrips';
 import type { Journey, Leg, Time } from './types';
 
 /** local time, so the tests hold in every time zone */
@@ -20,10 +20,25 @@ describe('saved connections', () => {
     expect(t.journey.legs[0]!.path).toHaveLength(300);
     expect(currentRun(t, at(30, 6)).journey.departure.delayMin).toBe(4);
   });
-  it('is over some time after the arrival', () => {
-    const t = makeSavedTrip(journey());
-    expect(currentRun(t, at(30, 8, 30)).past).toBe(false);
-    expect(currentRun(t, at(30, 10)).past).toBe(true);
+  it('is over one hour after the arrival, counted from the late arrival', () => {
+    const planned: SavedTrip = { ...makeSavedTrip(journey()), live: undefined };
+    expect(currentRun(planned, at(30, 7, 40))).toMatchObject({ arrived: true, past: false });
+    expect(currentRun(planned, at(30, 8, 31)).past).toBe(false);
+    expect(currentRun(planned, at(30, 8, 33)).past).toBe(true);
+    const late = makeSavedTrip(journey()); // 4 min late: arrives 07:36
+    expect(currentRun(late, at(30, 8, 35)).past).toBe(false);
+    expect(currentRun(late, at(30, 8, 37)).past).toBe(true);
+    expect(currentRun({ ...late, commute: { days: [1] } }, at(30, 23)).past).toBe(false);
+  });
+  it('does not lose an old commuter trip when it becomes a single one', () => {
+    const t: SavedTrip = { ...makeSavedTrip(journey()), commute: { days: [1] } };
+    const now = new Date(2026, 11, 9, 12).getTime(); // a week and more later
+    const single = { ...t, ...commuteOff(t, now) };
+    expect(single.commute).toBeUndefined();
+    expect(single.journey.departure.planned).toBe(new Date(2026, 11, 14, 7, 12).getTime());
+    expect(currentRun(single, now).past).toBe(false);
+    // a day that is still ahead stays as it is
+    expect(commuteOff(t, at(23, 12))).toEqual({ commute: undefined });
   });
   it('moves a commuter trip to the next chosen weekday, at the same time and without the old real time', () => {
     const t: SavedTrip = { ...makeSavedTrip(journey()), commute: { days: [1, 3] } };
