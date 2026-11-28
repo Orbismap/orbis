@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { provenOnTime } from '../data/delays';
 import { online } from '@/core/online';
 import { describeError } from '@/data/http';
 import { Icon, modeIcon } from '../ui/icons';
@@ -227,7 +228,7 @@ function JourneyCard({ j, now, onClick, onHover }: { j: Journey; now: number; on
       </span>
       <span class="bn-conn-meta">
         <span>{transfersText(j.transfers)}</span>
-        {cancelled ? <span class="bn-tag bn-tag-late">Fällt aus</span> : worst >= 2 ? <span class="bn-tag bn-tag-late">{delayText(j.departure) || delayText(j.arrival)} min</span> : j.delaySource === 'db' ? <span class="bn-tag bn-tag-ok">pünktlich</span> : null}
+        {cancelled ? <span class="bn-tag bn-tag-late">Fällt aus</span> : worst >= 2 ? <span class="bn-tag bn-tag-late">{delayText(j.departure) || delayText(j.arrival)} min</span> : provenOnTime(j) ? <span class="bn-tag bn-tag-ok">pünktlich</span> : null}
       </span>
     </button>
   );

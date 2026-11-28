@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createDbDelays, plannedJourney } from './delays';
+import { createDbDelays, provenOnTime, plannedJourney } from './delays';
 import { modeGroup, motisModes } from './modes';
 import { makeTime, named, parseDepartures, parseJourneys, parseStops, parseTrip } from './transitous';
 
@@ -99,6 +99,15 @@ describe('DB-Verspätungen', () => {
     expect(ride.from.time).toMatchObject({ delayMin: 4, delaySource: 'db', actual: Date.parse(T(5)) + 4 * 60000 });
     expect(ride.from.platform).toBe('13');
     expect(ride.to.time.delayMin).toBeNull(); // Ankunft nicht gefunden: bleibt Fahrplan
+  });
+
+  it('nennt eine Verbindung nur pünktlich, wenn jede Zeit jedes Fahrzeugs bekannt ist', () => {
+    const [j] = parseJourneys([itinerary]);
+    const known = (delay: number | null) => ({ ...j!, legs: j!.legs.map((l) => ({ ...l, cancelled: false, from: { ...l.from, time: { ...l.from.time, delayMin: 0 } }, to: { ...l.to, time: { ...l.to.time, delayMin: delay } } })) });
+    expect(provenOnTime(known(1))).toBe(true);
+    expect(provenOnTime(known(null))).toBe(false);
+    expect(provenOnTime(known(5))).toBe(false);
+    expect(provenOnTime(plannedJourney(j!))).toBe(false);
   });
 
   it('pausiert nach einem Fehler und liefert die Eingabe zurück', async () => {
